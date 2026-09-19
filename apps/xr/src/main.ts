@@ -155,7 +155,8 @@ async function start() {
     onChange: onAgentChange,
   });
   const interaction = new Interaction(renderer, scene, camera, controls, physics, palette, spawn, onAction, layoutChanged, onGrab);
-  const showPalette = () => palette.setItems([...catalog, ...PALETTE_ACTIONS, ...designerTiles(agent.snapshot)]);
+  // Designer tiles first (closest to the hand), then the catalogue, then Reset / Clear.
+  const showPalette = () => palette.setItems([...designerTiles(agent.snapshot), ...catalog, ...PALETTE_ACTIONS]);
   showPalette();
   renderAgentPanel(agent.snapshot);
 
@@ -216,10 +217,10 @@ async function start() {
         return [label('The room changed.', 'warn'), tile('Ask again', 'ask_again'), tile('Dismiss', 'try_again')];
       default:
         return [
-          label(`Designer${s.solver === 'offline' ? ' (solver offline)' : ''}`),
+          ...(s.solver === 'offline' ? [label('Solver offline', 'warn')] : []),
           tile('Turn 90° left', 'turn:left'),
           tile('Turn 90° right', 'turn:right'),
-          tile('Rearrange', 'preset:tidy_room', true),
+          ...(objects.size ? [tile('Rearrange', 'preset:tidy_room', true)] : []), // nothing to rearrange until something is down
           ...(undoAvailable ? [tile('Undo', 'undo')] : []),
         ];
     }
@@ -427,6 +428,7 @@ async function start() {
     objects.clear();
     fitOverlay.clear();
     say('All objects removed.');
+    showPalette();
   }
 
   // ---------- room ----------
@@ -511,6 +513,7 @@ async function start() {
     for (const obj of objects.values()) obj.replaces = undefined;
     for (const obj of objects.values()) place(obj);
     console.table([...objects.values()].map(describe));
+    showPalette();
   }
 
   async function addObject(url: string, name: string, scale?: number) {
@@ -518,7 +521,11 @@ async function start() {
       const loaded = await loader.load(url, scale);
       const obj: PlacedObject = { id: crypto.randomUUID(), objectId: localId(name), name, loaded };
       objects.set(obj.id, obj);
-      if (currentRoom && rise >= 1) place(obj); // otherwise placed when the room is ready
+      lastTouchedId = obj.id;
+      if (currentRoom && rise >= 1) {
+        place(obj); // otherwise placed when the room is ready
+        showPalette();
+      }
     } catch (err) {
       console.error(`Loading ${name} failed:`, err);
       say(`Couldn’t load ${name}: ${(err as Error).message}`);
@@ -538,6 +545,7 @@ async function start() {
       // Straight onto the floor under the ray, no drop: it's being carried, not delivered.
       physics.addObject(obj.id, loaded.node, loaded.size, loaded.hull, spot, 0, 0);
       report(obj);
+      showPalette(); // Rearrange appears with the first object
       return obj.id;
     } catch (err) {
       console.error(`Loading ${item.name} failed:`, err);
