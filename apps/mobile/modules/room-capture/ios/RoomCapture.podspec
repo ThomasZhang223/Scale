@@ -5,7 +5,7 @@ Pod::Spec.new do |s|
   s.description    = 'Wraps RoomCaptureSession (never RoomCaptureView) with a gravityAndHeading-aligned ARSession. See apps/mobile/modules/room-capture/README.md.'
   s.author         = 'Full Scale'
   s.homepage       = 'https://github.com/fullscale/htn-2026'
-  s.platforms      = { :ios => '16.4' }
+  s.platforms      = { :ios => '17.0' }
   s.source         = { git: '' }
   s.static_framework = true
 

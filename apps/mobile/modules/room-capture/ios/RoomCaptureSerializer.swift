@@ -42,6 +42,7 @@ enum RoomCaptureSerializer {
       return [
         "id": surface.identifier.uuidString,
         "kind": kind,
+        // parentIdentifier is iOS 17+, the app's deployment target.
         "wallId": surface.parentIdentifier?.uuidString ?? "",
         "transform": flatten(surface.transform),
         // contracts.md's fixture hardcodes 0 for the third dimension on every
@@ -118,13 +119,14 @@ enum RoomCaptureSerializer {
     ]
   }
 
-  // ceiling: prefers CapturedRoom.floors (iOS 17+) — a real per-story
-  // polygon from RoomPlan itself. Falls back to the convex hull of every
-  // wall's own base midpoint when no floor surface was detected. That is a
-  // real geometric derivation from the same scan, not a guessed value, for
-  // the rare room where floor detection fails; contracts.md has no
-  // "unmeasured" state for `floor`, so this is the honest fallback rather
-  // than blocking the whole capture on one missing surface.
+  // ceiling: prefers CapturedRoom.floors (iOS 17+, the app's deployment
+  // target) — a real per-story polygon from RoomPlan itself. Falls back to
+  // the convex hull of every wall's own base midpoint when no floor surface
+  // was detected. That is a real geometric derivation from the same scan,
+  // not a guessed value, for the rare room where floor detection genuinely
+  // fails at runtime; contracts.md has no "unmeasured" state for `floor`, so
+  // this is the honest fallback rather than blocking the whole capture on
+  // one missing surface.
   private static func floorPolygon(_ room: CapturedRoom) -> [SIMD2<Float>] {
     if !room.floors.isEmpty {
       return room.floors.flatMap { floor in

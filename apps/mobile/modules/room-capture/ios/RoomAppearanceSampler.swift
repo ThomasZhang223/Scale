@@ -1,5 +1,6 @@
 import ARKit
 import CoreGraphics
+import RoomPlan
 import simd
 
 // Appearance step 1 only (contracts.md's optional `appearance` field):

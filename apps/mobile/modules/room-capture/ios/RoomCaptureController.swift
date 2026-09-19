@@ -90,11 +90,14 @@ final class RoomCaptureController: NSObject {
 
     // Run our own configuration on `arSession` BEFORE RoomCaptureSession ever
     // touches it, with worldAlignment = .gravityAndHeading. "Inject your own
-    // ARSession" is a documented RoomPlan capability specifically so settings
-    // like this carry over into the session RoomCaptureSession then re-runs
-    // internally — see plan section 2. We do not attempt to also keep scene
-    // depth alive through that re-run; the object scan owns depth on its own
-    // separate session instead (plan: "neither wants both at once").
+    // ARSession" is a documented RoomPlan capability (iOS 17+ — the app's
+    // deployment target is pinned there specifically because this module
+    // has no honest way to set gravityAndHeading on anything older) that
+    // exists specifically so settings like this carry over into the session
+    // RoomCaptureSession then re-runs internally — see plan section 2. We do
+    // not attempt to also keep scene depth alive through that re-run; the
+    // object scan owns depth on its own separate session instead (plan:
+    // "neither wants both at once").
     let arConfig = ARWorldTrackingConfiguration()
     arConfig.worldAlignment = .gravityAndHeading
     arConfig.planeDetection = [.horizontal, .vertical]

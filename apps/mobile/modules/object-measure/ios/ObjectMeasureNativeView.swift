@@ -6,17 +6,10 @@ import simd
 // section 5, "the visible claim that the size is real"), and the point-cloud
 // ghost while the mesh generates (plan section 1). Shares
 // ObjectMeasureController's ARSession; does not run its own.
-//
-// Lower confidence than the rest of this module: the point-cloud entity
-// leans on RealityKit's MeshDescriptor point-primitive API, which is real
-// but was not re-verified against live Apple docs this session the way the
-// RoomPlan APIs were (see modules/room-capture's README). If it throws,
-// `showGhost` fails silently rather than crashing — a missing decorative
-// effect carries no decision weight; a wrong bboxMeters would.
 class ObjectMeasureNativeView: ExpoView {
   private let arView = ARView(frame: .zero)
   private var boxEntity: ModelEntity?
-  private var ghostEntity: ModelEntity?
+  private var ghostGroup: Entity?
   private let anchor = AnchorEntity(world: .zero)
 
   required init(appContext: AppContext? = nil) {
@@ -32,6 +25,17 @@ class ObjectMeasureNativeView: ExpoView {
     arView.frame = bounds
   }
 
+  // ceiling: UnlitMaterial.triangleFillMode (the line-drawing needed for an
+  // actual wireframe) is iOS 18+ — found by an actual compile, not by
+  // inspection. Below 18 we draw nothing at all rather than a solid box:
+  // a near-opaque fill at this alpha would hide the very object being
+  // measured, which is worse than showing no box. The measured numbers
+  // still return and display regardless — only this outline is missing.
+  // Not worth raising the deployment target for (unlike RoomCaptureSession
+  // in modules/room-capture, which had no working fallback at all): a LiDAR
+  // device can plausibly sit on 17.x, and every LiDAR iPhone (12 Pro
+  // onward) is expected to comfortably run 18 regardless, so this path may
+  // never execute on the real demo device.
   func showWireframeBox(
     center: SIMD3<Float>,
     widthMeters: Float,
@@ -40,11 +44,12 @@ class ObjectMeasureNativeView: ExpoView {
     yawDeg: Float
   ) {
     boxEntity?.removeFromParent()
-    let mesh = MeshResource.generateBox(
-      width: widthMeters,
-      height: heightMeters,
-      depth: depthMeters
-    )
+    guard #available(iOS 18.0, *) else {
+      boxEntity = nil
+      return
+    }
+
+    let mesh = MeshResource.generateBox(width: widthMeters, height: heightMeters, depth: depthMeters)
     var material = UnlitMaterial(color: .white.withAlphaComponent(0.9))
     material.triangleFillMode = .lines
     let entity = ModelEntity(mesh: mesh, materials: [material])
@@ -54,41 +59,55 @@ class ObjectMeasureNativeView: ExpoView {
     boxEntity = entity
   }
 
+  // ceiling: RealityKit's MeshDescriptor has no point-primitive case at all
+  // (confirmed against Apple's docs — only .triangles, .trianglesAndQuads,
+  // .polygons exist), so this cannot be one mesh the way the wireframe box
+  // is. Each surviving sample becomes its own tiny solid sphere instead
+  // (no triangleFillMode needed — a solid dot is the correct look for a
+  // point, not a wireframe outline, so this needs no iOS-18 guard either),
+  // capped at 200 with even subsampling above that. A real per-entity cost,
+  // acceptable because it only lives for the few seconds the mesh is
+  // generating. Upgrade path if this ever needs to scale further: a custom
+  // LowLevelMesh with an explicit point primitive type.
   func showGhost(points: [SIMD3<Float>]) {
-    ghostEntity?.removeFromParent()
+    ghostGroup?.removeFromParent()
     guard !points.isEmpty else { return }
 
-    var descriptor = MeshDescriptor(name: "objectGhost")
-    descriptor.positions = MeshBuffer(points)
-    descriptor.primitives = .points(Array(0..<UInt32(points.count)))
-
-    do {
-      let mesh = try MeshResource.generate(from: [descriptor])
-      var material = UnlitMaterial(color: .cyan.withAlphaComponent(0.6))
-      material.triangleFillMode = .lines
-      let entity = ModelEntity(mesh: mesh, materials: [material])
-      anchor.addChild(entity)
-      ghostEntity = entity
-    } catch {
-      // ceiling: decorative only — see the class-level note above.
-      ghostEntity = nil
+    let cap = 200
+    let sampled: [SIMD3<Float>]
+    if points.count > cap {
+      let stride = Double(points.count) / Double(cap)
+      sampled = (0..<cap).map { points[Int(Double($0) * stride)] }
+    } else {
+      sampled = points
     }
+
+    let group = Entity()
+    let mesh = MeshResource.generateSphere(radius: 0.004) // 4 mm — reads as a point, not a blob
+    let material = UnlitMaterial(color: .cyan.withAlphaComponent(0.6))
+    for point in sampled {
+      let sphere = ModelEntity(mesh: mesh, materials: [material])
+      sphere.position = point
+      group.addChild(sphere)
+    }
+    anchor.addChild(group)
+    ghostGroup = group
   }
 
   // Crossfades the ghost out when the real GLB lands (plan section 1);
   // the wireframe box stays, since it is the measurement claim, not a
   // stand-in for the mesh.
   func hideGhost(animated: Bool) {
-    guard let ghostEntity else { return }
+    guard let ghostGroup else { return }
     if animated {
-      ghostEntity.move(
-        to: Transform(scale: .zero, rotation: ghostEntity.orientation, translation: ghostEntity.position),
-        relativeTo: ghostEntity.parent,
+      ghostGroup.move(
+        to: Transform(scale: .zero, rotation: ghostGroup.orientation, translation: ghostGroup.position),
+        relativeTo: ghostGroup.parent,
         duration: 0.4
       )
     } else {
-      ghostEntity.removeFromParent()
+      ghostGroup.removeFromParent()
     }
-    self.ghostEntity = nil
+    self.ghostGroup = nil
   }
 }

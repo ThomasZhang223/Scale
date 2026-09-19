@@ -11,6 +11,20 @@ On iOS 26, in a build made with Xcode 26, `RoomCaptureView` fails to start: a Re
 response. `RoomCaptureNativeView.swift` draws its own camera feed (RealityKit `ARView`, sharing
 the session, not owning one) and its own instruction overlay instead.
 
+## The app's deployment target is iOS 17.0, not 16.4
+
+Found by an actual compile against the iOS 27.0 SDK, not by inspection: `RoomCaptureSession(arSession:)`
+— the entire reason this module can set `worldAlignment = .gravityAndHeading` — does not exist
+before iOS 17, and there is no honest degraded mode for it. `CapturedRoom.floors`,
+`Surface.polygonCorners` and `Surface.parentIdentifier` are iOS 17+ too. The deployment target was
+raised to 17.0 rather than guarding each call site, because no device that can run this app was
+ever going to be on 16: LiDAR starts at iPhone 12 Pro, which by now runs well past iOS 17. A
+fallback path that can never execute on any real device is worse than no path — it is untested
+code with a false sense of coverage. `RoomCaptureSerializer.swift` still has one genuine, reachable
+fallback (the wall-hull floor approximation, used when `CapturedRoom.floors` comes back empty at
+runtime, which is a real possibility on any iOS version) — that one earns its keep independent of
+the OS-version question.
+
 ## Why we inject our own `ARSession`
 
 `RoomCaptureController` runs an `ARWorldTrackingConfiguration` with

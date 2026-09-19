@@ -5,7 +5,7 @@ Pod::Spec.new do |s|
   s.description    = 'Measures a single object alone on a table via ARKit sceneDepth, plus the sweep frame capture for the generator. See apps/mobile/modules/object-measure/README.md.'
   s.author         = 'Full Scale'
   s.homepage       = 'https://github.com/fullscale/htn-2026'
-  s.platforms      = { :ios => '16.4' }
+  s.platforms      = { :ios => '17.0' }
   s.source         = { git: '' }
   s.static_framework = true
 

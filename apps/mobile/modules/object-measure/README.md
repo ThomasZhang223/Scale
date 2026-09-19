@@ -38,11 +38,22 @@ much easier bug to ship by accident.
 - The RGB sweep collects 16 candidate frames and keeps the sharpest 8, cropped to the measured
   box's projected hull. Section 1 also says "the phone sends a sweep either way" without pinning
   an exact count; 8 matches the "six to eight frames" range named there.
-- The point-cloud ghost (`ObjectMeasureNativeView.showGhost`) leans on RealityKit's
-  `MeshDescriptor` point-primitive API. It is real, but unlike the RoomPlan APIs in
-  `modules/room-capture`, it was not re-verified against live Apple docs this session. It fails
-  silently rather than crashing if mesh generation throws — a missing decorative effect carries no
-  decision weight; a wrong `bboxMeters` would.
+- The point-cloud ghost (`ObjectMeasureNativeView.showGhost`) was originally written against a
+  `MeshDescriptor` point-primitive API that turned out not to exist — caught by an actual compile,
+  not by inspection. `MeshDescriptor.Primitives` only has `.triangles`, `.trianglesAndQuads` and
+  `.polygons`. Each surviving sample is now its own small solid sphere entity instead (4 mm radius,
+  no wireframe styling needed — a solid dot is the correct look for a point), capped at 200 with
+  even subsampling above that. A real per-entity cost, acceptable because it only lives for the few
+  seconds the mesh is generating; a `LowLevelMesh` with an explicit point primitive is the upgrade
+  path if it ever needs to scale further.
+- `UnlitMaterial.triangleFillMode` (the wireframe outline on the measured box) is iOS 18+, also
+  caught by compiling rather than by inspection. First fallback attempt was wrong and worth naming:
+  skipping `triangleFillMode` alone leaves the box's default fill mode, rendering a near-opaque
+  white box that hides the very object being measured — worse than no box at all. Below iOS 18,
+  `showWireframeBox` now draws nothing; the measured numbers still return and display regardless.
+  Every LiDAR-capable iPhone (12 Pro onward) is expected to comfortably run 18+, so this path may
+  never execute on a real demo device — a 12-thin-edge-box wireframe (no version guard needed at
+  all) is the fallback to build if it ever does.
 - Yaw is medianed as a plain number across frames, not circularly. An object sitting right at the
   0/90-degree boundary can have frames disagree on which edge is "width" — untested on a real
   device.
