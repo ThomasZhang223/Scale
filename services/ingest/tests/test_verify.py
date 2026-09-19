@@ -168,6 +168,28 @@ def test_unknown_error_still_reports_its_type():
     assert status == "error" and "HTTPError" in note
 
 
+def test_coverage_buckets_products_by_category():
+    r = run("good")
+    # The fixture's products have no product_type, so they land in "uncategorised" and count
+    # toward no demo bucket — which is exactly the gap the report is meant to surface.
+    assert r.usable_products == 30
+    assert sum(vm.coverage([r]).values()) == 0
+
+
+def test_coverage_counts_a_real_product_type():
+    import copy
+    srv, base = serve("good")
+    try:
+        with httpx.Client(headers={"User-Agent": vm.USER_AGENT}, timeout=5) as c:
+            rep = vm.check(c, "good", base, 250)
+        for p in rep._products:
+            p["product_type"] = "Desks"
+        rep.categories = {"desks": 30}
+        assert vm.coverage([rep])["surface"] == 30
+    finally:
+        srv.shutdown()
+
+
 def test_output_keys_are_camel_case_like_the_example_file():
     """merchants.verified.json must match merchants.example.json's shape — the crawler reads it."""
     import json as _json
@@ -196,8 +218,8 @@ def test_cli_probe_mode_succeeds_on_one_store():
         srv.shutdown()
 
 
-def test_cli_file_mode_gates_on_merchant_count():
-    """A candidates file IS the gate, so one usable merchant must fail it."""
+def test_cli_file_mode_gates_on_product_count():
+    """A candidates file IS the gate. Products are the requirement, not merchants."""
     import subprocess, json as _json, tempfile, os
     srv, base = serve("good")
     fd, path = tempfile.mkstemp(suffix=".json")
@@ -210,7 +232,7 @@ def test_cli_file_mode_gates_on_merchant_count():
             capture_output=True, text=True,
         )
         assert r.returncode == 1
-        assert "GATE FAILED" in r.stderr
+        assert "usable products" in r.stderr, r.stderr
     finally:
         srv.shutdown()
         os.unlink(path)

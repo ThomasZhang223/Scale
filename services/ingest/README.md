@@ -77,8 +77,27 @@ robots                            robots_disallow      0        -        -
 reachable: 3/6   usable (>=25% fully dimensioned): 1
 ```
 
-`usable` means all three axes parsed, so the product yields a real `bboxMeters`. It exits
-non-zero below 15 usable merchants, so it works as a gate in a script.
+`usable` means all three axes parsed, so the product yields a real `bboxMeters`.
+
+**The gate counts products, not merchants.** `BUILD_DOC.md` asks for 60–100 pre-baked products
+with real dimensions; merchant count was never the requirement. Two catalogues at 250 products
+and 98% coverage satisfy it outright, and fifteen dimensionless ones cannot. It exits non-zero
+below 100 usable products (`--require N` to change), or if any of the four demo categories —
+seating, surface, storage, lighting — has none, because a small room needs one of each.
+
+### When a hit rate looks too low to be true
+
+A reachable catalogue at 0% is either a store that genuinely publishes no dimensions, or a
+format the regex pass has not met yet. `/products.json` **does not include metafields**, which
+is where a well-run store often keeps them, so a 0% store may still have the data on its
+product pages.
+
+```
+python3 verify_merchants.py candidates.json --dump samples/
+```
+
+writes 8 raw products per reachable merchant to `samples/<merchant>.json` — enough to read the
+real markup and decide whether to extend the patterns or drop the store.
 
 ### Statuses
 

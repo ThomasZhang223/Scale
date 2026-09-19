@@ -46,6 +46,31 @@ TIMEOUT_S = 20.0
 MIN_PRODUCTS = 20
 MIN_DIMENSION_RATE = 0.25
 
+# What the pre-bake actually needs: BUILD_DOC.md asks for 60-100 products with real
+# dimensions. Merchant COUNT was never the requirement — two good catalogues can satisfy it
+# outright, and fifteen dimensionless ones cannot.
+TARGET_USABLE_PRODUCTS = 100
+
+# A small room needs one of each of these, so coverage matters as much as volume.
+DEMO_CATEGORIES = {
+    "seating": ("chair", "sofa", "couch", "stool", "bench", "seating", "armchair", "ottoman"),
+    "surface": ("desk", "table", "console", "nightstand"),
+    "storage": ("shelf", "shelving", "bookcase", "cabinet", "storage", "dresser", "credenza"),
+    "lighting": ("lamp", "light", "sconce", "pendant"),
+}
+
+
+def coverage(reports: list["MerchantReport"]) -> dict[str, int]:
+    """Usable products per demo category, across every verified merchant."""
+    out = {k: 0 for k in DEMO_CATEGORIES}
+    for r in reports:
+        for ptype, n in (r.categories or {}).items():
+            for bucket, words in DEMO_CATEGORIES.items():
+                if any(w in ptype for w in words):
+                    out[bucket] += n
+                    break
+    return out
+
 
 def classify_error(e: BaseException) -> tuple[str, str]:
     """Turn a transport exception into (status, a sentence worth reading).
@@ -87,9 +112,12 @@ class MerchantReport:
     paginates: bool | None = None
     dimension_hit_rate: float | None = None
     fully_dimensioned_rate: float | None = None   # all three axes, usable as bboxMeters
+    usable_products: int = 0                      # the number that actually feeds the pre-bake
+    categories: dict | None = None                # product_type -> usable count
     sample_size: int = 0
     example: dict | None = None
     note: str | None = None
+    _products: list = field(default_factory=list, repr=False, compare=False)
 
     def to_dict(self) -> dict:
         """camelCase, to match merchants.example.json — that shape is what the crawler reads."""
@@ -101,10 +129,13 @@ class MerchantReport:
             "product_count": "productCount",
             "dimension_hit_rate": "dimensionHitRate",
             "fully_dimensioned_rate": "fullyDimensionedRate",
+            "usable_products": "usableProducts",
             "sample_size": "sampleSize",
         }
         return {
-            camel.get(k, k): v for k, v in asdict(self).items() if v is not None
+            camel.get(k, k): v
+            for k, v in asdict(self).items()
+            if v is not None and not k.startswith("_")
         }
 
 
@@ -135,6 +166,36 @@ def _fetch_page(client: httpx.Client, base: str, page: int, limit: int) -> list[
     if not isinstance(body, dict) or "products" not in body:
         raise ValueError("no 'products' key — not a Shopify catalogue endpoint")
     return body["products"]
+
+
+def dump_samples(products: list[dict], name: str, out_dir: str, n: int = 8) -> str:
+    """Write raw products for a merchant whose hit rate looks implausible.
+
+    A reachable catalogue at a 0% hit rate is either a store that genuinely publishes no
+    dimensions, or a format the regex pass does not know yet. The only way to tell them apart
+    is to read the real markup.
+    """
+    import os
+    os.makedirs(out_dir, exist_ok=True)
+    safe = "".join(c if c.isalnum() or c in "-_" else "_" for c in name)
+    path = os.path.join(out_dir, f"{safe}.json")
+    with open(path, "w") as f:
+        json.dump(
+            [
+                {
+                    "title": p.get("title"),
+                    "product_type": p.get("product_type"),
+                    "tags": p.get("tags"),
+                    "body_html": p.get("body_html"),
+                    "variants": [{"title": v.get("title")} for v in (p.get("variants") or [])],
+                    "options": p.get("options"),
+                }
+                for p in products[:n]
+            ],
+            f,
+            indent=2,
+        )
+    return path
 
 
 def check(client: httpx.Client, name: str, base: str, sample: int) -> MerchantReport:
@@ -183,6 +244,7 @@ def check(client: httpx.Client, name: str, base: str, sample: int) -> MerchantRe
 
     hits = 0
     full = 0
+    categories: dict[str, int] = {}
     for p in products:
         hit = extract(p)
         if hit is None:
@@ -190,6 +252,10 @@ def check(client: httpx.Client, name: str, base: str, sample: int) -> MerchantRe
         hits += 1
         if hit.as_bbox() is not None:
             full += 1
+            # What a product IS matters as much as how many there are: the demo needs a desk,
+            # a chair, shelving and a lamp, not 245 sofas.
+            ptype = (p.get("product_type") or "uncategorised").strip().lower()
+            categories[ptype] = categories.get(ptype, 0) + 1
             if rep.example is None:
                 rep.example = {
                     "title": p.get("title"),
@@ -197,6 +263,8 @@ def check(client: httpx.Client, name: str, base: str, sample: int) -> MerchantRe
                     "from": hit.source_field,
                     "raw": hit.raw,
                 }
+    rep.usable_products = full
+    rep.categories = categories or None
 
     if products:
         rep.dimension_hit_rate = round(hits / len(products), 3)
@@ -210,6 +278,7 @@ def check(client: httpx.Client, name: str, base: str, sample: int) -> MerchantRe
     rep.status = "ok"
     rep.products_json_verified = True
     rep.verified_at = datetime.now(timezone.utc).date().isoformat()
+    rep._products = products  # retained only for --dump; never serialised
     return rep
 
 
@@ -232,25 +301,39 @@ def render(reports: list[MerchantReport]) -> str:
     ]
     lines = [
         "",
-        f"{'merchant':<34}{'status':<16}{'n':>6}{'any dim':>9}{'usable':>9}",
-        "-" * 74,
+        f"{'merchant':<34}{'status':<16}{'n':>6}{'any dim':>9}{'usable':>9}{'products':>10}",
+        "-" * 84,
     ]
     # Verified merchants first, best dimension coverage at the top; everything else below.
     for r in sorted(reports, key=lambda r: (r.status != "ok", -(r.fully_dimensioned_rate or 0), r.name)):
         any_rate = f"{r.dimension_hit_rate:.0%}" if r.dimension_hit_rate is not None else "-"
         full_rate = f"{r.fully_dimensioned_rate:.0%}" if r.fully_dimensioned_rate is not None else "-"
+        usable_n = str(r.usable_products) if r.status == "ok" else "-"
         lines.append(
-            f"{r.name[:33]:<34}{r.status:<16}{r.product_count or 0:>6}{any_rate:>9}{full_rate:>9}"
+            f"{r.name[:33]:<34}{r.status:<16}{r.product_count or 0:>6}"
+            f"{any_rate:>9}{full_rate:>9}{usable_n:>10}"
         )
         if r.note:
             lines.append(f"  {r.note}")
+    total_usable = sum(r.usable_products for r in reports)
+    cov = coverage(reports)
+    missing = [k for k, v in cov.items() if v == 0]
+
     lines += [
-        "-" * 74,
+        "-" * 84,
         f"reachable: {sum(1 for r in reports if r.status == 'ok')}/{len(reports)}   "
-        f"usable (>={MIN_DIMENSION_RATE:.0%} fully dimensioned): {len(usable)}",
+        f"merchants worth keeping: {len(usable)}",
         "",
-        "'usable' is the number that matters: a merchant whose catalogue has no dimensions",
-        "costs more to support than it contributes. Target is 15-25 usable merchants.",
+        f"USABLE PRODUCTS: {total_usable}  (target {TARGET_USABLE_PRODUCTS} for the pre-bake)",
+        "  " + "   ".join(f"{k} {v}" for k, v in cov.items()),
+        "",
+    ]
+    if missing:
+        lines.append(f"GAP: no usable products in {', '.join(missing)} — find a merchant for each.")
+    lines += [
+        "Products, not merchants, are the requirement. Two good catalogues can satisfy it and",
+        "fifteen dimensionless ones cannot. Category coverage is the other half: a small room",
+        "needs a surface, seating, storage and a lamp.",
         "",
     ]
     return "\n".join(lines)
@@ -264,8 +347,13 @@ def main() -> int:
     ap.add_argument("--out", help="write the verified merchant list here")
     ap.add_argument(
         "--require", type=int, default=None,
-        help="exit non-zero below this many usable merchants. Defaults to 15 when checking a "
-             "candidates file (the H-4 gate) and 0 for a one-off --url probe.",
+        help=f"exit non-zero below this many usable PRODUCTS. Defaults to "
+             f"{TARGET_USABLE_PRODUCTS} for a candidates file (the H-4 gate), 0 for --url.",
+    )
+    ap.add_argument(
+        "--dump", metavar="DIR",
+        help="write raw sample products per reachable merchant, for diagnosing a hit rate that "
+             "looks too low to be true.",
     )
     args = ap.parse_args()
 
@@ -305,13 +393,25 @@ def main() -> int:
             )
         print(f"wrote {len(usable)} verified merchants to {args.out}\n")
 
+    if args.dump:
+        for r in reports:
+            if r.status in ("ok", "thin") and r._products:
+                print(f"dumped {dump_samples(r._products, r.name, args.dump)}", file=sys.stderr)
+
     # Non-zero exit makes this usable as a gate in a script. A one-off --url probe is a
     # lookup, not a gate, so it does not fail for having found only one store.
-    strong = [r for r in reports if r.status == "ok"
-              and (r.fully_dimensioned_rate or 0) >= MIN_DIMENSION_RATE]
-    required = args.require if args.require is not None else (15 if args.candidates else 0)
-    if len(strong) < required:
-        print(f"GATE FAILED: {len(strong)} usable merchants, need {required}.\n", file=sys.stderr)
+    total_usable = sum(r.usable_products for r in reports)
+    required = (args.require if args.require is not None
+                else (TARGET_USABLE_PRODUCTS if args.candidates else 0))
+    if required == 0:
+        return 0  # a probe reports; it does not judge
+
+    if total_usable < required:
+        print(f"GATE FAILED: {total_usable} usable products, need {required}.\n", file=sys.stderr)
+        return 1
+    missing = [k for k, v in coverage(reports).items() if v == 0]
+    if missing:
+        print(f"GATE FAILED: no usable products in {', '.join(missing)}.\n", file=sys.stderr)
         return 1
     return 0
 
