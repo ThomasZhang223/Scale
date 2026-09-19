@@ -121,6 +121,14 @@ def test_download_writes_images_at_the_r2_key():
         assert os.path.getsize(path) > 0
 
 
+def test_image_width_is_requested_from_the_cdn():
+    """100 full-resolution hero shots is tens of MB of git history for files that belong in R2,
+    and image-to-3D wants ~512-1024px anyway."""
+    assert bp.sized("https://cdn.shopify.com/x.jpg", 1024) == "https://cdn.shopify.com/x.jpg?width=1024"
+    assert bp.sized("https://cdn.shopify.com/x.jpg?v=1", 1024) == "https://cdn.shopify.com/x.jpg?v=1&width=1024"
+    assert bp.sized("https://cdn.shopify.com/x.jpg", None) == "https://cdn.shopify.com/x.jpg"
+
+
 def test_a_verified_file_with_no_merchants_fails_loudly():
     tmp = tempfile.mkdtemp()
     v = os.path.join(tmp, "v.json")

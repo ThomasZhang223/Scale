@@ -30,6 +30,20 @@ from app.dimensions import extract
 from verify_merchants import USER_AGENT, REQUEST_DELAY_S, bucket_for, DEMO_CATEGORIES
 
 
+def sized(url: str, width: int | None) -> str:
+    """Ask Shopify's CDN for a specific width.
+
+    Two reasons, both real: image-to-3D wants roughly 512-1024 px, so a 3000 px hero shot is
+    wasted bytes, and 100 full-resolution images is tens of megabytes of git history for files
+    that belong in R2 anyway. Shopify honours ?width=N; a CDN that does not just returns the
+    original, which is harmless.
+    """
+    if not width:
+        return url
+    sep = "&" if "?" in url else "?"
+    return f"{url}{sep}width={width}"
+
+
 def slug(text: str) -> str:
     return "".join(c if c.isalnum() or c in "-_" else "_" for c in (text or "")).strip("_")[:60]
 
@@ -99,7 +113,7 @@ def curate(candidates: list[dict], limit: int) -> list[dict]:
     return picked
 
 
-def download(rows: list[dict], out_dir: str, client: httpx.Client) -> int:
+def download(rows: list[dict], out_dir: str, client: httpx.Client, width: int | None = 1024) -> int:
     ok = 0
     for row in rows:
         path = os.path.join(out_dir, row["r2Key"])
@@ -109,7 +123,7 @@ def download(rows: list[dict], out_dir: str, client: httpx.Client) -> int:
             continue
         try:
             time.sleep(REQUEST_DELAY_S / 4)
-            r = client.get(row["imageUrl"], follow_redirects=True)
+            r = client.get(sized(row["imageUrl"], width), follow_redirects=True)
             r.raise_for_status()
             with open(path, "wb") as f:
                 f.write(r.content)
@@ -129,6 +143,9 @@ def main() -> int:
     ap.add_argument("--download", action="store_true",
                     help="also fetch the images into <out>/catalog/... , mirroring the R2 layout")
     ap.add_argument("--pages", type=int, default=2, help="catalogue pages per merchant")
+    ap.add_argument("--image-width", type=int, default=1024,
+                    help="ask the CDN for this width (0 for the original). 1024 suits "
+                         "image-to-3D and keeps the set small enough to commit.")
     args = ap.parse_args()
 
     data = json.load(open(args.verified))
@@ -157,7 +174,7 @@ def main() -> int:
         downloaded = 0
         if args.download:
             print(f"downloading {len(picked)} images ...", file=sys.stderr)
-            downloaded = download(picked, args.out, client)
+            downloaded = download(picked, args.out, client, args.image_width or None)
 
     manifest = {
         "_comment": "Pre-bake handoff for Ani (component C). Every row has a real bboxMeters "
@@ -176,6 +193,9 @@ def main() -> int:
     print(f"\n{len(picked)} products -> {path}")
     for k, n in manifest["byCategory"].items():
         print(f"  {k:<10} {n}")
+    total_bytes = sum(r.get("bytes", 0) for r in picked)
+    if total_bytes:
+        print(f"\n  images: {total_bytes / 1e6:.1f} MB at width={args.image_width or 'original'}")
     if not args.download:
         print("\nimages not fetched; re-run with --download to mirror the R2 layout locally")
     return 0

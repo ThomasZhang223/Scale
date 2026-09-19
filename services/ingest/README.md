@@ -143,7 +143,12 @@ top 100 by confidence would hand him whatever the biggest merchant sells most of
 do not furnish a room.
 
 A product needs **both** a bbox and an image to make the list: a mesh needs a picture, a
-placement needs a size.
+placement needs a size. Ani cannot test 2D→3D without the pixels — the manifest alone only
+unblocks the scale binding, which he has already built.
+
+Images are fetched at `--image-width 1024` by default: image-to-3D wants roughly 512–1024 px,
+and 100 hero shots at full resolution is tens of megabytes of git history for files that belong
+in R2. Pass `--image-width 0` for the originals.
 
 ## Dimensions are the hard part
 
