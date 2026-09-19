@@ -137,6 +137,20 @@ let currentVersionId: string | null = null; // parent for the next version we pu
 let lastFitReport: FitReport | null = null;
 let undoAvailable = false;
 let lastTouchedId: string | null = null; // what the turn buttons act on when nothing is held
+let showRules = false; // the Rearrange guidelines, expanded on the wrist
+
+/** What Rearrange does with each kind of object (mirrors services/agent generatedPlan). */
+const REARRANGE_RULES: [string, string][] = [
+  ['sofa', 'wall, facing in; faces the TV'],
+  ['TV / storage / shelf', 'against a wall'],
+  ['bed', 'wall, away from the door'],
+  ['desk', 'wall, near a window'],
+  ['dining table', 'middle of the room'],
+  ['chairs', 'at the table, facing it; else with the sofa'],
+  ['coffee table', 'in front of the sofa'],
+  ['lamps / other', 'a wall, out of the way'],
+  ['always', '90 cm walkways; doors and windows clear'],
+];
 const objects = new Map<string, PlacedObject>();
 const catalog: PaletteItem[] = []; // everything in objects.json, placed or not
 let rise = 1; // 0..1 while the walls rise; objects are placed once it reaches 1
@@ -166,6 +180,10 @@ async function start() {
     if (action.startsWith('preset:')) void askAgent({ preset: action.slice(7) });
     if (action === 'turn:left') turnLast(Math.PI / 2);
     if (action === 'turn:right') turnLast(-Math.PI / 2);
+    if (action === 'rules') {
+      showRules = !showRules;
+      showPalette();
+    }
     if (action === 'accept') void acceptProposal();
     if (action === 'reject') void rejectProposal();
     if (action === 'ask_again') void agent.askAgain();
@@ -222,6 +240,8 @@ async function start() {
           tile('Turn 90° right', 'turn:right'),
           ...(objects.size ? [tile('Rearrange', 'preset:tidy_room', true)] : []), // nothing to rearrange until something is down
           ...(undoAvailable ? [tile('Undo', 'undo')] : []),
+          tile(showRules ? 'Hide rules' : 'Rules', 'rules'),
+          ...(showRules ? REARRANGE_RULES.map(([kind, rule]) => label(`${kind}: ${rule}`)) : []),
         ];
     }
   }
