@@ -243,3 +243,4 @@ Pods/
 
 # macOS
 .DS_Store
+.gstack/
