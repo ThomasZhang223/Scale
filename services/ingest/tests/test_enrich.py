@@ -92,7 +92,8 @@ def test_a_fetch_failure_leaves_the_product_for_the_next_step():
 def test_llm_partitions_into_recovered_and_missing(monkey=None):
     products = [product(i) for i in range(4)]
     orig = bp.extract_with_llm
-    bp.extract_with_llm = lambda p, cfg, client=None: a_hit() if p["id"] % 2 == 0 else None
+    bp.extract_with_llm = (lambda p, cfg, client=None, errors=None:
+                           a_hit() if p["id"] % 2 == 0 else None)
     try:
         recovered, missing = bp.enrich_with_llm("m", "https://s.com", products, CFG, 10)
     finally:
@@ -106,7 +107,7 @@ def test_llm_keeps_input_order_when_parallel():
     products = [product(i) for i in range(20)]
     orig = bp.extract_with_llm
 
-    def slow(p, cfg, client=None):
+    def slow(p, cfg, client=None, errors=None):
         time.sleep(0.02 if p["id"] % 3 else 0.001)   # finish out of order on purpose
         return a_hit()
     bp.extract_with_llm = slow
@@ -135,7 +136,7 @@ def test_vlm_stops_at_the_first_image_that_answers():
     products = [product(0, images=4)]
     client = FakeClient()
     orig = bp.extract_with_vlm
-    bp.extract_with_vlm = lambda b, mt, cfg, c=None: a_hit()
+    bp.extract_with_vlm = lambda b, mt, cfg, c=None, errors=None: a_hit()
     try:
         rows = bp.enrich_with_vlm("m", "https://s.com", products, CFG, 10, client)
     finally:
@@ -148,7 +149,7 @@ def test_vlm_tries_at_most_three_images_and_skips_the_hero_shot():
     products = [product(0, images=6)]
     client = FakeClient()
     orig = bp.extract_with_vlm
-    bp.extract_with_vlm = lambda b, mt, cfg, c=None: None      # nothing ever answers
+    bp.extract_with_vlm = lambda b, mt, cfg, c=None, errors=None: None   # never answers
     try:
         rows = bp.enrich_with_vlm("m", "https://s.com", products, CFG, 10, client)
     finally:
@@ -164,7 +165,8 @@ def test_the_pool_actually_overlaps_calls():
     """The whole point. Serial, 12 x 0.1s is 1.2s; at 8 workers it should be a fraction."""
     products = [product(i) for i in range(12)]
     orig = bp.extract_with_llm
-    bp.extract_with_llm = lambda p, cfg, client=None: (time.sleep(0.1), a_hit())[1]
+    bp.extract_with_llm = (lambda p, cfg, client=None, errors=None:
+                           (time.sleep(0.1), a_hit())[1])
     try:
         t = time.time()
         bp.enrich_with_llm("m", "https://s.com", products, CFG, 12, 1)
@@ -183,7 +185,8 @@ def test_concurrency_of_one_is_still_serial():
     """--ai-concurrency 1 has to restore the old behaviour exactly, as an escape hatch."""
     seen = []
     orig = bp.extract_with_llm
-    bp.extract_with_llm = lambda p, cfg, client=None: (seen.append(p["id"]), a_hit())[1]
+    bp.extract_with_llm = (lambda p, cfg, client=None, errors=None:
+                           (seen.append(p["id"]), a_hit())[1])
     try:
         bp.enrich_with_llm("m", "https://s.com", [product(i) for i in range(5)], CFG, 5, 1)
     finally:

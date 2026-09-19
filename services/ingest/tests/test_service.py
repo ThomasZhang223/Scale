@@ -162,7 +162,7 @@ def test_the_llm_pass_does_not_block_the_event_loop():
 
     calls = []
 
-    def slow_llm(p, cfg, http=None):
+    def slow_llm(p, cfg, http=None, errors=None):
         calls.append(p["handle"])
         time.sleep(0.05)
         return None

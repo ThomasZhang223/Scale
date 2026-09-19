@@ -228,8 +228,10 @@ async def extract_products(request: Request):
     # Step 2: the same text, read rather than pattern-matched. The calls overlap on worker
     # threads; accept() stays on this one, in input order, because it mutates objects/stats.
     llm_batch = needs_ai[:ai_limit] if use_llm else []
+    ai_errors: list[str] = []
     llm_hits = await _in_threads(
-        [functools.partial(extract_with_llm, p, cfg) for p in llm_batch], AI_CONCURRENCY)
+        [functools.partial(extract_with_llm, p, cfg, None, ai_errors) for p in llm_batch],
+        AI_CONCURRENCY)
     for p, hit in zip(llm_batch, llm_hits):
         if accept(p, hit, "llm", "from_llm"):
             continue
@@ -293,11 +295,17 @@ async def extract_products(request: Request):
                             continue
                         hit = await asyncio.to_thread(
                             extract_with_vlm, r.content,
-                            r.headers.get("content-type", ""), cfg)
+                            r.headers.get("content-type", ""), cfg, None, ai_errors)
                         if accept(p, hit, "vlm", "from_vlm"):
                             return
 
             await asyncio.gather(*(read_one(p) for p in vlm_batch))
+
+    # A caller cannot tell "the model found nothing" from "every call was rejected" unless we
+    # say so. Counted, with one example, rather than raised: these passes are additive.
+    if ai_errors:
+        stats["ai_call_failures"] = len(ai_errors)
+        stats["ai_first_failure"] = ai_errors[0][:200]
 
     return {"merchant": merchant, "count": len(objects), "stats": stats, "objects": objects}
 

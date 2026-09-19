@@ -15,8 +15,9 @@ CFG = OpenAIConfig(api_key="k", model="gpt-test")
 
 class Fake:
     """Records the request and replays a canned choices[0].message.content."""
-    def __init__(self, payload=None, status=200, refusal=None, body=None):
+    def __init__(self, payload=None, status=200, refusal=None, body=None, text=""):
         self.payload, self.status, self.refusal, self.body = payload, status, refusal, body
+        self.text = text
         self.seen = None
 
     def post(self, url, headers=None, json=None):
@@ -24,6 +25,7 @@ class Fake:
         outer = self
         class R:
             status_code = outer.status
+            text = outer.text
             def json(self):
                 if outer.body is not None:
                     return outer.body
@@ -122,6 +124,42 @@ def test_a_refusal_returns_none():
 
 def test_a_malformed_body_returns_none():
     assert extract_with_llm(product(), CFG, client=Fake(body={"unexpected": True})) is None
+
+
+# --- a failure has to be distinguishable from "found nothing" -------------
+
+def test_an_http_error_is_recorded_with_the_api_s_own_explanation():
+    """Step 3 reported `recovered 0` across seven merchants and nobody could tell whether the
+    model found no diagrams or every call was being rejected. The body carries the reason."""
+    errors = []
+    fake = Fake(status=400, text='{"error":{"code":"invalid_image_format"}}')
+    assert extract_with_llm(product(), CFG, client=fake, errors=errors) is None
+    assert len(errors) == 1, errors
+    assert errors[0].startswith("http_400"), errors[0]
+    assert "invalid_image_format" in errors[0], errors[0]
+
+
+def test_a_refusal_is_recorded_separately_from_an_http_error():
+    errors = []
+    assert extract_with_llm(product(), CFG, client=Fake(refusal="no"), errors=errors) is None
+    assert errors and errors[0].startswith("refusal"), errors
+
+
+def test_a_successful_call_that_finds_nothing_records_no_error():
+    """The case that must stay quiet: the model answered, and the answer was 'not found'.
+    If this ever appends an error, the signal becomes noise and stops being read."""
+    errors = []
+    hit = extract_with_llm(product(), CFG, errors=errors,
+                           client=Fake(payload={"found": False}))
+    assert hit is None
+    assert errors == [], errors
+
+
+def test_the_vlm_records_its_failures_too():
+    errors = []
+    fake = Fake(status=401, text='{"error":{"message":"Incorrect API key"}}')
+    assert extract_with_vlm(b"\x89PNG", "image/png", CFG, client=fake, errors=errors) is None
+    assert errors and "http_401" in errors[0] and "Incorrect API key" in errors[0], errors
 
 
 # --- step 3 --------------------------------------------------------------

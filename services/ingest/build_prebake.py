@@ -18,6 +18,7 @@ Usage
 from __future__ import annotations
 
 import argparse
+import collections
 import json
 import os
 import sys
@@ -139,6 +140,11 @@ def candidates_from(merchant: str, base: str, products: list[dict]) -> tuple[lis
 # revisit if this ever runs over a full catalogue.
 DEFAULT_AI_CONCURRENCY = 8
 
+# What step 3 uploads. The originals are multi-megabyte and base64 adds a third; a run that
+# looked like it was thinking was mostly uploading. Wide enough that the callout text on a
+# dimension diagram survives — the whole point of the pass.
+VLM_IMAGE_WIDTH = 1024
+
 
 def ai_client_for(workers: int) -> httpx.Client:
     """A client for the OpenAI calls only, separate from the catalogue/CDN one.
@@ -168,7 +174,8 @@ def _in_parallel(items: list, fn, workers: int) -> list:
 
 def enrich_with_llm(merchant: str, base: str, products: list[dict], cfg: OpenAIConfig,
                     limit: int, workers: int = DEFAULT_AI_CONCURRENCY,
-                    ai_client: httpx.Client | None = None) -> tuple[list[dict], list[dict]]:
+                    ai_client: httpx.Client | None = None,
+                    errors: list | None = None) -> tuple[list[dict], list[dict]]:
     """Step 2. Returns (recovered, still_missing) so the caller can hand the rest to 2.5."""
     batch = products[:limit]
 
@@ -176,7 +183,8 @@ def enrich_with_llm(merchant: str, base: str, products: list[dict], cfg: OpenAIC
         image = next((i.get("src") for i in (p.get("images") or []) if i.get("src")), None)
         if not image:
             return None
-        return _accept(merchant, base, p, extract_with_llm(p, cfg, ai_client), image, "llm")
+        return _accept(merchant, base, p,
+                       extract_with_llm(p, cfg, ai_client, errors=errors), image, "llm")
 
     rows = _in_parallel(batch, one, workers)
     recovered = [r for r in rows if r]
@@ -187,7 +195,10 @@ def enrich_with_llm(merchant: str, base: str, products: list[dict], cfg: OpenAIC
 def enrich_with_vlm(merchant: str, base: str, products: list[dict], cfg: OpenAIConfig,
                     limit: int, client: httpx.Client,
                     workers: int = DEFAULT_AI_CONCURRENCY,
-                    ai_client: httpx.Client | None = None) -> list[dict]:
+                    ai_client: httpx.Client | None = None,
+                    width: int | None = VLM_IMAGE_WIDTH,
+                    errors: list | None = None,
+                    attempts: list | None = None) -> list[dict]:
     """Step 3. Only over what every cheaper source failed, and a spec diagram is rarely the
     hero shot, so images 2 through 4 are tried rather than the first.
 
@@ -200,11 +211,17 @@ def enrich_with_vlm(merchant: str, base: str, products: list[dict], cfg: OpenAIC
         srcs = [i.get("src") for i in (p.get("images") or []) if i.get("src")]
         for src in srcs[1:4]:
             try:
-                r = client.get(src)
+                # Sized, not the original. A full-resolution Shopify image is megabytes, and
+                # base64 adds a third on top of that — the upload, not the model, was what
+                # made step 3 crawl. 1024px keeps callout text on a spec diagram readable.
+                r = client.get(sized(src, width), follow_redirects=True)
                 r.raise_for_status()
             except httpx.HTTPError:
                 continue
-            hit = extract_with_vlm(r.content, r.headers.get("content-type", ""), cfg, ai_client)
+            if attempts is not None:
+                attempts.append(src)
+            hit = extract_with_vlm(r.content, r.headers.get("content-type", ""), cfg,
+                                   ai_client, errors=errors)
             row = _accept(merchant, base, p, hit, srcs[0], "vlm")
             if row:
                 return row
@@ -381,7 +398,7 @@ def main() -> int:
 
     candidates: list[dict] = []
     page_stats = {"attempted": 0, "recovered": 0, "failed": 0}
-    ai_stats = {"llm": 0, "vlm": 0}
+    ai_stats = {"llm": 0, "vlm": 0, "llm_errors": 0, "vlm_errors": 0}
     with httpx.Client(headers={"User-Agent": USER_AGENT}, timeout=30,
                       follow_redirects=True) as client, \
          ai_client_for(args.ai_concurrency) as ai_http:
@@ -399,11 +416,20 @@ def main() -> int:
             candidates.extend(found)
 
             if args.llm and needs_page:
+                llm_errors: list[str] = []
                 rescued, needs_page = enrich_with_llm(
-                    name, base, needs_page, cfg, args.ai_limit, args.ai_concurrency, ai_http)
+                    name, base, needs_page, cfg, args.ai_limit, args.ai_concurrency, ai_http,
+                    errors=llm_errors)
                 ai_stats["llm"] += len(rescued)
+                ai_stats["llm_errors"] += len(llm_errors)
                 candidates.extend(rescued)
-                print(f"  step 2 (llm): recovered {len(rescued)}", file=sys.stderr)
+                print(f"  step 2 (llm): recovered {len(rescued)}"
+                      + (f", {len(llm_errors)} call(s) FAILED" if llm_errors else ""),
+                      file=sys.stderr)
+                for reason, n in collections.Counter(
+                        e.split(":")[0] for e in llm_errors).most_common(3):
+                    sample = next(e for e in llm_errors if e.startswith(reason))
+                    print(f"      {n} x {sample[:160]}", file=sys.stderr)
 
             if fetcher is not None and needs_page:
                 print(f"  step 2.5: {len(needs_page)} have an image but no dimensions; "
@@ -418,11 +444,35 @@ def main() -> int:
                 candidates.extend(rescued)
 
             if args.vlm and needs_page:
+                vlm_errors: list[str] = []
+                vlm_attempts: list[str] = []
+                eligible = sum(
+                    1 for p in needs_page[:args.ai_limit]
+                    if len([i.get("src") for i in (p.get("images") or []) if i.get("src")]) > 1)
                 rescued = enrich_with_vlm(name, base, needs_page, cfg, args.ai_limit,
-                                          client, args.ai_concurrency, ai_http)
+                                          client, args.ai_concurrency, ai_http,
+                                          errors=vlm_errors, attempts=vlm_attempts)
                 ai_stats["vlm"] += len(rescued)
+                ai_stats["vlm_errors"] += len(vlm_errors)
                 candidates.extend(rescued)
-                print(f"  step 3 (vlm): recovered {len(rescued)}", file=sys.stderr)
+                # "recovered 0" on its own cannot distinguish a store with no spec diagrams
+                # from every call being rejected. Say which.
+                # Three different things print "recovered 0", and only one of them is a
+                # bug: no product had a second image to look at, the calls were rejected, or
+                # the model looked and honestly found no dimensioned diagram. Say which.
+                considered = min(len(needs_page), args.ai_limit)
+                print(f"  step 3 (vlm): recovered {len(rescued)} — "
+                      f"{eligible}/{considered} products had a 2nd image, "
+                      f"{len(vlm_attempts)} call(s) made"
+                      + (f", {len(vlm_errors)} FAILED" if vlm_errors else ""),
+                      file=sys.stderr)
+                if not vlm_attempts and considered:
+                    print("      no calls made: step 3 only reads images 2-4, and these "
+                          "products have one image each", file=sys.stderr)
+                for reason, n in collections.Counter(
+                        e.split(":")[0] for e in vlm_errors).most_common(3):
+                    sample = next(e for e in vlm_errors if e.startswith(reason))
+                    print(f"      {n} x {sample[:160]}", file=sys.stderr)
 
         picked = curate(candidates, args.limit)
 
