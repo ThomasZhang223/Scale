@@ -162,6 +162,27 @@ def curate(candidates: list[dict], limit: int) -> list[dict]:
     return picked
 
 
+def prune_orphans(rows: list[dict], out_dir: str) -> int:
+    """Delete images from a previous run that nothing in this manifest points at.
+
+    Product ids differ between runs, so without this every re-run leaves its predecessor's
+    images behind — a first re-run left 42 orphans, and a directory holding 142 files for a
+    100-product manifest is a thing someone has to stop and work out.
+    """
+    import glob
+    keep = {r["r2Key"] for r in rows}
+    removed = 0
+    for path in glob.glob(os.path.join(out_dir, "catalog", "*", "*", "source.jpg")):
+        if os.path.relpath(path, out_dir) in keep:
+            continue
+        os.remove(path)
+        parent = os.path.dirname(path)
+        if not os.listdir(parent):
+            os.rmdir(parent)
+        removed += 1
+    return removed
+
+
 def download(rows: list[dict], out_dir: str, client: httpx.Client, width: int | None = 1024) -> int:
     ok = 0
     for row in rows:
@@ -252,6 +273,9 @@ def main() -> int:
 
         downloaded = 0
         if args.download:
+            pruned = prune_orphans(picked, args.out)
+            if pruned:
+                print(f"pruned {pruned} images from a previous run", file=sys.stderr)
             print(f"downloading {len(picked)} images ...", file=sys.stderr)
             downloaded = download(picked, args.out, client, args.image_width or None)
 
