@@ -44,11 +44,20 @@ const COLORS = {
   object: '#9aa5b1',
 };
 
+const EXPECTED_SCHEMA_VERSION = 1;
+
 export function buildRoomFromScan(scan: Json): BuiltRoom {
+  // Two inputs: RoomCapture v1 (the team contract; fixtures/room-demo.json) carries a
+  // schemaVersion and one `openings` list with a `kind`; raw RoomPlan CapturedRoom JSON
+  // from the phone has neither and keeps doors and windows in their own lists.
+  if ('schemaVersion' in scan && scan.schemaVersion !== EXPECTED_SCHEMA_VERSION) {
+    throw new Error(`RoomCapture schemaVersion ${scan.schemaVersion}, expected ${EXPECTED_SCHEMA_VERSION} — ask Thomas`);
+  }
   const walls = surfaces(scan.walls);
-  const doors = surfaces(scan.doors);
-  const windows = surfaces(scan.windows);
-  const openings = surfaces(scan.openings);
+  const listed = surfaces(scan.openings);
+  const doors = [...surfaces(scan.doors), ...listed.filter((s) => s.kind === 'door')];
+  const windows = [...surfaces(scan.windows), ...listed.filter((s) => s.kind === 'window')];
+  const openings = listed.filter((s) => !s.kind || s.kind === 'opening');
   const objects = surfaces(scan.objects);
 
   // ---- find the floor and the center, so we can recenter ----
@@ -86,15 +95,18 @@ export function buildRoomFromScan(scan: Json): BuiltRoom {
   floor.position.set(center.x, floorY, center.z);
   content.add(floor);
 
+  // RoomCapture v1 measures wall thickness; RoomPlan reports 0, so those get a default.
+  const wallThickness = (s: Surface) => (s.dims[2] > 0 ? s.dims[2] : WALL_THICKNESS);
+  const thickest = walls.reduce((t, s) => Math.max(t, wallThickness(s)), WALL_THICKNESS);
   for (const s of walls) {
-    const wall = slab(s, WALL_THICKNESS, COLORS.wall);
+    const wall = slab(s, wallThickness(s), COLORS.wall);
     wall.userData.collider = 'wall'; // physics turns these into solid walls
     content.add(wall);
   }
   // Doors and windows lie in the wall's plane; slightly thicker so they show on both sides.
-  for (const s of doors) content.add(slab(s, WALL_THICKNESS + 0.02, COLORS.door));
-  for (const s of windows) content.add(slab(s, WALL_THICKNESS + 0.02, COLORS.window, 0.55));
-  for (const s of openings) content.add(slab(s, WALL_THICKNESS + 0.02, COLORS.opening, 0.35));
+  for (const s of doors) content.add(slab(s, thickest + 0.02, COLORS.door));
+  for (const s of windows) content.add(slab(s, thickest + 0.02, COLORS.window, 0.55));
+  for (const s of openings) content.add(slab(s, thickest + 0.02, COLORS.opening, 0.35));
 
   // ---- furniture: returned as data, drawn as reference boxes ----
   // Boxes live directly in `group` (already-recentered space) with their origin at the
@@ -126,6 +138,7 @@ export function buildRoomFromScan(scan: Json): BuiltRoom {
 
 interface Surface {
   identifier: string;
+  kind?: string; // RoomCapture v1 openings: door | window | opening
   category: string;
   dims: [number, number, number];
   position: THREE.Vector3;
@@ -144,8 +157,10 @@ function surfaces(list: unknown): Surface[] {
     const quaternion = new THREE.Quaternion();
     matrix.decompose(position, quaternion, new THREE.Vector3());
     const rotationY = new THREE.Euler().setFromQuaternion(quaternion, 'YXZ').y;
-    const identifier = typeof item.identifier === 'string' ? item.identifier : '';
-    out.push({ identifier, category: readCategory(item.category), dims, position, quaternion, rotationY });
+    // RoomCapture v1 uses `id`; RoomPlan's own export uses `identifier`.
+    const identifier = typeof item.id === 'string' ? item.id : typeof item.identifier === 'string' ? item.identifier : '';
+    const kind = typeof item.kind === 'string' ? item.kind : undefined;
+    out.push({ identifier, kind, category: readCategory(item.category), dims, position, quaternion, rotationY });
   }
   return out;
 }

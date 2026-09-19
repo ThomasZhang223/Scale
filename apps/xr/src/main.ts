@@ -6,11 +6,13 @@ import { ObjectLoader, type LoadedObject } from './objects';
 import { createPhysics } from './physics';
 import { Interaction } from './interaction';
 import { watchRoomScan, uploadRoomScan, supabase } from './sync';
+import roomDemo from '../../../fixtures/room-demo.json';
 
 /*
  * Stand inside a RoomPlan room scan, with scanned objects (GLBs) in it.
  *
- * Room: loaded from ?scan=<url>, else /room-scan.json. Built at true size, floor at y = 0.
+ * Room: loaded from ?scan=<url>, else the committed fixtures/room-demo.json (RoomCapture v1,
+ *   the team contract). Raw RoomPlan CapturedRoom JSON works too. Built at true size, floor at y = 0.
  * Objects: loaded from /objects.json, or dropped onto the page as .glb files.
  *   - Kept at their real-world size (Object Capture exports in meters).
  *   - If a file's name contains a category RoomPlan detected ("chair.glb", "my-sofa.glb"),
@@ -24,7 +26,7 @@ import { watchRoomScan, uploadRoomScan, supabase } from './sync';
 
 const params = new URLSearchParams(location.search);
 const SHOW_PANEL = params.get('panel') !== '0';
-const SCAN_URL = params.get('scan') ?? '/room-scan.json';
+const SCAN_URL = params.get('scan'); // null: the committed RoomCapture v1 fixture
 const OBJECTS_URL = params.get('objects') ?? '/objects.json';
 
 // ---------- renderer, scene, camera ----------
@@ -186,6 +188,7 @@ async function start() {
   // ---------- loading ----------
 
   async function loadScanFile() {
+    if (!SCAN_URL) return showScan(roomDemo, 'room-demo.json');
     try {
       const res = await fetch(SCAN_URL);
       if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);

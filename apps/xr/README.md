@@ -5,6 +5,10 @@ A three.js WebXR page for the Meta Quest. It builds a room from a RoomPlan scan
 Capture) at their real size, with physics: objects land on the floor, can't pass through
 walls or furniture, stay upright, and can be grabbed and moved.
 
+**Owner:** Justin (components D and E). Scope in `.claude/workstreams/justin.md`; every
+schema and endpoint this consumes is in `.claude/contracts.md`; transform conventions in
+`docs/TRANSFORMS.md`.
+
 ## Run it
 
 ```bash
@@ -13,8 +17,15 @@ npm run dev          # laptop: http://localhost:5173
 npm run quest        # Quest over USB: adb reverse, then open http://localhost:5173 → Enter VR
 ```
 
-The sample room rises out of the floor, then a sample chair and sofa drop into the spots
-where RoomPlan detected a chair and a sofa, replacing their grey boxes.
+The room from `fixtures/room-demo.json` (the team's `RoomCapture v1` sample, at the repo
+root) rises out of the floor. The sample chair drops into the spot where a chair was
+detected, replacing its grey box; the sample sofa has no match there, so it lands at a
+free spot in front of you.
+
+Two room formats are accepted: `RoomCapture v1` as defined in `.claude/contracts.md` (what
+the phone app and server send; a `schemaVersion` other than 1 is refused loudly), and raw
+RoomPlan `CapturedRoom` JSON straight from Apple's exporter (`public/room-scan.json` is one;
+open it with `?scan=/room-scan.json`).
 
 ## What happens to a GLB
 
@@ -58,7 +69,7 @@ Letting go leaves the object where it is.
 
 ## Adding your own
 
-- **Room:** replace `public/room-scan.json`, open `?scan=<url>`, or drop a `.json` on the page.
+- **Room:** open `?scan=<url>` or drop a `.json` on the page, in either format above.
 - **Objects:** list them in `public/objects.json`, or drop `.glb` files on the page
   (several at once works):
 
@@ -90,8 +101,15 @@ Letting go leaves the object where it is.
 
 ## Checked so far
 
-Tested in Node with the physics engine and the real sample GLBs (textures stripped,
-since decoding them needs a browser):
+`npm test` runs the committed Node tests (`src/roomScan.test.ts`): the fixture room is
+recentered with the floor at y = 0, a wall lands where the fixture's floor polygon says
+(the column-major, no-transpose proof from `docs/TRANSFORMS.md`), the chair's yaw is +45°,
+`openings` split into a solid door and a translucent window, a wrong `schemaVersion`
+throws, the raw RoomPlan sample still builds, and Rapier treats the detected chair as
+solid until `removeDetected` frees its spot.
+
+Also tested in Node earlier, with the physics engine and the real sample GLBs (textures
+stripped, since decoding them needs a browser):
 
 - A file in centimeters is converted to meters; the origin ends up at the bottom-center.
 - Objects land exactly on the floor and don't spawn on top of the table.
