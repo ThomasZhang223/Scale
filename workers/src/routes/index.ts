@@ -7,7 +7,7 @@
 import { HttpError, json, noContent, readJson } from "../lib/http";
 import { contentHash, nowIso, token, uuid } from "../lib/ids";
 import { R2Keys, contentTypeFor, keyFromAssetPath } from "../lib/keys";
-import { callUpstream, upstreamOrigin } from "../lib/config";
+import { callUpstream, callUpstreamRaw, upstreamOrigin } from "../lib/config";
 import { emitToRoom, roomAgent, scoutAgent } from "../lib/notify";
 import {
   advanceJob,
@@ -343,6 +343,36 @@ export async function postSearch(req: Request, env: Env, origin: string): Promis
   const body = await readJson<SearchBody>(req);
   const limit = Math.min(Math.max(body.limit ?? 8, 1), 50); // Vectorize caps topK at 50 with metadata.
 
+  // Paul's service first, when one is configured. It is a COMPLETE search, not a re-rank stage:
+  // services/search/app/main.py embeds the query itself, queries its own index, and returns
+  // `[{objectId, score, object}]` — the public contract shape. So the right move is to hand it
+  // the caller's body untouched and return its answer, not to wrap the body in an envelope.
+  //
+  // This ordering also matters for cost: retrieving from Vectorize first and then discarding it
+  // paid for a query nobody read.
+  const searchOrigin = await env.CONFIG.get("upstream:search");
+  if (searchOrigin) {
+    try {
+      // Verbatim. `{ query: body, candidates }` would nest every field one level too deep, and
+      // his `body.get("text")` / `body.get("fit")` would read None — producing an unfiltered,
+      // unembedded search that returns plausible rows and reports no error at all.
+      const res = await callUpstreamRaw(env, "search", "/search", body, 8_000);
+      const ranked = (await res.json()) as unknown;
+      const passthrough: Record<string, string> = { "x-ranker": "upstream" };
+      // His headers say something the body does not: that the fit filter was widened, or that
+      // his embedder was down. Losing them would hide a degradation.
+      for (const h of ["x-fit-relaxed", "x-search-degraded"]) {
+        const v = res.headers.get(h);
+        if (v) passthrough[h] = v;
+      }
+      return json(ranked, 200, passthrough);
+    } catch {
+      // Falls through to the Vectorize path below. A ranker that is down must not take search
+      // down with it — but the header has to say so, or the demo looks fine and is not.
+      // ceiling: no circuit breaker. Every request pays the 8s timeout while it is down.
+    }
+  }
+
   const embedding = await queryEmbedding(env, body);
 
   if (!embedding) {
@@ -396,39 +426,17 @@ export async function postSearch(req: Request, env: Env, origin: string): Promis
     return json(relaxedHits, 200, { "x-ranker": "relaxed" });
   }
 
-  // The one unset upstream key that does NOT raise, and the reason is worth stating because
-  // it looks like an exception to the fail-loud rule in lib/config.ts.
+  // Reaching here means either no ranker is configured, or the configured one failed. Both are
+  // real, complete answers in similarity order — which is why an unset upstream:search does not
+  // 503 the way an unset upstream:solver does. The solver is a capability: with none there is no
+  // answer to /v1/fit at all. The ranker is a stage: without it the result set is still correct.
   //
-  // upstream:solver is a *capability*: with no solver there is no answer to /v1/fit at all, so
-  // an unset key must 503. upstream:search is a *re-rank stage* over candidates Vectorize has
-  // already returned, so an unset key still produces a correct, complete result set — just in
-  // similarity order rather than Paul's order. Raising there would take a working search
-  // offline to report a missing optional component.
-  //
-  // What makes that safe rather than a silent default is the X-Ranker header: every response
-  // says which of the four paths ran, so "the results are not ranked" is one curl away instead
-  // of something you notice on stage.
-  const searchOrigin = await env.CONFIG.get("upstream:search");
-  if (!searchOrigin) return json(hits, 200, { "x-ranker": "vectorize" });
-
-  // Paul's ranker is a re-rank stage over candidates we already have, not a replacement for
-  // retrieval. If it is unreachable the Vectorize order still answers the request.
-  try {
-    const ranked = await callUpstream<{ objectId: string; score: number }[]>(
-      env,
-      "search",
-      "/search",
-      { query: body, candidates: hits },
-      8_000,
-    );
-    const order = new Map(ranked.map((r, i) => [r.objectId, { rank: i, score: r.score }]));
-    const reordered = [...hits].sort(
-      (a, b) => (order.get(a.objectId)?.rank ?? 1e6) - (order.get(b.objectId)?.rank ?? 1e6),
-    );
-    return json(reordered, 200, { "x-ranker": "upstream" });
-  } catch {
-    return json(hits, 200, { "x-ranker": "vectorize-ranker-unreachable" });
-  }
+  // What keeps that from being a silent default is the header. Every response names which of the
+  // five paths ran, so "these are not ranked" is one curl away rather than something you notice
+  // on stage.
+  return json(hits, 200, {
+    "x-ranker": searchOrigin ? "vectorize-ranker-unreachable" : "vectorize",
+  });
 }
 
 /**

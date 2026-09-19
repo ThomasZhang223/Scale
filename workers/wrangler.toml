@@ -105,13 +105,6 @@ class_name = "RoomAgent"
 name = "SCOUT_AGENT"
 class_name = "ScoutAgent"
 
-# ceiling: RoomSync is the registration-only 501 stub from the stub-layer branch. RoomAgent
-# replaces it and nothing routes to it any more. Delete the binding, the class in
-# src/index.ts, and this migration entry once thomas/worker-stubs and this branch are merged.
-[[durable_objects.bindings]]
-name = "ROOM_SYNC"
-class_name = "RoomSync"
-
 [[migrations]]
 tag = "v1"
-new_sqlite_classes = ["RoomAgent", "ScoutAgent", "RoomSync"]
+new_sqlite_classes = ["RoomAgent", "ScoutAgent"]
