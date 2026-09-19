@@ -15,7 +15,7 @@ import { HttpError } from "./http";
 // "solver" is services/fit, which answers /fit. "layout" is services/layout, the OR-Tools
 // CP-SAT service that answers /solve. They are two services with two tunnels, because they
 // speak different request shapes and only one of them can be satisfied by a stub.
-export type Upstream = "solver" | "search" | "ingest" | "layout";
+export type Upstream = "solver" | "search" | "ingest" | "layout" | "embedding";
 
 const KV_PREFIX = "upstream:";
 

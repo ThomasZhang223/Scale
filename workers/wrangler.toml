@@ -16,6 +16,12 @@ main = "src/index.ts"
 compatibility_date = "2026-09-19"
 compatibility_flags = ["nodejs_compat"]
 
+[vars]
+API_ORIGIN = "https://full-scale-workers.thomaszhangdev.workers.dev"
+
+[triggers]
+crons = ["* * * * *"]
+
 # Logs in the dashboard. Free, and the only way to debug a Workflow step at 3am.
 [observability]
 enabled = true
@@ -67,9 +73,8 @@ remote = true
 
 # --- Orchestration -------------------------------------------------------------------------
 
-# Queue: admission control for the unattended catalog pre-bake. It exists to throttle, not to
-# transport: 60-100 products would blow past the free plan's 100 concurrent Workflow
-# instances, so the consumer starts at most `max_concurrency` workflows at a time.
+# Queue: delivery/retry for catalog generation. max_concurrency limits consumers,
+# NOT outstanding asynchronous Workflows. MeshDispatcher holds the single admission slot.
 [[queues.producers]]
 binding = "JOB_QUEUE"
 queue = "full-scale-jobs"
@@ -77,7 +82,7 @@ queue = "full-scale-jobs"
 [[queues.consumers]]
 queue = "full-scale-jobs"
 max_batch_size = 1
-max_concurrency = 3
+max_concurrency = 1
 max_retries = 3
 
 # Workflows: the two multi-step pipelines. Each step.do() is durably retried on its own, which
@@ -108,3 +113,11 @@ class_name = "ScoutAgent"
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["RoomAgent", "ScoutAgent"]
+
+[[durable_objects.bindings]]
+name = "MESH_DISPATCHER"
+class_name = "MeshDispatcher"
+
+[[migrations]]
+tag = "v2-mesh-dispatcher"
+new_sqlite_classes = ["MeshDispatcher"]
