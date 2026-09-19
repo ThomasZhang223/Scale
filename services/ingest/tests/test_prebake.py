@@ -209,6 +209,22 @@ def test_image_width_is_requested_from_the_cdn():
     assert bp.sized("https://cdn.shopify.com/x.jpg", None) == "https://cdn.shopify.com/x.jpg"
 
 
+def test_a_rerun_prunes_the_previous_runs_images():
+    """Product ids differ between runs, so without pruning every re-run leaves its
+    predecessor's images behind — 142 files for a 100-product manifest."""
+    m, tmp = run_cli(["--download"])
+    prebake = os.path.join(tmp, "prebake")
+    stale = os.path.join(prebake, "catalog", "Old_Merchant", "999", "source.jpg")
+    os.makedirs(os.path.dirname(stale), exist_ok=True)
+    open(stale, "wb").write(PIXEL)
+
+    kept = {r["r2Key"] for r in m["products"]}
+    assert bp.prune_orphans(m["products"], prebake) == 1
+    assert not os.path.exists(stale)
+    for key in kept:
+        assert os.path.exists(os.path.join(prebake, key)), key
+
+
 def test_a_verified_file_with_no_merchants_fails_loudly():
     tmp = tempfile.mkdtemp()
     v = os.path.join(tmp, "v.json")
