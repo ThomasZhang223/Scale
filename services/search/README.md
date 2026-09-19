@@ -58,7 +58,7 @@ matters is `test_a_perfect_style_match_that_does_not_fit_is_excluded` — an oak
 
 Style is blended from three signals, weights in `ranking.py`:
 
-- **cosine** (0.70) over Ani's CLIP embeddings — the query proper
+- **cosine** (0.70) over Ani's SigLIP2 embeddings (`google/siglip2-base-patch16-224`, 768-dim) — the query proper
 - **colour** (0.30) — CIELAB ΔE76, not RGB distance, because wood tones are all brownish and
   RGB cannot separate them
 - **confidence** (0.05) — a tiebreaker only. Between two equal matches, prefer the one whose
