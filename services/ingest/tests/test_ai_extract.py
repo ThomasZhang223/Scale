@@ -15,17 +15,25 @@ CFG = OpenAIConfig(api_key="k", model="gpt-test")
 
 class Fake:
     """Records the request and replays a canned choices[0].message.content."""
-    def __init__(self, payload=None, status=200, refusal=None, body=None, text=""):
+    def __init__(self, payload=None, status=200, refusal=None, body=None, text="",
+                 statuses=None, resp_headers=None):
         self.payload, self.status, self.refusal, self.body = payload, status, refusal, body
         self.text = text
+        # `statuses` replays a sequence across attempts, for the retry tests.
+        self.statuses = list(statuses) if statuses else None
+        self.resp_headers = resp_headers or {}
+        self.calls = 0
         self.seen = None
 
     def post(self, url, headers=None, json=None):
         self.seen = {"url": url, "headers": headers, "json": json}
+        self.calls += 1
         outer = self
+        status = self.statuses.pop(0) if self.statuses else self.status
         class R:
-            status_code = outer.status
+            status_code = status
             text = outer.text
+            headers = outer.resp_headers
             def json(self):
                 if outer.body is not None:
                     return outer.body
@@ -223,3 +231,80 @@ if __name__ == "__main__":
                 print(f"FAIL {name}: {type(e).__name__}: {e}"); fails += 1
     print(f"\n{fails} failed")
     sys.exit(1 if fails else 0)
+
+
+# --- a rate limit is not an answer ---------------------------------------
+
+def test_a_429_is_retried_rather_than_recorded_as_a_miss():
+    """Seen for real on step 3: images are token-expensive and concurrent calls hit a
+    tokens-per-minute ceiling. Losing the product to that is a silently wrong answer."""
+    import app.ai_extract as ai
+    slept = []
+    orig = ai.time.sleep
+    ai.time.sleep = lambda s: slept.append(s)
+    try:
+        errors = []
+        f = Fake({"found": True, "width": 150, "height": 45, "depth": 40, "unit": "cm",
+                  "quote": "x"}, statuses=[429, 200])
+        hit = extract_with_llm(product(), CFG, client=f, errors=errors)
+    finally:
+        ai.time.sleep = orig
+    assert hit is not None, "gave up on a rate limit that cleared on the retry"
+    assert f.calls == 2, f"made {f.calls} attempts"
+    assert errors == [], f"a recovered 429 should not be reported as a failure: {errors}"
+    assert slept, "retried with no delay at all"
+
+
+def test_the_api_s_retry_after_is_honoured():
+    import app.ai_extract as ai
+    slept = []
+    orig = ai.time.sleep
+    ai.time.sleep = lambda s: slept.append(s)
+    try:
+        f = Fake({"found": False}, statuses=[429, 200], resp_headers={"retry-after": "7"})
+        extract_with_llm(product(), CFG, client=f)
+    finally:
+        ai.time.sleep = orig
+    assert slept == [7.0], f"slept {slept}, wanted the header's 7s"
+
+
+def test_a_retry_after_longer_than_the_cap_is_clamped():
+    """A 900s Retry-After would stall the whole pass behind one product."""
+    import app.ai_extract as ai
+    slept = []
+    orig = ai.time.sleep
+    ai.time.sleep = lambda s: slept.append(s)
+    try:
+        f = Fake({"found": False}, statuses=[429, 200], resp_headers={"retry-after": "900"})
+        extract_with_llm(product(), CFG, client=f)
+    finally:
+        ai.time.sleep = orig
+    assert slept == [ai.MAX_BACKOFF_S], slept
+
+
+def test_a_persistent_429_is_reported_once_after_the_last_attempt():
+    import app.ai_extract as ai
+    orig = ai.time.sleep
+    ai.time.sleep = lambda s: None
+    try:
+        errors = []
+        f = Fake(status=429, text='{"error":{"message":"Rate limit reached"}}')
+        assert extract_with_llm(product(), CFG, client=f, errors=errors) is None
+    finally:
+        ai.time.sleep = orig
+    assert f.calls == ai.MAX_ATTEMPTS, f"made {f.calls}, wanted {ai.MAX_ATTEMPTS}"
+    assert len(errors) == 1, f"one reason per call, not per attempt: {errors}"
+    assert "http_429" in errors[0]
+
+
+def test_a_400_is_not_retried():
+    """A bad request is bad every time. Retrying it burns the rate limit that much faster."""
+    import app.ai_extract as ai
+    orig = ai.time.sleep
+    ai.time.sleep = lambda s: None
+    try:
+        f = Fake(status=400, text='{"error":{"code":"invalid_image_format"}}')
+        assert extract_with_llm(product(), CFG, client=f, errors=[]) is None
+    finally:
+        ai.time.sleep = orig
+    assert f.calls == 1, f"retried a 400 {f.calls} times"
