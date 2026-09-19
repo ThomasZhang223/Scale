@@ -1,0 +1,131 @@
+"""B01 raw SF3D feasibility wrapper. Heavy imports/downloads occur only in load."""
+
+import hashlib
+import os
+from pathlib import Path
+import platform
+import sys
+import threading
+import time
+
+from .transport import artifact_response, decode_request
+
+SOURCE_REVISION = "ff21fc491b4dc5314bf6734c7c0dabd86b5f5bb2"
+MODEL_REVISION = "f0c9a8ffd62cb1bbc8a7a53c9f87a0be1b6be778"
+DINO_REVISION = "47b73eefe95e8d44ec3623f8890bd894b6ea2d6c"
+CLIP_REVISION = "1a25a446712ba5ee05982a381eed697ef9b435cf"
+SETTINGS = {"foreground_ratio": 0.85, "texture_resolution": 1024,
+            "remesh": "none", "vertex_count": -1, "dtype": "cuda-bfloat16-autocast"}
+REVISIONS = {"sf3d_source": SOURCE_REVISION, "sf3d_weights": MODEL_REVISION,
+             "dinov2": DINO_REVISION, "open_clip": CLIP_REVISION,
+             "rembg": "2.0.57", "u2net_md5": "60024c5c889badc19c04ad937298a77b"}
+
+
+class CudaRuntime:
+    def __init__(self, token):
+        import torch
+        if not torch.cuda.is_available() or not torch.cuda.is_bf16_supported():
+            raise RuntimeError("This candidate requires a Linux CUDA GPU with bfloat16 support")
+        if platform.system() != "Linux":
+            raise RuntimeError("This candidate is Linux-only")
+        from huggingface_hub import snapshot_download, hf_hub_download
+        from omegaconf import OmegaConf
+        from safetensors.torch import load_model
+        import rembg
+
+        # Explicit snapshots: no main-branch alias may choose secondary weights.
+        primary = Path(snapshot_download("stabilityai/stable-fast-3d", revision=MODEL_REVISION,
+                       allow_patterns=["config.yaml", "model.safetensors"], token=token))
+        dino = snapshot_download("facebook/dinov2-large", revision=DINO_REVISION,
+                                 allow_patterns=["config.json", "model.safetensors"], token=token)
+        clip = hf_hub_download("laion/CLIP-ViT-B-32-laion2B-s34B-b79K",
+                              "open_clip_pytorch_model.bin", revision=CLIP_REVISION, token=token)
+        cfg = OmegaConf.load(primary / "config.yaml")
+        OmegaConf.resolve(cfg)
+        # Gated config was not available during B01: fail loudly on another architecture.
+        if cfg.image_tokenizer_cls != "sf3d.models.tokenizers.image.DINOV2SingleImageTokenizer":
+            raise RuntimeError("Unexpected SF3D image tokenizer; inspect the pinned config")
+        if cfg.image_estimator_cls != "sf3d.models.image_estimator.clip_based_estimator.ClipBasedHeadEstimator":
+            raise RuntimeError("Unexpected SF3D image estimator; inspect the pinned config")
+        if cfg.image_estimator.get("model", "ViT-B-32") != "ViT-B-32":
+            raise RuntimeError("Unexpected OpenCLIP architecture")
+        cfg.image_tokenizer.pretrained_model_name_or_path = dino
+        cfg.image_estimator.pretrain = clip
+        sys.path.insert(0, "/opt/sf3d")
+        from sf3d.system import SF3D
+        from sf3d.utils import remove_background, resize_foreground
+        self.torch = torch
+        self.remove_background = remove_background
+        self.resize_foreground = resize_foreground
+        # Same construction/load_model sequence as upstream from_pretrained,
+        # with only the secondary checkpoint paths replaced by pinned local files.
+        self.model = SF3D(cfg)
+        load_model(self.model, str(primary / "model.safetensors"))
+        self.model.to("cuda").eval()
+        # CPU rembg is deliberate: predictable provider and no cuDNN search-path ambiguity.
+        # SF3D remains on GPU. Keep one session loaded for every request.
+        self.session = rembg.new_session("u2net", providers=["CPUExecutionProvider"])
+        u2net_path = Path(os.environ.get("U2NET_HOME", str(Path.home() / ".u2net"))) / "u2net.onnx"
+        if hashlib.md5(u2net_path.read_bytes()).hexdigest() != REVISIONS["u2net_md5"]:
+            raise RuntimeError("Unexpected U2NET checkpoint checksum")
+        self.info = {"python": platform.python_version(), "torch": torch.__version__,
+                     "cuda": torch.version.cuda, "gpu": torch.cuda.get_device_name(0),
+                     "onnx_providers": self.session.inner_session.get_providers(),
+                     "cond_image_size": int(cfg.cond_image_size),
+                     "u2net_sha256": hashlib.sha256(u2net_path.read_bytes()).hexdigest()}
+
+    def generate(self, image):
+        start = time.perf_counter()
+        image = self.remove_background(image, self.session)
+        alpha = image.getchannel("A")
+        box = alpha.point(lambda v: 255 if v > 127 else 0).getbbox()
+        if box is None or min(box[2] - box[0], box[3] - box[1]) < 2:
+            raise ValueError("Empty or degenerate foreground mask")
+        image = self.resize_foreground(image, SETTINGS["foreground_ratio"])
+        prep_end = time.perf_counter()
+        t = self.torch
+        t.cuda.synchronize()
+        t.cuda.reset_peak_memory_stats()
+        with t.inference_mode(), t.autocast(device_type="cuda", dtype=t.bfloat16):
+            mesh, _ = self.model.run_image(image, bake_resolution=SETTINGS["texture_resolution"],
+                                          remesh="none", vertex_count=-1)
+        t.cuda.synchronize()
+        gen_end = time.perf_counter()
+        if not len(mesh.vertices) or not len(mesh.faces):
+            raise ValueError("SF3D returned an empty mesh")
+        raw = mesh.export(file_type="glb", include_normals=True)
+        return raw, {"preprocess_ms": (prep_end - start) * 1000,
+                     "generate_bake_ms": (gen_end - prep_end) * 1000,
+                     "export_ms": (time.perf_counter() - gen_end) * 1000,
+                     "peak_cuda_bytes": t.cuda.max_memory_allocated()}
+
+
+class Model:
+    def __init__(self, **kwargs):
+        self._secrets = kwargs.get("secrets", {})
+        self._runtime = None
+        self._lock = threading.Lock()
+
+    def load(self):
+        with self._lock:
+            if self._runtime is None:
+                token = self._secrets.get("hf_access_token")
+                if not token:
+                    raise RuntimeError("Configure the hf_access_token runtime secret after access approval")
+                self._runtime = CudaRuntime(token)
+
+    def predict(self, model_input):
+        if self._runtime is None:
+            raise RuntimeError("SF3D is not loaded")
+        if not self._lock.acquire(blocking=False):
+            raise RuntimeError("SF3D is busy; one request at a time")
+        try:
+            start = time.perf_counter()
+            image, input_hash = decode_request(model_input)
+            decode_ms = (time.perf_counter() - start) * 1000
+            raw, timings = self._runtime.generate(image)
+            return artifact_response(raw, input_hash, revisions=REVISIONS, settings=SETTINGS,
+                                     runtime=self._runtime.info,
+                                     timings={"decode_ms": decode_ms, **timings})
+        finally:
+            self._lock.release()
