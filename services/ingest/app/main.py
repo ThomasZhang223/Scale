@@ -55,6 +55,15 @@ CRAWL_TIMEOUT_S = 30.0
 # one product its recovery. Fine for a single merchant per request.
 AI_CONCURRENCY = int(os.environ.get("AI_CONCURRENCY") or 8)
 
+# Step 2.5 is the slowest call in the pipeline — Browserbase renders a real page — and it is
+# synchronous too, so it had both of step 2's problems and a tighter budget: at the default
+# pageLimit of 60, anything past ~4s a render blows the Worker's 240s timeout, with /health
+# unanswerable the whole time.
+# Deliberately much lower than AI_CONCURRENCY: Browserbase limits concurrent sessions by plan
+# (low single digits on the smaller ones), so a wide pool earns 429s rather than speed. Three
+# is safe on a starter plan and still 3x serial; raise it if your plan allows.
+PAGE_CONCURRENCY = int(os.environ.get("PAGE_CONCURRENCY") or 3)
+
 
 async def _in_threads(calls: list, limit: int) -> list:
     """Run blocking callables on worker threads, at most `limit` at once, keeping order.
@@ -230,12 +239,23 @@ async def extract_products(request: Request):
         needs_page = [p for p in needs_ai if p.get("handle")]
 
     # Step 2.5: another surface entirely, for products whose text simply lacks the numbers.
+    # The fetches run on worker threads; the bookkeeping below stays on this one, in input
+    # order, so stats and objects come out the same regardless of which page finished first.
     needs_image: list[dict] = []
-    for p in needs_page[:page_limit] if fetcher else []:
-        stats["pages_fetched"] += 1
+    page_batch = needs_page[:page_limit] if fetcher else []
+
+    def fetch_one(p: dict):
+        """Returns the page content, or the FetchError to be counted by the caller."""
         try:
-            res = fetcher.fetch(product_url(storefront, p["handle"]))
-        except FetchError:
+            return fetcher.fetch(product_url(storefront, p["handle"]))
+        except FetchError as e:
+            return e
+
+    for p, res in zip(page_batch,
+                      await _in_threads([functools.partial(fetch_one, p) for p in page_batch],
+                                        PAGE_CONCURRENCY)):
+        stats["pages_fetched"] += 1
+        if isinstance(res, FetchError):
             stats["page_failures"] += 1
             continue
         if not accept(p, extract_from_page(res.content), "page", "from_page"):
