@@ -1,8 +1,9 @@
 # Ani ML demo runbook — 2026-09-19
 
 **Works locally:** real cached embeddings, Paul's search handoff, B04 and B06
-software composition. **Not live:** SF3D, product relevance evaluation, deployed
-generation workflow/SSE. Keep those claims separate.
+software composition. **Real SF3D generation and saved-mesh B04: PASS.**
+Product relevance evaluation and deployed generation workflow/SSE remain unproven.
+No further Baseten/GPU calls are authorized; use the saved artifact below.
 
 ## Start the CPU service
 
@@ -101,8 +102,8 @@ observations, **not p95**, not network/deployed latencies:
 | B04, synthetic textured GLB | 0.023 |
 | Real text -> selection -> fake provider -> B04 -> inline completion | 0.249 |
 
-No real generation/build/load/cold/warm GPU times exist. The fast fake-provider
-path does not estimate SF3D latency. Corpus has **zero verified products**, zero
+The saved SF3D generation receipt is separate evidence, not a cold/warm benchmark.
+The fast fake-provider path does not estimate SF3D latency. Corpus has **zero verified products**, zero
 held-out photos; Recall@K is not meaningful. Five synthetic hard-filter checks
 had zero violations. Unit fixtures also prove ranking changes with query vectors.
 
@@ -124,25 +125,47 @@ had zero violations. Unit fixtures also prove ranking changes with query vectors
   Actual upload/PUT/asset handlers pass with local R2/KV doubles; no deployed
   backend, durable workflow or SSE success is claimed. Justin's Object v1 adapter
   requires `state:ready`, `glbUrl`, `schemaVersion:1`, metre box and scale 1.
-- **Account owner / Baseten:** one preflight found no session/user environment
-  Baseten API key, deployment URL or standard Truss credentials. Custom deployment
-  entitlement and usable credits could not be verified. **BLOCKED_EXTERNAL**.
-  No account/deploy/inference requests were made, $0 spent, no compute created.
-  Restore credentials securely and verify applicable credit/build coverage for
-  the authorized <=US$3 run before the existing B02 runner is used. Do not add a
-  payment method or make a speculative deployment. A real GLB then needs Ani's
-  orientation/material/distortion review and binding check.
+- **Saved SF3D / B04:** real generation succeeded. The existing deployment's saved
+  shutdown receipt says `INACTIVE`, zero replicas. This completion run makes no
+  Baseten, inference, model-download or GPU calls. There is no deployed workflow claim.
 
-If Baseten is unavailable, keep the existing measured box in the product demo.
-There is currently no verified cached SF3D artifact to claim as a fallback. Fake
-providers are tests only; the default HTTP service never substitutes them.
+## Saved real mesh software proof
+
+[Sanitized evidence](evidence/real-sf3d-binding-2026-09-19.json) records raw and bound
+hashes, source AABB, exact target and validation. Source extents are
+`[0.49763214588165283, 0.9512068629264832, 0.5229946970939636]`.
+Multipliers `[1.08, 1.00, 0.96]` yield target W/H/D
+`[0.5374427175521851, 0.9512068629264832, 0.502074909210205]` metres;
+distortion is **1.125**. This is a moderate nonuniform software test target.
+The real chair's physical dimensions were **not independently measured**.
+
+Local root: `C:\Users\hp\AppData\Local\Temp\ani-sf3d-team26-7a0c56f9`.
+Open `bound\chair-bound.glb` in Blender. Previews are
+`bound\bound-six-views.png` and `bound\raw-vs-bound.png`.
+The preview uses Blender Cycles **CPU**, embedded base color and normal map, and
+explicit exported tangent/bitangent/normal attributes. No GPU render is used.
+Raw preview placement is centred on the floor for comparison; raw bytes are unchanged.
+The chair remains upright, with -Z front, visible wood/upholstery and no obvious
+new tangent shading or shape damage. Uneven individual feet are inherited from
+SF3D; bottom-centre/minY is exactly zero. This is not a physical accuracy review.
+
+Reproduce numeric evidence using only the saved raw artifact (new output directory):
+
+```powershell
+& $aniPython services/gen/tests/run_saved_sf3d_binding.py --raw "$env:TEMP\ani-sf3d-team26-7a0c56f9\raw\mesh.glb" --output "$env:TEMP\ani-sf3d-binding-recheck"
+```
+
+The script requires the reviewed raw SHA; it refuses other artifacts or an
+output directory inside Git. It never regenerates SF3D. Normal maps use final
+geometry tangents, with five duplicated seam vertices and unchanged UV corners,
+material records and embedded image hashes. Dimensions reload with errors
+`[2.622604367e-8, 0, 1.192092891e-8]` metres and zero origin error.
+Current full lightweight tests: **210 passed, 3 skipped** (opt-in real-model checks).
 
 Cut: quality tier, bulk prebake, model comparisons, captions, palette/thumbnail,
 best-frame scoring, new search/vector DB/backend, broad benchmarks and tuning.
 The SF3D rembg path is sufficient; a second background-removal service is cut.
 
-Sync note: the one authorized merge used `origin/main` at `13541b7`. During work,
-the remote-tracking ref advanced four commits to `0888470`. Those new files were
-inspected read-only and the importer adapted, without a second merge or edits to
-Paul's files. A future sync needs authorization; this checkout retains both the
-original team sync and Ani's local commits.
+Integration authorization now includes normal merges of latest `origin/main`
+into `ani/ml`, branch push, then a normal merge into main and push after tests.
+No rebase, squash, reset or force push. The Git history records the completed sync.

@@ -4,6 +4,7 @@ Implemented B04 local library: `bind_glb`, explicit `OrientationProfile`, immuta
 `BoundArtifact`, scoped cache identities and selected-product image/box checks.
 See [the implemented contract and limits](../../BINDING.md).
 
-Synthetic export/reload software tests pass. Real SF3D semantic orientation and
-visual distortion remain BLOCKED_ON_B02. This module performs no generation,
+Synthetic and saved real SF3D export/reload checks pass, including normal-map
+tangents and artifact-specific orientation/visual review. Physical chair
+measurements remain unverified. This module performs no generation,
 storage, HTTP integration or cloud operations.
