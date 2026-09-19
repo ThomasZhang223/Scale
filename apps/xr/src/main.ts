@@ -5,7 +5,12 @@ import { buildRoomFromScan, type BuiltRoom, type ScannedObject } from './roomSca
 import { ObjectLoader, type LoadedObject } from './objects';
 import { createPhysics } from './physics';
 import { Interaction } from './interaction';
-import { getRoom, getObject, objectToItem, boundsMismatch, watchRoom, STUB, type ObjectV1 } from './api';
+import {
+  getRoom, getObject, getVersion, postVersion, objectToItem, boundsMismatch, watchRoom, postFit, STUB,
+  type ObjectV1, type VersionV1,
+} from './api';
+import { FitOverlay, type FitReport } from './fit';
+import { fromPlacement, layoutToVersion, type PlacedLayout } from './placements';
 import { Palette, type PaletteItem } from './palette';
 import { matchDetected } from './placement';
 import roomDemo from '../../../fixtures/room-demo.json';
@@ -37,6 +42,7 @@ const SCAN_URL = params.get('scan'); // null: the committed RoomCapture v1 fixtu
 const OBJECTS_URL = params.get('objects') ?? '/objects.json';
 const ROOM_ID = params.get('room') ?? import.meta.env.VITE_ROOM_ID ?? roomDemo.roomId;
 const OBJECT_IDS = params.get('object')?.split(',').filter(Boolean) ?? [];
+const VERSION_ID = params.get('version'); // a stored layout to apply after the room loads
 
 // ---------- renderer, scene, camera ----------
 
@@ -78,6 +84,13 @@ const waiting = new THREE.GridHelper(6, 12, 0x5fb3ff, 0x39424c);
 scene.add(waiting);
 const room = new THREE.Group();
 scene.add(room);
+const fitOverlay = new FitOverlay();
+scene.add(fitOverlay.group);
+
+const PALETTE_ACTIONS: PaletteItem[] = [
+  { url: '', name: 'Reset room', action: 'reset' },
+  { url: '', name: 'Clear objects', action: 'clear' },
+];
 
 // ---------- panel ----------
 
@@ -91,14 +104,18 @@ const say = (text: string) => (note.textContent = text);
 // ---------- state ----------
 
 interface PlacedObject {
-  id: string;
+  id: string;          // placementId
+  objectId: string;    // Object v1 id from the server, or local:<name> for files and the manifest
   name: string;        // file or manifest name; matched against detected categories
   loaded: LoadedObject;
   replaces?: ScannedObject;
 }
 
+const localId = (name: string) => `local:${name}`;
+
 let currentRoom: BuiltRoom | null = null;
 let lastScan: Record<string, unknown> | null = null;
+let currentVersionId: string | null = null; // parent for the next version we push
 const objects = new Map<string, PlacedObject>();
 const catalog: PaletteItem[] = []; // everything in objects.json, placed or not
 let rise = 1; // 0..1 while the walls rise; objects are placed once it reaches 1
@@ -108,7 +125,25 @@ async function start() {
   const physics = await createPhysics(scene);
   const loader = new ObjectLoader(renderer);
   const palette = new Palette();
-  const interaction = new Interaction(renderer, scene, camera, controls, physics, palette, spawn);
+  const interaction = new Interaction(renderer, scene, camera, controls, physics, palette, spawn, onAction, layoutChanged);
+  const showPalette = () => palette.setItems([...catalog, ...PALETTE_ACTIONS]);
+  showPalette();
+
+  function onAction(action: string) {
+    if (action === 'reset' && lastScan) showScan(lastScan, 'Room reset');
+    if (action === 'clear') clearObjects();
+  }
+
+  /** Removes every placed object; detected boxes come back with the next reset. */
+  function clearObjects() {
+    for (const obj of objects.values()) {
+      physics.remove(obj.id);
+      obj.loaded.node.removeFromParent();
+    }
+    objects.clear();
+    fitOverlay.clear();
+    say('All objects removed.');
+  }
 
   // ---------- room ----------
 
@@ -131,12 +166,32 @@ async function start() {
     room.clear();
     room.add(built.group);
     currentRoom = built;
+    fitOverlay.setRoomOffset(built.offset);
+    fitOverlay.clear();
     waiting.visible = false;
     rise = 0;
     placementPending = true; // re-place every object once the walls are up
 
     const { width, depth } = built.size;
     say(`${source}: ${width.toFixed(1)} × ${depth.toFixed(1)} m, ${built.objects.length} pieces of furniture detected.`);
+  }
+
+  /** Draws a FitReport and says what's wrong. */
+  function showFit(report: FitReport) {
+    fitOverlay.show(report);
+    if (report.ok || !report.violations.length) return;
+    const blocks = report.violations.filter((v) => v.severity === 'block').length;
+    say(`Fit: ${report.violations.map((v) => v.message).join('; ')} (${blocks} blocking).`);
+  }
+
+  /** Asks the server to check the current layout; under the stub, that's the door-swing fixture. */
+  async function checkFit() {
+    if (SCAN_URL) return;
+    try {
+      showFit(await postFit(ROOM_ID));
+    } catch (err) {
+      console.warn('Fit check failed:', err);
+    }
   }
 
   // ---------- objects ----------
@@ -176,7 +231,7 @@ async function start() {
   async function addObject(url: string, name: string, scale?: number) {
     try {
       const loaded = await loader.load(url, scale);
-      const obj: PlacedObject = { id: crypto.randomUUID(), name, loaded };
+      const obj: PlacedObject = { id: crypto.randomUUID(), objectId: localId(name), name, loaded };
       objects.set(obj.id, obj);
       if (currentRoom && rise >= 1) place(obj); // otherwise placed when the room is ready
     } catch (err) {
@@ -190,7 +245,7 @@ async function start() {
     if (!currentRoom || rise < 1) return null;
     try {
       const loaded = await loader.load(item.url, item.scale);
-      const obj: PlacedObject = { id: crypto.randomUUID(), name: item.name, loaded };
+      const obj: PlacedObject = { id: crypto.randomUUID(), objectId: item.objectId ?? localId(item.name), name: item.name, loaded };
       objects.set(obj.id, obj);
       const spot = physics.findFreeSpot(loaded.size, 0, at);
       scene.add(loaded.node);
@@ -241,16 +296,16 @@ async function start() {
       return say(`${obj.name ?? obj.objectId}: ${(err as Error).message}.`);
     }
     if (catalog.some((c) => c.url === item.url)) return; // the feed can repeat an object
-    const entry: PaletteItem = { url: item.url, name: item.name, scale: 1 };
+    const entry: PaletteItem = { url: item.url, name: item.name, scale: 1, objectId: obj.objectId };
     catalog.push(entry);
-    palette.setItems(catalog);
+    showPalette();
     renderCatalog();
     try {
       const loaded = await loader.load(item.url, 1);
       entry.size = loaded.size;
-      palette.setItems(catalog);
+      showPalette();
       renderCatalog();
-      const placed: PlacedObject = { id: crypto.randomUUID(), name: item.name, loaded };
+      const placed: PlacedObject = { id: crypto.randomUUID(), objectId: obj.objectId, name: item.name, loaded };
       objects.set(placed.id, placed);
       if (currentRoom && rise >= 1) place(placed); // otherwise placed when the walls are up
       const mismatch = boundsMismatch(loaded.size, item.expected);
@@ -272,6 +327,57 @@ async function start() {
         say(`Object ${id}: ${(err as Error).message}`);
       }
     }
+  }
+
+  // ---------- versions (stored layouts) ----------
+
+  /** Moves every object the version mentions to its stored spot; fetches ones we don't have yet. */
+  async function applyVersion(version: VersionV1) {
+    if (!currentRoom) return;
+    currentVersionId = version.versionId;
+    const offset = currentRoom.offset;
+    for (const p of version.placements) {
+      const layout = fromPlacement(p, offset);
+      let obj = objects.get(p.placementId) ?? [...objects.values()].find((o) => o.objectId === p.objectId && !version.placements.some((q) => q.placementId === o.id && q !== p));
+      if (!obj) {
+        try {
+          await addServerObject(await getObject(p.objectId));
+        } catch (err) {
+          console.warn(`Version ${version.versionId}: object ${p.objectId} unavailable:`, err);
+          continue;
+        }
+        obj = [...objects.values()].find((o) => o.objectId === p.objectId);
+        if (!obj) continue;
+      }
+      physics.moveTo(obj.id, layout.position[0], layout.position[2], layout.rotationY);
+    }
+    say(`Layout "${version.label}" applied: ${version.placements.length} placements.`);
+  }
+
+  let pushTimer: number | undefined;
+
+  /** After a drop, push the layout as a new version (debounced; one call per pause in editing). */
+  function layoutChanged(_id: string) {
+    if (SCAN_URL || !currentRoom) return;
+    clearTimeout(pushTimer);
+    pushTimer = window.setTimeout(async () => {
+      const offset = currentRoom!.offset;
+      const layout: PlacedLayout[] = [...objects.values()].map((o) => ({
+        placementId: o.id,
+        objectId: o.objectId,
+        position: [o.loaded.node.position.x, o.loaded.node.position.y, o.loaded.node.position.z],
+        rotationY: physics.rotationY(o.id),
+      }));
+      try {
+        const body = await layoutToVersion(ROOM_ID, layout, offset, currentVersionId, 'headset edit');
+        const version = await postVersion(ROOM_ID, body);
+        currentVersionId = version.versionId;
+        void checkFit();
+      } catch (err) {
+        // The stub answers 501 here; once versions are real this becomes the live save.
+        console.info('Layout not saved to the server:', (err as Error).message);
+      }
+    }, 800);
   }
 
   // ---------- loading ----------
@@ -310,7 +416,7 @@ async function start() {
       return;
     }
     for (const o of list) catalog.push({ url: o.url, name: o.name ?? o.url.split('/').pop()!, scale: o.scale });
-    palette.setItems(catalog);
+    showPalette();
     renderCatalog();
 
     // Preload every item so the first pull from the palette is instant. Only items that
@@ -321,7 +427,7 @@ async function start() {
           const loaded = await loader.load(item.url, item.scale);
           item.size = loaded.size;
           if (!findMatch(item.name)) return;
-          const obj: PlacedObject = { id: crypto.randomUUID(), name: item.name, loaded };
+          const obj: PlacedObject = { id: crypto.randomUUID(), objectId: localId(item.name), name: item.name, loaded };
           objects.set(obj.id, obj);
           if (currentRoom && rise >= 1) place(obj); // otherwise placed when the walls are up
         } catch (err) {
@@ -330,18 +436,22 @@ async function start() {
         }
       }),
     );
-    palette.setItems(catalog); // labels now include sizes
+    showPalette(); // labels now include sizes
     renderCatalog();
   }
 
   await loadRoom();
   void loadManifest();
-  void loadServerObjects();
+  await loadServerObjects();
+  void checkFit();
+  if (VERSION_ID) {
+    getVersion(VERSION_ID).then(applyVersion).catch((err) => say(`Version ${VERSION_ID}: ${(err as Error).message}`));
+  }
   if (!SCAN_URL) {
     watchRoom(ROOM_ID, {
       object: (obj) => void addServerObject(obj),
-      version: (v) => console.info('A new version was pushed:', v.versionId), // placements: not rendered yet
-      fit: (report) => console.info('Fit report:', report), // drawing it in red is the next step
+      version: (v) => void getVersion(v.versionId).then(applyVersion).catch((err) => console.warn('Version event:', err)),
+      fit: showFit,
       status: setConnection,
     });
   }
@@ -378,9 +488,7 @@ async function start() {
     setConnection('file');
   }
 
-  document.getElementById('reset')!.addEventListener('click', () => {
-    if (lastScan) showScan(lastScan, 'Room reset');
-  });
+  document.getElementById('reset')!.addEventListener('click', () => onAction('reset'));
 
   (document.getElementById('colliders') as HTMLInputElement).addEventListener('change', (e) => {
     physics.setDebug((e.target as HTMLInputElement).checked);

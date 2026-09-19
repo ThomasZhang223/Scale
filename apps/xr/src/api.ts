@@ -6,6 +6,8 @@
  * Worker (vite.config.ts), so the browser sees one origin and CORS never comes up.
  */
 
+import type { FitReport } from './fit';
+
 const env = (import.meta as { env?: Record<string, string | undefined> }).env ?? {};
 export const API_BASE = env.VITE_API_BASE ?? '/v1';
 export const STUB = env.VITE_API_STUB !== '0';
@@ -76,10 +78,60 @@ export function boundsMismatch(size: { x: number; y: number; z: number }, expect
   return `mesh measures ${f(size.x)} × ${f(size.y)} × ${f(size.z)} m but bboxMeters says ${f(expected.w)} × ${f(expected.h)} × ${f(expected.d)} m — the normalisation contract broke upstream (ask Ani)`;
 }
 
+async function post<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...(STUB ? { 'X-Stub': '1' } : {}) },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText} from POST ${API_BASE}${path}`);
+  return res.json() as Promise<T>;
+}
+
+/** POST /fit: validate the room's layout. Returns FitReport v1 (the door-swing fixture under the stub). */
+export async function postFit(roomId: string, placements?: unknown[]): Promise<FitReport> {
+  const report = await post<FitReport>('/fit', placements ? { roomId, placements } : { roomId });
+  checkSchema(report, 'FitReport');
+  return report;
+}
+
+export interface PlacementV1 {
+  placementId: string;
+  objectId: string;
+  p: [number, number, number];
+  yawDeg: number;
+  scale: number;
+  lockedToWallId: string | null;
+  flags: string[];
+}
+
+export interface VersionV1 {
+  schemaVersion: number;
+  versionId: string;
+  roomId: string;
+  parentId: string | null;
+  label: string;
+  createdAt: string;
+  placements: PlacementV1[];
+  materials: Record<string, string>;
+  contentHash: string;
+}
+
+export async function getVersion(versionId: string): Promise<VersionV1> {
+  const version = await get<VersionV1>(`/versions/${versionId}`);
+  checkSchema(version, 'Version');
+  return version;
+}
+
+/** POST /rooms/{id}/versions with a Version v1 minus its ids; the server mints them. */
+export function postVersion(roomId: string, body: Omit<VersionV1, 'versionId' | 'createdAt'>): Promise<VersionV1> {
+  return post(`/rooms/${roomId}/versions`, body);
+}
+
 export interface RoomEvents {
   object: (obj: ObjectV1) => void;
   version: (v: { versionId: string }) => void;
-  fit: (report: unknown) => void;
+  fit: (report: FitReport) => void;
   status: (status: 'live' | 'nosync') => void;
 }
 

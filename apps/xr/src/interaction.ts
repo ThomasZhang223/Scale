@@ -60,6 +60,10 @@ export class Interaction {
     private palette: Palette,
     /** Puts a fresh copy of a catalogue item into the room; resolves to its id, or null. */
     private spawn: (item: PaletteItem, at: { x: number; z: number }) => Promise<string | null>,
+    /** A palette action tile (Reset, Clear) was pressed. */
+    private onAction: (action: string) => void,
+    /** An object was let go: the layout changed. */
+    private onRelease: (id: string) => void,
   ) {
     this.setUpControllers(renderer, scene);
     this.setUpMouse(renderer.domElement);
@@ -152,13 +156,17 @@ export class Interaction {
       controller.addEventListener('selectstart', () => {
         this.raycaster.setFromXRController(controller);
         const item = this.palette.hitTest(this.raycaster);
+        if (item?.action) return this.onAction(item.action);
         if (item) return this.pull(hand, item);
         hand.grab = this.tryGrab();
         if (hand.grab) hand.source?.gamepad?.hapticActuators?.[0]?.pulse?.(0.4, 40);
       });
       controller.addEventListener('selectend', () => {
         hand.pulling = false;
-        if (hand.grab) this.physics.release(hand.grab.id);
+        if (hand.grab) {
+          this.physics.release(hand.grab.id);
+          this.onRelease(hand.grab.id);
+        }
         hand.grab = undefined;
       });
       this.hands.push(hand);
@@ -232,6 +240,7 @@ export class Interaction {
     const end = () => {
       if (!this.mouseGrab) return;
       this.physics.release(this.mouseGrab.id);
+      this.onRelease(this.mouseGrab.id);
       this.mouseGrab = undefined;
       this.controls.enabled = true;
       canvas.style.cursor = '';

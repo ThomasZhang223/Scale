@@ -12,7 +12,11 @@ export interface PaletteItem {
   name: string;
   scale?: number;
   size?: THREE.Vector3; // known once the GLB has loaded
+  action?: string; // an action tile (Reset, Clear) instead of an object to pull out
+  objectId?: string; // the server's Object v1 id, when it came from there
 }
+
+const ACTION_TILE = 0x2a2f36;
 
 const TILE_W = 0.12;
 const TILE_H = 0.032;
@@ -59,7 +63,7 @@ export class Palette {
     items.forEach((item, i) => {
       const tile = new THREE.Mesh(
         new THREE.PlaneGeometry(TILE_W, TILE_H),
-        new THREE.MeshBasicMaterial({ color: TILE, side: THREE.DoubleSide, map: label(item) }),
+        new THREE.MeshBasicMaterial({ color: item.action ? ACTION_TILE : TILE, side: THREE.DoubleSide, map: label(item) }),
       );
       tile.position.y = height / 2 - PAD - TILE_H / 2 - i * (TILE_H + GAP);
       tile.userData.item = item;
@@ -78,7 +82,8 @@ export class Palette {
   hover(item: PaletteItem | null) {
     const tile = item ? this.tiles.find((t) => t.userData.item === item) ?? null : null;
     if (tile === this.hovered) return;
-    if (this.hovered) (this.hovered.material as THREE.MeshBasicMaterial).color.setHex(TILE);
+    const base = (t: THREE.Mesh) => ((t.userData.item as PaletteItem).action ? ACTION_TILE : TILE);
+    if (this.hovered) (this.hovered.material as THREE.MeshBasicMaterial).color.setHex(base(this.hovered));
     if (tile) (tile.material as THREE.MeshBasicMaterial).color.setHex(TILE_HOVER);
     this.hovered = tile;
   }

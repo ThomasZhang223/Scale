@@ -201,6 +201,18 @@ export class Physics {
     d.body.wakeUp();
   }
 
+  /** Puts an object exactly here (a stored placement), on the floor, at rest. */
+  moveTo(id: string, x: number, z: number, rotY: number) {
+    const d = this.dynamics.get(id);
+    if (!d) return;
+    d.target = undefined;
+    d.body.setTranslation({ x, y: 0, z }, true);
+    d.body.setRotation(this.quat.setFromAxisAngle(THREE.Object3D.DEFAULT_UP, rotY), true);
+    d.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+    d.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+    this.refreshQueries();
+  }
+
   release(id: string) {
     const d = this.dynamics.get(id);
     if (!d) return;
