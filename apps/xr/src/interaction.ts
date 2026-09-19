@@ -101,6 +101,20 @@ export class Interaction {
     else this.halo.hide();
   }
 
+  /**
+   * Lets go of `id` without a physical release: the object is about to be removed, so no
+   * drop, no onRelease, no layout push for it.
+   */
+  drop(id: string) {
+    for (const hand of this.hands) if (hand.grab?.id === id) hand.grab = undefined;
+    if (this.mouseGrab?.id === id) {
+      this.mouseGrab = undefined;
+      this.controls.enabled = true;
+    }
+    if (this.mouseHover === id) this.mouseHover = null;
+    this.halo.hide();
+  }
+
   /** Everything currently in someone's hand. */
   heldIds(): string[] {
     const ids = this.hands.flatMap((h) => (h.grab ? [h.grab.id] : []));

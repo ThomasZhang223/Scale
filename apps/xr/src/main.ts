@@ -189,6 +189,7 @@ async function start() {
     if (action.startsWith('preset:')) void askAgent({ preset: action.slice(7) });
     if (action === 'turn:left') turnLast(Math.PI / 2);
     if (action === 'turn:right') turnLast(-Math.PI / 2);
+    if (action === 'remove') removeLast();
     if (action === 'rules') {
       showRules = !showRules;
       showPalette();
@@ -214,6 +215,27 @@ async function start() {
     const n = obj.loaded.node;
     physics.moveTo(id, n.position.x, n.position.z, physics.rotationY(id) + delta);
     say(`${obj.name}: turned ${delta > 0 ? 'left' : 'right'} 90°.`);
+    layoutChanged(id);
+  }
+
+  /** Removes the held object (or the last one touched). A detected piece it stood in for comes back. */
+  function removeLast() {
+    const id = interaction.heldIds()[0] ?? lastTouchedId ?? [...objects.keys()].pop() ?? null;
+    const obj = id ? objects.get(id) : undefined;
+    if (!id || !obj) return say('Grab or add an object first, then remove it.');
+    interaction.drop(id);
+    physics.remove(id);
+    obj.loaded.node.removeFromParent();
+    objects.delete(id);
+    if (lastTouchedId === id) lastTouchedId = null;
+    const box = obj.replaces;
+    if (box) {
+      box.node.visible = true;
+      physics.moveDetected(box.identifier, box.position[0], box.position[2], box.rotationY, box.dimensions);
+    }
+    fitOverlay.clear(); // ceiling: the overlay is per-report, not per-object; the next report redraws it
+    say(`${obj.name} removed.`);
+    showPalette();
     layoutChanged(id);
   }
 
@@ -247,6 +269,7 @@ async function start() {
           ...(s.solver === 'offline' ? [label('Solver offline', 'warn')] : []),
           tile('Turn 90° left', 'turn:left'),
           tile('Turn 90° right', 'turn:right'),
+          ...(objects.size ? [tile('Remove', 'remove')] : []),
           ...(objects.size ? [tile('Rearrange', 'preset:tidy_room', true)] : []), // nothing to rearrange until something is down
           // Styles: the same whole-room rearrange under a different ideology (see STYLES in services/agent).
           ...(objects.size ? STYLES.map(([name, preset]) => ({ ...tile(name, `preset:${preset}`), section: 'Style' })) : []),
@@ -447,7 +470,7 @@ async function start() {
       return g;
     };
     agentPresets.replaceChildren(
-      group('segmented', button('Turn 90° left', 'turn:left', ''), button('Turn 90° right', 'turn:right', '')),
+      group('segmented', button('Turn 90° left', 'turn:left', ''), button('Turn 90° right', 'turn:right', ''), button('Remove', 'remove', '')),
       button('Rearrange', 'preset:tidy_room', 'filled'),
       group('styles', ...STYLES.map(([text, preset]) => button(text, `preset:${preset}`, 'tinted'))),
     );
@@ -839,6 +862,14 @@ async function start() {
   }
 
   document.getElementById('reset')!.addEventListener('click', () => onAction('reset'));
+  // Delete / Backspace on the laptop removes the last-touched object; not while typing.
+  window.addEventListener('keydown', (e) => {
+    if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+    const t = e.target as HTMLElement | null;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+    e.preventDefault();
+    onAction('remove');
+  });
 
   (document.getElementById('colliders') as HTMLInputElement).addEventListener('change', (e) => {
     physics.setDebug((e.target as HTMLInputElement).checked);
