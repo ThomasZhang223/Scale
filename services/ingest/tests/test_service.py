@@ -147,6 +147,46 @@ def test_extract_needs_merchant_and_storefront():
     assert client.post("/extract", json={"merchant": "M", "products": []}).status_code == 422
 
 
+def test_the_llm_pass_does_not_block_the_event_loop():
+    """A regression guard with teeth.
+
+    extract_with_llm is a synchronous call. Awaited straight from the async handler it stopped
+    the whole process: measured, ten products held /health past its 3s timeout twice running,
+    and compose marks a container unhealthy after five. The calls now go to worker threads, so
+    they overlap AND the loop stays free. Both halves are asserted: serial would be >= 10 x
+    0.05s, and /health has to answer while /extract is still in flight.
+    """
+    import time
+    products = [dict(CATALOGUE[2], id=100 + i, handle=f"slow-{i}", title=f"Slow {i}")
+                for i in range(10)]
+
+    calls = []
+
+    def slow_llm(p, cfg, http=None):
+        calls.append(p["handle"])
+        time.sleep(0.05)
+        return None
+
+    orig_llm, orig_cfg = main.extract_with_llm, main.OpenAIConfig
+    main.extract_with_llm = slow_llm
+    main.OpenAIConfig = lambda *a, **k: type(
+        "C", (), {"configured": True, "model": "m", "vlm_model": "m"})()
+    try:
+        started = time.time()
+        r = client.post("/extract", json={
+            "merchant": "m", "storefront": "https://s.com",
+            "products": products, "llm": True, "aiLimit": 10})
+        elapsed = time.time() - started
+    finally:
+        main.extract_with_llm, main.OpenAIConfig = orig_llm, orig_cfg
+
+    assert r.status_code == 200, r.text
+    assert len(calls) == 10, f"ran {len(calls)} of 10 products"
+    serial = 10 * 0.05
+    assert elapsed < serial * 0.6, (
+        f"took {elapsed:.2f}s; serial would be ~{serial:.2f}s — the calls are not overlapping")
+
+
 def test_both_endpoints_require_the_upstream_token():
     bare = TestClient(main.app)
     assert bare.post("/crawl", json={"storefront": "https://x"}).status_code == 401

@@ -263,6 +263,35 @@ Rescued rows carry `extractedFrom` (`json_ld`, `spec_block` or `page_text`) so y
 which surface paid off. `measure.method` stays `"extracted"` — a page read is still extraction,
 and inventing a fourth enum value would be a schema change.
 
+### Steps 2 and 3: `--llm`, `--vlm`, and what they cost
+
+`--ai-limit` is **per merchant**, not per run. With ten verified merchants the default of 40
+is 400 products, and step 3 spends up to three calls on each — so a `--llm --vlm` run is up to
+1600 API calls. Run serially at roughly a second each that is over half an hour, which is what
+it was before these ran concurrently.
+
+Two things fixed that, and both matter more than the model you pick:
+
+- **`--ai-concurrency`** (default 8) overlaps the calls. They are round trips the process
+  otherwise spends asleep; measured against a 1.2s mock, 24 calls went from 30s to 2.5s at 16
+  workers. `--ai-concurrency 1` restores the old serial behaviour if you are rate-limited.
+- **Step 2.5 now reports what it did *not* solve.** It used to return only its rescues while
+  the caller kept the original list, so step 3 re-attempted every product 2.5 had already
+  measured — 252 of 548 on a real run, at three calls apiece, for rows that were already in
+  hand. `curate()` does not deduplicate, so those also cost demo slots.
+
+The run prints its own worst case before making the first call:
+
+```
+steps 2/3: up to 40 products per merchant x 10 merchants x 4 call(s) = up to 1600 API calls, 8 at a time
+```
+
+If that number is wrong for your budget, stop it there rather than thirty minutes later. The
+same concurrency applies inside the service (`AI_CONCURRENCY`, default 8), where it is not
+just speed: the calls are synchronous, and awaiting them on the event loop blocked `/health`
+long enough for Docker to mark a working container unhealthy. See
+`tests/test_health_under_load.py`, which fails against the blocking version.
+
 **It curates rather than dumps.** The ceiling is not how many products were extracted, it is how
 many get a mesh, and that is Ani's generation throughput: 60–100 (`BUILD_DOC.md`). So selection
 is round-robin across the four demo categories, highest confidence first inside each. Taking the

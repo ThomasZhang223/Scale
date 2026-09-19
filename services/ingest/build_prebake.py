@@ -22,11 +22,12 @@ import json
 import os
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import urlparse
 
 import httpx
 
-from app.ai_extract import OpenAIConfig, extract_with_llm, extract_with_vlm
+from app.ai_extract import TIMEOUT_S, OpenAIConfig, extract_with_llm, extract_with_vlm
 from app.browserbase import BrowserbaseFetch, CachedFetch, FetchError
 from app.dimensions import extract
 from app.page_extract import extract_from_page, product_url
@@ -129,23 +130,73 @@ def candidates_from(merchant: str, base: str, products: list[dict]) -> tuple[lis
     return out, needs_page
 
 
+# Steps 2 and 3 are network-bound: every call is a round trip that this process spends
+# entirely asleep. Run serially they set the pipeline's whole runtime — a measured 1600 calls
+# at ~1.2s was ~32 minutes of almost pure waiting. Held at 8, which is polite to both OpenAI
+# and the image CDNs; raise it with --ai-concurrency if your rate limit allows.
+# ceiling: a flat thread pool with no adaptive backoff. A 429 is swallowed by _ask and costs
+# that one product its recovery rather than slowing the pool down. Fine at 100 products;
+# revisit if this ever runs over a full catalogue.
+DEFAULT_AI_CONCURRENCY = 8
+
+
+def ai_client_for(workers: int) -> httpx.Client:
+    """A client for the OpenAI calls only, separate from the catalogue/CDN one.
+
+    Two reasons it is not shared: the catalogue client carries a 30s timeout and a storefront
+    User-Agent, neither of which should reach the API, and a pool sized for the thread count
+    stops workers queueing on connections. Reuse also means one TLS handshake per connection
+    rather than one per call — _ask builds a throwaway client when passed none.
+    """
+    return httpx.Client(
+        timeout=TIMEOUT_S,
+        limits=httpx.Limits(max_connections=max(workers, 1),
+                            max_keepalive_connections=max(workers, 1)),
+    )
+
+
+def _in_parallel(items: list, fn, workers: int) -> list:
+    """Map fn over items, keeping input order. Order matters: curate() sorts by confidence but
+    ties resolve by position, so a run should not reshuffle its own output run to run."""
+    if not items:
+        return []
+    if workers <= 1:
+        return [fn(x) for x in items]
+    with ThreadPoolExecutor(max_workers=workers) as ex:
+        return list(ex.map(fn, items))
+
+
 def enrich_with_llm(merchant: str, base: str, products: list[dict], cfg: OpenAIConfig,
-                    limit: int) -> tuple[list[dict], list[dict]]:
+                    limit: int, workers: int = DEFAULT_AI_CONCURRENCY,
+                    ai_client: httpx.Client | None = None) -> tuple[list[dict], list[dict]]:
     """Step 2. Returns (recovered, still_missing) so the caller can hand the rest to 2.5."""
-    recovered, missing = [], []
-    for p in products[:limit]:
+    batch = products[:limit]
+
+    def one(p: dict) -> dict | None:
         image = next((i.get("src") for i in (p.get("images") or []) if i.get("src")), None)
-        row = _accept(merchant, base, p, extract_with_llm(p, cfg), image, "llm") if image else None
-        (recovered if row else missing).append(row or p)
-    return [r for r in recovered if r], missing + products[limit:]
+        if not image:
+            return None
+        return _accept(merchant, base, p, extract_with_llm(p, cfg, ai_client), image, "llm")
+
+    rows = _in_parallel(batch, one, workers)
+    recovered = [r for r in rows if r]
+    missing = [p for p, r in zip(batch, rows) if not r]
+    return recovered, missing + products[limit:]
 
 
 def enrich_with_vlm(merchant: str, base: str, products: list[dict], cfg: OpenAIConfig,
-                    limit: int, client: httpx.Client) -> list[dict]:
+                    limit: int, client: httpx.Client,
+                    workers: int = DEFAULT_AI_CONCURRENCY,
+                    ai_client: httpx.Client | None = None) -> list[dict]:
     """Step 3. Only over what every cheaper source failed, and a spec diagram is rarely the
-    hero shot, so images 2 through 4 are tried rather than the first."""
-    recovered = []
-    for p in products[:limit]:
+    hero shot, so images 2 through 4 are tried rather than the first.
+
+    Up to three calls per product, so this is the step that decides the runtime. Keeping the
+    per-product images serial is deliberate: most products stop at the first image that works,
+    and firing all three would spend three calls to save latency on a product that needed one.
+    The parallelism is across products instead.
+    """
+    def one(p: dict) -> dict | None:
         srcs = [i.get("src") for i in (p.get("images") or []) if i.get("src")]
         for src in srcs[1:4]:
             try:
@@ -153,23 +204,30 @@ def enrich_with_vlm(merchant: str, base: str, products: list[dict], cfg: OpenAIC
                 r.raise_for_status()
             except httpx.HTTPError:
                 continue
-            hit = extract_with_vlm(r.content, r.headers.get("content-type", ""), cfg)
+            hit = extract_with_vlm(r.content, r.headers.get("content-type", ""), cfg, ai_client)
             row = _accept(merchant, base, p, hit, srcs[0], "vlm")
             if row:
-                recovered.append(row)
-                break
-    return recovered
+                return row
+        return None
+
+    return [r for r in _in_parallel(products[:limit], one, workers) if r]
 
 
 def enrich_from_pages(merchant: str, base: str, products: list[dict], fetcher,
-                      limit: int) -> tuple[list[dict], dict]:
+                      limit: int) -> tuple[list[dict], list[dict], dict]:
     """Step 2.5: recover dimensions from the rendered product page.
 
     For stores whose /products.json carries none — Floyd, Fyrn, Bend Goods, Branch Furniture,
     about 690 products — the dimensions sit in metafields the endpoint does not serve but the
     page does render. Fetches are cached, so a second run over the same products is free.
+
+    Returns (recovered, still_missing, stats). The middle value is the one that matters:
+    without it the caller hands step 3 the products this step already solved, and step 3 is
+    the most expensive step in the pipeline. A real run had 252 of 548 solved here and then
+    re-attempted downstream at three VLM calls apiece.
     """
-    recovered, stats = [], {"attempted": 0, "recovered": 0, "failed": 0}
+    recovered, missing = [], []
+    stats = {"attempted": 0, "recovered": 0, "failed": 0}
     for p in products[:limit]:
         url = product_url(base, p["handle"])
         stats["attempted"] += 1
@@ -178,17 +236,21 @@ def enrich_from_pages(merchant: str, base: str, products: list[dict], fetcher,
         except FetchError as e:
             stats["failed"] += 1
             print(f"    fetch failed: {p.get('title', '')[:34]} — {e}", file=sys.stderr)
+            missing.append(p)
             continue
         hit = extract_from_page(res.content)
         if hit is None or hit.as_bbox() is None:
+            missing.append(p)
             continue
         image = next(i.get("src") for i in p["images"] if i.get("src"))
         row = _accept(merchant, base, p, hit, image, "page")
         if row is None:
+            missing.append(p)
             continue
         recovered.append(row)
         stats["recovered"] += 1
-    return recovered, stats
+    # Anything past `limit` was never looked at, so it is still missing, not solved.
+    return recovered, missing + products[limit:], stats
 
 
 def curate(candidates: list[dict], limit: int) -> list[dict]:
@@ -271,7 +333,12 @@ def main() -> int:
                     help="step 3: read the spec-sheet diagram. The most expensive pass, so it "
                          "runs only on what every cheaper source failed.")
     ap.add_argument("--ai-limit", type=int, default=40,
-                    help="products per merchant for steps 2 and 3 (default 40)")
+                    help="products PER MERCHANT for steps 2 and 3 (default 40). With ten "
+                         "merchants this is 400 products, not 40 — step 3 spends up to three "
+                         "calls on each, so it sets the runtime more than any other flag.")
+    ap.add_argument("--ai-concurrency", type=int, default=DEFAULT_AI_CONCURRENCY,
+                    help=f"parallel API calls for steps 2 and 3 (default "
+                         f"{DEFAULT_AI_CONCURRENCY}). 1 restores the old serial behaviour.")
     ap.add_argument("--browserbase", action="store_true",
                     help="step 2.5: for products with an image but no dimensions in "
                          "/products.json, fetch the rendered product page and read them there. "
@@ -301,6 +368,13 @@ def main() -> int:
             raise SystemExit(f"{e}")  # standing rule 4: do not quietly skip step 2.5
 
     cfg = OpenAIConfig()
+    if args.llm or args.vlm:
+        # The single most useful line this script prints. A run that is about to make 1600
+        # serial calls should say so before it makes the first one, not after 30 minutes.
+        per = (1 if args.llm else 0) + (3 if args.vlm else 0)
+        print(f"steps 2/3: up to {args.ai_limit} products per merchant x {len(merchants)} "
+              f"merchants x {per} call(s) = up to {args.ai_limit * len(merchants) * per} API "
+              f"calls, {args.ai_concurrency} at a time", file=sys.stderr)
     if (args.llm or args.vlm) and not cfg.configured:
         # standing rule 4: skipping quietly would look like the merchants having no dimensions.
         raise SystemExit("--llm/--vlm need OPENAI_API_KEY and OPENAI_MODEL")
@@ -308,7 +382,9 @@ def main() -> int:
     candidates: list[dict] = []
     page_stats = {"attempted": 0, "recovered": 0, "failed": 0}
     ai_stats = {"llm": 0, "vlm": 0}
-    with httpx.Client(headers={"User-Agent": USER_AGENT}, timeout=30, follow_redirects=True) as client:
+    with httpx.Client(headers={"User-Agent": USER_AGENT}, timeout=30,
+                      follow_redirects=True) as client, \
+         ai_client_for(args.ai_concurrency) as ai_http:
         for m in merchants:
             name, base = m.get("name") or urlparse(m["storefrontBaseUrl"]).netloc, m["storefrontBaseUrl"]
             print(f"pulling {name} ...", file=sys.stderr, flush=True)
@@ -323,7 +399,8 @@ def main() -> int:
             candidates.extend(found)
 
             if args.llm and needs_page:
-                rescued, needs_page = enrich_with_llm(name, base, needs_page, cfg, args.ai_limit)
+                rescued, needs_page = enrich_with_llm(
+                    name, base, needs_page, cfg, args.ai_limit, args.ai_concurrency, ai_http)
                 ai_stats["llm"] += len(rescued)
                 candidates.extend(rescued)
                 print(f"  step 2 (llm): recovered {len(rescued)}", file=sys.stderr)
@@ -331,7 +408,7 @@ def main() -> int:
             if fetcher is not None and needs_page:
                 print(f"  step 2.5: {len(needs_page)} have an image but no dimensions; "
                       f"fetching up to {args.browserbase_limit} pages", file=sys.stderr)
-                rescued, stats = enrich_from_pages(
+                rescued, needs_page, stats = enrich_from_pages(
                     name, base, needs_page, fetcher, args.browserbase_limit)
                 for k in page_stats:
                     page_stats[k] += stats[k]
@@ -341,7 +418,8 @@ def main() -> int:
                 candidates.extend(rescued)
 
             if args.vlm and needs_page:
-                rescued = enrich_with_vlm(name, base, needs_page, cfg, args.ai_limit, client)
+                rescued = enrich_with_vlm(name, base, needs_page, cfg, args.ai_limit,
+                                          client, args.ai_concurrency, ai_http)
                 ai_stats["vlm"] += len(rescued)
                 candidates.extend(rescued)
                 print(f"  step 3 (vlm): recovered {len(rescued)}", file=sys.stderr)

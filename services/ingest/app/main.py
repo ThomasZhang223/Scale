@@ -21,6 +21,8 @@ validate.py (4 and 5). See ../EXTRACTION.md.
 
 from __future__ import annotations
 
+import asyncio
+import functools
 import os
 import time
 import uuid
@@ -42,6 +44,32 @@ USER_AGENT = "FullScale-HTN2026/0.1 (hackathon project; catalogue dimension rese
 PAGE_CACHE = os.environ.get("PAGE_CACHE", ".page-cache")
 MAX_PAGES = 4          # 250 products each; past this a merchant is not a demo, it is a scrape
 CRAWL_TIMEOUT_S = 30.0
+
+# Steps 2 and 3 call OpenAI through a synchronous client. Awaiting them directly on the event
+# loop blocks the whole process: measured, ten LLM products held /health past its 3s timeout
+# twice in a row, and the default aiLimit of 40 is four times that — long enough for compose
+# to hit its five-failure threshold and mark a working container unhealthy. So every blocking
+# call goes to a worker thread, which also lets them overlap: they are round trips this
+# process would otherwise spend asleep.
+# ceiling: a fixed width with no adaptive backoff. A 429 is swallowed by _ask and costs that
+# one product its recovery. Fine for a single merchant per request.
+AI_CONCURRENCY = int(os.environ.get("AI_CONCURRENCY") or 8)
+
+
+async def _in_threads(calls: list, limit: int) -> list:
+    """Run blocking callables on worker threads, at most `limit` at once, keeping order.
+
+    Order matters: the caller zips the results back against the products that produced them.
+    """
+    if not calls:
+        return []
+    sem = asyncio.Semaphore(max(limit, 1))
+
+    async def run(fn):
+        async with sem:
+            return await asyncio.to_thread(fn)
+
+    return await asyncio.gather(*(run(fn) for fn in calls))
 
 
 def _err(status: int, code: str, detail: str):
@@ -188,9 +216,13 @@ async def extract_products(request: Request):
             continue
         needs_ai.append(p)
 
-    # Step 2: the same text, read rather than pattern-matched.
-    for p in needs_ai[:ai_limit] if use_llm else []:
-        if accept(p, extract_with_llm(p, cfg), "llm", "from_llm"):
+    # Step 2: the same text, read rather than pattern-matched. The calls overlap on worker
+    # threads; accept() stays on this one, in input order, because it mutates objects/stats.
+    llm_batch = needs_ai[:ai_limit] if use_llm else []
+    llm_hits = await _in_threads(
+        [functools.partial(extract_with_llm, p, cfg) for p in llm_batch], AI_CONCURRENCY)
+    for p, hit in zip(llm_batch, llm_hits):
+        if accept(p, hit, "llm", "from_llm"):
             continue
         if p.get("handle"):
             needs_page.append(p)
@@ -212,20 +244,40 @@ async def extract_products(request: Request):
     # Step 3: the spec-sheet diagram. Last resort, and the most expensive call here, so it runs
     # only over what every cheaper source failed on.
     if use_vlm:
+        vlm_batch = needs_image[:ai_limit]
+        sem = asyncio.Semaphore(AI_CONCURRENCY)
         async with httpx.AsyncClient(timeout=CRAWL_TIMEOUT_S, follow_redirects=True) as img:
-            for p in needs_image[:ai_limit]:
-                # A spec diagram is rarely the hero shot, so try the later images first.
-                for src in [i.get("src") for i in (p.get("images") or [])][1:4]:
-                    if not src:
-                        continue
-                    try:
-                        r = await img.get(src)
-                        r.raise_for_status()
-                    except httpx.HTTPError:
-                        continue
-                    hit = extract_with_vlm(r.content, r.headers.get("content-type", ""), cfg)
-                    if accept(p, hit, "vlm", "from_vlm"):
-                        break
+
+            async def read_one(p: dict) -> None:
+                """Up to three images, stopping at the first accept() takes. Kept sequential
+                inside a product on purpose: most stop at the first, and firing all three
+                would spend three calls to save latency on a product that needed one. The
+                overlap is across products.
+
+                accept() is called here rather than after the gather so that a hit it refuses
+                — a partial bbox, or a value validate() rejects — still falls through to the
+                next image, as it did when this loop was serial. That is safe: only the
+                to_thread call leaves the event loop, so every accept() still runs on one
+                thread. The cost is that VLM rows land in completion order rather than input
+                order, which nothing downstream depends on.
+                """
+                async with sem:
+                    # A spec diagram is rarely the hero shot, so try the later images first.
+                    for src in [i.get("src") for i in (p.get("images") or [])][1:4]:
+                        if not src:
+                            continue
+                        try:
+                            r = await img.get(src)
+                            r.raise_for_status()
+                        except httpx.HTTPError:
+                            continue
+                        hit = await asyncio.to_thread(
+                            extract_with_vlm, r.content,
+                            r.headers.get("content-type", ""), cfg)
+                        if accept(p, hit, "vlm", "from_vlm"):
+                            return
+
+            await asyncio.gather(*(read_one(p) for p in vlm_batch))
 
     return {"merchant": merchant, "count": len(objects), "stats": stats, "objects": objects}
 
