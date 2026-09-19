@@ -62,14 +62,7 @@ def safe_reference(value):
     return value
 
 
-def make_record(metadata, embedding, *, expected_fingerprint, scope, image_ref, image_bytes):
-    """Unknown fields stay absent/null. No IDs, confidence, units or prices guessed."""
-    result = validate_embedding(embedding, expected_fingerprint)
-    require(result["modality"] == "image", "Index records require an image embedding")
-    require(isinstance(image_bytes, bytes) and 0 < len(image_bytes) <= MAX_IMAGE_BYTES,
-            "Bounded image bytes required")
-    require(hashlib.sha256(image_bytes).hexdigest() == result["inputHash"], "Image hash mismatch")
-    require(isinstance(scope, str) and bool(scope.strip()), "Explicit scope required")
+def validate_metadata(metadata):
     require(isinstance(metadata, dict), "Object metadata required")
     allowed = {"objectId", "productId", "variantId", "name", "source", "category", "bboxMeters",
                "measure", "price", "merchant", "productUrl", "state", "glbUrl", "createdAt",
@@ -108,6 +101,18 @@ def make_record(metadata, embedding, *, expected_fingerprint, scope, image_ref, 
                 "Provenance accepts only non-secret source facts")
         for value in p.values():
             safe_reference(value)
+    return obj
+
+
+def make_record(metadata, embedding, *, expected_fingerprint, scope, image_ref, image_bytes):
+    """Unknown fields stay absent/null. No IDs, confidence, units or prices guessed."""
+    result = validate_embedding(embedding, expected_fingerprint)
+    require(result["modality"] == "image", "Index records require an image embedding")
+    require(isinstance(image_bytes, bytes) and 0 < len(image_bytes) <= MAX_IMAGE_BYTES,
+            "Bounded image bytes required")
+    require(hashlib.sha256(image_bytes).hexdigest() == result["inputHash"], "Image hash mismatch")
+    require(isinstance(scope, str) and bool(scope.strip()), "Explicit scope required")
+    obj = validate_metadata(metadata)
     obj["vector"] = result["values"]
     obj["embeddingMeta"] = {"dimension": DIMENSION, "fingerprint": result["fingerprint"],
                             "inputHash": result["inputHash"], "modality": "image",
@@ -121,7 +126,11 @@ def index_payload(records, *, expected_fingerprint, scope):
     require(isinstance(records, list) and bool(records), "Nonempty record list required")
     seen = set()
     for obj in records:
+        require(isinstance(obj, dict), "Record must be an object")
+        validate_metadata({k: v for k, v in obj.items() if k not in ("vector", "embeddingMeta")})
         meta = obj.get("embeddingMeta", {})
+        require(isinstance(meta, dict) and meta.get("modality") == "image", "Image record metadata required")
+        safe_reference(meta.get("imageRef"))
         validate_embedding({"values": obj.get("vector"), **{k: meta.get(k) for k in
                            ("dimension", "fingerprint", "inputHash", "modality")}}, expected_fingerprint)
         require(meta.get("scope") == scope and bool(scope), "Scope mismatch")

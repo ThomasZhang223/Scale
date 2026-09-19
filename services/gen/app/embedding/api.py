@@ -87,7 +87,7 @@ class EmbedResponse(BaseModel):
         return self
 
 
-async def bounded_request(request):
+async def bounded_request(request, *, worker_compat=False):
     if request.headers.get("content-type", "").split(";", 1)[0].strip() != "application/json":
         raise HTTPException(415, detail="application_json_required")
     try:
@@ -102,7 +102,12 @@ async def bounded_request(request):
             raise HTTPException(413, detail="request_too_large")
         body.extend(chunk)
     try:
-        return EmbedRequest.model_validate(json.loads(body))
+        data = json.loads(body)
+        if worker_compat and isinstance(data, dict) and "image_key" in data:
+            if "imageKey" in data:
+                raise ValueError("Ambiguous image key")
+            data["imageKey"] = data.pop("image_key")
+        return EmbedRequest.model_validate(data)
     except (ValueError, UnicodeError):
         # Do not echo the image, text, key, auth or raw Pydantic input in errors.
         raise HTTPException(422, detail="invalid_embedding_request") from None
@@ -141,9 +146,21 @@ def create_app(*, encoder=None, authenticator=None, image_reader: ImageReader | 
 
     @app.post("/embed", response_model=EmbedResponse)
     async def embed(request: Request):
-        principal = app.state.auth.authenticate(request.headers.get("authorization"))
-        payload = await bounded_request(request)
-        return await encode(payload, principal)
+        authorization = request.headers.get("authorization", "")
+        worker = os.environ.get("EMBEDDING_WORKER_COMPAT") == "1" and authorization.startswith("Api-Key ")
+        principal = app.state.auth.authenticate("Bearer " + authorization[8:] if worker else authorization)
+        payload = await bounded_request(request, worker_compat=worker)
+        if worker:
+            expected = os.environ.get("EMBEDDING_SEARCH_FINGERPRINT")
+            if not expected:
+                raise HTTPException(503, detail="search_fingerprint_unconfigured")
+            if payload.expectedFingerprint is not None and payload.expectedFingerprint != expected:
+                raise HTTPException(409, detail="embedding_fingerprint_mismatch")
+            payload.expectedFingerprint = expected
+        result = await encode(payload, principal)
+        if worker:
+            return JSONResponse({**result.model_dump(), "embedding": result.values})
+        return result
 
     @app.post("/embed/search")
     async def search_compat(request: Request):

@@ -79,6 +79,14 @@ def test_unknown_stays_unknown_and_cannot_enter_incompatible_index():
             index_payload([record(obj)], expected_fingerprint=FP, scope="test")
 
 
+@pytest.mark.parametrize("change", [{"price": {"cents": -1, "currency": "CAD"}},
+    {"price": {"cents": 1, "currency": "cad"}}, {"source": "unknown"},
+    {"productUrl": "https://example.invalid/?secret=value"}])
+def test_reloaded_export_revalidates_metadata(change):
+    with pytest.raises(RecordError):
+        index_payload([{**record(), **change}], expected_fingerprint=FP, scope="test")
+
+
 def test_actual_paul_index_route_accepts_measured_records(monkeypatch):
     main = paul_module("main")
     monkeypatch.setattr(main, "INDEX", paul_module("index").BruteForceIndex())

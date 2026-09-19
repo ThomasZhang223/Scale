@@ -58,8 +58,29 @@ corpus fingerprint on gen. That optional route accepts his text/imageKey
 payload and returns `vector`, using the same validated encoder. It only accepts
 loopback clients; bind gen to 127.0.0.1, disable proxy-header trust, and NEVER
 publish this route via a tunnel/reverse proxy. `/embed` remains bearer-authenticated.
-The existing authorized imageKey reader still requires a configured storage seam;
-inline photo bytes and the library handoff work without it.
+`EMBEDDING_IMAGE_MANIFEST` enables the local authorized imageKey reader. Its JSON
+list has `imageKey`, `path` (relative to manifest), `sha256` and explicit `principals`
+per photo. Use `trusted-local-search` for Paul's local caller and
+`trusted-internal-service` for authenticated callers. Unindexed query photos can
+be listed too. No caller-controlled paths/URLs are fetched; changed bytes fail.
+
+For Thomas's current caller, explicitly enable `EMBEDDING_WORKER_COMPAT=1` and
+set `EMBEDDING_SEARCH_FINGERPRINT`. `/embed` then accepts `Api-Key` with the same
+configured **embedding service token**, `image_key` and nullable text; it returns
+`embedding` alongside canonical fields. Wrong/missing tokens and fingerprint
+mismatches fail. Thomas must configure the CPU embedding origin/token separately
+from GPU inference credentials; his Worker search payload still needs to match
+Paul's flat request. No backend files are changed.
+
+Repeatable strict query CLI (no insertion, no HTTP dependency), from services/gen:
+
+```text
+python -m app.embedding.query --records C:/data/index.json --cache-dir C:/data/models --fingerprint <ready-fingerprint> --scope demo-catalog --text "a wooden chair" --max-w 0.8 --budget-cents 20000 --currency CAD
+```
+
+Replace `--text` with `--image C:/data/query.jpg` for a photo. Output gives rankings
+and local embedding/search times; scores are not probabilities. This local command
+requires the sibling services/search checkout (the gen-only Docker image omits it).
 
 Current real merchant samples contain dimension text but omit images, product IDs
 and prices. Paul must supply 5–10 real image files with object/variant identity,

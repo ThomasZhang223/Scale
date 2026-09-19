@@ -66,6 +66,20 @@ Current main still has stub backend routes. Do not enable `X-Stub` for live clai
 Full HTTP/job readiness is therefore **partial**, not a live end-to-end success.
 No second backend, job store, queue, SSE or public API is implemented here.
 
+`app.main.create_app(generation_handler=..., generation_auth=...)` now wires the
+existing `/generate` route. A synchronous handler takes `(payload, principal)`,
+resolves the authorized selected/owned input, reconciles the caller's durable
+attempt, and returns `(PreparedArtifact, VisualReview)`. Both Bearer and Thomas's
+Api-Key header spelling authenticate against the configured generation service
+token. The default route fails 503 until the provider/job authority is configured;
+it never falls back to a fake. Ambiguous outcomes return 409 with `retryable:false`.
+
+`tests/test_ml_integration.py` exercises actual Paul HTTP handlers and this route.
+With Node 24 and the teammate ref available, `worker_handoff.mjs` executes Thomas's
+unchanged upload/PUT/asset handlers from Git, with in-memory R2/KV. The signed grant
+is single-use and round-tripped bytes match. This is actual handler execution with
+fake storage, **not** a deployed Worker or a complete durable workflow/SSE test.
+
 ## Test
 
 From the repository, in B03's CPU environment plus `requirements-adapters.txt`:
