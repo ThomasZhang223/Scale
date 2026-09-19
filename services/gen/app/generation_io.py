@@ -3,6 +3,7 @@ import base64
 import hashlib
 import json
 import logging
+import time
 from contextlib import contextmanager
 from contextvars import ContextVar
 from urllib.parse import urlsplit
@@ -29,7 +30,10 @@ _transport_filter = _PrivateTransportFilter()
 def private_http():
     # httpx INFO logs include full signed URLs. Suppress transport logs only in this
     # execution context; do not change other requests' logging or log secret bodies.
-    for name in ["httpx", "httpcore", *list(logging.Logger.manager.loggerDict)]:
+    # Core transports can create their loggers lazily on the first real request.
+    for name in ["httpx", "httpcore", "httpcore.connection", "httpcore.http11",
+                 "httpcore.http2", "httpcore.proxy", "httpcore.socks",
+                 *list(logging.Logger.manager.loggerDict)]:
         if name == "httpx" or name == "httpcore" or name.startswith(("httpx.", "httpcore.")):
             logging.getLogger(name).addFilter(_transport_filter)
     token = _private_io.set(True)
@@ -39,10 +43,14 @@ def private_http():
         _private_io.reset(token)
 
 
-def response_bytes(response, limit):
+def response_bytes(response, limit, *, deadline=None):
     check(response.status_code == 200, "upstream_http_error")
     chunks = bytearray()
-    for chunk in response.iter_bytes(chunk_size=65536):
+    # Yield each received chunk; buffering a full 64 KiB could hide a slow trickle
+    # from the total-deadline check.
+    for chunk in response.iter_bytes():
+        if deadline is not None and time.monotonic() >= deadline:
+            raise TimeoutError("upstream_deadline_exceeded")
         check(len(chunks) + len(chunk) <= limit, "upstream_response_too_large")
         chunks.extend(chunk)
     return bytes(chunks)
@@ -65,18 +73,19 @@ class SF3DProvider:
               and re.fullmatch(r"model-[A-Za-z0-9-]+\.api\.baseten\.co", url.hostname or "")
               and url.path.endswith("/predict") and "async" not in url.path, "invalid_provider_endpoint")
         client = self.client or httpx.Client(timeout=httpx.Timeout(180, connect=15), follow_redirects=False)
+        deadline = time.monotonic() + 180
         try:
             with client.stream("POST", self.endpoint, headers={"Authorization": "Bearer " + self._token},
                                json={"image_base64": base64.b64encode(image).decode("ascii")},
                                follow_redirects=False) as response:
-                payload = json.loads(response_bytes(response, MAX_RESPONSE_BYTES))
+                payload = json.loads(response_bytes(response, MAX_RESPONSE_BYTES, deadline=deadline))
             glb = decode_response(payload, image_sha256)
             revisions = payload.get("revisions", {})
             check(revisions.get("sf3d_source") == SOURCE_REVISION
                   and revisions.get("sf3d_weights") == MODEL_REVISION, "provider_revision_mismatch")
             return RawGeneration(glb, image_sha256, SOURCE_REVISION + ":" + MODEL_REVISION,
                                  "real_sf3d", response.headers.get("x-baseten-request-id"))
-        except httpx.RequestError:
+        except (httpx.RequestError, TimeoutError):
             raise AmbiguousGeneration("generation_outcome_unknown_do_not_resubmit") from None
         except (httpx.HTTPError, ValueError, TypeError, KeyError):
             raise GenerationError("provider_response_rejected") from None

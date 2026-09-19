@@ -11,7 +11,7 @@ from PIL import Image
 
 from test_mesh_contract import fixture, IDENTITY
 from app import generation as g
-from app.generation_io import SF3DProvider, WorkerArtifactSink
+from app.generation_io import SF3DProvider, WorkerArtifactSink, response_bytes, private_http
 from deploy.sf3d.model.model import REVISIONS
 from deploy.sf3d.model.transport import artifact_response
 
@@ -153,6 +153,24 @@ def test_paid_disabled_by_default():
     with pytest.raises(g.GenerationError, match="not_enabled"):
         SF3DProvider("https://model-unit.api.baseten.co/production/predict", "test-token", client=client).generate(b"", "")
     client.stream.assert_not_called()
+
+
+def test_stream_deadline_and_byte_limit():
+    with pytest.raises(TimeoutError, match="deadline"):
+        response_bytes(httpx.Response(200, content=b"data"), 10, deadline=0)
+    with pytest.raises(g.GenerationError, match="too_large"):
+        response_bytes(httpx.Response(200, content=b"data"), 3)
+
+
+def test_lazy_core_transport_does_not_log_credentials(caplog):
+    import logging
+    caplog.set_level(logging.DEBUG)
+    with private_http():
+        for name in ("httpx", "httpcore.connection", "httpcore.http11", "httpcore.http2", "httpcore.proxy", "httpcore.socks"):
+            logging.getLogger(name).debug("private-transport-test-secret")
+    assert "private-transport-test-secret" not in caplog.text
+    logging.getLogger("httpx").info("unrelated-normal-log")
+    assert "unrelated-normal-log" in caplog.text
 
 
 @pytest.mark.parametrize("behavior", ["ok", "timeout", "corrupt", "revision", "redirect"])
