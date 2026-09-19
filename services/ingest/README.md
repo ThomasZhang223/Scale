@@ -10,16 +10,52 @@ writes only through `.claude/contracts.md`.
 
 ## How to run
 
+Normally you don't run this service by hand. It is registered in the repo's
+`docker-compose.yml` as `ingest` on **host port 8003** (container 8080), and `infra/up.sh`
+brings it up with `fit` and `search`, tunnels it, and publishes the origin to the Worker:
+
 ```
-docker build -t ingest .
-docker run --rm -p 8081:8080 ingest
+cp infra/.env.example infra/.env     # then fill in UPSTREAM_TOKEN
+infra/up.sh
 ```
 
-Or locally:
+Config comes from `infra/.env`, which compose passes into the container. `UPSTREAM_TOKEN` is
+required — the service refuses to start without it, because an auth check that silently
+passes when unconfigured is worse than no auth. `BROWSERBASE_API_KEY` and `OPENAI_API_KEY` /
+`OPENAI_MODEL` are optional and gate the later extraction steps; see the comments in
+`infra/.env.example` and `EXTRACTION.md`.
+
+To run just this container:
+
+```
+docker compose --profile local up -d --build ingest
+curl -s localhost:8003/health          # {"ok":true,"browserbase":true|false}
+docker compose logs -f ingest
+```
+
+`/health` needs no token and reports whether step 2.5 is configured, so it tells you which
+mode a running container is in without spending a page fetch to find out.
+
+Or without Docker, from this directory:
 
 ```
 pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8081
+UPSTREAM_TOKEN=devtoken uvicorn app.main:app --reload --port 8080
+```
+
+Every route except `/health` needs `X-Upstream-Token` matching `UPSTREAM_TOKEN`:
+
+```
+curl -s -X POST localhost:8003/extract \
+  -H 'content-type: application/json' -H "X-Upstream-Token: $UPSTREAM_TOKEN" \
+  -d '{"merchant":"floyd","storefront":"https://floydhome.com","products":[]}'
+```
+
+The tests are plain scripts, not pytest — run one, or all of them:
+
+```
+UPSTREAM_TOKEN=devtoken python3 tests/test_service.py
+for t in tests/test_*.py; do UPSTREAM_TOKEN=devtoken python3 "$t"; done
 ```
 
 ## The service the Worker calls
