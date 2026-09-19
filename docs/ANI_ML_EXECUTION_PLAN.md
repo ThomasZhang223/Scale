@@ -398,7 +398,7 @@ Backend owns durable idempotency keyed by scope/object/image/settings/bbox snaps
 
 ## 8. Sequential implementation prompts
 
-These are **copy-pastable bounded tasks**. B01 packaging is complete; B02 local preparation has begun but cloud execution is blocked on credit coverage; see §10 for evidence. B03 is complete for local real-model embeddings; B04–B09 remain unexecuted. B02 is an access gate, not a reason to block independent B03/B04. Each prompt is bounded and stops at its step. New test names/commands below are instructions to **add and run** tests, not claims those tests already exist unless recorded in §10. Run commands from repo root unless a prompt says otherwise; use the step's isolated interpreter. Logs/results must redact secrets and distinguish unit fakes, local real-model checks and live integration.
+These are **copy-pastable bounded tasks**. B01 packaging is complete; B02 local preparation has begun but cloud execution is blocked on credit coverage; see §10 for evidence. B03 is complete for local real-model embeddings; B04's synthetic software gate passes, with real SF3D orientation/visual review blocked on B02; B05–B09 remain unexecuted. B02 is an access gate, not a reason to block independent B03/B04. Each prompt is bounded and stops at its step. New test names/commands below are instructions to **add and run** tests, not claims those tests already exist unless recorded in §10. Run commands from repo root unless a prompt says otherwise; use the step's isolated interpreter. Logs/results must redact secrets and distinguish unit fakes, local real-model checks and live integration.
 
 ### B01 — Prepare the SF3D feasibility package (first action)
 
@@ -861,7 +861,7 @@ Do not require captions/palettes to unlock Paul's baseline. `SiglipModel` is not
 | B01 | COMPLETE (candidate packaging only) | 25 lightweight tests passed; runner help passed; package/config/source evidence below | Actual build, model load and generation UNVERIFIED; live B02 access outstanding | Complete B02 manual access/setup prerequisites |
 | B02 | IN_PROGRESS; cloud execution BLOCKED | Official chair decoded; isolated Truss 0.18.30 installed; real config parser, dependency check and CLI help passed; no generation | Remaining credit coverage and builder rate unconfirmed under USD 3 credits-only authorization | Confirm billing details below before any cloud build |
 | B03 | COMPLETE (local real-model E1) | 35 preprocessing/contract tests + 2 opt-in real-model tests passed; isolated pip check passed; evidence below | None for B03; Docker and production storage integration unverified | Stop at this checkpoint; await the next authorized step |
-| B04 | NOT_STARTED | Existing mesh contract only | Binding dependencies; real mesh for orientation gate | Synthetic software tests then genuine generated mesh |
+| B04 | SOFTWARE PASS; real-output gates BLOCKED_ON_B02 | 66 synthetic tests passed; actual GLB export/reload, texture/normal/material and selection checks; evidence below | Genuine SF3D semantic orientation and visual distortion review | Stop; inspect a genuine raw artifact with Justin only after B02 becomes available and is authorized |
 | B05 | NOT_STARTED | Proposed records/filter reference | Paul data, Thomas scope/index bridge agreement | Establish payloads before remote mutation |
 | B06 | NOT_STARTED | Proposed lifecycle | B02/B04 + Thomas job/storage/completion seams | Integrate Ani adapter only |
 | B07 | NOT_STARTED | Evaluation design, no results | Real labeled phone/corpus data | Run honest baseline report |
@@ -996,6 +996,45 @@ $env:EMBEDDING_TEST_REPORT = Join-Path $embedRoot ('real-' + [guid]::NewGuid().T
 - Final complete machine-readable report, including asset hashes, runtime provenance and output-vector hashes: `C:\Users\hp\AppData\Local\Temp\ani-siglip2-b03\real-9fd76ab5cde148b1a698737fe48e5003.json`. Reports, weights and environments remain outside Git.
 
 **Boundary and remaining limits.** `/embed` accepts exactly one image (bounded base64 bytes or an authorized object-key adapter) OR text, and returns `values`, `dimension`, `fingerprint`, `inputHash`, `modality`. It rejects a mismatched expected fingerprint and invalid vectors. Interactive batch size is one; local offline methods allow 1–8. A busy encoder returns 429; no inference queue, mesh gate or index write is introduced. `/health` indicates process liveness; `/ready` indicates model availability. A separate `EMBEDDING_API_KEY` authenticates trusted internal callers. Thomas's principal-aware storage reader remains an injected seam, disabled by default: production `imageKey` integration is **UNVERIFIED**, not silently replaced with arbitrary URL fetching. Network-server deployment, Linux/Docker execution, retrieval evaluation and shared-index integration remain outside this completed B03 check. No B03 blocker remains; stop here.
+
+### B04 execution evidence — 2026-09-19
+
+Starting branch `ani/ml`, HEAD `0f18c06`, clean working tree and empty index. Only the authorized B04 paths changed. No B01/B02/B03 implementation, cloud service, credential check, model download or paid operation was performed.
+
+| Gate | Result | Evidence / limit |
+| --- | --- | --- |
+| Mesh binding software | **PASS — VERIFIED_LOCALLY** | 66 synthetic tests, real serialization and independent trimesh scene reload |
+| Real SF3D semantic orientation | **BLOCKED_ON_B02** | No genuine generated mesh available; no SF3D profile invented |
+| Real SF3D visual distortion review | **BLOCKED_ON_B02** | Synthetic geometry and texture tests cannot establish generated-object quality |
+
+**Implemented:** `app/binding/core.py` provides `bind_glb`, explicit proper-rotation profiles, immutable result bytes/report, scoped `raw_key`/`bound_key` and a selected-product image/bbox boundary. `glb.py` validates a bounded static GLB subset, traverses the complete scene hierarchy and handles shared geometry instances, nested TRS/matrix transforms, nonuniform scaling and mirrors. A small GLB writer retains original material/texture JSON and embedded bytes, appending transformed vertex/normal/index arrays; this avoids a lossy material conversion through a general mesh exporter. Every output node is identity. The original and exported scenes are independently loaded by trimesh; the exported bytes are re-parsed and checked against the numerical and visual-data contract. This is an internal component API, not a new shared HTTP contract; `/bind` remains a stub.
+
+**Environment — VERIFIED_LOCALLY:** separate CPython **3.11.9** venv at `C:\Users\hp\AppData\Local\Temp\ani-binding-b04\venv`, created using the already installed uv and managed Python. Exact installed packages: trimesh **4.4.1**, NumPy **1.26.4**, Pillow **11.1.0**, pytest **8.3.5**, colorama **0.4.6**, iniconfig **2.3.0**, packaging **26.3**, pluggy **1.6.0**. All are pinned in `services/gen/requirements-binding.txt`; global Python and the embedding/generation environments were not changed. `uv pip check` checked eight compatible packages; literal pip check returned **No broken requirements found**.
+
+**Commands and observed final result:**
+
+```powershell
+$bindingRoot = Join-Path $env:TEMP 'ani-binding-b04'
+$bindingPython = Join-Path $bindingRoot 'venv\Scripts\python.exe'
+$env:PYTHONDONTWRITEBYTECODE = '1'
+& $bindingPython -m pytest services/gen/tests/test_mesh_contract.py services/gen/tests/test_selection_binding.py services/gen/tests/test_mesh_cache.py -q -p no:cacheprovider --basetemp (Join-Path $bindingRoot ('tests-' + [guid]::NewGuid().ToString('N')))
+python -m pip --isolated --python $bindingPython check
+```
+
+**66 passed in 2.96 s**, no warnings reported. All are synthetic software tests, none is model-generation evidence. Coverage includes positive W/H/D; missing/zero/negative/NaN/infinite/malformed values; empty/invalid/nonfinite geometry; degenerate extents and triangles; bad indices; malformed GLB; transformed shared instances and translated/rotated/mirrored/nonuniform sources; matrix and interleaved accessors; generated and inverse-transpose normals; embedded images, UVs, PBR data and multiple material assignments; reloaded <=1 mm bounds/origin; rejection when float32 export cannot satisfy tolerance; explicit orientation and wrong/swapped axes; double-binding rejection; immutable raw reuse at different boxes; deterministic identities sensitive to scope, exact dimensions and versions; selected product B's image/dimensions isolated from query A. No existing gen/shared imports were changed or made dependent on binding, so existing generation/embedding suites were not rerun and no new B01/B03 evidence is claimed.
+
+**Saved synthetic evidence** (outside Git): `C:\Users\hp\AppData\Local\Temp\ani-binding-b04\software-evidence-8bc0717ec74d4f229a2c783a682bb0e2`. Contains `orientation-raw.glb`, `orientation-bound.glb`, `orientation-report.json`, `complex-raw.glb`, `complex-bound.glb`, `complex-report.json`, `synthetic-preview.png`. Fixtures are deterministically generated by tracked `tests/data/mesh/synthetic.py`; their generator, labels and README explicitly say synthetic. No model/merchant assets or large binary files were committed.
+
+| Synthetic sample | Raw SHA-256 | Bound SHA-256 | Bound bytes |
+| --- | --- | --- | --- |
+| Labeled orientation scene | `3f985bb0af7abaca7f2b9e215e1fd0e3105d142677c715614479cfd348a12906` | `73ac45bcdca363c3e6577d23821c74a59252ac58eed923ba5051c8b0e09990aa` | 16268 |
+| Nested transformed/shared scene | `2d514f793d839379f3a8c6ff47c53b1ab538f1b42502446bd6d3ddfc334c37a8` | `cb1de7c773132ac6bf898b431996e81653bfd6d1cfbf9a0370b2f7352236732f` | 11304 |
+
+Both use target **[0.73, 1.29, 0.47] m**; absolute post-export dimension errors are **[1.90735e-8, 3.81470e-8, 1.19209e-9] m**, and bottom-centre errors are **[0,0,0] m**. Their two materials and embedded texture are retained. The synthetic profile has rotation rows **[[0,-1,0],[0,0,1],[-1,0,0]]**, version `1`, mapping source +X front/+Z up/+Y left into project -Z front/+Y up/-X left. Full per-instance matrices are in the reports. **Reviewer:** Codex inspected the local unlit embedded-texture front/side/back projection; body floor contact and asymmetric markers were visible. This is not Justin/client PBR review and not SF3D semantic evidence.
+
+**Important limits and decisions:** normals are inverse-transpose transformed and mirror winding corrected. Tangents and normal maps explicitly raise `UnsupportedMesh`; their preservation is not claimed. Animated/skinned/morphed/extended/compressed assets, external images, unsupported accessors and unreachable scene nodes also fail closed. `BINDING.md` records the supported subset and size limits. The complex example's distortion ratio is **3.1697**, correctly labeled `proxy_recommended` despite passing dimensions. The binder returns a validated candidate plus the diagnostic, never silently publishes or substitutes a proxy; all results require visual review. The provenance marker rejects accidental double binding, but cannot prevent external removal of every marker; callers must retain immutable raw identities. A 1 mm software check does not establish physical measurement accuracy or room fit.
+
+No further implementation step is authorized by this evidence. Next B04-specific action is review of a genuine raw generated GLB with Justin after B02 becomes available; do not resume B02 or start B05 automatically.
 
 ## 11. Sources and compact HTN requirements appendix
 

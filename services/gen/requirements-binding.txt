@@ -1,0 +1,9 @@
+# Isolated CPython 3.11.9 B04 environment; no generation/embedding dependencies.
+numpy==1.26.4
+trimesh==4.4.1
+Pillow==11.1.0
+pytest==8.3.5
+colorama==0.4.6; sys_platform == "win32"
+iniconfig==2.3.0
+packaging==26.3
+pluggy==1.6.0
