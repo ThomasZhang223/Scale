@@ -52,8 +52,9 @@ export function prepareObject(model: THREE.Object3D, scaleOverride?: number): Lo
 
   // 1. Units. Real furniture is between a few centimeters and a few meters.
   const raw = measure(node).getSize(new THREE.Vector3());
+  // A scaleOverride of 1 means "trust the file" (server meshes are already in metres).
   const { factor, note } = scaleOverride
-    ? { factor: scaleOverride, note: `Scaled by ${scaleOverride} as configured.` }
+    ? { factor: scaleOverride, note: scaleOverride === 1 ? null : `Scaled by ${scaleOverride} as configured.` }
     : guessUnits(Math.max(raw.x, raw.y, raw.z));
   model.scale.multiplyScalar(factor);
 

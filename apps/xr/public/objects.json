@@ -1,4 +1,5 @@
 [
   { "url": "/objects/chair.glb", "name": "chair" },
-  { "url": "/objects/sofa.glb", "name": "sofa" }
+  { "url": "/objects/sofa.glb", "name": "sofa" },
+  { "url": "/objects/xander.glb", "name": "xander" }
 ]

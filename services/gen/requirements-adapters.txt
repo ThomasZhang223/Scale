@@ -1,0 +1,2 @@
+# Add to the pinned CPU embedding environment; never install SF3D's CUDA stack here.
+trimesh==4.4.1

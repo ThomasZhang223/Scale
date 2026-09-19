@@ -1,0 +1,87 @@
+{
+  "schemaVersion": 1,
+  "measurement": "Single local CPU run, not p95; 4 torch threads; cached model; no warmup before first call",
+  "host": {
+    "python": "3.11.9",
+    "platform": "Windows"
+  },
+  "fingerprint": "fc3e942234e223f2853a3087c16ed804755419f3fe953a08be80a9441338327d",
+  "imageSha256": "2503c12a74419d91a4c6c9f1affc48fee6e2b8b9091956ca6211e91ada57b5bf",
+  "imageProvenance": "Official SF3D chair1 sample; no verified product identity or dimensions",
+  "evidence": {
+    "embedding": "real cached SigLIP2",
+    "search": "actual Paul index/ranking",
+    "metadata": "synthetic TEST INPUTS",
+    "provider": "fake_provider",
+    "binding": "actual B04 on synthetic textured GLB",
+    "storage": "not exercised in this timing run",
+    "realProducts": 0,
+    "corpusItems": 1,
+    "heldOutPhotos": 0,
+    "retrievalQualityClaim": false
+  },
+  "embeddingSeconds": {
+    "modelLoad": 13.465404799964745,
+    "imageFirst": 0.7403305000043474,
+    "imageRepeat": 0.4729121999698691,
+    "textFirst": 0.2928482999559492,
+    "textRepeat": 0.22531270002946258
+  },
+  "queries": [
+    {
+      "query": "identical_source_image",
+      "rankings": [
+        {
+          "objectId": "synthetic-metadata-real-image",
+          "score": 0.9333
+        }
+      ],
+      "searchSeconds": 0.0012330000172369182
+    },
+    {
+      "query": "text_wooden_chair",
+      "rankings": [
+        {
+          "objectId": "synthetic-metadata-real-image",
+          "score": 0.5282
+        }
+      ],
+      "searchSeconds": 0.0011358000338077545
+    },
+    {
+      "query": "text_red_sports_car",
+      "rankings": [
+        {
+          "objectId": "synthetic-metadata-real-image",
+          "score": 0.4481
+        }
+      ],
+      "searchSeconds": 0.0011411000159569085
+    }
+  ],
+  "queryCount": 3,
+  "hardFilterChecks": 5,
+  "hardFilterViolations": 0,
+  "queryInserted": false,
+  "bindingSeconds": 0.023291899997275323,
+  "integrationSeconds": {
+    "queryToResults": 0.17329760000575334,
+    "queryThroughBoundInlineResult": 0.2494406999903731
+  },
+  "artifact": {
+    "boundSha256": "9580391aab288ad7b4fc6319cfb96c4e940abd8e7de5c472730c66c527912656",
+    "bytes": 11328,
+    "scale": 1,
+    "measuredMeters": [
+      0.6100000143051147,
+      1.0700000524520874,
+      0.49000000953674316
+    ]
+  },
+  "failures": [],
+  "realGeneration": false,
+  "realGeneratedMeshBinding": false,
+  "gitHeadAtRun": "76864acb06f8bee7c2ba3582d4cd6d6663aba532",
+  "testedImplementationCommit": "f2b2ff829e1aa53d0658ee087ea8ecdd37fdff65",
+  "note": "Run occurred before the integration commit; that commit contains the tested implementation unchanged."
+}

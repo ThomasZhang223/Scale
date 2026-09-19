@@ -1,0 +1,4 @@
+fastapi
+uvicorn[standard]
+ortools==9.15.*
+httpx

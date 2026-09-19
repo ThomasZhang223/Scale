@@ -2,8 +2,9 @@
 
 Owner: Ani. The shared contract remains `.claude/contracts.md`: metres, +Y up,
 -Z front, bottom-centre origin, and dimensions within 1 mm after export/reload.
-This is a local library; the existing `/bind` HTTP route is still a stub. No
-Worker, storage, generation, fit or embedding interfaces were changed.
+This is a local library, composed by [B06](GENERATION_HANDOFF.md). The unused
+`/bind` stage stub was removed; binding still happens exactly once in Ani code.
+No teammate implementation or shared contract was changed.
 
 **Software gate: PASS on synthetic fixtures. Real SF3D semantic orientation and
 visual distortion review: BLOCKED_ON_B02.** Matching a supplied box does not

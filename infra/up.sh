@@ -51,11 +51,14 @@ preflight() {
   if [ -z "${SEARCH_PORT:-}" ]; then die "SEARCH_PORT is unset in infra/.env."; fi
   if [ -z "${INGEST_PORT:-}" ]; then die "INGEST_PORT is unset in infra/.env."; fi
 
-  if ! command -v wrangler >/dev/null 2>&1; then
-    die "wrangler CLI not found on PATH. Install it and run 'wrangler login'."
+  # `npx wrangler`, not bare `wrangler`. This project installs wrangler as a devDependency of
+  # workers/, so it is never on PATH — the preflight rejected a perfectly working setup.
+  # infra/cloudflare/set-upstreams.sh, which this script calls, already uses npx.
+  if ! (cd "$REPO_ROOT/workers" && npx --no-install wrangler --version >/dev/null 2>&1); then
+    die "wrangler not found. Run 'npm install' in workers/, then 'npx wrangler login'."
   fi
-  if wrangler whoami 2>&1 | grep -qi "not authenticated"; then
-    die "wrangler is not logged in. Run 'wrangler login' first."
+  if (cd "$REPO_ROOT/workers" && npx --no-install wrangler whoami 2>&1) | grep -qi "not authenticated"; then
+    die "wrangler is not logged in. Run 'npx wrangler login' from workers/ first."
   fi
 
   # A tunnel left running from an earlier, un-stopped run would collide with a fresh set of

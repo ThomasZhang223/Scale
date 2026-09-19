@@ -1,0 +1,24 @@
+{
+  "units": "cm",
+  "room": {
+    "widthCm": 410,
+    "depthCm": 350,
+    "walls": [
+      { "id": "n1", "side": "north", "lengthCm": 410 },
+      { "id": "s1", "side": "south", "lengthCm": 410 },
+      { "id": "e1", "side": "east", "lengthCm": 350 },
+      { "id": "w1", "side": "west", "lengthCm": 350 }
+    ],
+    "doors": [{ "id": "d1", "wall": "south", "centerCm": [80, 175], "widthCm": 90 }],
+    "windows": [{ "id": "win1", "wall": "north", "centerCm": [-50, -175], "widthCm": 120 }]
+  },
+  "objects": [
+    { "id": "obj_sofa", "category": "sofa", "sizeCm": [219, 102, 79], "atCm": [0, -124], "facing": "south", "movable": true },
+    { "id": "obj_chair", "category": "chair", "sizeCm": [83, 57, 69], "atCm": [140, 30], "facing": "west", "movable": true },
+    { "id": "obj_table", "category": "table", "sizeCm": [100, 60, 45], "atCm": [0, 28], "facing": "south", "movable": false, "note": "no scan yet" },
+    { "id": "obj_storage", "category": "storage", "sizeCm": [80, 40, 180], "atCm": [-185, 80], "facing": "east", "movable": false, "note": "no scan yet" }
+  ],
+  "pinned": [],
+  "preferences": [],
+  "request": "Reading corner by the window"
+}

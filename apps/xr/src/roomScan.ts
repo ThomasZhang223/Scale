@@ -30,6 +30,8 @@ export interface BuiltRoom {
   group: THREE.Group;
   objects: ScannedObject[];
   size: { width: number; depth: number };
+  /** Added to capture-frame coordinates to get scene coordinates (floor at 0, room centered). */
+  offset: [number, number, number];
 }
 
 type Json = Record<string, unknown>;
@@ -131,7 +133,7 @@ export function buildRoomFromScan(scan: Json): BuiltRoom {
     };
   });
 
-  return { group, objects: scanned, size };
+  return { group, objects: scanned, size, offset: [offset.x, offset.y, offset.z] };
 }
 
 // ---------- readers ----------

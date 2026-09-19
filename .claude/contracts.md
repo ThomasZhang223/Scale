@@ -60,6 +60,25 @@ These are not negotiable per component. A component that breaks one of them corr
 }
 ```
 
+Optional, added post-launch — absent renders exactly as today, boxes with no colour:
+
+```json
+"appearance": {
+  "surfaces": {
+    "<wallId>": { "hex": "#c9c3b8", "textureUrl": null },
+    "floor":    { "hex": "#8a6a44", "textureUrl": null },
+    "ceiling":  { "hex": "#f2f0ec", "textureUrl": null }
+  }
+}
+```
+
+`textureUrl` is always `null` for now (per-wall rectified photos are plan section 4b step 3, out
+of scope unless Component A is ahead at H16). A surface key is present only when A actually
+sampled a colour for it — RoomPlan has no ceiling category, so `"ceiling"` is often absent, not a
+guessed default. **Appearance is never a source of dimensions.** When the shell and the
+parametric wall disagree, the parametric wall is right. Justin renders the visual on layer 0 and
+the parametric boxes on layer 1 at `visible = false`, so `raycaster.layers.set(1)` still hits them.
+
 Notes that matter:
 
 - `worldAlignment` must be the literal `"gravityAndHeading"`. If A ever emits anything else, B rejects the upload with HTTP 422. Without true north the sun simulation is invented, and retrofitting means re-scanning every room.
