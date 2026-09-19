@@ -1,8 +1,9 @@
 # B03: independent SigLIP2 embeddings
 
 One image **or** text becomes a real 768-dimension, finite, L2-normalized float32
-vector. This module does not generate captions/meshes, combine modalities, fetch
-arbitrary URLs, or write/search an index. Cosine similarity is not a probability.
+vector. The encoder does not generate captions/meshes, combine modalities or fetch
+arbitrary URLs. [B05](../../SEARCH_HANDOFF.md) separately exports records and
+hands queries to Paul's existing index/ranker. Cosine similarity is not a probability.
 
 Checkpoint: `google/siglip2-base-patch16-224` at
 `75de2d55ec2d0b4efc50b3e9ad70dba96a7b2fa2`. This fixed-resolution checkpoint resolves
@@ -32,7 +33,8 @@ This is Ani's internal service boundary, not a change to the shared Worker API.
 
 Optional `expectedFingerprint` rejects an incompatible model with HTTP 409.
 Unknown fields, image+text, two image inputs and interactive batches are rejected.
-Output fields are exactly:
+Canonical Bearer output fields are exactly (the opt-in caller compatibility
+routes add documented aliases; see [B05](../../SEARCH_HANDOFF.md)):
 
 ```text
 values: float32 values serialized as 768 JSON numbers

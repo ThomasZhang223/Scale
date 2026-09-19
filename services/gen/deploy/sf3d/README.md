@@ -7,7 +7,8 @@ files, running the packaging tests, or asking the runner for `--help`.
 This isolated Truss generates **one raw, unscaled textured GLB** from one image.
 It is not Object v1-ready: no metre binding, semantic orientation guarantee, R2,
 jobs, callbacks, embeddings, retrieval or alternative model. Production artifact
-transport remains B06. Do not call this wrapper with `/async_predict`: its inline
+transport/binding is implemented in [B06](../../GENERATION_HANDOFF.md), with
+fake-provider evidence until B02 succeeds. Do not call this wrapper with `/async_predict`: its inline
 base64 transfer is designed only for this synchronous B02 spike.
 
 ## Prepared files and limits
