@@ -14,7 +14,7 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
+/lib/
 lib64/
 parts/
 sdist/
@@ -243,3 +243,10 @@ Pods/
 
 # macOS
 .DS_Store
+
+# Expo local env (per-machine API base, never committed)
+.env.local
+.env*.local
+
+# Personal, per-machine Claude context. Never committed.
+CLAUDE.local.md

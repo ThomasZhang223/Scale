@@ -64,7 +64,7 @@ on plain backgrounds, and a category mix that suits a small room.
 | Produce | `POST /objects` request `{ source:"catalog", name, category, bboxMeters, measure, frameKeys[] }` → `Object v1` with `state:"measured"` | Thomas (B) |
 | Produce | R2 key `catalog/{merchant}/{productId}/source.jpg` | Ani (C), reads for pre-bake |
 | Consume | `Object v1` fields `bboxMeters`, `measure.confidence`, `caption`, `palette` once `state:"ready"` | Ani (C) writes on generation |
-| Consume | Vectorize index `objects-v1` metadata: `objectId, source, category, w_mm, h_mm, d_mm, dominant_hex` | Ani (C) writes embeddings; you query for ranking |
+| Consume | Vectorize index `objects-v1`: 768-dim SigLIP2 embeddings plus metadata `objectId, source, category, w_mm, h_mm, d_mm, dominant_hex` | Ani (C) writes embeddings; you query for ranking |
 | Produce | Ranking logic behind `POST /search` body `{ text?, imageKey?, fit?, source?, limit }`, where `fit` is `{ maxW, maxH, maxD }` (integer-range filter, never a vector term) | Thomas (B) hosts the endpoint |
 | Produce | The search query shape you actually need | Thomas (B), due H12 |
 | Consume | Claude API for intent and spoken response (`services/ingest` already pins `anthropic`) | external |
@@ -73,6 +73,10 @@ on plain backgrounds, and a category mix that suits a small room.
 
 Everything you write into `bboxMeters` is metres, float, even though merchant data arrives in
 inches, cm, or mixed units. Converting is your job, at ingest — never downstream.
+
+For image search, the scanned frame is the query: embed it with the same SigLIP2 model and search
+the catalog and saved-possession vectors. The query frame does not need to be inserted into the
+database first. Keep dimensions, price, and source as hard filters rather than vector terms.
 
 ## Hour by hour
 

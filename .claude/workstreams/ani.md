@@ -8,8 +8,9 @@ four-person timeline; this file is your lane extracted from it.
 
 You own image-to-3D on Baseten behind two latency tiers, background removal, the scale binding
 that turns a normalised mesh into a metrically true one, image embeddings for retrieval, and the
-offline pre-bake of the catalog. `live` tier is Stable Fast 3D (sub-second on an A100, ~6 GB
-VRAM, MIT licence, UV unwrap and PBR params) for the one on-stage generation. `quality` tier is
+offline pre-bake of the catalog. `live` tier is Stable Fast 3D (one best clean image as input,
+sub-second on an A100, ~6 GB VRAM, Stability AI Community License, UV unwrap and PBR params)
+for the one on-stage generation. `quality` tier is
 TRELLIS 2 or Hunyuan3D Pro for the pre-baked catalog and async upgrades. Both tiers sit behind
 one `tier` parameter on the same endpoint.
 
@@ -18,7 +19,7 @@ one `tier` parameter on the same endpoint.
 - Background removal before generation
 - The scale binding (mesh normalisation contract) — sole owner, see below
 - Both input paths (phone scan, catalog product) converging on `Object v1`
-- CLIP ViT-L/14 image embeddings (768-dim), caption, colour palette, written on `state:"ready"`
+- `google/siglip2-base-patch16-224` embeddings (768-dim), caption, colour palette, written on `state:"ready"`
 - Pre-baking 60–100 catalog products and caching their GLBs
 
 **You do not own:** the iOS app, backend, or schemas (Thomas); WebXR/Quest or the fit solver
@@ -42,9 +43,9 @@ judge is standing there waiting — past that, latency wins.
 
 ### Levers on fidelity
 
-- **Multi-view beats single-image, and it is free.** A phone sweep gives four or more good
-  frames. Single-image generation hallucinates the back of the object. Take every frame the
-  capture gives you.
+- **Route the sweep by task.** All useful frames can support SigLIP2 retrieval. Stable Fast 3D
+  receives one best clean frame, not a multi-view set, so select the frame with the clearest
+  silhouette and least occlusion after background removal.
 - **Background removal quality feeds mesh quality.** A bad matte becomes geometry. Shoot against
   a clean surface when you can, and check the matte before sending it.
 - Stable Fast 3D gives UV unwrap and PBR parameters. Use them rather than baking flat colour.
@@ -80,7 +81,7 @@ You never read another component's internals — only `.claude/contracts.md`.
 | Produce | Thumbnail | R2 `objects/{objectId}/thumb.jpg` | Justin (D), Thomas (A) |
 | Produce | Object ready state | `Object v1` → `state:"ready"`, `glbUrl`, `caption`, `palette` (written into `objects` D1 table via B) | all |
 | Produce | Job progress | `jobs` D1 table rows behind `GET /jobs/{id}` | Thomas (A) |
-| Produce | Image embeddings | Vectorize index `objects-v1`, 768-dim CLIP ViT-L/14, cosine, metadata `objectId, source, category, w_mm, h_mm, d_mm, dominant_hex` | Paul (F) ranks, Thomas (B) owns `/search` |
+| Produce | Image embeddings | Vectorize index `objects-v1`, 768-dim `google/siglip2-base-patch16-224`, cosine, metadata `objectId, source, category, w_mm, h_mm, d_mm, dominant_hex` | Paul (F) ranks, Thomas (B) owns `/search` |
 | Produce | SSE trigger | `event: object data: Object v1` on `GET /sync/{roomId}` fires when your write flips `state` to `ready` | Justin (D) via B's Durable Object |
 
 ## The binding
@@ -146,7 +147,7 @@ Sync points: H4, H10, H16, H20, H26, H31 — fifteen minutes, standing, all four
   scale 1 — checked in a viewer, not assumed.
 - Justin has a real bound GLB by H8 and confirms 1:1 in the headset with his own tape measure.
 - 60–100 catalog products are pre-baked and cached as GLBs before H20.
-- Every object at `state:"ready"` has a 768-dim CLIP embedding, caption, and palette in
+- Every object at `state:"ready"` has a 768-dim SigLIP2 embedding, caption, and palette in
   `objects-v1`.
 - Cold start and generation latency are measured on the venue network, not at home, and reported
   at the H4 sync.

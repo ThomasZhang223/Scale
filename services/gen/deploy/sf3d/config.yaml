@@ -1,0 +1,35 @@
+# Candidate only: B01 does not build, download weights, deploy or incur compute.
+model_name: ani-sf3d-feasibility
+python_version: py311
+base_image:
+  # pytorch/pytorch:2.4.0-cuda12.1-cudnn9-devel, Linux amd64 registry manifest.
+  image: pytorch/pytorch@sha256:a55ff10111eb11f998884327d37361592e632899edd24fce99886b69289e33e6
+  python_executable_path: /opt/conda/bin/python
+resources:
+  accelerator: L4
+  cpu: "4"
+  memory: 16Gi
+runtime:
+  predict_concurrency: 1
+  enable_debug_logs: false
+  truss_server_version_override: "0.18.30"
+secrets:
+  hf_access_token: null
+environment_variables:
+  HF_HUB_DISABLE_TELEMETRY: "1"
+  TOKENIZERS_PARALLELISM: "false"
+  OMP_NUM_THREADS: "4"
+  U2NET_HOME: /tmp/ani-sf3d-u2net
+requirements_file: requirements.txt
+system_packages:
+  - git
+  - build-essential
+  - libgomp1
+  - libgl1
+  - libglib2.0-0
+build_commands:
+  - git clone https://github.com/Stability-AI/stable-fast-3d.git /opt/sf3d && cd /opt/sf3d && git checkout --detach ff21fc491b4dc5314bf6734c7c0dabd86b5f5bb2
+  # Build machines need not expose a GPU. Force CUDA and L4 (Ada, sm_89).
+  - cd /opt/sf3d && USE_CUDA=1 CUDA_HOME=/usr/local/cuda TORCH_CUDA_ARCH_LIST=8.9 USE_NATIVE_ARCH=0 MAX_JOBS=2 CFLAGS='-O3 -fopenmp' CXXFLAGS='-O3 -fopenmp' LDFLAGS='-fopenmp' /opt/conda/bin/python -m pip install --no-build-isolation --no-deps ./texture_baker ./uv_unwrapper
+  - /opt/conda/bin/python -m pip check
+  - /opt/conda/bin/python -c "import sys, torch, texture_baker, uv_unwrapper; assert sys.version_info[:2] == (3, 11); assert torch.__version__.split('+')[0] == '2.4.0'; assert torch.version.cuda == '12.1'"

@@ -138,7 +138,7 @@ A custom native module wrapping an Apple framework is the Expo differentiator. M
 
 | Tier | Model | Behaviour | Use |
 | --- | --- | --- | --- |
-| `live` | Stable Fast 3D | Sub-second on an A100, about 6 GB VRAM, MIT licence, UV unwrap and PBR parameters | The on-stage generation |
+| `live` | Stable Fast 3D | One best clean image as input; sub-second on an A100, about 6 GB VRAM, Stability AI Community License, UV unwrap and PBR parameters | The on-stage generation |
 | `quality` | TRELLIS 2 or Hunyuan3D Pro | Slower, better | Pre-baked catalog, async upgrade |
 
 **Depends on.** B for job records and R2 keys. Nothing else.
@@ -155,7 +155,7 @@ A custom native module wrapping an Apple framework is the Expo differentiator. M
 2. Background removal. Shoot against a clean surface instead.
 3. Generation itself. Fall back to a textured box at the measured dimensions. Ugly, but still dimensionally true, and the fit engine does not care.
 
-**Known failure set.** Single-image generation degrades badly on transparent, reflective, thin, and very dark objects. A MacBook is a good demo object, because it is matte, rectangular, and solid. A water bottle is the adversarial case. Test twenty random objects on Friday so the boundary is known rather than discovered on stage. Multi-view input beats single-image, and a sweep gives four good frames for free.
+**Known failure set.** Single-image generation degrades badly on transparent, reflective, thin, and very dark objects. A MacBook is a good demo object, because it is matte, rectangular, and solid. A water bottle is the adversarial case. Test twenty random objects on Friday so the boundary is known rather than discovered on stage. A sweep gives multiple candidate frames: all useful frames can support SigLIP2 retrieval, while Stable Fast 3D receives one best clean frame, not a multi-view set.
 
 ## Components D, E, F
 
@@ -208,15 +208,18 @@ A custom native module wrapping an Apple framework is the Expo differentiator. M
 
 ### F — Retrieval, agents, and voice
 
-**Scope.** Three pieces that share one owner.
+**Scope.** Four pieces split across the owners named in the seam above.
 
-1. **Indexing.** Every object gets an image embedding, a caption, a colour palette, and its true dimensions, written to Vectorize on `state:"ready"`.
-2. **Hybrid search.** Dense vector for style, integer range filter for fit, over your own objects plus catalog. This is the differentiator in the positioning above, so it outranks the agent loop if time is short.
-3. **Voice (OMNI).** One unbroken loop on the phone: hold the phone at an object, ask "what is this, will it fit beside my desk?", get an answer aloud from live video plus measured geometry.
+1. **Query embedding.** Scan frame → SigLIP2 → 768-dimensional normalized query embedding.
+2. **Indexing.** Catalog products and saved possessions get the same embedding and are stored in Vectorize.
+3. **Hybrid retrieval.** Vector similarity finds visually and semantically similar objects. Dimensions, price, and source are hard metadata filters. This is the differentiator in the positioning above, so it outranks the agent loop if time is short.
+4. **Voice (OMNI).** One unbroken loop on the phone: hold the phone at an object, ask "what is this, will it fit beside my desk?", get an answer aloud from live video plus measured geometry.
+
+The scanned object becomes the query and does not need to be inserted into the database before searching.
 
 The multi-agent design loop, scout → fit → style → budget, sits on top of search and solve. It is the second Huawei track and the openJiuwen angle.
 
-**Depends on.** B's `/search` and `/solve`. Objects must reach `state:"ready"` first.
+**Depends on.** B's `/search` and `/solve`. Catalog products and saved possessions must reach `state:"ready"` before indexing; the scanned query does not.
 
 **Exposes.** The search endpoint behaviour and the voice loop.
 
@@ -282,7 +285,7 @@ Shopify has a weight field but no standard dimensions field, so dimensions live 
 
 ### P4 — Retrieval
 
-F. Object → embedding, caption, palette, dimensions → Vectorize → hybrid query → results into the scene.
+F. Scan frame → SigLIP2 query embedding → Vectorize similarity search over catalog + saved possessions → numeric dimension/price filtering → ranked results.
 
 **The detail.** The query has two halves that must not be mixed. Style is a dense vector similarity. Fit is an integer range filter on `w_mm`, `h_mm`, `d_mm`. Trying to express fit as a vector term produces results that look right and do not fit, which is the exact failure the product exists to prevent.
 

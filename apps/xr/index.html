@@ -1,12 +1,51 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Full Scale — XR</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Room scan</title>
+    <style>
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #1d2126; }
+      body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: #eef1f4; }
+      #panel {
+        position: absolute; top: 16px; left: 16px; width: 290px;
+        padding: 14px; border-radius: 12px; display: grid; gap: 10px;
+        background: rgba(20, 23, 27, 0.86); border: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      #panel[hidden] { display: none; }
+      #connection::before {
+        content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 7px;
+        border-radius: 50%; background: #ff9f43; vertical-align: middle;
+      }
+      #connection[data-live="true"]::before { background: #4cd28a; }
+      button {
+        font: inherit; padding: 9px 12px; border-radius: 8px; cursor: pointer;
+        color: inherit; background: #2d5d86; border: 1px solid #3f78a8;
+      }
+      button:hover { background: #356c9b; }
+      button:focus-visible { outline: 2px solid #5fb3ff; outline-offset: 2px; }
+      #note { color: #a9b2bc; min-height: 1.45em; }
+      .row { display: flex; gap: 8px; }
+      .row button:first-child { flex: 1; }
+      button.quiet { background: #2a2f36; border-color: rgba(255, 255, 255, 0.15); }
+      button.quiet:hover { background: #343a42; }
+      .check { display: flex; align-items: center; gap: 8px; color: #cfd6dd; cursor: pointer; }
+      .check input { accent-color: #4cd28a; width: 16px; height: 16px; }
+      .hint { margin: 0; color: #8a96a3; font-size: 13px; }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
+    <div id="panel">
+      <span id="connection" data-live="false">Connecting…</span>
+      <div class="row">
+        <button id="open" type="button">Add room or object</button>
+        <button id="reset" type="button" class="quiet">Reset</button>
+      </div>
+      <input id="picker" type="file" accept=".json,.glb,.gltf,application/json,model/gltf-binary" multiple hidden />
+      <label class="check"><input id="colliders" type="checkbox" /> Show physics shapes</label>
+      <p class="hint">Drop a room scan (.json) or scanned objects (.glb) anywhere. Drag objects to move them; scroll while dragging to turn.</p>
+      <div id="note" role="status"></div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

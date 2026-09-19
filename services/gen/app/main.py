@@ -1,16 +1,17 @@
-"""services/gen — Component C skeleton.
+"""services/gen — independent B03 embeddings plus remaining component stubs.
 
-Owner: Ani. Scaffold only — no generation, binding, or embedding logic implemented.
+Owner: Ani. Generation and binding remain unimplemented.
 See ../README.md and ../BINDING.md.
 
 Job-worker entry points, one per stage of the pipeline described in the workstream doc. Each
 returns HTTP 501 with a JSON body naming the job, until implemented.
 """
 
-from fastapi import FastAPI, Response
+from fastapi import Response
 import json
+from .embedding.api import create_app
 
-app = FastAPI(title="services-gen")
+app = create_app()
 
 
 def _not_implemented(job: str) -> Response:
@@ -47,14 +48,3 @@ async def baseten_call():
 async def bind():
     """The scale binding: normalised mesh -> bboxMeters. Sole owner. See BINDING.md."""
     return _not_implemented("bind")
-
-
-@app.post("/embed")
-async def embed():
-    """CLIP ViT-L/14 embedding, caption, palette, written on state:"ready". See app/embedding/."""
-    return _not_implemented("embed")
-
-
-@app.get("/health")
-async def health():
-    return {"status": "ok"}
