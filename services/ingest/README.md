@@ -33,9 +33,50 @@ Shopify storefronts expose their catalog publicly, no auth required:
 - `/collections/<handle>/products.json`
 
 Some merchants disable this. **The chosen 15–25 furniture merchants must be verified reachable
-before the event starts (H-4–H0)** — this decides whether this whole pipeline exists at all. See
-`merchants.example.json` for the shape of the verified list; the real list is not checked in here
-until it exists.
+before the event starts (H-4–H0)** — this decides whether this whole pipeline exists at all.
+
+### Verifying them: `verify_merchants.py`
+
+```
+pip install -r requirements.txt
+cp candidates.example.json candidates.json     # then put real merchants in it
+python3 verify_merchants.py candidates.json --out merchants.verified.json
+```
+
+Reachability is not the question. A store can serve a flawless `/products.json` that contains no
+dimensions anywhere, and it is worth nothing to us. So the verifier also runs **step 1 of
+`EXTRACTION.md` (the regex pass)** over a sample of each catalogue and reports the real hit
+rate. That is the number that decides a merchant, and it is the H4 "real extraction hit rate"
+report from `workstreams/paul.md`.
+
+```
+merchant                          status               n  any dim   usable
+--------------------------------------------------------------------------
+good                              ok                  30     100%     100%
+partial                           ok                  30      20%      20%
+nodims                            ok                  30       0%       0%
+blocked                           blocked              0        -        -
+  HTTP 403 on /products.json
+html                              not_shopify          0        -        -
+  expected JSON, got text/html
+robots                            robots_disallow      0        -        -
+--------------------------------------------------------------------------
+reachable: 3/6   usable (>=25% fully dimensioned): 1
+```
+
+`usable` means all three axes parsed, so the product yields a real `bboxMeters`. It exits
+non-zero below 15 usable merchants, so it works as a gate in a script.
+
+Statuses worth knowing: `not_shopify` is the common way a store "disables" the endpoint — it
+returns the HTML shop page with a 200, which a naive check reads as success. `thin` means the
+catalogue is too small to carry its own integration cost.
+
+It is polite by construction: `robots.txt` is fetched and honoured for `/products.json`, one
+request at a time per host with a delay, a descriptive User-Agent, and public catalogue
+endpoints only. Re-run it on the day — a store can turn the endpoint off at any time.
+
+`candidates.example.json` is the input shape (placeholders, not real merchants);
+`merchants.verified.json` is the generated output and is what the crawler should read.
 
 ## Dimensions are the hard part
 
