@@ -8,10 +8,9 @@ and normal merge/push to main after tests. No rebase/reset/squash/force is autho
 No further Baseten/GPU calls: reuse the saved genuine artifact.
 See [the current demo runbook](../services/gen/DEMO_RUNBOOK.md) for commands/evidence.
 
-- Synced once to origin/main `13541b7`, fast-forward, no conflicts; B01/B03/B04
-  regressions passed. Paul already owns working search/index/ranking. Thomas's
-  implemented backend is visible at `origin/thomas/cloudflare-verify` `5a3ce5f`;
-  it is not merged into current main. Justin's renderer branch is `3196bd2`.
+- Latest main sync: normal merge `8156fee`, incoming main `0f25a27`, no conflicts.
+  This incorporates the teammate backend, renderer, auth and ingestion changes.
+  Earlier sync/branch-status notes below are historical snapshots.
 - B03 real cached image/text embeddings and HTTP evidence pass. B04 now passes
   76 binding/selection/cache tests and genuine saved-SF3D nonuniform binding.
   The full lightweight suite passes 210 tests with 3 opt-in skips.
@@ -30,9 +29,11 @@ See [the current demo runbook](../services/gen/DEMO_RUNBOOK.md) for commands/evi
   corpus yet). Ani's `app.embedding.catalog_manifest` now consumes that shape,
   requires supplied backend object IDs and checks image hashes before export.
   No second merge, teammate-file edits, catalog crawl or invented facts occurred.
-- Real product retrieval checkpoint is blocked on Paul's image/identity/metadata
-  corpus. Existing extraction text, example.com seed merchants and renderer GLBs
-  are not a legitimate product search dataset. No success commit was manufactured.
+- Latest main now has 100 downloaded catalog images and extracted metadata in
+  `services/ingest/prebake/manifest.json`; the earlier missing-corpus status is stale.
+  Retrieval relevance and independently measured accuracy remain unproven. Backend
+  identity mapping is still an explicit importer input. The SF3D chair1 sample
+  has no independently verified physical bbox in this evidence.
 - B02 **REAL SF3D PASS**: saved raw SHA
   `6291edefcd2e1342903b57619d9c17ebf676a2a33774d17ab629fa76ae4e4956`,
   798,560 bytes, 12,177 vertices, 19,996 faces, one material, two embedded textures.

@@ -58,16 +58,18 @@ the commands below start his existing service using the CPU environment:
 ```powershell
 $null = Remove-Item Env:PYTHONPATH -ErrorAction SilentlyContinue
 Set-Location services/search
+# UPSTREAM_TOKEN must already be supplied securely for Paul's current auth gate.
 $env:EMBED_URL = 'http://127.0.0.1:8002/embed/search'
 & "$env:TEMP\ani-siglip2-b03\venv\Scripts\python.exe" -m uvicorn app.main:app --host 127.0.0.1 --port 8004 --workers 1
 ```
 
 GET `http://127.0.0.1:8004/health`, then POST the validated exported JSON to
-`/index`. POST `/search` with `{"text":"chair","limit":5}` or a manifest-listed
+`/index` with `X-Upstream-Token` from the configured environment. Use that header
+for `/search` too. POST `/search` with `{"text":"chair","limit":5}` or a manifest-listed
 `imageKey`. Require no `X-Search-Degraded`. His HTTP route can relax fit and ignores
 budget; **use the strict local handoff when those constraints matter**. Restarting
-his service clears its index. Current search Docker listens on 8080 while root
-compose maps 8004:8004: Thomas/Paul must align that before using compose.
+his service clears its index. Latest main includes the team's compose port fixes;
+use `infra/README.md` for current deployment wiring.
 
 Lightweight suite (repository root; set `$aniPython` as above):
 
@@ -109,16 +111,13 @@ had zero violations. Unit fixtures also prove ranking changes with query vectors
 
 ## Remaining dependencies and honest fallback
 
-- **Paul:** supply 5–10 real images with verified object/product/variant identity,
-  names/source, metre dimensions and measurement provenance/confidence, and actual
-  cents/currency where used. Current 11 merchant sample files contain title/text
-  only. The newly visible `0888470` commit adds `build_prebake.py` and image URL
-  capture, but no real downloaded corpus. Ask Paul for its downloaded manifest
-  with 5–10 items; Ani's [manifest importer](SEARCH_HANDOFF.md#new-paul-image-manifest-0888470)
-  accepts that current shape, with Thomas's supplied backend object IDs.
-  Thomas's seed catalog uses `example.com` merchants; Justin's GLBs are renderer
-  assets, not verified product/photo pairs. None count as retrieval evidence.
-- **Thomas:** connect CPU embed origin/token and the flat Paul search payload;
+- **Paul / Thomas:** latest main now includes 100 downloaded catalog images and
+  `services/ingest/prebake/manifest.json` with extracted metadata. This supersedes
+  the earlier missing-image status. Ani's importer accepts that manifest shape;
+  Thomas must supply real backend object IDs. This completion run does not claim
+  retrieval relevance evaluation or independent physical measurement verification.
+  Nothing in that catalog verifies the official SF3D chair1 sample's dimensions.
+- **Thomas:** connect CPU embed origin/token and the flat Paul search payload (now forwarded directly by the Worker);
   hydrate source/authorized image/scope and durable attempt identity for generation;
   stop blind timeout resubmission; retain artifact validation and emit Object v1
   at finalization. Exact paths/gaps: [GENERATION_HANDOFF.md](GENERATION_HANDOFF.md).
@@ -169,3 +168,10 @@ The SF3D rembg path is sufficient; a second background-removal service is cut.
 Integration authorization now includes normal merges of latest `origin/main`
 into `ani/ml`, branch push, then a normal merge into main and push after tests.
 No rebase, squash, reset or force push. The Git history records the completed sync.
+
+Sync checkpoint: `8156fee` merged `origin/main` at `0f25a27` without conflicts.
+Ani's integration clients now exercise the required search auth header with a
+synthetic token and verify 401 without it. Worker handler tests use the actual
+checkout HEAD, with local R2/KV doubles. No shared auth behavior was changed.
+The incoming main already tracks `infra/.env` (commit `502ebab`); its token was
+not printed, used or introduced by Ani. Ani's staged secret/artifact scans passed.

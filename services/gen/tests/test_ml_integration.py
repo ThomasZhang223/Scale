@@ -46,14 +46,19 @@ def test_actual_paul_http_photo_and_text_queries_without_insertion(tmp_path, mon
     images, _ = reader(tmp_path)
     monkeypatch.setenv("EMBEDDING_LOCAL_SEARCH", "1")
     monkeypatch.setenv("EMBEDDING_SEARCH_FINGERPRINT", FakeEncoder.fingerprint)
+    monkeypatch.setenv("UPSTREAM_TOKEN", "synthetic-upstream-token")
     gen = embed_app(encoder=FakeEncoder(), image_reader=images)
     paul = paul_module("main")
+    monkeypatch.setattr(paul_module("auth"), "_TOKEN", "synthetic-upstream-token")
     monkeypatch.setattr(paul, "INDEX", paul_module("index").BruteForceIndex())
     monkeypatch.setattr(paul, "EMBED_URL", "http://gen.local/embed/search")
     original_client = httpx.AsyncClient
     monkeypatch.setattr(httpx, "AsyncClient", lambda **kwargs: original_client(
         **kwargs, transport=httpx.ASGITransport(app=gen, client=("127.0.0.1", 1234))))
     with TestClient(gen), TestClient(paul.app) as client:
+        assert client.post("/index", json=[]).status_code == 401
+        assert client.post("/search", json={"text": "chair"}).status_code == 401
+        client.headers["X-Upstream-Token"] = "synthetic-upstream-token"
         indexed = client.post("/index", json=index_payload([record()],
             expected_fingerprint=FakeEncoder.fingerprint, scope="test-session"))
         assert indexed.json() == {"indexed": 1, "total": 1}
@@ -144,7 +149,7 @@ def test_generation_http_honest_failures(kind, status):
 def test_actual_thomas_upload_and_asset_handlers_with_local_r2_kv():
     if not shutil.which("node"):
         pytest.skip("Node 24 required for current Worker source integration")
-    ref = os.environ.get("ANI_WORKER_REF", "origin/thomas/cloudflare-verify")
+    ref = os.environ.get("ANI_WORKER_REF", "HEAD")
     repo = Path(__file__).resolve().parents[3]
     if subprocess.run(["git", "rev-parse", "--verify", ref], cwd=repo, capture_output=True).returncode:
         pytest.skip("Fetch the teammate branch to test its actual handlers")
