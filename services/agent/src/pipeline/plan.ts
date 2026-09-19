@@ -193,7 +193,9 @@ export function buildSolverRequest(
   geo: RoomGeometry,
   objects: SolverRequest['objects'],
   rules: SolverRule[],
-  settings: { walkwayCm: number; timeLimitMs: number; doorKeepOutGrowCm?: number },
+  settings: { walkwayCm: number; timeLimitMs: number; doorKeepOutGrowCm?: number; closePairs?: [string, string, number][] },
 ): SolverRequest {
-  return { room: solverRoom(geo, settings.doorKeepOutGrowCm ?? 0), objects, rules, settings: { walkwayCm: settings.walkwayCm, timeLimitMs: settings.timeLimitMs } };
+  const out: SolverRequest = { room: solverRoom(geo, settings.doorKeepOutGrowCm ?? 0), objects, rules, settings: { walkwayCm: settings.walkwayCm, timeLimitMs: settings.timeLimitMs } };
+  if (settings.closePairs?.length) out.settings.closePairs = settings.closePairs;
+  return out;
 }

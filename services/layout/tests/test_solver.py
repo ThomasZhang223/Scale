@@ -45,6 +45,7 @@ def assert_valid(tc, req, res):
     """Test 2 as a helper: recompute every footprint and check the hard rules."""
     objs = {o["id"]: o for o in req["objects"]}
     walkway = req["settings"]["walkwayCm"]
+    close = {frozenset((a, b)): g for a, b, g in req["settings"].get("closePairs", [])}
     b = req["room"]["boundsCm"]
     boxes = {p["id"]: footprint(objs[p["id"]], p) for p in res["placements"]}
     tc.assertEqual(set(boxes), set(objs), "every object comes back")
@@ -64,7 +65,8 @@ def assert_valid(tc, req, res):
             cx0, cx1, cz0, cz1 = boxes[c]
             gap_x = max(cx0 - ax1, ax0 - cx1)
             gap_z = max(cz0 - az1, az0 - cz1)
-            tc.assertTrue(gap_x >= walkway or gap_z >= walkway, f"{a} and {c} closer than the {walkway} cm walkway")
+            need = close.get(frozenset((a, c)), walkway)
+            tc.assertTrue(gap_x >= need or gap_z >= need, f"{a} and {c} closer than {need} cm")
 
 
 def manhattan(p, q):
@@ -163,6 +165,22 @@ class Solver(unittest.TestCase):
         req = request([{"id": "r1", "type": "near", "a": "obj_chair", "b": {"point": [-50, -175]}, "maxCm": 100, "priority": "must"}])
         a, b = solve(req), solve(req)
         self.assertEqual(a["placements"], b["placements"])
+
+    def test_11_close_pairs_let_a_chair_sit_at_its_table(self):
+        objects = [
+            {"id": "table", "widthCm": 120, "depthCm": 70, "xCm": 0, "zCm": 0, "rotDeg": 0, "movable": True},
+            {"id": "chair", "widthCm": 50, "depthCm": 50, "xCm": 150, "zCm": 120, "rotDeg": 0, "movable": True},
+        ]
+        rule = [{"id": "r1", "type": "near", "a": "chair", "b": {"object": "table"}, "maxCm": 80, "priority": "must"}]
+        apart = solve(request(rule, objects))
+        self.assertEqual(apart["status"], "INFEASIBLE", "with a 60 cm walkway between them, 80 cm centre to centre can't hold")
+        req = request(rule, objects)
+        req["settings"]["closePairs"] = [["chair", "table", 5]]
+        together = solve(req)
+        self.assertEqual(together["status"], "OPTIMAL")
+        chair, table = placement(together, "chair"), placement(together, "table")
+        self.assertLessEqual(manhattan((chair["xCm"], chair["zCm"]), (table["xCm"], table["zCm"])), 80)
+        assert_valid(self, req, together)
 
     def test_10_twelve_objects_six_rules_in_time(self):
         objects = []

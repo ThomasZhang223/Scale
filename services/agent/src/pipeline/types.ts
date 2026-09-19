@@ -132,7 +132,12 @@ export interface SolverRequest {
   };
   objects: SolverObject[];
   rules: SolverRule[];
-  settings: { walkwayCm: number; timeLimitMs: number };
+  settings: {
+    walkwayCm: number;
+    timeLimitMs: number;
+    /** Pairs that belong together (a chair at its table): only this gap between them, not the walkway. */
+    closePairs?: [string, string, number][];
+  };
 }
 
 export interface SolverResponse {

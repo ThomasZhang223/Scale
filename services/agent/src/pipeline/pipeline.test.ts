@@ -172,9 +172,10 @@ test('W7: a red fit issue strengthens the rules and re-solves; two rounds logged
   const d = deps({ solves: [solveResponse, solveResponse], fits: [red, clean] });
   const proposal = await runLoop(input(), d);
   assert.equal(d.solveCalls.length, 2);
-  assert.equal(d.solveCalls[1].settings.walkwayCm, 75);
+  const depth = (call: SolverRequest) => call.room.doors[0].keepOut.maxZ - call.room.doors[0].keepOut.minZ;
+  assert.equal(depth(d.solveCalls[1]), depth(d.solveCalls[0]) + 15, 'the door zone got deeper');
   assert.equal(d.entries.filter((e) => e.kind === 'fit').length, 2);
-  assert.ok(d.entries.some((e) => e.kind === 'retry' && /walkway 75 cm/.test(e.message)));
+  assert.ok(d.entries.some((e) => e.kind === 'retry' && /door zone \+15 cm/.test(e.message)));
   assert.deepEqual(proposal.fit, { red: 0, amber: 0 });
 });
 

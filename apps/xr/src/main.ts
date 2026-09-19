@@ -678,7 +678,7 @@ async function start() {
 
   /** A category the agent and the detected boxes will recognise, from a file or manifest name. */
   function categoryOf(name: string): string {
-    const known = ['sofa', 'couch', 'chair', 'table', 'desk', 'bed', 'storage', 'shelf', 'lamp', 'television', 'tv', 'plant'];
+    const known = ['coffee table', 'side table', 'sofa', 'couch', 'armchair', 'chair', 'stool', 'bench', 'dining', 'table', 'desk', 'bed', 'storage', 'shelf', 'bookcase', 'cabinet', 'dresser', 'wardrobe', 'lamp', 'television', 'tv', 'plant', 'rug'];
     const lower = name.toLowerCase();
     return known.find((k) => lower.includes(k)) ?? name.replace(/\.(glb|gltf)$/i, '');
   }

@@ -76,7 +76,6 @@ def solve(request: dict) -> dict:
                 walkway = max(walkway, int(r.get("marginCm", walkway)))
             elif isinstance(zone, dict) and "rect" in zone:
                 obstacles.append({"id": r["id"], **zone["rect"]})
-    margin = half(walkway)
 
     m = cp_model.CpModel()
     objs = [_Obj(m, o, bounds) for o in request["objects"]]
@@ -84,28 +83,46 @@ def solve(request: dict) -> dict:
         raise ValueError(f"{len(objs)} objects; the limit is {MAX_OBJECTS}")
     by_id = {o.id: o for o in objs}
 
-    # ---- no overlap (footprints inflated by half the walkway on every side) ----
-    xs, zs = [], []
+    # Half sizes as linear expressions in `upright`, so one constraint covers both orientations.
     for o in objs:
-        for upright, lit in ((True, o.upright), (False, o.upright.Not())):
-            hw, hd = o.half_sizes(upright)
-            xs.append(m.NewOptionalIntervalVar(o.x - hw - margin, 2 * (hw + margin), o.x + hw + margin, lit, f"xi{upright}_{o.id}"))
-            zs.append(m.NewOptionalIntervalVar(o.z - hd - margin, 2 * (hd + margin), o.z + hd + margin, lit, f"zi{upright}_{o.id}"))
-            # ---- walls: the un-inflated footprint stays inside the room ----
-            m.Add(o.x - hw >= bounds["minX"]).OnlyEnforceIf(lit)
-            m.Add(o.x + hw <= bounds["maxX"]).OnlyEnforceIf(lit)
-            m.Add(o.z - hd >= bounds["minZ"]).OnlyEnforceIf(lit)
-            m.Add(o.z + hd <= bounds["maxZ"]).OnlyEnforceIf(lit)
-    # Keep-outs are already clearance zones, so they aren't inflated again: shrink them by
-    # the objects' inflation so a footprint may touch a keep-out's edge but never enter it.
-    for ob in obstacles:
-        for axis, lo_key, hi_key, out in (("x", "minX", "maxX", xs), ("z", "minZ", "maxZ", zs)):
-            lo, hi = int(ob[lo_key]) + margin, int(ob[hi_key]) - margin
-            if hi <= lo:
-                mid = (int(ob[lo_key]) + int(ob[hi_key])) // 2
-                lo, hi = mid, mid + 1
-            out.append(m.NewIntervalVar(lo, hi - lo, hi, f"o{axis}_{ob['id']}"))
-    m.AddNoOverlap2D(xs, zs)
+        hw_u, hd_u = o.half_sizes(True)
+        hw_r, hd_r = o.half_sizes(False)
+        o.hw = hw_r + (hw_u - hw_r) * o.upright
+        o.hd = hd_r + (hd_u - hd_r) * o.upright
+        # ---- walls: the footprint stays inside the room ----
+        m.Add(o.x - o.hw >= bounds["minX"])
+        m.Add(o.x + o.hw <= bounds["maxX"])
+        m.Add(o.z - o.hd >= bounds["minZ"])
+        m.Add(o.z + o.hd <= bounds["maxZ"])
+
+    # ---- separation, pair by pair ----
+    # A walkway between any two pieces, except pairs the caller says belong together (a chair
+    # at its table, a coffee table before the sofa), which only need their own small gap.
+    close: dict[frozenset, int] = {}
+    for pair in settings.get("closePairs") or []:
+        a, b, gap = pair
+        close[frozenset((a, b))] = int(gap)
+
+    def separated(a, b_x, b_hw, b_z, b_hd, gap: int, name: str):
+        lits = [m.NewBoolVar(f"{name}_{k}") for k in range(4)]
+        m.Add(a.x + a.hw + gap <= b_x - b_hw).OnlyEnforceIf(lits[0])
+        m.Add(b_x + b_hw + gap <= a.x - a.hw).OnlyEnforceIf(lits[1])
+        m.Add(a.z + a.hd + gap <= b_z - b_hd).OnlyEnforceIf(lits[2])
+        m.Add(b_z + b_hd + gap <= a.z - a.hd).OnlyEnforceIf(lits[3])
+        m.AddBoolOr(lits)
+
+    for i, oi in enumerate(objs):
+        for oj in objs[i + 1:]:
+            if not oi.movable and not oj.movable:
+                continue  # fixed things are where they are; don't let them make the model infeasible
+            gap = close.get(frozenset((oi.id, oj.id)), walkway)
+            separated(oi, oj.x, oj.hw, oj.z, oj.hd, gap, f"sep_{oi.id}_{oj.id}")
+        # Keep-outs are already clearance zones: a footprint may touch their edge, never enter.
+        if oi.movable:
+            for ob in obstacles:
+                cx = (int(ob["minX"]) + int(ob["maxX"])) // 2
+                cz = (int(ob["minZ"]) + int(ob["maxZ"])) // 2
+                separated(oi, cx, (int(ob["maxX"]) - int(ob["minX"])) // 2, cz, (int(ob["maxZ"]) - int(ob["minZ"])) // 2, 0, f"ob_{oi.id}_{ob['id']}")
 
     # ---- rules ----
     objective: list = []

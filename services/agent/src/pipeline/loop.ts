@@ -87,12 +87,14 @@ export async function runLoop(input: LoopInput, deps: LoopDeps): Promise<Proposa
   deps.status('planning', 'Planning…');
   let plan = input.preset === 'tidy_room' ? null : await deps.plan(facts);
   let usedPreset = false;
+  let closePairs: [string, string, number][] = [];
   if (!plan) {
     const presetId = input.preset ?? presetFromText(requestText);
     const generated = presetId ? generatedPlan(presetId, facts) : null;
     const preset = generated ?? (presetId ? deps.presetPlans[presetId] : undefined);
     if (!preset) throw new AgentFailure('The planner is offline and this request has no built-in plan. Try "tidy up", or a preset tile.');
     plan = { summary: preset.summary, rules: preset.rules, remember: preset.remember };
+    closePairs = generated?.closePairs ?? [];
     usedPreset = true;
     if (input.preset !== 'tidy_room') say('plan', `Planner offline: using the built-in plan for '${preset.text}'.`, 'warn');
     else say('plan', `Tidying: ${preset.text}.`);
@@ -125,7 +127,7 @@ export async function runLoop(input: LoopInput, deps: LoopDeps): Promise<Proposa
   for (let round = 1; round <= MAX_ROUNDS; round++) {
     deps.status('solving', round === 1 ? 'Solving…' : `Solving again (round ${round})…`);
     const rules = [...resolvePlan(plan, facts, geo, walkway), ...hardRules(facts, input.preferences), ...extraRules];
-    const request = buildSolverRequest(geo, objects, rules, { walkwayCm: walkway, timeLimitMs: TIME_LIMIT_MS, doorKeepOutGrowCm: doorGrow });
+    const request = buildSolverRequest(geo, objects, rules, { walkwayCm: walkway, timeLimitMs: TIME_LIMIT_MS, doorKeepOutGrowCm: doorGrow, closePairs });
     try {
       response = await deps.solve(request);
     } catch (err) {
@@ -172,15 +174,16 @@ export async function runLoop(input: LoopInput, deps: LoopDeps): Promise<Proposa
     }
     // Strengthen and re-solve.
     for (const v of red) {
+      // Both door checks are about the zone in front of the door: make it deeper and re-solve.
       if (v.kind === 'door_swing') doorGrow += 30;
-      else if (v.kind === 'clearance') walkway += 15;
+      else if (v.kind === 'clearance') doorGrow += 15;
       else {
         const p = placements.find((x) => x.placementId === v.placementId);
         const oid = p ? objects.find((o) => o.id === p.objectId) : undefined;
         if (oid) extraRules.push({ id: `fix:${v.kind}:${oid.id}`, type: 'far_from', a: oid.id, b: { point: [oid.xCm, oid.zCm] }, minCm: 40, priority: 'should', weight: 6 });
       }
     }
-    say('retry', `Strengthening: ${red.map((v) => v.kind === 'door_swing' ? 'wider door keep-out' : v.kind === 'clearance' ? `walkway ${walkway} cm` : `keep clear around ${v.placementId}`).join(', ')}.`);
+    say('retry', `Strengthening: ${red.map((v) => v.kind === 'door_swing' || v.kind === 'clearance' ? `door zone +${doorGrow} cm` : `keep clear around ${v.placementId}`).join(', ')}.`);
   }
 
   // 6. Explaining
@@ -222,31 +225,130 @@ export async function runLoop(input: LoopInput, deps: LoopDeps): Promise<Proposa
   };
 }
 
-const SEATING = ['sofa', 'couch', 'chair', 'armchair', 'bench', 'storage', 'shelf', 'bookcase', 'cabinet', 'dresser', 'bed', 'desk', 'television', 'tv'];
-const CENTRE = ['table', 'coffee', 'rug', 'ottoman'];
+type Kind = 'sofa' | 'coffee' | 'table' | 'desk' | 'chair' | 'storage' | 'tv' | 'bed' | 'accent' | 'rug' | 'other';
+
+const KINDS: [RegExp, Kind][] = [
+  [/sofa|couch|loveseat|settee/, 'sofa'],
+  [/coffee|side table|end table|ottoman|footstool/, 'coffee'],
+  [/desk/, 'desk'],
+  [/dining|table/, 'table'],
+  [/chair|stool|bench|seat/, 'chair'],
+  [/storage|shelf|shelves|bookcase|cabinet|dresser|wardrobe|drawer|sideboard|console/, 'storage'],
+  [/\btv\b|television|screen|monitor/, 'tv'],
+  [/\bbed\b|mattress/, 'bed'],
+  [/lamp|plant|vase|tree|light/, 'accent'],
+  [/rug|carpet|mat/, 'rug'],
+];
+
+export function kindOf(category: string): Kind {
+  const c = category.toLowerCase();
+  return KINDS.find(([re]) => re.test(c))?.[1] ?? 'other';
+}
+
+export interface GeneratedPlan extends Plan {
+  text: string;
+  closePairs: [string, string, number][];
+}
 
 /**
- * A tidy room, as rules: tables toward the middle, seating and storage against the walls,
- * wide walkways. Written per object from what's actually in the room, so it works in any
- * room with any number of things. Everything is a strong wish, not a must, so an over-full
- * room still solves; the walkway is the one hard rule.
+ * A rearranged room the way people actually live in it: furniture in groups, walkways
+ * between the groups, big pieces on the walls, nothing in front of a window or door.
+ * Written per object from what's really in the room, so every piece gets a rule, and all
+ * of them are strong wishes rather than musts, so a crowded room still solves and the
+ * trade-offs get reported. The 90 cm walkway is the one hard rule.
+ *
+ *   sofa, TV, storage, bed, desk  → back against a wall, facing in (TV faces the sofa)
+ *   dining table                  → toward the middle; its chairs pulled up to it, facing it
+ *   coffee table                  → in front of the sofa; chairs around them, facing the room
+ *   lamps, plants, unknown things → against a wall, out of the way
  */
-export function generatedPlan(preset: string, facts: RoomFacts): (Plan & { text: string }) | null {
+export function generatedPlan(preset: string, facts: RoomFacts): GeneratedPlan | null {
   if (preset !== 'tidy_room') return null;
   const rules: Rule[] = [];
+  const closePairs: [string, string, number][] = [];
   let n = 0;
-  for (const o of facts.objects) {
-    if (!o.movable) continue;
-    const cat = o.category.toLowerCase();
-    if (CENTRE.some((k) => cat.includes(k))) {
-      rules.push({ id: `t${++n}`, type: 'near', a: o.id, b: 'center', maxCm: 120, priority: 'should', weight: 6, why: `${o.category} in the middle of the room` });
-    } else if (SEATING.some((k) => cat.includes(k))) {
-      rules.push({ id: `t${++n}`, type: 'against_wall', a: o.id, wall: 'any', priority: 'should', weight: 6, why: `${o.category} against a wall` });
+  const add = (rule: Omit<Rule, 'id'>) => rules.push({ id: `t${++n}`, ...rule } as Rule);
+  const should = (weight: number) => ({ priority: 'should' as const, weight });
+
+  const movable = facts.objects.filter((o) => o.movable);
+  const kinds = new Map(movable.map((o) => [o.id, kindOf(o.category)]));
+  const first = (k: Kind) => movable.find((o) => kinds.get(o.id) === k);
+  const sofa = first('sofa');
+  const table = first('table');
+  const tv = first('tv');
+  const coffee = first('coffee');
+  const window = facts.room.windows[0];
+  const door = facts.room.doors[0];
+  const chairs = movable.filter((o) => kinds.get(o.id) === 'chair');
+  const seatingGroup = [sofa, coffee, ...(table ? [] : chairs)].filter(Boolean) as RoomFacts['objects'];
+
+  for (const o of movable) {
+    const name = o.category;
+    switch (kinds.get(o.id)) {
+      case 'sofa':
+        add({ type: 'against_wall', a: o.id, wall: 'any', ...should(8), why: `${name} against a wall, facing the room` });
+        if (tv) add({ type: 'facing', a: o.id, target: tv.id, ...should(4), why: `${name} faces the TV` });
+        break;
+      case 'tv':
+        add({ type: 'against_wall', a: o.id, wall: 'any', ...should(8), why: `${name} against a wall` });
+        if (sofa) add({ type: 'facing', a: o.id, target: sofa.id, ...should(4), why: `${name} faces the sofa` });
+        break;
+      case 'coffee':
+        if (sofa) {
+          add({ type: 'near', a: o.id, b: sofa.id, maxCm: 110, ...should(6), why: `${name} in front of the sofa` });
+          closePairs.push([o.id, sofa.id, 30]);
+        } else add({ type: 'near', a: o.id, b: 'center', maxCm: 120, ...should(4), why: `${name} toward the middle` });
+        break;
+      case 'table':
+        add({ type: 'near', a: o.id, b: 'center', maxCm: 120, ...should(6), why: `${name} in the middle of the room` });
+        break;
+      case 'chair':
+        if (table) {
+          add({ type: 'near', a: o.id, b: table.id, maxCm: 90, ...should(6), why: `${name} at the table` });
+          add({ type: 'facing', a: o.id, target: table.id, ...should(4), why: `${name} faces the table` });
+          closePairs.push([o.id, table.id, 5]);
+        } else if (sofa) {
+          add({ type: 'near', a: o.id, b: coffee?.id ?? sofa.id, maxCm: 150, ...should(5), why: `${name} with the sofa` });
+          add({ type: 'facing', a: o.id, target: 'center', ...should(3), why: `${name} faces the room` });
+          for (const g of seatingGroup) if (g.id !== o.id) closePairs.push([o.id, g.id, 20]);
+        } else add({ type: 'against_wall', a: o.id, wall: 'any', ...should(5), why: `${name} against a wall` });
+        for (const other of chairs) if (other.id !== o.id) closePairs.push([o.id, other.id, 10]);
+        break;
+      case 'desk':
+        add({ type: 'against_wall', a: o.id, wall: 'any', ...should(7), why: `${name} against a wall` });
+        if (window) add({ type: 'near', a: o.id, b: `window:${window.id}`, maxCm: 160, ...should(3), why: `${name} near daylight` });
+        break;
+      case 'bed':
+        add({ type: 'against_wall', a: o.id, wall: 'any', ...should(8), why: `${name} headboard on a wall` });
+        if (door) add({ type: 'far_from', a: o.id, b: `door:${door.id}`, minCm: 150, ...should(4), why: `${name} away from the door` });
+        break;
+      case 'storage':
+        add({ type: 'against_wall', a: o.id, wall: 'any', ...should(8), why: `${name} against a wall` });
+        break;
+      case 'rug':
+        add({ type: 'near', a: o.id, b: sofa?.id ?? 'center', maxCm: 100, ...should(5), why: `${name} in the seating area` });
+        for (const g of movable) if (g.id !== o.id) closePairs.push([o.id, g.id, 0]);
+        break;
+      case 'accent':
+        add({ type: 'against_wall', a: o.id, wall: 'any', ...should(5), why: `${name} against a wall, out of the way` });
+        break;
+      default:
+        add({ type: 'against_wall', a: o.id, wall: 'any', ...should(4), why: `${name} out of the way, against a wall` });
     }
   }
-  rules.push({ id: `t${++n}`, type: 'keep_clear', zone: 'walkway', marginCm: 90, priority: 'must', why: 'wide walkways' });
-  const summary = 'Tidy up the room';
-  return { text: `${rules.length - 1} pieces: tables to the middle, seating and storage to the walls, 90 cm walkways`, summary, rules, remember: [] };
+  for (const w of facts.room.windows) add({ type: 'keep_clear', zone: `window:${w.id}`, marginCm: 50, ...should(3), why: `nothing in front of the window ${w.id}` });
+  add({ type: 'keep_clear', zone: 'walkway', marginCm: 90, priority: 'must', why: 'wide walkways between groups' });
+
+  // Dedupe pairs; chairs at a table already have the table pair, so don't add a sofa one too.
+  const seen = new Set<string>();
+  const pairs = closePairs.filter(([a, b]) => {
+    const key = [a, b].sort().join('|');
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  const summary = 'Rearrange the room';
+  return { text: `${movable.length} pieces in groups: big pieces to the walls, tables and chairs together, 90 cm walkways`, summary, rules, remember: [], closePairs: pairs };
 }
 
 /** Typed requests that clearly mean a preset, for when the planner is offline. */
