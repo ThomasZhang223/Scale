@@ -1,0 +1,14 @@
+{
+  "_comment": "SHAPE ONLY — every entry below is a placeholder, not a real merchant. Paul picks the real candidates (workstreams/paul.md: 'Nobody hands you a vendor list'), then runs verify_merchants.py against them before H0 and commits the generated merchants.verified.json.",
+  "_howToPick": [
+    "Furniture stores that publish real dimensions — that is what the verifier measures.",
+    "Clean product photos on plain backgrounds, because Ani's image-to-3D degrades badly otherwise.",
+    "A category mix that suits one small room: desk, chair, shelving, side table, lamp.",
+    "Prefer a *.myshopify.com host or a store you already know runs Shopify; the verifier tells you either way."
+  ],
+  "merchants": [
+    { "name": "Example Furniture Co (placeholder)", "storefrontBaseUrl": "https://example-furniture.myshopify.com" },
+    { "name": "Placeholder Modern Living", "storefrontBaseUrl": "https://placeholder-modern-living.com" },
+    { "name": "Sample Oak & Co (placeholder)", "storefrontBaseUrl": "https://sample-oak-co.example" }
+  ]
+}

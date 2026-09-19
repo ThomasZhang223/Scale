@@ -1,0 +1,144 @@
+{
+  "objects": [
+    {
+      "objectId": "0c8b5cb7-1ce7-491f-9119-009fbe34ce2d",
+      "source": "catalog",
+      "name": "Ellery Walnut Side Table",
+      "category": "table",
+      "bboxMeters": { "w": 0.45, "h": 0.5, "d": 0.45 },
+      "measure": { "method": "declared", "confidence": 0.4 },
+      "price": { "cents": 18900, "currency": "USD" },
+      "productUrl": "https://cedarhome.example.com/products/ellery-walnut-side-table",
+      "merchant": "Cedar Home"
+    },
+    {
+      "objectId": "4462c919-20c7-4d8e-a3ef-cee58fc3cdb0",
+      "source": "catalog",
+      "name": "Marlow Oak Dining Chair",
+      "category": "chair",
+      "bboxMeters": { "w": 0.48, "h": 0.86, "d": 0.55 },
+      "measure": { "method": "declared", "confidence": 0.45 },
+      "price": { "cents": 24900, "currency": "USD" },
+      "productUrl": "https://cedarhome.example.com/products/marlow-oak-dining-chair",
+      "merchant": "Cedar Home"
+    },
+    {
+      "objectId": "579ac816-6cb4-4d05-b0a8-9190041a609f",
+      "source": "catalog",
+      "name": "Haven 5-Shelf Bookcase",
+      "category": "storage",
+      "bboxMeters": { "w": 0.8, "h": 1.8, "d": 0.3 },
+      "measure": { "method": "declared", "confidence": 0.35 },
+      "price": { "cents": 32900, "currency": "USD" },
+      "productUrl": "https://northloftliving.example.com/products/haven-5-shelf-bookcase",
+      "merchant": "Northloft Living"
+    },
+    {
+      "objectId": "fed18d76-6a06-4d58-82b5-86b23124aa72",
+      "source": "catalog",
+      "name": "Brindle Two-Seat Sofa",
+      "category": "sofa",
+      "bboxMeters": { "w": 1.7, "h": 0.85, "d": 0.9 },
+      "measure": { "method": "declared", "confidence": 0.4 },
+      "price": { "cents": 89900, "currency": "USD" },
+      "productUrl": "https://northloftliving.example.com/products/brindle-two-seat-sofa",
+      "merchant": "Northloft Living"
+    },
+    {
+      "objectId": "88c635a7-4b66-4acc-95ab-1aa9382258ad",
+      "source": "catalog",
+      "name": "Fenwick Round Coffee Table",
+      "category": "table",
+      "bboxMeters": { "w": 0.9, "h": 0.4, "d": 0.9 },
+      "measure": { "method": "declared", "confidence": 0.5 },
+      "price": { "cents": 27500, "currency": "USD" },
+      "productUrl": "https://mapleandmoss.example.com/products/fenwick-round-coffee-table",
+      "merchant": "Maple and Moss"
+    },
+    {
+      "objectId": "b3144ec2-1c20-4100-810b-656fd52d5a2e",
+      "source": "catalog",
+      "name": "Solstice Arc Floor Lamp",
+      "category": "lighting",
+      "bboxMeters": { "w": 0.35, "h": 1.65, "d": 0.35 },
+      "measure": { "method": "declared", "confidence": 0.3 },
+      "price": { "cents": 15900, "currency": "USD" },
+      "productUrl": "https://mapleandmoss.example.com/products/solstice-arc-floor-lamp",
+      "merchant": "Maple and Moss"
+    },
+    {
+      "objectId": "b9520434-988d-432a-9f28-a2d494df18da",
+      "source": "catalog",
+      "name": "Corvus Writing Desk",
+      "category": "table",
+      "bboxMeters": { "w": 1.2, "h": 0.75, "d": 0.6 },
+      "measure": { "method": "declared", "confidence": 0.45 },
+      "price": { "cents": 34900, "currency": "USD" },
+      "productUrl": "https://birchandbolt.example.com/products/corvus-writing-desk",
+      "merchant": "Birch and Bolt"
+    },
+    {
+      "objectId": "f3434048-d4dd-4455-9130-6e56d4192ed5",
+      "source": "catalog",
+      "name": "Pivot Mesh Office Chair",
+      "category": "chair",
+      "bboxMeters": { "w": 0.65, "h": 1.1, "d": 0.65 },
+      "measure": { "method": "declared", "confidence": 0.4 },
+      "price": { "cents": 29900, "currency": "USD" },
+      "productUrl": "https://birchandbolt.example.com/products/pivot-mesh-office-chair",
+      "merchant": "Birch and Bolt"
+    },
+    {
+      "objectId": "d8546b90-fdcf-4561-bff0-fa331d6b8a5a",
+      "source": "catalog",
+      "name": "Dunmore Wool Area Rug 5x7",
+      "category": "rug",
+      "bboxMeters": { "w": 1.52, "h": 0.02, "d": 2.13 },
+      "measure": { "method": "declared", "confidence": 0.35 },
+      "price": { "cents": 22900, "currency": "USD" },
+      "productUrl": "https://greylanehome.example.com/products/dunmore-wool-area-rug-5x7",
+      "merchant": "Greylane Home"
+    },
+    {
+      "objectId": "b267abe8-b572-4e2d-80a7-3cb7e7e2e8bf",
+      "source": "catalog",
+      "name": "Alder Two-Drawer Nightstand",
+      "category": "storage",
+      "bboxMeters": { "w": 0.5, "h": 0.55, "d": 0.4 },
+      "measure": { "method": "declared", "confidence": 0.5 },
+      "price": { "cents": 16900, "currency": "USD" },
+      "productUrl": "https://greylanehome.example.com/products/alder-two-drawer-nightstand",
+      "merchant": "Greylane Home"
+    },
+    {
+      "objectId": "e4c02db2-d9ef-4c50-b4b4-ed0e4ebd5e76",
+      "source": "catalog",
+      "name": "Somerton Queen Bed Frame",
+      "category": "bed",
+      "bboxMeters": { "w": 1.55, "h": 1.05, "d": 2.1 },
+      "measure": { "method": "declared", "confidence": 0.4 },
+      "price": { "cents": 62900, "currency": "USD" },
+      "productUrl": "https://willowbrookfurniture.example.com/products/somerton-queen-bed-frame",
+      "merchant": "Willowbrook Furniture"
+    },
+    {
+      "objectId": "96676d6c-fd01-4522-bcc8-0caceb1dda67",
+      "source": "catalog",
+      "name": "Halcyon Six-Drawer Dresser",
+      "category": "storage",
+      "bboxMeters": { "w": 1.4, "h": 0.85, "d": 0.5 },
+      "measure": { "method": "declared", "confidence": 0.45 },
+      "price": { "cents": 58900, "currency": "USD" },
+      "productUrl": "https://willowbrookfurniture.example.com/products/halcyon-six-drawer-dresser",
+      "merchant": "Willowbrook Furniture"
+    }
+  ],
+  "merchants": [
+    { "name": "Cedar Home", "storefront": "https://cedarhome.example.com" },
+    { "name": "Northloft Living", "storefront": "https://northloftliving.example.com" },
+    { "name": "Maple and Moss", "storefront": "https://mapleandmoss.example.com" },
+    { "name": "Birch and Bolt", "storefront": "https://birchandbolt.example.com" },
+    { "name": "Greylane Home", "storefront": "https://greylanehome.example.com" },
+    { "name": "Willowbrook Furniture", "storefront": "https://willowbrookfurniture.example.com" }
+  ]
+}

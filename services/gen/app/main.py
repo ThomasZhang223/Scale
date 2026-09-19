@@ -1,60 +1,62 @@
-"""services/gen — Component C skeleton.
+"""CPU embeddings and the existing generation route's narrow integration seam.
 
-Owner: Ani. Scaffold only — no generation, binding, or embedding logic implemented.
-See ../README.md and ../BINDING.md.
-
-Job-worker entry points, one per stage of the pipeline described in the workstream doc. Each
-returns HTTP 501 with a JSON body naming the job, until implemented.
+B04/B06 are library adapters. No GPU provider or durable job authority is guessed
+at startup. An owner-supplied generation handler must reconcile existing attempts.
 """
-
-from fastapi import FastAPI, Response
 import json
+import os
 
-app = FastAPI(title="services-gen")
-
-
-def _not_implemented(job: str) -> Response:
-    return Response(
-        content=json.dumps({"error": "not_implemented", "job": job}),
-        status_code=501,
-        media_type="application/json",
-    )
+from fastapi import HTTPException, Request
+from fastapi.responses import JSONResponse
+from starlette.concurrency import run_in_threadpool
+from .embedding.api import create_app as embedding_app, ServiceTokenAuth
+from .embedding.images import ManifestImageReader
 
 
-@app.post("/generate")
-async def generate():
-    """Entry point for POST /objects/{id}/generate, tier: "live" | "quality".
+def create_app(*, generation_handler=None, generation_auth=None, **embedding_options):
+    manifest = os.environ.get("EMBEDDING_IMAGE_MANIFEST")
+    if manifest and "image_reader" not in embedding_options:
+        embedding_options["image_reader"] = ManifestImageReader(manifest)
+    app = embedding_app(**embedding_options)
 
-    Runs background removal, calls Baseten for the chosen tier, applies the scale binding, and
-    writes embeddings on completion. See BINDING.md for the binding contract.
-    """
-    return _not_implemented("generate")
+    @app.post("/generate")
+    async def generate(request: Request):
+        auth = generation_auth or ServiceTokenAuth(os.environ.get("GENERATION_API_KEY"))
+        authorization = request.headers.get("authorization", "")
+        if authorization.startswith("Api-Key "):
+            authorization = "Bearer " + authorization[8:]
+        principal = auth.authenticate(authorization)
+        if generation_handler is None:
+            raise HTTPException(503, detail="generation_provider_and_job_authority_unconfigured")
+        if request.headers.get("content-type", "").split(";", 1)[0] != "application/json":
+            raise HTTPException(415, detail="application_json_required")
+        body = bytearray()
+        async for chunk in request.stream():
+            if len(body) + len(chunk) > 16384:
+                raise HTTPException(413, detail="generation_request_too_large")
+            body.extend(chunk)
+        try:
+            payload = json.loads(body)
+            if not isinstance(payload, dict):
+                raise ValueError()
+        except (ValueError, UnicodeError):
+            raise HTTPException(422, detail="invalid_generation_request") from None
+        # Handler resolves authorized image/source/scope and durable attempt ownership.
+        # Only PreparedArtifact + matching review may cross the completion seam.
+        from .generation import PreparedArtifact, GenerationError, AmbiguousGeneration
+        try:
+            artifact, review = await run_in_threadpool(generation_handler, payload, principal)
+            if not isinstance(artifact, PreparedArtifact):
+                raise GenerationError("invalid_generation_handler_result")
+            return artifact.worker_result(review)
+        except AmbiguousGeneration:
+            return JSONResponse({"error": "generation_outcome_unknown_do_not_resubmit", "retryable": False}, 409)
+        except GenerationError:
+            return JSONResponse({"error": "generation_rejected", "retryable": False}, 422)
+        except Exception:
+            return JSONResponse({"error": "generation_failed_do_not_resubmit", "retryable": False}, 502)
+
+    return app
 
 
-@app.post("/bgremove")
-async def bgremove():
-    """Background removal stage, run before generation. See app/bgremove/."""
-    return _not_implemented("bgremove")
-
-
-@app.post("/baseten")
-async def baseten_call():
-    """Baseten image-to-3D call, both tiers behind `tier`. See app/baseten/."""
-    return _not_implemented("baseten")
-
-
-@app.post("/bind")
-async def bind():
-    """The scale binding: normalised mesh -> bboxMeters. Sole owner. See BINDING.md."""
-    return _not_implemented("bind")
-
-
-@app.post("/embed")
-async def embed():
-    """SigLIP2 embedding, caption, palette, written on state:"ready". See app/embedding/."""
-    return _not_implemented("embed")
-
-
-@app.get("/health")
-async def health():
-    return {"status": "ok"}
+app = create_app()

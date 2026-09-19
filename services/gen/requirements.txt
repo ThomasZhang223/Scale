@@ -1,5 +1,13 @@
-fastapi
-uvicorn[standard]
-httpx
-pillow
-baseten
+# B03 CPU embedding runtime. Separate from deploy/sf3d/requirements.txt.
+# Compile platform-specific hashed locks before installing (see app/embedding/README.md).
+torch==2.6.0+cpu
+transformers==4.51.3
+tokenizers==0.21.1
+huggingface-hub==0.30.2
+safetensors==0.5.3
+sentencepiece==0.2.0
+numpy==1.26.4
+Pillow==11.1.0
+fastapi==0.116.1
+httpx==0.28.1
+uvicorn==0.34.0

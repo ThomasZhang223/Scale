@@ -49,6 +49,16 @@ not a fixture, until it lands.
 | Produce | SSE fan-out on room change | `GET /sync/{roomId}` | Justin (D) |
 | Produce | `/search` endpoint shape (you own the contract, not the ranking) | `POST /search` | Paul (F) implements ranking behind it |
 
+## Start here
+
+The scaffold boots. `apps/mobile/README.md` has a four-step runbook that gets you from a clean
+clone to the app on your phone talking to the Worker's stub layer, before you write any Swift.
+Do that first — it proves the transport, and the transport is what the H4 gate checks.
+
+The home screen already pings `GET /v1/rooms/{id}` under `X-Stub: 1` and shows the result. If it
+reads `stub layer OK — 4 walls`, the whole loop works and you can start on the native module. If
+it reads `unreachable`, it is the LAN address or the router, not your code.
+
 ## Hour by hour
 
 | Hour | Task | Blocks whom |

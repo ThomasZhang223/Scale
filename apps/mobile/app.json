@@ -12,12 +12,21 @@
       "infoPlist": {
         "NSCameraUsageDescription": "Full Scale scans your room and objects with the camera and LiDAR.",
         "NSMicrophoneUsageDescription": "Full Scale listens for voice commands to place and search for objects.",
-        "NSSpeechRecognitionUsageDescription": "Full Scale transcribes your voice commands on-device."
+        "NSSpeechRecognitionUsageDescription": "Full Scale transcribes your voice commands on-device.",
+        "NSLocationWhenInUseUsageDescription": "Full Scale uses Location Services so a room scan can align to true north."
       }
     },
     "plugins": [
       "expo-router",
       "expo-dev-client",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "deploymentTarget": "17.0"
+          }
+        }
+      ],
       "./plugins/with-room-capture",
       "./plugins/with-ar-view",
       "./plugins/with-speech"

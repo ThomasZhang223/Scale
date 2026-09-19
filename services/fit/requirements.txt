@@ -1,3 +1,7 @@
 fastapi
 uvicorn[standard]
 scipy
+# ortools installs only inside the python:3.12-slim container (the Dockerfile already pins
+# that image). The host interpreter is Python 3.14.7, and ortools publishes no cp314 wheels —
+# the current release ships cp312 and cp313 only. `pip install ortools` on the host fails.
+ortools

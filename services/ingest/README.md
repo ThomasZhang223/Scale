@@ -33,9 +33,153 @@ Shopify storefronts expose their catalog publicly, no auth required:
 - `/collections/<handle>/products.json`
 
 Some merchants disable this. **The chosen 15–25 furniture merchants must be verified reachable
-before the event starts (H-4–H0)** — this decides whether this whole pipeline exists at all. See
-`merchants.example.json` for the shape of the verified list; the real list is not checked in here
-until it exists.
+before the event starts (H-4–H0)** — this decides whether this whole pipeline exists at all.
+
+### Verifying them: `verify_merchants.py`
+
+Run it from `services/ingest/`. The only dependency it needs is `httpx`.
+
+**Probe one store** — the fastest way to check a candidate, and it exits 0 on success:
+
+```
+cd services/ingest
+pip install httpx
+python3 verify_merchants.py --url https://some-furniture-store.com
+```
+
+**Check the whole list** — this is the H-4 gate, so it exits non-zero below 15 usable
+merchants (override with `--require N`):
+
+```
+cp candidates.example.json candidates.json
+$EDITOR candidates.json          # replace the placeholders with merchants you picked
+python3 verify_merchants.py candidates.json --out merchants.verified.json
+```
+
+Reachability is not the question. A store can serve a flawless `/products.json` that contains no
+dimensions anywhere, and it is worth nothing to us. So the verifier also runs **step 1 of
+`EXTRACTION.md` (the regex pass)** over a sample of each catalogue and reports the real hit
+rate. That is the number that decides a merchant, and it is the H4 "real extraction hit rate"
+report from `workstreams/paul.md`.
+
+```
+merchant                          status               n  any dim   usable
+--------------------------------------------------------------------------
+good                              ok                  30     100%     100%
+partial                           ok                  30      20%      20%
+nodims                            ok                  30       0%       0%
+blocked                           blocked              0        -        -
+  HTTP 403 on /products.json
+html                              not_shopify          0        -        -
+  expected JSON, got text/html
+robots                            robots_disallow      0        -        -
+--------------------------------------------------------------------------
+reachable: 3/6   usable (>=25% fully dimensioned): 1
+```
+
+`usable` means all three axes parsed, so the product yields a real `bboxMeters`.
+
+**The gate counts products, not merchants.** `BUILD_DOC.md` asks for 60–100 pre-baked products
+with real dimensions; merchant count was never the requirement. Two catalogues at 250 products
+and 98% coverage satisfy it outright, and fifteen dimensionless ones cannot. It exits non-zero
+below 100 usable products (`--require N` to change), or if any of the four demo categories —
+seating, surface, storage, lighting — has none, because a small room needs one of each.
+
+### When a hit rate looks too low to be true
+
+A reachable catalogue at 0% is either a store that genuinely publishes no dimensions, or a
+format the regex pass has not met yet. `/products.json` **does not include metafields**, which
+is where a well-run store often keeps them, so a 0% store may still have the data on its
+product pages.
+
+```
+python3 verify_merchants.py candidates.json --dump samples/
+```
+
+writes 8 raw products per reachable merchant to `samples/<merchant>.json` — enough to read the
+real markup and decide whether to extend the patterns or drop the store.
+
+### Statuses
+
+| Status | Means |
+| --- | --- |
+| `ok` | Endpoint served a real catalogue. Check the `usable` column before trusting it. |
+| `not_shopify` | The common way a store "disables" the endpoint: it returns the HTML shop page with a **200**, which a naive check reads as success. Also covers JSON with no `products` key. |
+| `blocked` | HTTP 4xx/5xx on `/products.json`, or an egress policy in the way. |
+| `robots_disallow` | `robots.txt` forbids it. Not negotiable — pick another merchant. |
+| `dns_error` | The domain does not resolve. Almost always a typo in `candidates.json`. |
+| `timeout` | Slow host, or it is throttling us. Worth one retry before writing it off. |
+| `tls_error` | Expired or mismatched certificate. |
+| `refused` | Nothing listening on 443. |
+| `thin` | Catalogue too small to carry its own integration cost. |
+
+`dns_error` vs `blocked` is the distinction that saves time on a hand-typed list: one is your
+spelling, the other is the merchant.
+
+It is polite by construction: `robots.txt` is fetched and honoured for `/products.json`, one
+request at a time per host with a delay, a descriptive User-Agent, and public catalogue
+endpoints only. Re-run it on the day — a store can turn the endpoint off at any time.
+
+`candidates.example.json` is the input shape (placeholders, not real merchants);
+`merchants.verified.json` is the generated output and is what the crawler should read.
+
+## The pre-bake handoff to Ani: `build_prebake.py`
+
+`.claude/contracts.md` owes Ani "product images plus extracted dimensions for the pre-bake" at
+H14, keyed `catalog/{merchant}/{productId}/source.jpg`.
+
+```
+python3 verify_merchants.py candidates.json --out merchants.verified.json
+python3 build_prebake.py merchants.verified.json --limit 100 --out prebake/ --download
+```
+
+Writes `prebake/manifest.json` — one row per product with a real `bboxMeters`, an image URL, and
+the R2 key the image belongs at — and with `--download`, the images themselves in that layout.
+
+### Step 2.5: `--browserbase`
+
+```
+export BROWSERBASE_API_KEY=...
+python3 build_prebake.py merchants.verified.json --limit 100 --out prebake/ \
+        --download --browserbase --browserbase-limit 60
+```
+
+For every product that has an image but **no** dimensions in `/products.json`, this fetches
+`{storefront}/products/{handle}` and reads them off the rendered page. That is the Floyd, Fyrn,
+Bend Goods and Branch Furniture case — roughly 690 products whose dimensions sit in metafields
+the endpoint does not serve.
+
+The run reports the recovery rate, which is the number that decides whether those stores are
+worth keeping:
+
+```
+  step 2.5: 38/60 pages yielded dimensions (63%), 0 fetch failures
+  cache: 0 hit, 60 fetched
+```
+
+`--browserbase-limit` is the cost knob — one request per product, per merchant. Pages are
+cached in `--page-cache`, so a second run over the same products costs nothing and only new
+products are fetched. Without `BROWSERBASE_API_KEY` the run **fails** rather than silently
+skipping the pass: a quietly smaller manifest looks exactly like the stores having no
+dimensions.
+
+Rescued rows carry `extractedFrom` (`json_ld`, `spec_block` or `page_text`) so you can see
+which surface paid off. `measure.method` stays `"extracted"` — a page read is still extraction,
+and inventing a fourth enum value would be a schema change.
+
+**It curates rather than dumps.** The ceiling is not how many products were extracted, it is how
+many get a mesh, and that is Ani's generation throughput: 60–100 (`BUILD_DOC.md`). So selection
+is round-robin across the four demo categories, highest confidence first inside each. Taking the
+top 100 by confidence would hand him whatever the biggest merchant sells most of, and 245 sofas
+do not furnish a room.
+
+A product needs **both** a bbox and an image to make the list: a mesh needs a picture, a
+placement needs a size. Ani cannot test 2D→3D without the pixels — the manifest alone only
+unblocks the scale binding, which he has already built.
+
+Images are fetched at `--image-width 1024` by default: image-to-3D wants roughly 512–1024 px,
+and 100 hero shots at full resolution is tens of megabytes of git history for files that belong
+in R2. Pass `--image-width 0` for the originals.
 
 ## Dimensions are the hard part
 
