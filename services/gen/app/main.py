@@ -51,7 +51,7 @@ async def bind():
 
 @app.post("/embed")
 async def embed():
-    """CLIP ViT-L/14 embedding, caption, palette, written on state:"ready". See app/embedding/."""
+    """SigLIP2 embedding, caption, palette, written on state:"ready". See app/embedding/."""
     return _not_implemented("embed")
 
 

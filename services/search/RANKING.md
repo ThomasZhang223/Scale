@@ -2,7 +2,8 @@
 
 **Style and fit are two halves of the query and they must never be mixed.**
 
-- **Style** is a dense vector similarity search over CLIP ViT-L/14 768-dimension embeddings
+- **Style** is a dense vector similarity search over `google/siglip2-base-patch16-224`
+  768-dimension embeddings
   (Vectorize index `objects-v1`, cosine metric).
 - **Fit** is an integer range filter on the `w_mm`, `h_mm`, `d_mm` metadata fields on that same
   index — never a vector term.
@@ -18,6 +19,10 @@ similarity ranks within the set that already passes the fit filter, not the othe
 
 `fit` in the request body is `{ maxW, maxH, maxD }` — a numeric filter, not a vector term
 (`.claude/contracts.md`).
+
+For image search, the scan frame becomes a normalized SigLIP2 query embedding. It does not need
+to be inserted into the database first. Search over catalog products and saved possessions, with
+dimensions, price, and source applied as hard filters before returning the ranked results.
 
 ## Fallback rule
 
