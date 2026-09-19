@@ -103,13 +103,21 @@ def main() -> int:
         if not args.base:
             ap.error("--from-samples needs --base (the storefront URL)")
         products = json.load(open(args.from_samples))
-        missing = [p.get("title") for p in products if not p.get("handle")]
-        if missing:
-            print(f"note: {len(missing)} sampled products have no handle — re-run "
-                  f"verify_merchants.py --dump to pick up the fix\n", file=sys.stderr)
-        for p in products:
-            if p.get("handle") and len(urls) < args.limit:
-                urls.append(product_url(args.base, p["handle"]))
+        with_handle = [p for p in products if p.get("handle")]
+        if not with_handle:
+            # Say the actual reason. An earlier --dump wrote samples without handles, and
+            # reporting "give a URL or --from-samples" when --from-samples WAS given sends you
+            # looking in the wrong place.
+            ap.error(
+                f"{args.from_samples} has {len(products)} products but none carry a `handle`, "
+                f"so no product URLs can be built. That file was written before --dump started "
+                f"including handles.\n\n"
+                f"  Fix:   python3 verify_merchants.py candidates.json --dump samples/\n"
+                f"  Or:    python3 probe_page.py <a product URL from your browser>"
+            )
+        for p in with_handle[: args.limit]:
+            urls.append(product_url(args.base, p["handle"]))
+
     if not urls:
         ap.error("give a URL, --file, or --from-samples")
 
