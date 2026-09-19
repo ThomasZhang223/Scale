@@ -216,3 +216,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+.gstack/
+
+# Node
+node_modules/
+dist-ssr/
+*.local
