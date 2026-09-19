@@ -55,6 +55,13 @@ OpenAI over raw HTTP, matching `services/agent/src/pipeline/planner.ts` — same
 `OPENAI_GATEWAY_TOKEN`, same strict `json_schema`. No SDK, since this service already has
 `httpx`.
 
+`OPENAI_MODEL` should match what the rest of the project uses — `services/agent/wrangler.toml`
+sets `gpt-4o-mini`, which is plenty for step 2: reading a stated number out of prose under a
+strict schema is an easy extraction task. Step 3 is the harder read — small callout text on a
+dimension diagram — and the lowest volume, since it runs only on what every cheaper source
+failed, so `OPENAI_VLM_MODEL` can point it at something stronger without paying for that on
+every step-2 call. It defaults to `OPENAI_MODEL`.
+
 Pass `"llm": true` and `"vlm": true` on `/extract`. Both are additive — they run only over
 products steps 1 and 2.5 failed on, capped by `aiLimit` — so an unconfigured key skips them and
 `stats.llm_skipped` says why. The strict schema is also the defence against a stranger writing

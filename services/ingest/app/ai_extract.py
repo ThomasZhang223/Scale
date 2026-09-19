@@ -93,9 +93,15 @@ class OpenAIConfig:
     skipped — unlike step 2.5, whose absence would look like a merchant having no dimensions,
     these are additive passes over products the earlier steps already failed on."""
 
-    def __init__(self, api_key=None, model=None, gateway_url=None, gateway_token=None):
+    def __init__(self, api_key=None, model=None, gateway_url=None, gateway_token=None,
+                 vlm_model=None):
         self.api_key = api_key or os.environ.get("OPENAI_API_KEY")
         self.model = model or os.environ.get("OPENAI_MODEL")
+        # Step 3 reads small callout text off a dimension diagram, which is the hardest read in
+        # the pipeline and by far the lowest volume — it only runs on what every cheaper source
+        # failed. Worth being able to point it at a stronger model without paying for one on
+        # every step-2 call. Defaults to the same model, so nothing changes unless you set it.
+        self.vlm_model = vlm_model or os.environ.get("OPENAI_VLM_MODEL") or self.model
         # https://gateway.ai.cloudflare.com/v1/{account}/{gateway}/openai
         self.gateway_url = gateway_url or os.environ.get("OPENAI_GATEWAY_URL")
         self.gateway_token = gateway_token or os.environ.get("OPENAI_GATEWAY_TOKEN")
@@ -146,7 +152,7 @@ def _to_hit(payload: dict | None, method: str, confidence: float) -> DimensionHi
     )
 
 
-def _ask(cfg: OpenAIConfig, system: str, content, client=None) -> dict | None:
+def _ask(cfg: OpenAIConfig, system: str, content, client=None, model=None) -> dict | None:
     """One constrained call. Returns the parsed object, or None — a failed extraction must
     never take the pipeline with it, and these passes are additive by definition."""
     if not cfg.configured:
@@ -157,7 +163,7 @@ def _ask(cfg: OpenAIConfig, system: str, content, client=None) -> dict | None:
             f"{cfg.base}/chat/completions",
             headers=cfg.headers(),
             json={
-                "model": cfg.model,
+                "model": model or cfg.model,
                 "temperature": 0,  # reading a stated number is not a creative task
                 "messages": [
                     {"role": "system", "content": system},
@@ -211,4 +217,4 @@ def extract_with_vlm(image_bytes: bytes, media_type: str, cfg: OpenAIConfig,
         {"type": "image_url",
          "image_url": {"url": f"data:{media_type or 'image/jpeg'};base64,{data}"}},
     ]
-    return _to_hit(_ask(cfg, VLM_SYSTEM, content, client), "vlm", 0.55)
+    return _to_hit(_ask(cfg, VLM_SYSTEM, content, client, model=cfg.vlm_model), "vlm", 0.55)

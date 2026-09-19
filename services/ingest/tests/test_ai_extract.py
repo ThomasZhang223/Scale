@@ -135,6 +135,22 @@ def test_the_vlm_sends_a_data_uri_image():
     assert hit.method == "vlm" and abs(hit.w - 1.524) < 1e-3
 
 
+def test_the_vlm_can_use_a_stronger_model_than_the_llm():
+    """Reading callouts off a dimension diagram is the hardest read here and the lowest volume,
+    so it should be pointable at a better model without paying for one on every step-2 call."""
+    cfg = OpenAIConfig(api_key="k", model="cheap", vlm_model="strong")
+    f = Fake({"found": True, "width": 60, "height": 29, "depth": 30, "unit": "in", "quote": "d"})
+    extract_with_vlm(b"img", "image/png", cfg, client=f)
+    assert f.seen["json"]["model"] == "strong"
+    extract_with_llm(product(), cfg, client=f)
+    assert f.seen["json"]["model"] == "cheap"
+
+
+def test_the_vlm_model_defaults_to_the_main_one():
+    cfg = OpenAIConfig(api_key="k", model="only-one")
+    assert cfg.vlm_model == "only-one"
+
+
 def test_no_image_means_no_call():
     f = Fake({"found": True})
     assert extract_with_vlm(b"", "image/png", CFG, client=f) is None
