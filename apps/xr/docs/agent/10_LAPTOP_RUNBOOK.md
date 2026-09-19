@@ -12,8 +12,8 @@ itself under `wrangler dev`.
 | `services/agent` | 8789 | The designer agent (local dev; deployed, it runs on Cloudflare) | `cd services/agent && npm run dev` |
 | `cloudflared` | (outbound only) | Tunnel from Cloudflare to `localhost:8080` | `cloudflared tunnel run <name>` (or `cloudflared tunnel --url http://localhost:8080` for a throwaway URL) |
 
-On this machine port 8787 is taken by another project, so Thomas's Worker runs on 8788
-(`apps/xr/.env` sets `VITE_API_PROXY`). Secrets for the agent go in `services/agent/.dev.vars`
+On this machine ports 8787 and 8788 are taken by another project, so Thomas's Worker runs
+on 8790 (`apps/xr/.env` sets `VITE_API_PROXY`). Secrets for the agent go in `services/agent/.dev.vars`
 locally (`OPENAI_API_KEY`, `SOLVER_KEY`, and `SOLVER_URL=https://<tunnel host>` when the
 agent runs on Cloudflare).
 
