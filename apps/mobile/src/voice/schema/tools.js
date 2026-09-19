@@ -1,8 +1,11 @@
-// Tool definitions for the OMNI voice loop. See ../TOOLS.md for the design.
+// Tool definitions for the voice assistant. See ../TOOLS.md for the design.
 //
-// JSON-Schema shaped, so these drop straight into a native function-calling API. If the
-// reseller does not support function calling, pass 1 emits an `intent` (schema/intent.js)
-// instead and these become the dispatch table behind it. One schema, two transports.
+// The model does NOT choose from these. Pass 1 emits an intent (schema/intent.js) and the
+// action decides the pipeline in agent/toolRuntime.js — see ../TOOLS.md. These definitions
+// are the written contract for what each tool means and costs, and TOOLS_BY_ACTION below is
+// enforced at dispatch, so a pipeline cannot quietly start calling something its action
+// never declared. They are JSON-Schema shaped so they would drop into a native
+// function-calling API unchanged, should the design ever need one.
 //
 // Every tool maps onto an endpoint already in .claude/contracts.md except find_anchor v1,
 // which is marked NEEDS JUSTIN. Metres everywhere (standing rule 1).
@@ -152,13 +155,17 @@ export const TOOLS = [
   },
 ];
 
-// Tools available per intent action. The dispatcher uses this to narrow what pass 2 may call,
-// which keeps a `describe` turn from wandering into measurement.
+// The tools each action is permitted to call. agent/toolRuntime.js asserts against this on
+// every call, so a `describe` turn cannot wander into measurement and a pipeline cannot drift
+// away from what this file documents.
+// measure_object_in_view appears on every action that can be about the thing in the user's
+// hand, because resolving a target of kind "in_view" is what measures it. Only `place_object`
+// may write a version — that separation is the point of enforcing this.
 export const TOOLS_BY_ACTION = {
   measure_and_fit: ['measure_object_in_view', 'find_anchor', 'check_fit', 'start_generation'],
-  find_object: ['find_anchor', 'search_objects'],
-  place_object: ['find_anchor', 'check_fit', 'place_object'],
-  check_placement: ['find_anchor', 'check_fit'],
+  find_object: ['measure_object_in_view', 'find_anchor', 'search_objects'],
+  place_object: ['measure_object_in_view', 'find_anchor', 'check_fit', 'place_object'],
+  check_placement: ['measure_object_in_view', 'find_anchor', 'check_fit'],
   describe: [],
   clarify: [],
   unsupported: [],

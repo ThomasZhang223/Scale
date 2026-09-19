@@ -8,6 +8,45 @@
 // makes every turn reproducible in a test.
 
 import { findAnchors } from './anchors.js';
+import { TOOLS_BY_ACTION } from '../schema/tools.js';
+
+// Which documented tool each API method stands for, so TOOLS_BY_ACTION can be enforced rather
+// than merely written down.
+const METHOD_TO_TOOL = {
+  getObject: 'measure_object_in_view',
+  createObject: 'measure_object_in_view',
+  getRoom: 'find_anchor',
+  fit: 'check_fit',
+  search: 'search_objects',
+  createVersion: 'place_object',
+  push: 'place_object',
+  generate: 'start_generation',
+};
+
+/** Wrap an api so a pipeline can only call what its action declared (standing rule 4). */
+export function guardApi(api, action) {
+  const allowed = TOOLS_BY_ACTION[action];
+  if (!allowed) throw new Error(`tools: no tool set declared for action "${action}"`);
+  const guarded = {};
+  for (const key of Object.keys(api)) {
+    const value = api[key];
+    if (typeof value !== 'function') {
+      guarded[key] = value;
+      continue;
+    }
+    guarded[key] = (...args) => {
+      const tool = METHOD_TO_TOOL[key];
+      if (tool && !allowed.includes(tool)) {
+        throw new Error(
+          `tools: action "${action}" may not call ${tool} (api.${key}). ` +
+          `Declared: ${allowed.join(', ') || 'none'}.`,
+        );
+      }
+      return value(...args);
+    };
+  }
+  return guarded;
+}
 
 export function createApi({ baseUrl, stub = false, fetchImpl = globalThis.fetch }) {
   if (!baseUrl) throw new Error('api: baseUrl is required'); // standing rule 4
@@ -76,13 +115,16 @@ async function resolveAnchor(intent, { api, roomId }) {
  * Run the fixed pipeline for an intent. Returns a results object that pass 2 speaks from —
  * and that assertGrounded() checks every spoken number against.
  */
-export async function runPipeline(intent, ctx) {
-  const { api, roomId } = ctx;
+export async function runPipeline(intent, rawCtx) {
   const results = { action: intent.action };
 
   if (intent.action === 'describe' || intent.action === 'clarify' || intent.action === 'unsupported') {
     return results; // no tools; nothing to ground against, so pass 2 must speak no numbers
   }
+
+  // Everything below calls through the guard, never the bare api.
+  const ctx = { ...rawCtx, api: guardApi(rawCtx.api, intent.action) };
+  const { api, roomId } = ctx;
 
   const object = await resolveTarget(intent, ctx);
   if (!object) {

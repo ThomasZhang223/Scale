@@ -1,4 +1,4 @@
-// Intent schema for the OMNI voice loop. See ../TOOLS.md for the design.
+// Intent schema for the voice assistant. See ../TOOLS.md for the design.
 //
 // Pass 1 (understand) emits one of these. The resolver binds its refs to real ids and
 // coordinates; the model never emits geometry itself (CLAUDE.md standing rule 3).

@@ -55,11 +55,13 @@ Two properties worth keeping:
 
 1. **Pass 1 has no tool results in context, so it cannot state a measurement.** The grounding
    rule is a property of the structure, not a line in a prompt the model might drift from.
-2. **The action picks the pipeline, not the model.** Each action maps to one fixed sequence of
-   calls (`TOOLS_BY_ACTION` in `schema/tools.js`, dispatched in `agent/toolRuntime.js`). The
-   model chooses the action and describes the references; it never chooses which tools run or
-   in what order. That kills a whole class of demo failure — check_fit before anything was
-   measured — and makes every turn reproducible in a test.
+2. **The action picks the pipeline, not the model.** Each action runs one fixed sequence of
+   calls, written in `agent/toolRuntime.js`. The model chooses the action and describes the
+   references; it never chooses which tools run or in what order. That kills a whole class of
+   demo failure — check_fit before anything was measured — and makes every turn reproducible
+   in a test. `TOOLS_BY_ACTION` in `schema/tools.js` declares what each action is *allowed* to
+   call and is asserted on every dispatch, so a pipeline cannot drift away from the tool
+   contract without failing loudly. Only `place_object` may write a version.
 
 Pass 1 uses structured outputs (`output_config.format` with a JSON schema), so the shape cannot
 come back wrong and there is no JSON-parsing fallback to maintain.
