@@ -190,6 +190,26 @@ def test_coverage_counts_a_real_product_type():
         srv.shutdown()
 
 
+def test_a_table_lamp_is_lighting_not_a_surface():
+    """First-match-in-dict-order put "table lamps" in `surface` because "table" is a surface
+    keyword, so a real run reported "lighting 0" while holding a lighting merchant's catalogue."""
+    assert vm.bucket_for("table lamps") == "lighting"
+    assert vm.bucket_for("floor lamp") == "lighting"
+    assert vm.bucket_for("dining table") == "surface"
+
+
+def test_longest_keyword_wins_outside_lighting():
+    assert vm.bucket_for("bookcase") == "storage"
+    assert vm.bucket_for("sofas") == "seating"
+
+
+def test_uncategorised_lists_what_matched_nothing():
+    r = run("good")
+    r.categories = {"table lamps": 4, "throws & blankets": 9}
+    assert vm.coverage([r])["lighting"] == 4
+    assert vm.uncategorised([r]) == [("throws & blankets", 9)]
+
+
 def test_output_keys_are_camel_case_like_the_example_file():
     """merchants.verified.json must match merchants.example.json's shape — the crawler reads it."""
     import json as _json

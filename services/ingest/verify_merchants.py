@@ -60,16 +60,49 @@ DEMO_CATEGORIES = {
 }
 
 
+def bucket_for(ptype: str) -> str | None:
+    """Which demo category a product_type belongs to, or None.
+
+    Lighting wins outright: "table lamps" is a lamp, and first-match-in-dict-order put it in
+    `surface` because "table" is a surface keyword — which is how a real run reported
+    "lighting 0" while holding a lighting merchant's catalogue. Otherwise the longest matching
+    keyword wins, so "bookcase" beats a stray substring.
+    """
+    ptype = (ptype or "").lower()
+    if any(w in ptype for w in DEMO_CATEGORIES["lighting"]):
+        return "lighting"
+    best, best_len = None, 0
+    for bucket, words in DEMO_CATEGORIES.items():
+        for w in words:
+            if w in ptype and len(w) > best_len:
+                best, best_len = bucket, len(w)
+    return best
+
+
 def coverage(reports: list["MerchantReport"]) -> dict[str, int]:
     """Usable products per demo category, across every verified merchant."""
     out = {k: 0 for k in DEMO_CATEGORIES}
     for r in reports:
         for ptype, n in (r.categories or {}).items():
-            for bucket, words in DEMO_CATEGORIES.items():
-                if any(w in ptype for w in words):
-                    out[bucket] += n
-                    break
+            bucket = bucket_for(ptype)
+            if bucket:
+                out[bucket] += n
     return out
+
+
+def uncategorised(reports: list["MerchantReport"]) -> list[tuple[str, int]]:
+    """product_type values that matched no bucket, commonest first.
+
+    Without this a "no usable products in lighting" gate is unfalsifiable: you cannot tell a
+    real gap from a keyword list that does not know what this merchant calls a lamp.
+    """
+    tally: dict[str, int] = {}
+    for r in reports:
+        for ptype, n in (r.categories or {}).items():
+            if bucket_for(ptype) is not None:
+                continue
+            tally[ptype] = tally.get(ptype, 0) + n
+    return sorted(tally.items(), key=lambda kv: -kv[1])
 
 
 def classify_error(e: BaseException) -> tuple[str, str]:
@@ -331,8 +364,17 @@ def render(reports: list[MerchantReport]) -> str:
         "  " + "   ".join(f"{k} {v}" for k, v in cov.items()),
         "",
     ]
+    unmatched = uncategorised(reports)
+    if unmatched:
+        total_unmatched = sum(n for _, n in unmatched)
+        lines += [
+            f"UNCATEGORISED: {total_unmatched} usable products matched no demo category.",
+            "  " + ", ".join(f"{t or '(none)'} {n}" for t, n in unmatched[:8]),
+            "  If a lamp is in there, widen DEMO_CATEGORIES rather than hunting a new merchant.",
+            "",
+        ]
     if missing:
-        lines.append(f"GAP: no usable products in {', '.join(missing)} — find a merchant for each.")
+        lines.append(f"GAP: no usable products in {', '.join(missing)} — check UNCATEGORISED first.")
     lines += [
         "Products, not merchants, are the requirement. Two good catalogues can satisfy it and",
         "fifteen dimensionless ones cannot. Category coverage is the other half: a small room",
