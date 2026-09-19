@@ -157,6 +157,12 @@ worth keeping:
   cache: 0 hit, 60 fetched
 ```
 
+Pages are cached in `.page-cache/`, which is **gitignored**: a full run caches around 250 MB at
+~450 KB a page, and it is derived data anyway — deleting it costs a re-fetch and nothing else.
+Three real Floyd pages were promoted out of it into `tests/fixtures/pages/`, because they are
+the only genuine merchant markup in the repo and they settled what Floyd's JSON-LD does and does
+not carry. See the README there.
+
 `--browserbase-limit` is the cost knob — one request per product, per merchant. Pages are
 cached in `--page-cache`, so a second run over the same products costs nothing and only new
 products are fetched. Without `BROWSERBASE_API_KEY` the run **fails** rather than silently
