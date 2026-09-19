@@ -39,7 +39,7 @@ def authorized(request: Request) -> bool:
 async def health(request: Request):
     if not authorized(request):
         return JSONResponse(status_code=401, content={"error": "missing or wrong X-Solver-Key"})
-    return {"ok": True, "ortools": ortools.__version__, "workers": int(os.environ.get("SOLVER_WORKERS", "1"))}
+    return {"ok": True, "ortools": ortools.__version__, "workers": int(os.environ.get("SOLVER_WORKERS", "8"))}
 
 
 @app.post("/solve")

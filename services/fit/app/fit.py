@@ -200,8 +200,8 @@ def polygons_overlap(a: list[Vec], b: list[Vec]) -> bool:
             axis = (-(q[1] - p[1]), q[0] - p[0])
             pa = [dot(v, axis) for v in a]
             pb = [dot(v, axis) for v in b]
-            if max(pa) < min(pb) or max(pb) < min(pa):
-                return False
+            if max(pa) <= min(pb) + 1e-6 or max(pb) <= min(pa) + 1e-6:
+                return False  # touching along an edge is not overlapping
     return True
 
 
@@ -264,6 +264,8 @@ def clearance(room: Room, placed: list[Placed]) -> list[dict]:
         for p in placed:
             if polygons_overlap(p.corners(), corridor):
                 depth = overlap_depth(p.corners(), corridor, door.wall.normal_in)
+                if depth < 0.005:
+                    continue  # a solver's whole-centimetre position grazing the corridor edge
                 out.append(
                     violation(
                         "clearance", "block", p.placement_id, depth,

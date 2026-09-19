@@ -42,7 +42,11 @@ export class AgentFailure extends Error {}
 const MAX_ROUNDS = 3;
 const MAX_RELAXATIONS = 2;
 const WALKWAY_CM = 60;
+const WALKWAY_MIN_CM = 30;
+const WALKWAY_STEP_CM = 15;
 const TIME_LIMIT_MS = 2000;
+const TIME_LIMIT_BUSY_MS = 3000; // more than eight pieces: proving optimality is hopeless, take the best found
+const CROWDED = 8; // pieces; above this, start with 60 cm walkways rather than discover 90 won't fit
 
 export async function runLoop(input: LoopInput, deps: LoopDeps): Promise<Proposal> {
   const say = (kind: LogEntry['kind'], message: string, severity: LogEntry['severity'] = 'info') => deps.log({ at: now(), kind, message, severity });
@@ -123,11 +127,23 @@ export async function runLoop(input: LoopInput, deps: LoopDeps): Promise<Proposa
   let report: FitReport | null = null;
   let placements: PlacementV1[] = [];
   let relaxations = 0;
+  let narrowed = 0;
+  const movableCount = objects.filter((o) => o.movable).length;
+  const timeLimit = movableCount > CROWDED ? TIME_LIMIT_BUSY_MS : TIME_LIMIT_MS;
+  // A full room: the plan's walkway wish (keep_clear walkway) is honoured until it can't be.
+  const askedWalkway = Math.max(walkway, ...plan.rules.filter((r) => r.type === 'keep_clear' && r.zone === 'walkway').map((r) => r.marginCm ?? 0));
+  walkway = askedWalkway;
+  plan.rules = plan.rules.filter((r) => !(r.type === 'keep_clear' && r.zone === 'walkway'));
+  if (movableCount > CROWDED && walkway > 60) {
+    walkway = 60;
+    narrowed++;
+    say('decision', `${movableCount} pieces in this room: planning with 60 cm walkways rather than ${askedWalkway} cm.`, 'warn');
+  }
 
   for (let round = 1; round <= MAX_ROUNDS; round++) {
     deps.status('solving', round === 1 ? 'Solving…' : `Solving again (round ${round})…`);
     const rules = [...resolvePlan(plan, facts, geo, walkway), ...hardRules(facts, input.preferences), ...extraRules];
-    const request = buildSolverRequest(geo, objects, rules, { walkwayCm: walkway, timeLimitMs: TIME_LIMIT_MS, doorKeepOutGrowCm: doorGrow, closePairs });
+    const request = buildSolverRequest(geo, objects, rules, { walkwayCm: walkway, timeLimitMs: timeLimit, doorKeepOutGrowCm: doorGrow, closePairs });
     try {
       response = await deps.solve(request);
     } catch (err) {
@@ -137,9 +153,19 @@ export async function runLoop(input: LoopInput, deps: LoopDeps): Promise<Proposa
 
     if (response.status === 'INFEASIBLE') {
       const conflicts = response.conflicts.filter((id) => plan!.rules.some((r) => r.id === id && r.priority === 'must'));
+      if (!conflicts.length && walkway - WALKWAY_STEP_CM >= WALKWAY_MIN_CM) {
+        // Nothing to relax but the room itself: try with narrower walkways.
+        walkway -= WALKWAY_STEP_CM;
+        narrowed++;
+        say('retry', `The room is tight: ${objects.filter((o) => o.movable).length} pieces don't fit with ${walkway + WALKWAY_STEP_CM} cm walkways. Trying ${walkway} cm.`, 'warn');
+        round--;
+        continue;
+      }
       if (!conflicts.length || relaxations >= MAX_RELAXATIONS) {
         const names = response.conflicts.map((id) => plan!.rules.find((r) => r.id === id)?.why ?? id);
-        throw new AgentFailure(`No arrangement satisfies these together: ${names.join('; ')}. Drop one and ask again.`);
+        throw new AgentFailure(names.length
+          ? `No arrangement satisfies these together: ${names.join('; ')}. Drop one and ask again.`
+          : `The room is too full: ${objects.filter((o) => o.movable).length} pieces can't all fit with even ${walkway} cm walkways. Remove a few and ask again.`);
       }
       // Relax the least important clashing must (latest in the plan's order).
       const victim = plan.rules.filter((r) => conflicts.includes(r.id)).pop()!;
@@ -151,7 +177,16 @@ export async function runLoop(input: LoopInput, deps: LoopDeps): Promise<Proposa
       round--; // relaxations don't count as fit rounds
       continue;
     }
-    if (response.status === 'TIMEOUT') throw new AgentFailure("Couldn't find a layout in time.");
+    if (response.status === 'TIMEOUT') {
+      if (walkway - WALKWAY_STEP_CM >= WALKWAY_MIN_CM) {
+        walkway -= WALKWAY_STEP_CM;
+        narrowed++;
+        say('retry', `No layout found in ${Math.round(timeLimit / 1000)} s with ${walkway + WALKWAY_STEP_CM} cm walkways: trying ${walkway} cm.`, 'warn');
+        round--;
+        continue;
+      }
+      throw new AgentFailure("Couldn't find a layout in time. Remove a few pieces and ask again.");
+    }
     say('solve', `OR-Tools: ${response.status} in ${response.solveMs} ms; moved ${(response.movedCm / 100).toFixed(1)} m in total; ${response.satisfied.length} rule${response.satisfied.length === 1 ? '' : 's'} satisfied${response.violated.length ? `, ${response.violated.length} relaxed` : ''}.`);
 
     placements = convertBack(input.state.placements, objects, response, geo);
@@ -197,6 +232,7 @@ export async function runLoop(input: LoopInput, deps: LoopDeps): Promise<Proposa
     ...[...violatedIds].filter((id) => id.startsWith('pref:')).map((id) => ({ ruleId: id, why: input.preferences.find((p) => `pref:${p.id}` === id)?.text ?? 'a remembered preference' })),
   ];
   if (unsatisfied.some((u) => u.ruleId.startsWith('pref:'))) say('memory', `Couldn't keep every remembered preference this time: ${unsatisfied.filter((u) => u.ruleId.startsWith('pref:')).map((u) => u.why).join('; ')}.`, 'warn');
+  if (narrowed) unsatisfied.push({ ruleId: 'walkway', why: `walkways narrowed to ${walkway} cm to fit everything (asked for ${askedWalkway} cm)` });
   const factsText = explanationFacts(requestText, plan, moves, input.state, objects, response!, report, relaxed, cleaned.log);
   let explanation: string;
   let tradeoffs: string[];

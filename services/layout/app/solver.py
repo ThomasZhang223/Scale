@@ -243,9 +243,17 @@ def solve(request: dict) -> dict:
     if assumptions:
         m.AddAssumptions([lit for lit, _ in assumptions])
 
+    # Start the search from where things are: the current layout is usually close to legal,
+    # and a hint turns "no solution in time" into "a solution in milliseconds" on full rooms.
+    for o in objs:
+        m.AddHint(o.x, o.x0)
+        m.AddHint(o.z, o.z0)
+        for k in range(4):
+            m.AddHint(o.r[k], 1 if k == o.k0 else 0)
+
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = time_limit_ms / 1000
-    solver.parameters.num_workers = int(os.environ.get("SOLVER_WORKERS", "1"))
+    solver.parameters.num_workers = int(os.environ.get("SOLVER_WORKERS", "8"))
     solver.parameters.random_seed = SEED
     status = solver.Solve(m)
     elapsed_ms = round((time.perf_counter() - started) * 1000)
