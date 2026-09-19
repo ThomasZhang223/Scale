@@ -23,7 +23,6 @@ from __future__ import annotations
 
 import os
 import time
-import uuid
 
 import httpx
 from fastapi import Depends, FastAPI, Request
@@ -33,6 +32,7 @@ from .ai_extract import OpenAIConfig, extract_with_llm, extract_with_vlm
 from .auth import require_upstream_token
 from .browserbase import BrowserbaseFetch, CachedFetch, FetchError
 from .dimensions import extract
+from .identity import object_id
 from .page_extract import extract_from_page, product_url
 from .validate import validate
 
@@ -100,9 +100,14 @@ def _object_v1(merchant: str, storefront: str, p: dict, bbox: dict, verdict, met
             break
         except (KeyError, TypeError, ValueError):
             continue
+    handle = p.get("handle")
+    product_url = f"{storefront.rstrip('/')}/products/{handle}" if handle else None
     return {
         "schemaVersion": 1,
-        "objectId": str(uuid.uuid4()),
+        # Deterministic, so re-ingesting a merchant refreshes its rows instead of duplicating
+        # them — IngestMerchantWorkflow's ON CONFLICT(id) DO UPDATE depends on it. See
+        # app/identity.py for why the key is the product URL and not the merchant label.
+        "objectId": object_id(merchant, product_url, p.get("id"), handle),
         "source": "catalog",
         "state": "measured",
         "name": p.get("title"),
@@ -113,7 +118,7 @@ def _object_v1(merchant: str, storefront: str, p: dict, bbox: dict, verdict, met
         "caption": None,          # Ani writes this on state:"ready"
         "palette": [],            # likewise
         "price": {"cents": price_cents, "currency": "USD"} if price_cents is not None else None,
-        "productUrl": f"{storefront.rstrip('/')}/products/{p.get('handle')}" if p.get("handle") else None,
+        "productUrl": product_url,
         "merchant": merchant,
         "createdAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         # Beyond the contract, for the caller's benefit — a low score has to be explainable
