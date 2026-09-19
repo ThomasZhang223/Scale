@@ -1,6 +1,7 @@
 [
   {
     "title": "Complete Houses, Tom Kundig",
+    "handle": "complete-houses-tom-kundig",
     "product_type": "",
     "tags": [
       "leadtime_2"
@@ -23,6 +24,7 @@
   },
   {
     "title": "Panafold Issue 4",
+    "handle": "panafold-issue-4",
     "product_type": "",
     "tags": [
       "leadtime_2"
@@ -45,6 +47,7 @@
   },
   {
     "title": "Studio Series - Charcuterie Large Board",
+    "handle": "studio-series-charcuterie-platter",
     "product_type": "annex",
     "tags": [
       "fixed",
@@ -68,6 +71,7 @@
   },
   {
     "title": "Studio Series - Charcuterie Plate",
+    "handle": "studio-series-charcuterie-plate",
     "product_type": "annex",
     "tags": [
       "fixed",
@@ -91,6 +95,7 @@
   },
   {
     "title": "Studio Series - Charcuterie Cube",
+    "handle": "studio-series-charcuterie-cube",
     "product_type": "annex",
     "tags": [
       "fixed",
@@ -114,6 +119,7 @@
   },
   {
     "title": "Untapped Print Edition 003",
+    "handle": "untapped-print-edition-003",
     "product_type": "",
     "tags": [
       "leadtime_2"
@@ -136,6 +142,7 @@
   },
   {
     "title": "Para Llevar, ISSUE 6: MARMOTA",
+    "handle": "para-llevar-issue-6-marmota",
     "product_type": "",
     "tags": [
       "leadtime_2"
@@ -158,6 +165,7 @@
   },
   {
     "title": "Para Llevar, ISSUE 5: FLOUR+WATER // PENNY ROMA",
+    "handle": "para-llevar-issue-5-flour-water-penny-roma",
     "product_type": "",
     "tags": [
       "leadtime_2"

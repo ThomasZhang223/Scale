@@ -1,6 +1,7 @@
 [
   {
     "title": "Terrazzo Switch Table",
+    "handle": "terrazzo-switch-table",
     "product_type": "Side Tables",
     "tags": [
       "all",
@@ -32,6 +33,7 @@
   },
   {
     "title": "Tube Lounge 2.0",
+    "handle": "tube-lounge-2-0",
     "product_type": "Lounge Chair",
     "tags": [
       "All",
@@ -67,6 +69,7 @@
   },
   {
     "title": "86\" Hinoki Table",
+    "handle": "hinoki-table-86",
     "product_type": "Tables",
     "tags": [
       "Dining Table",
@@ -94,6 +97,7 @@
   },
   {
     "title": "Folding Freddie Seat Pad",
+    "handle": "folding-freddie-seat-pad",
     "product_type": "Padding",
     "tags": [
       "Seatpads"
@@ -128,6 +132,7 @@
   },
   {
     "title": "Jolene Upholstered Dining Chair",
+    "handle": "jolene-upholstered-dining-chair",
     "product_type": "",
     "tags": [
       "All",
@@ -159,6 +164,7 @@
   },
   {
     "title": "Cono Side Table",
+    "handle": "cono-side-table",
     "product_type": "Side Tables",
     "tags": [
       "All",
@@ -183,6 +189,7 @@
   },
   {
     "title": "Slim Cube Ottoman",
+    "handle": "cube-slim-ottoman",
     "product_type": "",
     "tags": [],
     "body_html": "<meta charset=\"utf-8\">\n<h3 data-mce-fragment=\"1\">\n<meta charset=\"utf-8\">Inspired by 70s Italian Luxury Furniture</h3>\n<p data-mce-fragment=\"1\">The collection features six different pieces, all following rounded - square shapes that are designed to be separated and\u00a0re-arranged\u00a0- allowing for endless modular layouts for any project or space. The sofa is like sitting on\u00a0a\u00a0cloud with its deep\u00a0lounge\u00a0seating, rounded shapes, and low profile.\u00a0\u00a0The sofa\u00a0features\u00a0a visually interesting back and side detail making it a centerpiece of any home. Made to order, with an array of fabric selections\u00a0to choose from, the multi piece collection is available to purchase individually or together.<br><strong data-mce-fragment=\"1\"></strong><br data-mce-fragment=\"1\">Made in Los Angeles at Bend Goods very own upholstery factory. The Nanda Sofa is completely different from the signature wire furniture that Bend Goods is known for but still takes cues from our well known\u00a0aesthetic.<strong data-mce-fragment=\"1\"><br data-mce-fragment=\"1\"></strong></p>",
@@ -207,6 +214,7 @@
   },
   {
     "title": "Coffee Table",
+    "handle": "coffee-table",
     "product_type": "Tables",
     "tags": [
       "All",

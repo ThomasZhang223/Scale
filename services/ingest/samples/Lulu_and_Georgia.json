@@ -1,6 +1,7 @@
 [
   {
     "title": "Leni Outdoor Chaise",
+    "handle": "leni-indoor-outdoor-chaise",
     "product_type": "Furniture",
     "tags": [
       "Bestseller",
@@ -106,6 +107,7 @@
   },
   {
     "title": "Leni Outdoor Dining Chair",
+    "handle": "leni-indoor-outdoor-dining-chair",
     "product_type": "Furniture",
     "tags": [
       "Bestseller",
@@ -214,6 +216,7 @@
   },
   {
     "title": "Leni Outdoor Dining Arm Chair",
+    "handle": "leni-indoor-outdoor-dining-arm-chair",
     "product_type": "Furniture",
     "tags": [
       "bundle",
@@ -319,6 +322,7 @@
   },
   {
     "title": "Breeland Faux Grasscloth Peel + Stick Wallpaper",
+    "handle": "breeland-faux-grasscloth-peel-stick-wallpaper",
     "product_type": "Wall D\u00e9cor + Mirrors",
     "tags": [
       "algolia_updated9.18",
@@ -352,6 +356,7 @@
   },
   {
     "title": "Whitley Paperweave Wallpaper",
+    "handle": "whitley-paperweave-wallpaper",
     "product_type": "Wall D\u00e9cor + Mirrors",
     "tags": [
       "algolia_updated9.18",
@@ -385,6 +390,7 @@
   },
   {
     "title": "Under the Spanish Moss Wall Art",
+    "handle": "under-the-spanish-moss-wall-art",
     "product_type": "Wall D\u00e9cor + Mirrors",
     "tags": [
       "algolia_updated9.18",
@@ -427,6 +433,7 @@
   },
   {
     "title": "Travelers Resting Diptych Wall Art (Set of 2)",
+    "handle": "travelers-resting-diptych-wall-art-set-of-2",
     "product_type": "Wall D\u00e9cor + Mirrors",
     "tags": [
       "algolia_updated9.18",
@@ -467,6 +474,7 @@
   },
   {
     "title": "The Charmer Wall Art",
+    "handle": "the-charmer-wall-art",
     "product_type": "Wall D\u00e9cor + Mirrors",
     "tags": [
       "algolia_updated9.18",
