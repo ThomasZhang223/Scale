@@ -3,8 +3,8 @@
 //
 //   node dev/cli.mjs "what is this, will it fit beside my desk?"
 //   node dev/cli.mjs --all              run the scripted scenarios
-//   node dev/cli.mjs --live "..."       use the real Claude transport (needs ANTHROPIC_API_KEY
-//                                       and @anthropic-ai/sdk installed)
+//   node dev/cli.mjs --live "..."       use the real transport (needs OPENAI_API_KEY and
+//                                       OPENAI_MODEL)
 
 import { runTurn } from '../agent/runTurn.js';
 import { createFakeApi, createFakeCapture } from './fakeApi.js';
@@ -17,9 +17,13 @@ const utterances = args.filter((a) => !a.startsWith('--'));
 
 async function transport() {
   if (!live) return createFakeTransport();
-  const { default: Anthropic } = await import('@anthropic-ai/sdk');
-  const { createAnthropicTransport } = await import('../transport/anthropic.js');
-  return createAnthropicTransport({ client: new Anthropic() });
+  const { createOpenAITransport } = await import('../transport/openai.js');
+  return createOpenAITransport({
+    apiKey: process.env.OPENAI_API_KEY,
+    model: process.env.OPENAI_MODEL,
+    gatewayUrl: process.env.OPENAI_GATEWAY_URL,
+    gatewayToken: process.env.OPENAI_GATEWAY_TOKEN,
+  });
 }
 
 const SCENARIOS = [

@@ -2,4 +2,5 @@ fastapi
 uvicorn[standard]
 httpx
 beautifulsoup4
-anthropic
+# LLM passes (steps 2 and 3) call OpenAI over raw HTTP via httpx, matching
+# services/agent. No SDK dependency.

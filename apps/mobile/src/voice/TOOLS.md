@@ -136,8 +136,10 @@ matters because of one unresolved question: **running it in the app means an API
 device.** Options are a Worker route (Thomas owns `workers/**`) or a small service. Until that
 is decided the transport is a one-line swap and nothing else moves.
 
-Model is `claude-opus-5` at `effort: "low"` on both passes — reference-picking and a
-two-sentence spoken answer are simple tasks, and this is the latency-critical path.
+OpenAI at `temperature: 0` on both passes, over raw `/chat/completions` with the same env
+vars and optional Cloudflare AI Gateway as `services/agent` and `services/ingest`. Picking a
+reference and reading back a measured number are not creative tasks, and this is the
+latency-critical path.
 
 ## What I need from Thomas
 
@@ -155,7 +157,7 @@ question, not a native-module one.
 node dev/test.mjs                 # 8 regression tests, no key, no server, no phone
 node dev/cli.mjs --all            # the scripted scenarios
 node dev/cli.mjs "put it by the door"
-node dev/cli.mjs --live "..."     # real Claude; needs ANTHROPIC_API_KEY + @anthropic-ai/sdk
+node dev/cli.mjs --live "..."     # the real model; needs OPENAI_API_KEY + OPENAI_MODEL
 ```
 
 `dev/fakeApi.js` serves the committed fixtures (`fixtures/room-demo.json`,

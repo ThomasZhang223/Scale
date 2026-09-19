@@ -41,7 +41,7 @@ function clarifyFromResults(results) {
 /**
  * @param {string} transcript  what the user said
  * @param {object} ctx         { api, roomId, room, knownObjects, capture, complete, speak }
- *   complete({ system, user, schema? }) -> string | parsed object   (transport/anthropic.js)
+ *   complete({ system, user, schema? }) -> string | parsed object   (transport/openai.js)
  *   speak(text)                                                     (TTS or a caption)
  */
 export async function runTurn(transcript, ctx) {

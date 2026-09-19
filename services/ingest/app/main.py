@@ -29,6 +29,7 @@ import httpx
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
 
+from .ai_extract import OpenAIConfig, extract_with_llm, extract_with_vlm
 from .auth import require_upstream_token
 from .browserbase import BrowserbaseFetch, CachedFetch, FetchError
 from .dimensions import extract
@@ -142,6 +143,12 @@ async def extract_products(request: Request):
 
     use_pages = bool(body.get("browserbase"))
     page_limit = int(body.get("pageLimit") or 60)
+    # Steps 2 and 3 are additive passes over products the cheaper steps already failed on, so
+    # an unconfigured key skips them and says so rather than failing the request.
+    cfg = OpenAIConfig()
+    use_llm = bool(body.get("llm")) and cfg.configured
+    use_vlm = bool(body.get("vlm")) and cfg.configured
+    ai_limit = int(body.get("aiLimit") or 40)
     fetcher = None
     if use_pages:
         try:
@@ -152,26 +159,46 @@ async def extract_products(request: Request):
             return _err(503, "browserbase_unconfigured", str(e))
 
     objects: list[dict] = []
-    stats = {"products": len(products), "from_api": 0, "from_page": 0,
-             "pages_fetched": 0, "page_failures": 0, "rejected": 0, "unverified": 0}
+    stats = {"products": len(products), "from_api": 0, "from_llm": 0, "from_page": 0,
+             "from_vlm": 0, "pages_fetched": 0, "page_failures": 0,
+             "rejected": 0, "unverified": 0}
+    if body.get("llm") and not cfg.configured:
+        stats["llm_skipped"] = "OPENAI_API_KEY / OPENAI_MODEL not configured"
     needs_page: list[dict] = []
 
-    for p in products:
-        hit = extract(p)
+    def accept(p: dict, hit, via: str, counter: str) -> bool:
+        """Step 4 and 5 for one hit, from whichever source. Identical for all of them, which
+        is the point: a model's answer is not trusted more than a regex's."""
         bbox = hit.as_bbox() if hit else None
         if not bbox:
-            if p.get("handle"):
-                needs_page.append(p)
-            continue
+            return False
         v = validate(bbox, category=p.get("product_type"), title=p.get("title") or "",
                      source_field=hit.source_field)
         if not v.ok:
             stats["rejected"] += 1
-            continue
-        stats["from_api"] += 1
+            return False
+        stats[counter] += 1
         stats["unverified"] += int(v.unverified)
-        objects.append(_object_v1(merchant, storefront, p, bbox, v, hit.source_field, "api"))
+        objects.append(_object_v1(merchant, storefront, p, bbox, v, hit.source_field, via))
+        return True
 
+    needs_ai: list[dict] = []
+    for p in products:
+        if accept(p, extract(p), "api", "from_api"):
+            continue
+        needs_ai.append(p)
+
+    # Step 2: the same text, read rather than pattern-matched.
+    for p in needs_ai[:ai_limit] if use_llm else []:
+        if accept(p, extract_with_llm(p, cfg), "llm", "from_llm"):
+            continue
+        if p.get("handle"):
+            needs_page.append(p)
+    if not use_llm:
+        needs_page = [p for p in needs_ai if p.get("handle")]
+
+    # Step 2.5: another surface entirely, for products whose text simply lacks the numbers.
+    needs_image: list[dict] = []
     for p in needs_page[:page_limit] if fetcher else []:
         stats["pages_fetched"] += 1
         try:
@@ -179,18 +206,26 @@ async def extract_products(request: Request):
         except FetchError:
             stats["page_failures"] += 1
             continue
-        hit = extract_from_page(res.content)
-        bbox = hit.as_bbox() if hit else None
-        if not bbox:
-            continue
-        v = validate(bbox, category=p.get("product_type"), title=p.get("title") or "",
-                     source_field=hit.source_field)
-        if not v.ok:
-            stats["rejected"] += 1
-            continue
-        stats["from_page"] += 1
-        stats["unverified"] += int(v.unverified)
-        objects.append(_object_v1(merchant, storefront, p, bbox, v, hit.source_field, "page"))
+        if not accept(p, extract_from_page(res.content), "page", "from_page"):
+            needs_image.append(p)
+
+    # Step 3: the spec-sheet diagram. Last resort, and the most expensive call here, so it runs
+    # only over what every cheaper source failed on.
+    if use_vlm:
+        async with httpx.AsyncClient(timeout=CRAWL_TIMEOUT_S, follow_redirects=True) as img:
+            for p in needs_image[:ai_limit]:
+                # A spec diagram is rarely the hero shot, so try the later images first.
+                for src in [i.get("src") for i in (p.get("images") or [])][1:4]:
+                    if not src:
+                        continue
+                    try:
+                        r = await img.get(src)
+                        r.raise_for_status()
+                    except httpx.HTTPError:
+                        continue
+                    hit = extract_with_vlm(r.content, r.headers.get("content-type", ""), cfg)
+                    if accept(p, hit, "vlm", "from_vlm"):
+                        break
 
     return {"merchant": merchant, "count": len(objects), "stats": stats, "objects": objects}
 

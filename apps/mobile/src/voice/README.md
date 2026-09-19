@@ -12,7 +12,7 @@ agent/intentJsonSchema  structured-output schema for pass 1 (derived from schema
 agent/anchors.js        "beside my desk" -> a real free span (find_anchor v0)
 agent/toolRuntime.js    API client + the fixed pipeline per action
 agent/runTurn.js        one utterance -> one spoken answer
-transport/anthropic.js  Claude-backed completion (injected, so the core stays testable)
+transport/openai.js     OpenAI-backed completion (injected, so the core stays testable)
 dev/                    fake API over the fixtures, scripted transport, CLI, tests
 ```
 
@@ -28,6 +28,7 @@ the `VoiceScreen` stub; Paul writes JavaScript only, here. Paul never edits the 
 asks. See `CLAUDE.md` under File ownership.
 
 Note `apps/mobile/package.json` is Thomas's, so nothing here adds a dependency to it. The agent
-core has no npm dependencies at all; `@anthropic-ai/sdk` is needed only by
-`transport/anthropic.js` and only when actually calling Claude. Running the dev tools under
-bare `node` prints a `MODULE_TYPELESS_PACKAGE_JSON` warning — harmless, and Metro does not care.
+core has no npm dependencies at all, and neither does the transport — it POSTs
+`/chat/completions` with `fetch`, the same way `services/agent` and `services/ingest` do.
+Running the dev tools under bare `node` prints a `MODULE_TYPELESS_PACKAGE_JSON` warning —
+harmless, and Metro does not care.
