@@ -53,33 +53,40 @@ def _is_unrendered_template(text: str) -> bool:
 
 
 def _loads_tolerant(raw: str):
-    """json.loads, then two fallbacks for the malformed blobs real themes ship.
+    """json.loads, then fallbacks for the malformed blobs real themes ship.
 
-    Floyd serves two ld+json blocks per page and both fail a strict parse. Skipping them loses
-    the one source where the axis is unambiguous, so it is worth trying harder before giving up.
+    Floyd's Product block fails a strict parse on an invalid control character — a literal
+    newline inside a string value — which `strict=False` is exactly for. That one line is what
+    recovers a real Product object.
+
+    The scan-for-objects fallback is last and deliberately fussy: run loosely on Floyd's block
+    it returned nineteen garbage fragments and called that success, which is worse than
+    failing. It now keeps only objects that actually carry an @type.
     """
     raw = raw.strip()
-    try:
-        return json.loads(raw)
-    except (ValueError, TypeError):
-        pass
-    # Trailing commas before a close brace/bracket.
-    cleaned = re.sub(r",\s*([}\]])", r"\1", raw)
-    try:
-        return json.loads(cleaned)
-    except ValueError:
-        pass
-    # Several concatenated top-level objects: decode them one at a time and keep what parses.
-    decoder = json.JSONDecoder()
-    out, idx = [], 0
-    while idx < len(cleaned):
+    for attempt in (
+        lambda: json.loads(raw),
+        lambda: json.loads(raw, strict=False),                       # control chars in strings
+        lambda: json.loads(re.sub(r",\s*([}\]])", r"\1", raw), strict=False),  # trailing commas
+    ):
         try:
-            obj, end = decoder.raw_decode(cleaned, idx)
+            return attempt()
+        except (ValueError, TypeError):
+            continue
+
+    # Several concatenated top-level objects. Only worth anything if the pieces are real
+    # JSON-LD nodes, so anything without an @type is discarded rather than counted.
+    decoder = json.JSONDecoder(strict=False)
+    out, idx = [], 0
+    while idx < len(raw):
+        try:
+            obj, end = decoder.raw_decode(raw, idx)
         except ValueError:
             idx += 1
             continue
-        out.append(obj)
-        idx = end
+        if isinstance(obj, dict) and obj.get("@type"):
+            out.append(obj)
+        idx = max(end, idx + 1)
     return out or None
 
 

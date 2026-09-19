@@ -157,6 +157,22 @@ def test_shipping_days_are_not_read_as_a_dimension():
         assert v not in (0.03, 0.05), "'Ships in 3-5 days' leaked into the dimensions"
 
 
+def test_control_character_inside_a_string_still_parses():
+    """Floyd's Product block fails a strict parse on a literal newline inside a description.
+    json.loads(strict=False) is exactly for that, and without it the block is skipped."""
+    from app.page_extract import _loads_tolerant
+    raw = '{"@context":"http://schema.org/","@type":"Product","description":"line one\nline two"}'
+    d = _loads_tolerant(raw)
+    assert isinstance(d, dict) and d["@type"] == "Product"
+
+
+def test_the_object_scan_fallback_rejects_fragments():
+    """Run loosely on Floyd's block this returned nineteen garbage fragments and called it
+    success, which is worse than failing. Only real JSON-LD nodes count."""
+    from app.page_extract import _loads_tolerant
+    assert _loads_tolerant("12 34 [] {} 'nope'") is None
+
+
 def test_product_url_is_built_from_the_handle():
     assert product_url("https://shop.com/", "oak-desk") == "https://shop.com/products/oak-desk"
     try:
