@@ -1,6 +1,9 @@
 -- D1 schema. Authority: .claude/contracts.md "D1 tables". Do not edit without updating there.
+--
+-- IF NOT EXISTS throughout, so `wrangler d1 execute --file` is safe to re-run. Re-running the
+-- provisioning script must never be a destructive act.
 
-CREATE TABLE rooms (
+CREATE TABLE IF NOT EXISTS rooms (
   id TEXT PRIMARY KEY,
   name TEXT,
   captured_at TEXT,
@@ -8,7 +11,7 @@ CREATE TABLE rooms (
   created_at TEXT
 );
 
-CREATE TABLE versions (
+CREATE TABLE IF NOT EXISTS versions (
   id TEXT PRIMARY KEY,
   room_id TEXT,
   parent_id TEXT,
@@ -19,7 +22,7 @@ CREATE TABLE versions (
   created_at TEXT
 );
 
-CREATE TABLE objects (
+CREATE TABLE IF NOT EXISTS objects (
   id TEXT PRIMARY KEY,
   source TEXT,
   state TEXT,
@@ -40,7 +43,7 @@ CREATE TABLE objects (
   created_at TEXT
 );
 
-CREATE TABLE jobs (
+CREATE TABLE IF NOT EXISTS jobs (
   id TEXT PRIMARY KEY,
   object_id TEXT,
   kind TEXT,
@@ -51,3 +54,15 @@ CREATE TABLE jobs (
   created_at TEXT,
   updated_at TEXT
 );
+
+-- Indexes for the three queries this backend actually runs on a hot path. D1 is SQLite and
+-- writes are not free, so there is one index per real access pattern and no others.
+
+-- GET /v1/rooms/{id}/versions, and the parent lookup on every version write.
+CREATE INDEX IF NOT EXISTS idx_versions_room_created ON versions (room_id, created_at);
+
+-- The /v1/search d1-fallback path filters on state and source, then orders by created_at.
+CREATE INDEX IF NOT EXISTS idx_objects_state_source ON objects (state, source, created_at);
+
+-- The mesh workflow reads a job by object during a re-run.
+CREATE INDEX IF NOT EXISTS idx_jobs_object ON jobs (object_id);

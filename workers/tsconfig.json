@@ -9,7 +9,7 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "skipLibCheck": true,
-    "types": ["@cloudflare/workers-types"]
+    "types": []
   },
-  "include": ["src/**/*.ts", "../fixtures/**/*.json"]
+  "include": ["src/**/*.ts", "worker-configuration.d.ts", "../fixtures/**/*.json"]
 }
