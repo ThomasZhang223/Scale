@@ -25,7 +25,9 @@ import re
 import sys
 
 from app.browserbase import BrowserbaseFetch, CachedFetch, FetchError
-from app.page_extract import from_json_ld, from_spec_block, from_full_text, product_url, _spec_texts
+from app.page_extract import (
+    from_json_ld, from_spec_block, from_full_text, product_url, _spec_texts, _loads_tolerant,
+)
 
 
 def report(label: str, html: str, verbose: bool) -> bool:
@@ -51,10 +53,12 @@ def report(label: str, html: str, verbose: bool) -> bool:
     blocks = re.findall(r'<script[^>]+application/ld\+json[^>]*>(.*?)</script>', html, re.S | re.I)
     print(f"    json-ld blocks: {len(blocks)}")
     for b in blocks[:3]:
-        try:
-            data = json.loads(b)
-        except ValueError:
-            print("      (unparseable)")
+        # Same parser the extractor uses. Parsing strictly here reported "(unparseable)" for
+        # blocks from_json_ld reads fine — a diagnostic that disagrees with the code it is
+        # diagnosing is worse than none.
+        data = _loads_tolerant(b)
+        if data is None:
+            print("      (unparseable, even tolerantly)")
             continue
         nodes = data if isinstance(data, list) else (data.get("@graph") or [data])
         for n in nodes if isinstance(nodes, list) else []:

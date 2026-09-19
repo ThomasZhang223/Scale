@@ -22,6 +22,13 @@ PIXEL = bytes.fromhex(
 CATS = [("Desks", "surface"), ("Sofas", "seating"), ("Bookcases", "storage"),
         ("Table Lamps", "lighting")]
 
+# A Floyd-shaped product page: no dimensions in the API, but the page renders them.
+PRODUCT_PAGE = """
+<html><body><h1>Shelf</h1>
+<details><summary>Dimensions</summary><div>60" W x 30" D x 29" H</div></details>
+</body></html>
+"""
+
 
 def catalogue(port):
     out = []
@@ -33,12 +40,21 @@ def catalogue(port):
             "body_html": "<p>W 152 x D 76 x H 74 cm</p>",
             "images": [{"src": f"http://127.0.0.1:{port}/img/{i}.png"}],
         })
-    # One with dimensions but no image, and one with an image but no dimensions: both must be
-    # excluded, because a mesh needs a picture and a placement needs a size.
+    # Products with an image but NO dimensions in the API: invisible without step 2.5, and
+    # rescued by it. This is the Floyd/Fyrn/Bend/Branch case, ~690 products.
+    for i in range(6):
+        out.append({
+            "id": 3000 + i, "title": f"Page-only {i}", "handle": f"page-only-{i}",
+            "product_type": "Bookcases", "variants": [], "options": [],
+            "body_html": "<p>Solid oak. Made in Canada.</p>",
+            "images": [{"src": f"http://127.0.0.1:{port}/img/p{i}.png"}],
+        })
+    # One with dimensions but no image, and one with an image but no dimensions and no handle:
+    # both must be excluded, because a mesh needs a picture and a page fetch needs a handle.
     out.append({"id": 2001, "title": "No image", "handle": "no-image", "product_type": "Desks",
                 "variants": [], "options": [], "body_html": "<p>W 152 x D 76 x H 74 cm</p>",
                 "images": []})
-    out.append({"id": 2002, "title": "No dims", "handle": "no-dims", "product_type": "Desks",
+    out.append({"id": 2002, "title": "No dims no handle", "handle": "", "product_type": "Desks",
                 "variants": [], "options": [], "body_html": "<p>Solid oak.</p>",
                 "images": [{"src": f"http://127.0.0.1:{port}/img/x.png"}]})
     return out
@@ -68,18 +84,34 @@ def serve():
     return srv, f"http://127.0.0.1:{port}/"
 
 
-def run_cli(extra=()):
+def prime_page_cache(cache_dir, base, handles):
+    """Pre-fill the cache so --browserbase exercises the real path without an API call.
+    Mirrors CachedFetch._path exactly — if that naming changes, these tests notice."""
+    import hashlib
+    os.makedirs(cache_dir, exist_ok=True)
+    for h in handles:
+        url = f"{base.rstrip('/')}/products/{h}"
+        name = hashlib.sha256(url.encode()).hexdigest()[:24] + ".html"
+        with open(os.path.join(cache_dir, name), "w") as f:
+            f.write(PRODUCT_PAGE)
+
+
+def run_cli(extra=(), limit="12", prime=()):
     srv, base = serve()
     tmp = tempfile.mkdtemp()
     verified = os.path.join(tmp, "v.json")
+    cache = os.path.join(tmp, "pages")
     with open(verified, "w") as f:
         json.dump({"merchants": [{"name": "Fake Co", "storefrontBaseUrl": base,
                                   "productsJsonVerified": True}]}, f)
+    if prime:
+        prime_page_cache(cache, base, prime)
+    env = {**os.environ, "BROWSERBASE_API_KEY": "test-key-not-used-when-cached"}
     try:
         r = subprocess.run(
             [sys.executable, "build_prebake.py", verified, "--out", os.path.join(tmp, "prebake"),
-             "--limit", "12", *extra],
-            cwd=ROOT, capture_output=True, text=True,
+             "--limit", limit, "--page-cache", cache, *extra],
+            cwd=ROOT, capture_output=True, text=True, env=env,
         )
         assert r.returncode == 0, f"exited {r.returncode}:\n{r.stderr}"
         with open(os.path.join(tmp, "prebake", "manifest.json")) as f:
@@ -98,10 +130,50 @@ def test_manifest_has_images_and_dimensions_for_every_row():
 
 
 def test_products_missing_an_image_or_a_bbox_are_excluded():
-    m, _ = run_cli()
+    m, _ = run_cli(limit="40")
     titles = {r["title"] for r in m["products"]}
     assert "No image" not in titles, "a product with no picture cannot be meshed"
-    assert "No dims" not in titles, "a product with no size cannot be placed"
+    assert "No dims no handle" not in titles, "no size and no page to read one from"
+
+
+def test_without_browserbase_page_only_products_are_invisible():
+    m, _ = run_cli(limit="40")
+    assert not [r for r in m["products"] if r["title"].startswith("Page-only")]
+    assert m["step2_5"] is None
+
+
+def test_browserbase_rescues_products_the_api_had_no_dimensions_for():
+    """The Floyd case: dimensions in metafields the endpoint does not serve, rendered on
+    the page."""
+    handles = [f"page-only-{i}" for i in range(6)]
+    m, _ = run_cli(["--browserbase"], limit="40", prime=handles)
+    rescued = [r for r in m["products"] if r["title"].startswith("Page-only")]
+    assert len(rescued) == 6, f"expected 6 rescued, got {len(rescued)}"
+    for r in rescued:
+        assert r["bboxMeters"]["w"] > 1.5   # 60 inches
+        assert r["extractedFrom"] == "spec_block"
+    assert m["step2_5"]["recovered"] == 6
+    assert m["step2_5"]["failed"] == 0
+
+
+def test_browserbase_without_a_key_refuses_rather_than_skipping():
+    """Quietly producing a smaller manifest would look like the stores had no dimensions."""
+    srv, base = serve()
+    tmp = tempfile.mkdtemp()
+    v = os.path.join(tmp, "v.json")
+    with open(v, "w") as f:
+        json.dump({"merchants": [{"name": "X", "storefrontBaseUrl": base,
+                                  "productsJsonVerified": True}]}, f)
+    env = {k: val for k, val in os.environ.items() if k != "BROWSERBASE_API_KEY"}
+    try:
+        r = subprocess.run(
+            [sys.executable, "build_prebake.py", v, "--out", tmp, "--browserbase"],
+            cwd=ROOT, capture_output=True, text=True, env=env,
+        )
+        assert r.returncode != 0
+        assert "BROWSERBASE_API_KEY" in r.stderr
+    finally:
+        srv.shutdown()
 
 
 def test_selection_is_balanced_across_categories():
