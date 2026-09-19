@@ -33,14 +33,14 @@ bucket_name = "full-scale-objects"
 [[d1_databases]]
 binding = "DB"
 database_name = "full-scale-db"
-database_id = "PLACEHOLDER_D1_DATABASE_ID"
+database_id = "7e9a53b7-ddbf-4c47-9725-279a382a797b"
 
 # KV: upload tokens (short TTL) and the upstream service origins the tunnel publishes.
 # Origins live in KV rather than in [vars] so that rotating a quick-tunnel URL is one
 # `wrangler kv key put` and not a redeploy. See src/lib/config.ts.
 [[kv_namespaces]]
 binding = "CONFIG"
-id = "PLACEHOLDER_KV_NAMESPACE_ID"
+id = "601059204ab74578a49b99ace41c9e4a"
 
 # Vectorize: objects-v1, 768-dim google/siglip2-base-patch16-224 embeddings, cosine metric.
 # The w_mm/h_mm/d_mm range filter only works if the metadata indexes exist — provision.sh
