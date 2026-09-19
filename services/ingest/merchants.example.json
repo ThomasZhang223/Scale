@@ -1,0 +1,23 @@
+{
+  "_comment": "Shape only. The real, verified merchant list is NOT this file — it must be built and verified against live /products.json responses before H0 (see README.md and workstreams/paul.md). Every entry below is a placeholder, not a real merchant.",
+  "merchants": [
+    {
+      "name": "Example Furniture Co (placeholder)",
+      "storefrontBaseUrl": "https://example-furniture.myshopify.com",
+      "productsJsonVerified": false,
+      "verifiedAt": null
+    },
+    {
+      "name": "Placeholder Modern Living",
+      "storefrontBaseUrl": "https://placeholder-modern-living.com",
+      "productsJsonVerified": false,
+      "verifiedAt": null
+    },
+    {
+      "name": "Sample Oak & Co (placeholder)",
+      "storefrontBaseUrl": "https://sample-oak-co.com",
+      "productsJsonVerified": true,
+      "verifiedAt": "2026-09-19"
+    }
+  ]
+}

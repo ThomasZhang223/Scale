@@ -2,7 +2,7 @@
 
 2026-09-19
 
-Organised by ownership, not narrative. Five people pick a component and build against the contracts in §3–4.
+Organised by ownership, not narrative. Five people pick a component and build against `.claude/contracts.md`.
 
 Live editable copy: https://claude.ai/code/artifact/d5148499-b861-4db6-a48b-0d17cdcda9b8
 
@@ -34,261 +34,56 @@ v1 led with fit certainty against a field of "dimensionally a lie" tools. That l
 
 ## Ownership map
 
-Six components, five people. One person owns C and E together, because both are server-side Python against the same fixtures.
+Six components, four people. Justin owns D and E together, because the solver's output is drawn by the runtime that consumes it.
 
 | # | Component | Owner | Exposes to everyone else | Critical path |
 | --- | --- | --- | --- | --- |
-| A | iOS capture + app shell (Expo) | TBD — must be the Swift person | `RoomCapture v1` JSON, `Object v1` with `state:"measured"` in under 1 s | Yes |
-| B | Backend + data layer (Cloudflare) | TBD | The whole `/v1` HTTP surface, R2 keys, the room SSE stream | Yes |
-| C | 3D generation (Baseten) | TBD (also owns E) | A GLB at R2 key `objects/{id}/mesh.glb`, already bound to `bboxMeters` | Yes |
-| D | WebXR / Quest runtime | TBD | Nothing. D is a pure consumer of B. | Demo only |
-| E | Fit engine + solver | Same owner as C | `POST /v1/fit` → `FitReport v1`, `POST /v1/solve` → placements | No, but it is the pitch |
-| F | Retrieval + agents + voice | TBD | `POST /v1/search`, the OMNI voice loop on the phone | No |
+| A | iOS capture + app shell (Expo) | **Thomas** | `RoomCapture v1` JSON, `Object v1` with `state:"measured"` in under 1 s | Yes |
+| B | Backend + data layer (Cloudflare) | **Thomas** | The whole `/v1` HTTP surface, R2 keys, the room SSE stream | Yes |
+| C | 3D generation (Baseten) | **Ani** | A GLB at R2 key `objects/{id}/mesh.glb`, already bound to `bboxMeters` | Yes |
+| D | WebXR / Quest runtime | **Justin** | Nothing. D is a pure consumer of B. | Demo only |
+| E | Fit engine + solver | **Justin** | `POST /v1/fit` → `FitReport v1`, `POST /v1/solve` → placements | No, but it is the pitch |
+| F | Retrieval + agents + voice | **Paul** | `POST /v1/search`, the OMNI voice loop on the phone | No |
 
 ### Rules that make this work
 
-1. A component never reads another component's internals. It reads the contract in §3 and §4.
+1. A component never reads another component's internals. It reads `.claude/contracts.md`.
 2. Every `/v1` endpoint answers from a committed fixture when the request carries `X-Stub: 1`. B ships the stub layer in hours 0–2, before any real logic.
 3. The mesh scale binding happens exactly once, in C. A, D, and E never rescale a GLB. If two components both rescale, the object is wrong by the square of the error and nobody finds it until the demo.
 4. D earns zero sponsor points. There is no AR/VR track in 2026. Treat every headset hour as demo spend, not investment.
 
-### Staffing risk
+### Seams to confirm
 
-If no one is comfortable in Swift, component A cannot produce real measurements. The product then becomes a visualiser with estimated numbers, which is the thing Kreativ already does better. Verify the Swift owner before H0, not at H4.
+Two pieces of F are split across owners, because they are different skills. Ani writes the embeddings, captions, and palettes, since that is an inference job. Thomas owns the `/search` endpoint shape, since that is a backend endpoint. Paul owns the ranking inside it, and the agent loop on top. Confirm this split before H4.
 
-## Contracts, part 1 — the four schemas
+Per-person operational briefs live in `.claude/workstreams/`. The 36-hour parallel plan lives in `.claude/sprint.md`. The interface authority is `.claude/contracts.md` — if it and this document disagree, that file wins.
 
-Write these four files before you write anything else. Everything in §5 and §6 is an implementation detail behind them.
+## Contracts
 
-### Global conventions
+The interfaces live in `.claude/contracts.md`, and that file is the authority. It holds the four
+schemas every component reads or writes, the HTTP surface, the R2 key layout, the D1 tables, the
+Vectorize index shape, the stub rule, and the dependency table with an hour on every edge.
 
-These are not negotiable per component. A component that breaks one of them corrupts every other component silently.
+They are deliberately not reproduced here. A schema is looked up constantly and has to sit in a
+file that diffs and that anyone can edit. A design doc is read once, to understand why the schema
+is shaped the way it is. Two copies of a schema means one of them is wrong and nothing says which.
 
-| Thing | Convention |
-| --- | --- |
-| Length | Metres, float. Never centimetres, never inches, never millimetres. Convert at the UI edge only. |
-| Angle | Degrees, float, counter-clockwise seen from +Y. |
-| Money | Integer cents plus an ISO 4217 code. Never a float. |
-| Time | ISO 8601 with a `Z` suffix. Compute in UTC, convert once for display. |
-| Axes | Right-handed, +Y up. The ARKit world frame with `.gravityAndHeading`, so −Z points to true north and +X points east. |
-| Transform | 16 floats, column-major. This matches `simd_float4x4` memory order and `THREE.Matrix4.fromArray` with no transpose. |
-| Id | UUID v4 string, minted by the client, so a scan works offline and reconciles later. |
+Four things are worth stating here, because they are decisions rather than syntax.
 
-### RoomCapture v1 — A writes, B stores, D and E read
-
-```json
-{
-  "schemaVersion": 1,
-  "roomId": "uuid",
-  "capturedAt": "2026-09-20T02:11:04Z",
-  "worldAlignment": "gravityAndHeading",
-  "northBearingDeg": 0.0,
-  "floor": { "polygon": [[x, z]], "areaM2": 18.4 },
-  "walls": [{
-    "id": "uuid",
-    "transform": [16 floats],
-    "dimensions": [width, height, thickness],
-    "confidence": "high|medium|low"
-  }],
-  "openings": [{
-    "id": "uuid",
-    "kind": "door|window|opening",
-    "wallId": "uuid",
-    "transform": [16 floats],
-    "dimensions": [width, height, 0],
-    "hingeSide": "left|right|unknown",
-    "swingDeg": 90
-  }],
-  "objects": [{
-    "id": "uuid",
-    "category": "table|chair|bed|sofa|storage|…",
-    "transform": [16 floats],
-    "dimensions": [w, h, d],
-    "confidence": "high|medium|low"
-  }]
-}
-```
-
-Notes that matter:
-
-- `worldAlignment` must be the literal `"gravityAndHeading"`. If A ever emits anything else, B rejects the upload with HTTP 422. Without true north the sun simulation is invented, and retrofitting means re-scanning every room.
-- `northBearingDeg` is redundant with the frame, but store it anyway. It is the one value a reviewer can check against a compass on the table.
-- RoomPlan already gives segmentation. Object removal is `object.visible = false` on a thing the API labelled. Nobody implements segmentation.
-- Transport is JSON, never USDZ. D rebuilds walls as boxes, openings as gaps, and objects as per-category proxies. The USDZ → GLB conversion chain is where the weekend dies.
-
-### Object v1 — the convergence type
-
-Every object, from a phone scan, a Shopify product, or a primitive fallback, is this shape. The fit engine reads `bboxMeters` and nothing else.
-
-```json
-{
-  "schemaVersion": 1,
-  "objectId": "uuid",
-  "source": "scan|catalog|primitive",
-  "state": "measured|generating|ready|failed",
-  "name": "MacBook Pro 14",
-  "category": "laptop",
-  "glbUrl": null,
-  "bboxMeters": { "w": 0.3126, "h": 0.0155, "d": 0.2212 },
-  "measure": { "method": "lidar|extracted|declared", "confidence": 0.94 },
-  "caption": "matte space-grey aluminium laptop, closed",
-  "palette": ["#3a3a3c", "#8e8e93"],
-  "price": { "cents": 199900, "currency": "CAD" },
-  "productUrl": null,
-  "merchant": null,
-  "createdAt": "2026-09-20T02:12:09Z"
-}
-```
-
-`state` is the perceived-latency fix, and it lives in the schema rather than in the UI. A returns `state:"measured"` with a real `bboxMeters` and a null `glbUrl` in under one second. The client renders the measured box with its numbers straight away. `glbUrl` arrives later, over SSE, when `state` becomes `ready`.
-
-### The mesh normalisation contract
-
-C guarantees all four of these for every GLB it publishes. This is the single most important sentence in the document for anyone downstream.
-
-1. The mesh axis-aligned bounding box equals `bboxMeters`, to within 1 mm.
-2. The origin sits at the bottom-centre of that box, so a placement `y` of 0 means "on the floor".
-3. +Y is up and −Z is the front face.
-4. Units in the GLB are metres, so the glTF node scale is 1.
-
-A consumer that applies its own scale factor is a bug, not a preference.
-
-### Placement v1 and Version v1 — B stores, D renders, E validates
-
-```json
-{
-  "placementId": "uuid",
-  "objectId": "uuid",
-  "p": [x, y, z],
-  "yawDeg": 0.0,
-  "scale": 1.0,
-  "lockedToWallId": null,
-  "flags": ["blocks_door_swing"]
-}
-```
-
-```json
-{
-  "schemaVersion": 1,
-  "versionId": "uuid",
-  "roomId": "uuid",
-  "parentId": "uuid|null",
-  "label": "under $1200",
-  "createdAt": "2026-09-20T04:40:00Z",
-  "placements": [],
-  "materials": { "wall": "#8a9a7b", "floor": "oak-natural", "trim": "#ffffff" },
-  "contentHash": "sha256 of placements + materials, keys sorted"
-}
-```
-
-`scale` exists only for an explicit user override and must be 1.0 everywhere else. E raises a warning when it sees any other value, because a non-unit scale means somebody broke the normalisation contract upstream.
-
-A version is immutable. An edit writes a new version with `parentId` set to the old one. That is what makes history free: hash the layout, keep parent pointers, diff two versions into added, removed, and moved.
-
-## Contracts, part 2 — API, storage, and stubs
-
-B ships this surface as stubs in hours 0–2. Real logic lands behind it afterwards. Nobody waits.
-
-### HTTP surface (Cloudflare Workers, base `/v1`)
-
-| Method + path | Body | Returns | Consumer |
-| --- | --- | --- | --- |
-| `POST /rooms` | `RoomCapture v1` | `{ roomId }` | A |
-| `GET /rooms/{id}` | — | `RoomCapture v1` | D, E |
-| `POST /rooms/{id}/versions` | Version without ids | `Version v1` | A, D, F |
-| `GET /rooms/{id}/versions` | — | `[{ versionId, label, createdAt, parentId }]` | A, D |
-| `GET /versions/{id}` | — | `Version v1` | D |
-| `POST /uploads` | `{ kind, ext }` | `{ key, putUrl }` presigned R2 | A, C |
-| `POST /objects` | `{ source, name, category, bboxMeters, measure, frameKeys[] }` | `Object v1` with `state:"measured"` | A |
-| `GET /objects/{id}` | — | `Object v1` | all |
-| `POST /objects/{id}/generate` | `{ tier: "live" \| "quality" }` | `{ jobId }` | A, C |
-| `GET /jobs/{id}` | — | `{ state, progressPct, objectId, error }` | A |
-| `POST /search` | `{ text?, imageKey?, fit?, source?, limit }` | `[{ objectId, score, object }]` | F |
-| `POST /fit` | `{ roomId, versionId }` or `{ roomId, placements }` | `FitReport v1` | A, D |
-| `POST /solve` | `{ roomId, intent, budgetCents?, fixed[] }` | `{ placements, objective, infeasible? }` | F |
-| `POST /push/{roomId}` | `{ versionId }` | `204` | A, F |
-| `GET /sync/{roomId}` | — | SSE stream | D |
-
-`fit` in a search body is a numeric filter, not a vector term: `{ "maxW": 0.8, "maxH": 1.2, "maxD": 0.6 }`. That is the half of the query Kreativ cannot express.
-
-### FitReport v1
-
-```json
-{
-  "ok": false,
-  "checkedAt": "2026-09-20T05:02:00Z",
-  "violations": [{
-    "kind": "door_swing|clearance|wall_gap|window_occlusion",
-    "severity": "block|warn",
-    "placementId": "uuid",
-    "detailMeters": 0.11,
-    "message": "blocks the door swing by 11 cm",
-    "geometry": { "type": "arc", "center": [x, z], "radiusM": 0.9, "startDeg": 0, "endDeg": 90 }
-  }]
-}
-```
-
-`geometry` exists so D and A can draw the violation in red without re-deriving it. Supported types are `arc`, `polyline`, and `rect`. E owns the list. Adding a fifth type is a contract change, so announce it.
-
-### SSE stream, `GET /sync/{roomId}`
-
-One Durable Object per room does the fan-out. Event payloads:
-
-```
-event: object   data: Object v1            // state changed, usually measured -> ready
-event: version  data: { versionId }        // a new version was pushed
-event: fit      data: FitReport v1         // a re-check finished
-```
-
-The Quest subscribes on room open and never polls. This is pipeline P6.
-
-### R2 key layout
-
-| Key | Written by |
-| --- | --- |
-| `rooms/{roomId}/capture.json` | B, on upload |
-| `objects/{objectId}/frames/{n}.jpg` | A, presigned |
-| `objects/{objectId}/mesh.glb` | C |
-| `objects/{objectId}/thumb.jpg` | C |
-| `catalog/{merchant}/{productId}/source.jpg` | P3 crawler |
-| `fixtures/…` | committed by hand at H0 |
-
-Keys are derived, never stored as URLs in D1. A URL in a row is a cache-invalidation bug waiting to happen.
-
-### D1 tables
-
-```sql
-rooms(id TEXT PK, name, captured_at, north_bearing_deg REAL, created_at)
-versions(id TEXT PK, room_id, parent_id, label, content_hash,
-         placements_json TEXT, materials_json TEXT, created_at)
-objects(id TEXT PK, source, state, name, category,
-        bbox_w REAL, bbox_h REAL, bbox_d REAL,
-        measure_method, measure_confidence REAL,
-        caption, palette_json, price_cents INTEGER, currency,
-        product_url, merchant, created_at)
-jobs(id TEXT PK, object_id, kind, tier, state, progress_pct, error, created_at, updated_at)
-```
-
-### Vectorize index `objects-v1`
-
-768 dimensions, cosine metric, from CLIP ViT-L/14 image embeddings. Filterable metadata, integers in millimetres so numeric range filters work:
-
-```
-objectId, source, category, w_mm, h_mm, d_mm, dominant_hex
-```
-
-That is pipeline P4 in one line: dense vector for style, integer range filter for fit.
-
-### The stub rule
-
-Every endpoint returns a committed fixture when the request carries `X-Stub: 1`. Four fixtures go in the repository in hour 0, before any component compiles:
-
-1. `fixtures/room-demo.json` — a real RoomPlan capture of any room, frozen.
-2. `fixtures/object-macbook.json` — `state:"ready"`, real numbers.
-3. `fixtures/mesh-macbook.glb` — already bound to those numbers.
-4. `fixtures/fitreport-doorswing.json` — one blocking violation with an arc.
-
-D can build the whole headset runtime against these with no phone and no server. That is the point.
+1. **Metres, everywhere, in every schema and column.** Convert at the UI edge only.
+2. **Transport is JSON, never USDZ.** The room ships as wall transforms, opening rectangles, and
+   object boxes, rebuilt in three.js from primitives. The USDZ to GLB conversion chain is where
+   the weekend dies: coordinate conventions, unit scaling, material loss, headless Blender in a
+   container at 3 am. Avoiding that class of problem is worth more than photorealism nobody was
+   going to get.
+3. **`state:"measured"` is in the schema, not in the UI.** An object comes back with a real
+   `bboxMeters` and a null `glbUrl` in under a second. The measured box renders immediately with
+   real numbers while the mesh is still generating. That is the perceived-latency fix, and putting
+   it in the contract is what stops it being reinvented three times.
+4. **The mesh normalisation contract makes the scale binding single-owner.** Component C publishes
+   a GLB whose bounding box already equals `bboxMeters`, origin at bottom-centre, +Y up, metres.
+   Nothing downstream rescales. If two components both rescale, the error squares and nobody finds
+   it until the demo.
 
 ## Components A, B, C
 
@@ -315,7 +110,7 @@ D can build the whole headset runtime against these with no phone and no server.
 - A config plugin for `NSCameraUsageDescription`, or the app crashes on first camera use.
 - LiDAR device required: iPhone 12 Pro or later, iOS 16 or later.
 - A free Apple developer account works, with a 7-day provisioning profile.
-- Time-box the RoomPlan module to 4 hours. See the H4 gate in §9.
+- Time-box the RoomPlan module to 4 hours. See the H4 gate in `.claude/sprint.md`.
 
 A custom native module wrapping an Apple framework is the Expo differentiator. Most Expo entries never leave the JavaScript sandbox.
 
@@ -325,9 +120,9 @@ A custom native module wrapping an Apple framework is the Expo differentiator. M
 
 **Depends on.** Nothing. B is the only component that can start at minute zero with no blockers, which is why B owes everyone else the stub layer first.
 
-**Exposes.** Everything in §4.
+**Exposes.** Everything in `.claude/contracts.md`.
 
-**Done when.** Every endpoint in §4 answers with the right shape, live or stubbed, and the room SSE stream delivers an `object` event end to end.
+**Done when.** Every endpoint in `.claude/contracts.md` answers with the right shape, live or stubbed, and the room SSE stream delivers an `object` event end to end.
 
 **Cut if behind, in order.**
 
@@ -335,7 +130,7 @@ A custom native module wrapping an Apple framework is the Expo differentiator. M
 2. The job queue. Call Baseten inline with a longer timeout.
 3. Auth. A device id header is enough for a weekend.
 
-**Order of work.** Stub layer, then `/objects` and `/uploads`, then `/rooms`, then SSE, then the rest. The order matches the critical path in §8.
+**Order of work.** Stub layer, then `/objects` and `/uploads`, then `/rooms`, then SSE, then the rest. The order matches the critical path in `.claude/sprint.md`.
 
 ### C — 3D generation (Baseten)
 
@@ -348,7 +143,7 @@ A custom native module wrapping an Apple framework is the Expo differentiator. M
 
 **Depends on.** B for job records and R2 keys. Nothing else.
 
-**Exposes.** A GLB at `objects/{id}/mesh.glb` that satisfies all four clauses of the mesh normalisation contract in §3.
+**Exposes.** A GLB at `objects/{id}/mesh.glb` that satisfies all four clauses of the mesh normalisation contract in `.claude/contracts.md`.
 
 **Done when.** An arbitrary object photographed on the venue floor returns a GLB whose bounding box matches the LiDAR measurement to within 1 mm, and a tape measure on the table agrees.
 
@@ -378,7 +173,7 @@ A custom native module wrapping an Apple framework is the Expo differentiator. M
 
 1. The version scrubber in the headset. Keep it on the phone, where the Expo judges see it.
 2. Object manipulation. A read-only walkthrough still lands the 1:1 beat.
-3. The whole headset. See §10 for the phone-only fallback.
+3. The whole headset. See the minimum viable demo below for the phone-only fallback.
 
 **Do not use Unity.** It costs about five hours in build-and-deploy cycles. WebXR has no build step, hot reloads from a laptop, and renders the same scene in a desktop browser for the casting monitor.
 
@@ -416,7 +211,7 @@ A custom native module wrapping an Apple framework is the Expo differentiator. M
 **Scope.** Three pieces that share one owner.
 
 1. **Indexing.** Every object gets an image embedding, a caption, a colour palette, and its true dimensions, written to Vectorize on `state:"ready"`.
-2. **Hybrid search.** Dense vector for style, integer range filter for fit, over your own objects plus catalog. This is the differentiator from §1, so it outranks the agent loop if time is short.
+2. **Hybrid search.** Dense vector for style, integer range filter for fit, over your own objects plus catalog. This is the differentiator in the positioning above, so it outranks the agent loop if time is short.
 3. **Voice (OMNI).** One unbroken loop on the phone: hold the phone at an object, ask "what is this, will it fit beside my desk?", get an answer aloud from live video plus measured geometry.
 
 The multi-agent design loop, scout → fit → style → budget, sits on top of search and solve. It is the second Huawei track and the openJiuwen angle.
@@ -505,88 +300,31 @@ B → D. Phone posts to `/push/{roomId}`, the room Durable Object fans out over 
 
 **The detail.** Bring a travel router, about $40, and put every device on it. Conference Wi-Fi at peak judging will not carry phone → server → Quest. This is the single largest latency risk and the cheapest to remove.
 
-**Failure it owns.** Dead air during the handoff. Measure the end-to-end push time on the venue network during the rehearsal block in §9, not at 3 am with the access point to yourself.
+**Failure it owns.** Dead air during the handoff. Measure the end-to-end push time on the venue network during the rehearsal block in `.claude/sprint.md`, not at 3 am with the access point to yourself.
 
-## Sprint plan, 36 hours
+## Sprint plan
 
-H0 is Friday 18:00. Track lock is H20, Saturday 14:00. Submission is H36, Sunday 06:00. Adjust H0 in this one place if the real schedule differs, because every other hour below is relative to it.
+The plan lives in `.claude/sprint.md`, and that file is the authority. It has four named swimlanes
+running at the same time, the sync points, the kill criteria with a judge assigned to each gate,
+and the critical path.
 
-### H−4 to H0 — before the clock starts
+The shape behind it, which is the part worth arguing about rather than reading off a schedule:
 
-Four things must be true at H0, and none of them is code.
+**Hours 0 to 4 are an integration spike, not a feature block.** The goal is a skeleton that moves
+hardcoded data end to end. Nobody writes a feature. If the pieces do not connect at hour four, that
+is the hour to know it, not hour thirty.
 
-- [ ] A named Swift owner for component A. Without one, the measurement claim is an estimate and the project becomes a worse Kreativ.
-- [ ] `/products.json` verified on the chosen merchants. Ten minutes, and it decides whether P3 exists at all.
-- [ ] The travel router is bought and tested.
-- [ ] Twenty random objects tested through Stable Fast 3D, so the quality boundary is known.
+**There is exactly one serialisation in the whole weekend.** Thomas owes the four fixtures and the
+`X-Stub: 1` layer at H1.5. Before that the other three do work with no dependencies at all. After
+it, nobody is blocked by a person again — they are blocked by a fixture, which they already have.
+Every other apparent dependency is an artefact of not having committed a fixture early enough.
 
-### H0–H4 — integration spike, no features
+**The track lock at H20 happens before the work is finished.** That is not a scheduling mistake, it
+is the constraint. Select for what exists at H20 and change the pitch that afternoon, rather than
+discovering the mismatch at the judging table.
 
-The goal is a skeleton that moves hardcoded data from end to end. Nobody writes a feature in this block. This is where the project fails if it fails.
-
-| # | Task | Owner | Proves |
-| --- | --- | --- | --- |
-| 1 | Commit the four fixtures from §4 | B | Everyone unblocks at once |
-| 2 | Stub `/v1` behind `X-Stub: 1` | B | A, D, F build against a real surface |
-| 3 | Expo native module returns `RoomCapture v1` | A | The Expo track is live |
-| 4 | Fixture room renders in the Quest browser at correct scale | D | P1 transport works |
-| 5 | Phone → server → Quest push of the fixture GLB | A + B + D | P6 works |
-| 6 | Baseten returns a mesh, timed on the venue network | C | P2 is not a fantasy |
-
-Tasks 3 and 6 run in parallel with 1, 2, 4, and 5. Tasks 1 and 2 come first, because they unblock four people.
-
-### H4–H10 — core paths
-
-| Workstream | Owner | Critical path |
-| --- | --- | --- |
-| Real `/objects`, `/uploads`, `/rooms`, SSE | B | Yes |
-| Object scan flow, measured box under 1 s | A | Yes |
-| The scale binding, verified with a tape measure | C | Yes |
-| Room rebuild from real capture, grab and move | D | Demo only |
-| Fit validator: door swing and clearance | E | No |
-| Embedding and indexing on `state:"ready"` | F | No |
-
-**Exit condition at H10.** A judge-shaped person scans a real object and it appears in the headset at true scale. That is the demo spine. Everything after this is depth.
-
-### H10–H16 — depth
-
-| Workstream | Owner | Notes |
-| --- | --- | --- |
-| Object library, room list, version history UI | A | The Expo track is graded on this, not on the headset |
-| Version write and diff, `/push` | B | History is nearly free once layouts are JSON |
-| `quality` tier, pre-bake the catalog | C | Runs unattended while C works on E |
-| Version scrubber, red violation geometry | D | High demo value per hour |
-| Solver on a discretised grid | E | The unclaimed part of the pitch |
-| Hybrid search, phone voice loop | F | Both differentiators from §1 |
-| P3 catalog ingest | whoever is free | Cut first, always |
-
-### H16–H20 — freeze a candidate
-
-Stop starting new work at H16. Get one complete path working, rehearse it once badly, and write the track submissions. Track lock happens at H20 with a working demo in hand, not a hoped-for one.
-
-### H20–H28 — second pass
-
-After the lock, build only what the selected tracks are graded on. If Shopify and Rox were not selected, P3 dies here and its owner moves to E or F. If they were selected, P3 is now on the critical path and everything else yields to it.
-
-### H28–H31 — feature freeze at H31
-
-H31 is a hard line. After it, only bug fixes, demo data, and rehearsal. A feature that lands at H33 has never been rehearsed and is more likely to break the demo than to improve it.
-
-### H31–H33 — demo rehearsal, venue network, floor full
-
-This catches more failures than any other single activity. Run the full 60 seconds five times with different people holding the phone. Time the push. Rehearse the failure path: what you say when generation is slow, and what you do when it fails.
-
-### H33–H36 — buffer and submission
-
-Submit at H34, not H36. Keep two hours of slack for the submission system. Rotate sleep so at least two people are alert for judging.
-
-### Critical path versus slack
-
-**On the critical path.** A's native module, B's `/objects` plus SSE, C's binding. If any of the three slips, the demo has no spine.
-
-**Can slip without killing the demo.** E, F, D's scrubber, P3, sun simulation, the shareable link, the phone-AR bookend.
-
-**Can slip without killing the pitch.** Only D. The headset is a demo device with no sponsor track behind it.
+**Feature freeze at H31 is a hard line.** A feature that lands at H33 has never been rehearsed, and
+an unrehearsed feature is likelier to break the demo than to improve it.
 
 ## Checkpoints and kill criteria
 
@@ -597,7 +335,7 @@ A kill criterion works only if it is decided before the hour arrives and by a na
 | Native module | H4 | The Expo module returns valid `RoomCapture v1` | Drop Expo, ship pure Swift, lose the primary track. Decide at H4, not H6. |
 | Skeleton | H4 | Fixture GLB travels phone → server → Quest | Stop feature work. Every person debugs transport until it passes. |
 | Binding | H6 | A generated mesh measures correct against a tape measure | Fall back to a textured box at measured dimensions and keep going. |
-| Demo spine | H10 | A real object scanned by a stranger reaches the headset at true scale | Cut D entirely and move to the phone-only demo in §10. |
+| Demo spine | H10 | A real object scanned by a stranger reaches the headset at true scale | Cut D entirely and move to the phone-only demo below. |
 | Track lock | H20 | See below | — |
 | Feature freeze | H31 | Nothing merges except fixes | Revert the branch. Do not negotiate this one at H32. |
 
@@ -683,7 +421,7 @@ Select 5 to 7 at H20. Expo is primary. Cloudflare rises to tier 1 under the v2 a
 | Tier | Track | What earns it | Contingent on |
 | --- | --- | --- | --- |
 | 1 | **Expo — Best Mobile Experience** | The whole product is an Expo app: rooms, object library, version history, scan flows. Two custom native modules wrapping Apple frameworks. Most Expo entries never leave the JavaScript sandbox. | Component A at H4 |
-| 1 | **Cloudflare — Best Agent with a Brain** | Workers orchestrate, Vectorize holds the embeddings of your own possessions, D1 holds rooms and versions, R2 holds meshes. The retrieval claim in §1 is literally a Cloudflare feature. | B plus F search |
+| 1 | **Cloudflare — Best Agent with a Brain** | Workers orchestrate, Vectorize holds the embeddings of your own possessions, D1 holds rooms and versions, R2 holds meshes. The retrieval claim in the positioning is literally a Cloudflare feature. | B plus F search |
 | 1 | **Baseten** | Image-to-3D cannot run on the phone, so hosted inference is load-bearing. Two latency tiers. Two Baseten people sit on the judging panel, which is the best attention signal available this year. | Nothing. The safest track on the list. |
 | 1 | **Huawei OMNI Live** | Vision, speech, and language in one loop on a phone. The three-modality requirement is a hard filter that thins the field. Cloud API access is explicitly permitted. | P5, which is cheap |
 | 2 | **Shopify** | Real products with real dimensions at true scale, and the budget re-solve. | P3, the most cuttable piece |
@@ -708,6 +446,6 @@ Select 5 to 7 at H20. Expo is primary. Cloudflare rises to tier 1 under the v2 a
 
 ### Open questions
 
-- Who owns component A? Nothing else in the document matters until this is a name.
+- Is the F split above right? Ani indexes, Thomas serves, Paul ranks.
 - Is the demo room scanned in advance, or scanned live at the booth? A pre-scanned fixture is safer and removes 40 seconds from a 60-second demo.
 - Which 15–25 merchants, and are they verified?

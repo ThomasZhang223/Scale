@@ -1,0 +1,26 @@
+{
+  "expo": {
+    "name": "Full Scale",
+    "slug": "full-scale",
+    "scheme": "fullscale",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "bundleIdentifier": "com.fullscale.app",
+      "supportsTablet": false,
+      "infoPlist": {
+        "NSCameraUsageDescription": "Full Scale scans your room and objects with the camera and LiDAR.",
+        "NSMicrophoneUsageDescription": "Full Scale listens for voice commands to place and search for objects.",
+        "NSSpeechRecognitionUsageDescription": "Full Scale transcribes your voice commands on-device."
+      }
+    },
+    "plugins": [
+      "expo-router",
+      "expo-dev-client",
+      "./plugins/with-room-capture",
+      "./plugins/with-ar-view",
+      "./plugins/with-speech"
+    ]
+  }
+}
