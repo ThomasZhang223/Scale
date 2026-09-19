@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FULL SCALE — Search by vibe.</title>
+  <style>
+    :root { color-scheme: light; --ink:#272d26; --muted:#71756d; --paper:#faf9f6; --line:#dedfd6; --green:#384c37; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--paper); color:var(--ink); font:14px/1.5 "Segoe UI",Arial,sans-serif; }
+    button,input { font:inherit; }
+    button { cursor:pointer; }
+    button:disabled { cursor:wait; opacity:.6; }
+    button:focus-visible,input:focus-visible { outline:2px solid var(--green); outline-offset:4px; }
+    [hidden] { display:none!important; }
+    header { max-width:1320px; margin:auto; padding:22px 36px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--line); }
+    .brand { font-size:18px; letter-spacing:.18em; font-weight:650; }
+    .collection { color:var(--muted); font-size:12px; letter-spacing:.04em; display:flex; align-items:center; gap:9px; }
+    .dot { width:6px; height:6px; background:#768966; border-radius:50%; }
+    main { max-width:1320px; margin:auto; padding:0 36px; }
+    .hero { max-width:1000px; margin:32px auto 28px; text-align:center; }
+    .eyebrow { text-transform:uppercase; letter-spacing:.18em; color:var(--muted); font-size:10px; }
+    h1 { font:normal clamp(38px,4vw,54px)/1.15 Georgia,serif; letter-spacing:-.035em; margin:10px 0 18px; }
+    .modes { display:inline-flex; gap:3px; padding:4px; background:#eeeee7; border-radius:9px; margin-bottom:18px; }
+    .mode { border:0; background:transparent; color:var(--muted); border-radius:6px; padding:6px 24px; font-size:10px; letter-spacing:.1em; font-weight:600; }
+    .mode[aria-pressed="true"] { background:var(--paper); color:var(--ink); box-shadow:0 1px 4px #272d2610; }
+    .search { display:flex; align-items:center; gap:15px; background:white; border:1px solid #bfc6b5; border-radius:15px; padding:10px 11px 10px 25px; box-shadow:0 6px 24px #272d2607; text-align:left; }
+    .search:focus-within { border-color:var(--green); box-shadow:0 6px 24px #272d2610; }
+    .search svg { width:22px; flex:none; color:#8d9587; }
+    input[type="text"] { width:100%; min-width:0; border:0; background:transparent; font-size:20px; color:var(--ink); outline:none; padding:12px 0; }
+    input::placeholder { color:#95998f; }
+    .submit { flex-shrink:0; white-space:nowrap; border:0; border-radius:9px; background:var(--green); color:white; padding:16px 25px; font-size:13px; }
+    .chips { display:flex; justify-content:center; gap:8px; flex-wrap:wrap; margin-top:17px; }
+    .chip { background:transparent; border:1px solid var(--line); color:#666e60; border-radius:30px; padding:6px 12px; font-size:11px; transition:background .2s,border-color .2s; }
+    .chip:hover,.chip[aria-pressed="true"] { background:#e9ede3; border-color:#b7c2ab; color:var(--green); }
+    .drop { display:flex; justify-content:center; align-items:center; gap:20px; min-height:98px; border:1px dashed #9fae96; border-radius:15px; background:#f0f2eb; cursor:pointer; padding:14px; }
+    .drop.dragging { background:#dfe8d7; }
+    .drop strong { display:block; font-weight:500; font-size:18px; }
+    .drop small { color:var(--muted); }
+    .drop img { width:66px; height:66px; object-fit:contain; border-radius:7px; background:white; }
+    .browse { color:var(--green); text-decoration:underline; text-underline-offset:3px; }
+    .result-heading { display:flex; align-items:center; justify-content:space-between; gap:20px; padding-bottom:16px; border-bottom:1px solid var(--line); }
+    h2 { font-size:15px; font-weight:500; margin:0; }
+    #status { font-size:12px; color:var(--muted); text-align:right; }
+    #notice { font-size:13px; color:#766845; margin:12px 0 0; }
+    .grid { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:20px; padding-top:18px; }
+    .card { min-width:0; }
+    .image-wrap { position:relative; background:white; border-radius:12px; overflow:hidden; aspect-ratio:1.08; border:1px solid #edeee7; }
+    .product-image { width:100%; height:100%; object-fit:contain; padding:8px; transition:transform .3s; }
+    .card:hover .product-image { transform:scale(1.035); }
+    .rank { position:absolute; top:10px; left:10px; background:#faf9f6e8; color:#7d8476; border-radius:20px; padding:2px 7px; font-size:10px; }
+    .merchant { font-size:10px; text-transform:uppercase; letter-spacing:.1em; color:var(--muted); margin:14px 0 5px; }
+    .title { font-size:13px; line-height:1.5; font-weight:500; margin:0; min-height:39px; }
+    .dimensions { color:var(--muted); font-size:10px; min-height:16px; margin:7px 0 10px; }
+    .similarity { display:inline-block; font-size:10px; color:#56654e; background:#edf0e7; border-radius:5px; padding:4px 7px; font-variant-numeric:tabular-nums; }
+    .empty { text-align:center; padding:53px 20px 55px; color:var(--muted); }
+    .empty p { font:24px Georgia,serif; color:#6a7362; margin:0 0 8px; }
+    .empty span { font-size:12px; }
+    footer { max-width:1248px; margin:24px auto 0; padding:20px 0 20px; border-top:1px solid var(--line); display:flex; justify-content:space-between; gap:20px; color:#83877e; font-size:10px; }
+    #tech { white-space:nowrap; font-variant-numeric:tabular-nums; }
+    @media(max-width:1000px) { .grid { grid-template-columns:repeat(3,minmax(0,1fr)); } footer { flex-direction:column; gap:6px; } }
+    @media(max-width:620px) { header { padding:20px; } main { padding:0 20px; } .collection { font-size:10px; } .hero { margin:30px auto; } .grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:15px; } .search { padding-left:14px; gap:8px; } .search svg { display:none; } input[type="text"] { font-size:16px; } .submit { padding:13px; } .result-heading { align-items:start; } .title { min-height:0; } }
+    @media(prefers-reduced-motion:reduce) { *,*::before,*::after { transition:none!important; } }
+  </style>
+</head>
+<body>
+  <header><div class="brand">FULL SCALE</div><div class="collection"><span class="dot"></span><span id="catalog-count">A real furniture collection</span></div></header>
+  <main>
+    <section class="hero" aria-label="Product search">
+      <div class="eyebrow">A feeling. A material. A little inspiration.</div>
+      <h1>Search by vibe.</h1>
+      <div class="modes" aria-label="Search mode">
+        <button class="mode" id="text-mode" aria-pressed="true">TEXT</button>
+        <button class="mode" id="photo-mode" aria-pressed="false">PHOTO</button>
+      </div>
+      <form id="text-form">
+        <div class="search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg>
+          <input id="query" type="text" placeholder="describe what you're looking for..." aria-label="Describe what you're looking for" autocomplete="off" maxlength="4096" autofocus>
+          <button class="submit" type="submit">Search <span aria-hidden="true">↗</span></button>
+        </div>
+        <div class="chips" aria-label="Try a search">
+          <button class="chip" type="button">soft beige armchair</button>
+          <button class="chip" type="button">dark walnut chair</button>
+          <button class="chip" type="button">cozy reading corner</button>
+          <button class="chip" type="button">minimal wooden coffee table</button>
+          <button class="chip" type="button">something warm and expensive-looking</button>
+        </div>
+      </form>
+      <div id="photo-panel" hidden>
+        <label class="drop" id="drop" for="photo-input" tabindex="0">
+          <img id="preview" alt="Your query photo" hidden>
+          <span><strong>Find a similar feeling.</strong><span>Drop a photo here, or <span class="browse">choose a file</span></span><br><small>JPG or PNG · up to 10 MB</small></span>
+        </label>
+        <input type="file" id="photo-input" accept="image/jpeg,image/png,.jpg,.jpeg,.png" hidden>
+      </div>
+    </section>
+    <section aria-label="Search results" id="results-section">
+      <div class="result-heading"><h2 id="result-title">Your next find starts here.</h2><span id="status" role="status" aria-live="polite">Ready when you are</span></div>
+      <p id="notice" role="status" hidden></p>
+      <div class="empty" id="empty"><p>You know the feeling.</p><span>Describe it in your own words, or try a suggestion above.</span></div>
+      <div class="grid" id="results"></div>
+    </section>
+    <footer><span>No keyword matching. Product photos and your query share the same embedding space.</span><span id="tech">SigLIP2 · 768d · cosine search</span></footer>
+  </main>
+  <script>
+    const $ = id => document.getElementById(id);
+    let mode = 'text', busy = false, count = 0, previewURL;
+    const cards = new Map();
+    const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const tech = ms => { $('tech').textContent = `SigLIP2 · 768d · ${count} real products · cosine search${ms == null ? '' : ` · ${ms.toFixed(0)} ms`}`; };
+    fetch('/api/info').then(r => { if (!r.ok) throw Error(); return r.json(); }).then(info => {
+      count = info.products; $('catalog-count').textContent = `${count} real products. Endless ways to look.`; tech();
+    }).catch(() => { $('status').textContent = 'Cannot reach the demo. Refresh to reconnect.'; });
+
+    function setMode(next) {
+      if (busy) return;
+      mode = next;
+      $('text-mode').setAttribute('aria-pressed', mode === 'text');
+      $('photo-mode').setAttribute('aria-pressed', mode === 'photo');
+      $('text-form').hidden = mode !== 'text'; $('photo-panel').hidden = mode !== 'photo';
+      if (mode === 'text') $('query').focus();
+    }
+    $('text-mode').onclick = () => setMode('text');
+    $('photo-mode').onclick = () => setMode('photo');
+
+    function render(data) {
+      const old = new Map([...cards].map(([id, card]) => [id, card.getBoundingClientRect()]));
+      const keep = new Set(data.results.map(item => item.id));
+      for (const [id, card] of cards) if (!keep.has(id)) { card.remove(); cards.delete(id); }
+      data.results.forEach((item, index) => {
+        let card = cards.get(item.id);
+        if (!card) {
+          card = document.createElement('article'); card.className = 'card';
+          card.innerHTML = '<div class="image-wrap"><img class="product-image"><span class="rank"></span></div><p class="merchant"></p><h3 class="title"></h3><p class="dimensions"></p><span class="similarity"></span>';
+          const image = card.querySelector('img'); image.src = item.image; image.alt = item.title;
+          image.onerror = () => { image.alt = 'Product image unavailable'; };
+          card.querySelector('.title').textContent = item.title;
+          card.querySelector('.merchant').textContent = item.merchant.replaceAll('_', ' ');
+          const d = item.dimensions;
+          card.querySelector('.dimensions').textContent = d && ['w','h','d'].every(k => Number.isFinite(d[k]) && d[k] > 0)
+            ? `${(d.w*100).toFixed(0)} W × ${(d.h*100).toFixed(0)} H × ${(d.d*100).toFixed(0)} D cm` : '';
+          cards.set(item.id, card);
+        }
+        card.querySelector('.rank').textContent = String(index + 1).padStart(2, '0');
+        card.querySelector('.similarity').textContent = `similarity ${item.similarity.toFixed(3)}`;
+        $('results').append(card);
+      });
+      if (!reducedMotion) for (const [id, card] of cards) {
+        const from = old.get(id), to = card.getBoundingClientRect();
+        card.animate(from ? [{transform:`translate(${from.left-to.left}px,${from.top-to.top}px)`},{transform:'translate(0,0)'}]
+          : [{opacity:0,transform:'translateY(10px)'},{opacity:1,transform:'translateY(0)'}], {duration:320,easing:'ease-out'});
+      }
+      $('empty').hidden = data.results.length > 0;
+      $('notice').hidden = !data.weakMatch;
+      $('notice').textContent = data.weakMatch ? 'Nothing in this catalog is a strong match.' : '';
+      $('status').textContent = `${data.results.length} closest finds · ${data.timing.queryMs.toFixed(0)} ms`;
+      tech(data.timing.queryMs);
+    }
+
+    async function search(searchMode, body, label) {
+      if (busy) return;
+      busy = true;
+      document.querySelectorAll('button').forEach(b => b.disabled = true);
+      $('photo-input').disabled = true;
+      $('results-section').setAttribute('aria-busy', 'true');
+      $('status').textContent = 'Finding your closest matches…'; $('notice').hidden = true;
+      try {
+        const response = await fetch(`/api/search/${searchMode}`, {method:'POST',body,
+          headers:{'Content-Type':searchMode === 'text' ? 'application/json' : 'application/octet-stream'}});
+        const data = await response.json();
+        if (!response.ok) throw Error(data.error || 'Search could not finish. Please try again.');
+        $('result-title').textContent = searchMode === 'text' ? `Closest to “${label}”` : 'Inspired by your photo';
+        document.querySelectorAll('.chip').forEach(chip => chip.setAttribute('aria-pressed', searchMode === 'text' && chip.textContent === label));
+        render(data);
+      } catch (error) {
+        $('notice').textContent = error.message === 'Failed to fetch' ? 'Cannot reach the demo. Check the server, then try again.' : error.message;
+        $('notice').hidden = false; $('status').textContent = 'Search didn’t finish';
+      } finally {
+        busy = false; document.querySelectorAll('button').forEach(b => b.disabled = false);
+        $('photo-input').disabled = false; $('results-section').setAttribute('aria-busy', 'false');
+      }
+    }
+    function textSearch() {
+      const text = $('query').value.trim();
+      if (!text) { $('status').textContent = 'Describe something you’d love to find.'; $('query').focus(); return; }
+      search('text', JSON.stringify({text}), text);
+    }
+    $('text-form').onsubmit = event => { event.preventDefault(); textSearch(); };
+    document.querySelectorAll('.chip').forEach(chip => chip.onclick = () => { $('query').value = chip.textContent; textSearch(); });
+    function photoSearch(file) {
+      if (!file || busy) return;
+      if (file.size > 10*1024*1024 || !/\.(jpe?g|png)$/i.test(file.name)) {
+        $('notice').textContent = 'Choose a JPG or PNG, up to 10 MB.'; $('notice').hidden = false; return;
+      }
+      if (previewURL) URL.revokeObjectURL(previewURL);
+      previewURL = URL.createObjectURL(file); $('preview').src = previewURL; $('preview').hidden = false;
+      search('photo', file, '');
+    }
+    $('photo-input').onchange = event => { photoSearch(event.target.files[0]); event.target.value = ''; };
+    $('drop').onkeydown = event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); if (!busy) $('photo-input').click(); } };
+    $('drop').ondragover = event => { event.preventDefault(); $('drop').classList.add('dragging'); };
+    $('drop').ondragleave = () => $('drop').classList.remove('dragging');
+    $('drop').ondrop = event => { event.preventDefault(); $('drop').classList.remove('dragging'); photoSearch(event.dataTransfer.files[0]); };
+    window.addEventListener('dragover', event => event.preventDefault());
+    window.addEventListener('drop', event => event.preventDefault());
+  </script>
+</body>
+</html>
