@@ -1,0 +1,37 @@
+{
+  "status": "OPTIMAL",
+  "placements": [
+    {
+      "id": "obj_sofa",
+      "xCm": 95,
+      "zCm": -124,
+      "rotDeg": 0
+    },
+    {
+      "id": "obj_chair",
+      "xCm": -117,
+      "zCm": -142,
+      "rotDeg": 0
+    },
+    {
+      "id": "obj_table",
+      "xCm": 0,
+      "zCm": 28,
+      "rotDeg": 0
+    },
+    {
+      "id": "obj_storage",
+      "xCm": -185,
+      "zCm": 80,
+      "rotDeg": 90
+    }
+  ],
+  "satisfied": [
+    "r1",
+    "r2"
+  ],
+  "violated": [],
+  "conflicts": [],
+  "movedCm": 524,
+  "solveMs": 4
+}

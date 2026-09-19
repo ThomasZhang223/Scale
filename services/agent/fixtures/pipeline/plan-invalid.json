@@ -1,0 +1,8 @@
+{
+  "summary": "Reading corner by the window",
+  "rules": [
+    { "id": "r1", "type": "near", "a": "obj_armchair", "b": "window:win1", "maxCm": 5, "priority": "must", "why": "Reading needs daylight" },
+    { "id": "r3", "type": "near", "a": "obj_chair", "b": "obj_chair", "maxCm": 50, "priority": "should", "weight": 2, "why": "Nonsense self-reference" }
+  ],
+  "remember": []
+}

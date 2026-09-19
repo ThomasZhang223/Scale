@@ -1,0 +1,21 @@
+{
+  "requestId": "stub-req-1",
+  "note": "Timeline the stub walks through, one step per poll (about a second each). The headset ships a copy for when the server is down.",
+  "steps": [
+    { "state": "reading",  "message": "Reading room…",
+      "log": { "kind": "data", "severity": "info", "message": "Room 4.1 × 3.5 m, 4 objects, 1 door, 1 window, current layout ver_stub_base." } },
+    { "state": "reading",  "message": "Checking the data…",
+      "log": { "kind": "data", "severity": "warn", "message": "Sofa scan is 2.19 m, detected box 2.00 m: using the scan (a real scan beats an estimate)." } },
+    { "state": "reading",  "message": "Checking the data…",
+      "log": { "kind": "data", "severity": "warn", "message": "Door d1's swing points outside the wall: mirrored inward for this solve." } },
+    { "state": "planning", "message": "Planning…",
+      "log": { "kind": "plan", "severity": "info", "message": "Plan: chair within 100 cm of the window (must); chair faces the room (should, 5)." } },
+    { "state": "solving",  "message": "Solving…",
+      "log": { "kind": "solve", "severity": "info", "message": "OR-Tools: OPTIMAL in 4 ms; moved 5.2 m in total; both rules satisfied." } },
+    { "state": "checking", "message": "Checking fit…",
+      "log": { "kind": "fit", "severity": "info", "message": "Fit check: 0 red, 0 amber." } },
+    { "state": "proposed", "message": "Proposal ready.",
+      "log": { "kind": "decision", "severity": "info", "message": "Proposing: chair to the window, sofa 95 cm east." } }
+  ],
+  "proposalFixture": "pipeline/proposal.json"
+}
