@@ -136,6 +136,37 @@ python3 build_prebake.py merchants.verified.json --limit 100 --out prebake/ --do
 Writes `prebake/manifest.json` — one row per product with a real `bboxMeters`, an image URL, and
 the R2 key the image belongs at — and with `--download`, the images themselves in that layout.
 
+### Step 2.5: `--browserbase`
+
+```
+export BROWSERBASE_API_KEY=...
+python3 build_prebake.py merchants.verified.json --limit 100 --out prebake/ \
+        --download --browserbase --browserbase-limit 60
+```
+
+For every product that has an image but **no** dimensions in `/products.json`, this fetches
+`{storefront}/products/{handle}` and reads them off the rendered page. That is the Floyd, Fyrn,
+Bend Goods and Branch Furniture case — roughly 690 products whose dimensions sit in metafields
+the endpoint does not serve.
+
+The run reports the recovery rate, which is the number that decides whether those stores are
+worth keeping:
+
+```
+  step 2.5: 38/60 pages yielded dimensions (63%), 0 fetch failures
+  cache: 0 hit, 60 fetched
+```
+
+`--browserbase-limit` is the cost knob — one request per product, per merchant. Pages are
+cached in `--page-cache`, so a second run over the same products costs nothing and only new
+products are fetched. Without `BROWSERBASE_API_KEY` the run **fails** rather than silently
+skipping the pass: a quietly smaller manifest looks exactly like the stores having no
+dimensions.
+
+Rescued rows carry `extractedFrom` (`json_ld`, `spec_block` or `page_text`) so you can see
+which surface paid off. `measure.method` stays `"extracted"` — a page read is still extraction,
+and inventing a fourth enum value would be a schema change.
+
 **It curates rather than dumps.** The ceiling is not how many products were extracted, it is how
 many get a mesh, and that is Ani's generation throughput: 60–100 (`BUILD_DOC.md`). So selection
 is round-robin across the four demo categories, highest confidence first inside each. Taking the
