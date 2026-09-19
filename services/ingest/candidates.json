@@ -1,0 +1,23 @@
+{
+  "_comment": "CANDIDATE list, NOT verified. Every entry is a search-sourced guess: the /products.json endpoint has not been checked, and some of these will not be Shopify at all. Run verify_merchants.py against this file to find out which are real. Replace, don't trust.",
+  "_generated": "2026-09-19, from web search. Egress policy prevented checking any endpoint.",
+  "_target": "15-25 USABLE merchants. Expect roughly half of these to fail, so add more as you find them.",
+  "merchants": [
+    { "name": "Burrow", "storefrontBaseUrl": "https://burrow.com" },
+    { "name": "Floyd Home", "storefrontBaseUrl": "https://floydhome.com" },
+    { "name": "Poly & Bark", "storefrontBaseUrl": "https://polyandbark.com" },
+    { "name": "Fyrn", "storefrontBaseUrl": "https://fyrn.com" },
+    { "name": "Bend Goods", "storefrontBaseUrl": "https://bendgoods.com" },
+    { "name": "Arhaus", "storefrontBaseUrl": "https://arhaus.com" },
+    { "name": "Herman Miller", "storefrontBaseUrl": "https://hermanmiller.com" },
+    { "name": "Article", "storefrontBaseUrl": "https://article.com" },
+    { "name": "Wazo Furniture (CA)", "storefrontBaseUrl": "https://wazofurniture.com" },
+    { "name": "Woodcraft (CA)", "storefrontBaseUrl": "https://www.woodcraft.ca" },
+    { "name": "Stylegarage (CA)", "storefrontBaseUrl": "https://stylegarage.com" },
+    { "name": "Buckshee Woodshop (CA)", "storefrontBaseUrl": "https://buckshee.ca" },
+    { "name": "Omba (CA)", "storefrontBaseUrl": "https://omba.ca" },
+    { "name": "Cold Steal Creations (CA)", "storefrontBaseUrl": "https://coldstealcreations.com" },
+    { "name": "Stoney Creek Furniture (CA)", "storefrontBaseUrl": "https://www.stoneycreekfurniture.com" },
+    { "name": "InStyle Home (CA)", "storefrontBaseUrl": "https://instylehome.ca" }
+  ]
+}
