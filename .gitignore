@@ -250,3 +250,6 @@ Pods/
 
 # Personal, per-machine Claude context. Never committed.
 CLAUDE.local.md
+
+# infra/up.sh runtime state (tunnel pids, urls, cloudflared logs) — regenerated every run.
+/infra/.run/
