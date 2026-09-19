@@ -14,9 +14,21 @@ export interface PaletteItem {
   size?: THREE.Vector3; // known once the GLB has loaded
   action?: string; // an action tile (Reset, Clear) instead of an object to pull out
   objectId?: string; // the server's Object v1 id, when it came from there
+  label?: boolean; // a text line (status, log): drawn, never hit
+  severity?: 'info' | 'warn'; // labels only: amber for warnings
+  accent?: boolean; // a highlighted action (Accept)
 }
 
 const ACTION_TILE = 0x2a2f36;
+const LABEL_TILE = 0x14171b;
+const WARN_TILE = 0x4a3410;
+const ACCENT_TILE = 0x1f6b45;
+
+function tileColor(item: PaletteItem): number {
+  if (item.label) return item.severity === 'warn' ? WARN_TILE : LABEL_TILE;
+  if (item.accent) return ACCENT_TILE;
+  return item.action ? ACTION_TILE : TILE;
+}
 
 const TILE_W = 0.12;
 const TILE_H = 0.032;
@@ -63,11 +75,12 @@ export class Palette {
     items.forEach((item, i) => {
       const tile = new THREE.Mesh(
         new THREE.PlaneGeometry(TILE_W, TILE_H),
-        new THREE.MeshBasicMaterial({ color: item.action ? ACTION_TILE : TILE, side: THREE.DoubleSide, map: label(item) }),
+        new THREE.MeshBasicMaterial({ color: tileColor(item), side: THREE.DoubleSide, map: label(item) }),
       );
       tile.position.y = height / 2 - PAD - TILE_H / 2 - i * (TILE_H + GAP);
       tile.userData.item = item;
-      this.tiles.push(tile);
+      if (item.label) tile.raycast = () => {}; // text lines are never hit
+      else this.tiles.push(tile);
       this.group.add(tile);
     });
   }
@@ -82,7 +95,7 @@ export class Palette {
   hover(item: PaletteItem | null) {
     const tile = item ? this.tiles.find((t) => t.userData.item === item) ?? null : null;
     if (tile === this.hovered) return;
-    const base = (t: THREE.Mesh) => ((t.userData.item as PaletteItem).action ? ACTION_TILE : TILE);
+    const base = (t: THREE.Mesh) => tileColor(t.userData.item as PaletteItem);
     if (this.hovered) (this.hovered.material as THREE.MeshBasicMaterial).color.setHex(base(this.hovered));
     if (tile) (tile.material as THREE.MeshBasicMaterial).color.setHex(TILE_HOVER);
     this.hovered = tile;
@@ -101,9 +114,19 @@ function label(item: PaletteItem): THREE.Texture | null {
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.textBaseline = 'middle';
-  ctx.font = 'bold 56px system-ui, sans-serif';
-  ctx.fillStyle = '#10233a';
-  ctx.fillText(item.name, 24, item.size ? 46 : 68);
+  ctx.font = item.label ? '40px system-ui, sans-serif' : 'bold 56px system-ui, sans-serif';
+  ctx.fillStyle = item.label ? '#e8edf2' : '#10233a';
+  if (item.label) {
+    // Labels keep their own dark background; fit the text to the tile.
+    ctx.fillStyle = item.severity === 'warn' ? '#4a3410' : '#14171b';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = item.severity === 'warn' ? '#ffd27a' : '#e8edf2';
+    ctx.fillText(fitText(ctx, item.name, canvas.width - 40), 20, 68);
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    return texture;
+  }
+  ctx.fillText(fitText(ctx, item.name, canvas.width - 40), 24, item.size ? 46 : 68);
   if (item.size) {
     ctx.font = '38px system-ui, sans-serif';
     ctx.fillStyle = '#2a4a6e';
@@ -112,4 +135,12 @@ function label(item: PaletteItem): THREE.Texture | null {
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   return texture;
+}
+
+/** Truncates with an ellipsis so a line stays readable at arm's length. */
+function fitText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string {
+  if (ctx.measureText(text).width <= maxWidth) return text;
+  let cut = text;
+  while (cut.length > 1 && ctx.measureText(`${cut}…`).width > maxWidth) cut = cut.slice(0, -1);
+  return `${cut}…`;
 }

@@ -201,6 +201,31 @@ export class Physics {
     d.body.wakeUp();
   }
 
+  /** Moves a detected piece's solid box (it has no body of its own). */
+  moveDetected(identifier: string, x: number, z: number, rotY: number, size: [number, number, number]) {
+    this.removeDetected(identifier);
+    if (!this.roomBody) return;
+    const [w, h, d] = size;
+    const rot = new THREE.Quaternion().setFromAxisAngle(THREE.Object3D.DEFAULT_UP, rotY);
+    const entry = this.addFixedBox(this.roomBody, new THREE.Vector3(w / 2, h / 2, d / 2), new THREE.Vector3(x, h / 2, z), rot);
+    this.detected.set(identifier, entry);
+    this.refreshQueries();
+  }
+
+  /**
+   * While a proposal is applied, the moving objects ignore each other (otherwise two
+   * objects swapping places jam halfway) but still collide with the room and everything
+   * else. An empty list restores normal collisions.
+   */
+  setMovers(ids: string[]) {
+    const MOVER = 0x0002;
+    for (const [id, d] of this.dynamics) {
+      const collider = d.body.collider(0);
+      if (ids.includes(id)) collider.setCollisionGroups((MOVER << 16) | (0xffff & ~MOVER));
+      else collider.setCollisionGroups(0xffffffff);
+    }
+  }
+
   /** Puts an object exactly here (a stored placement), on the floor, at rest. */
   moveTo(id: string, x: number, z: number, rotY: number) {
     const d = this.dynamics.get(id);

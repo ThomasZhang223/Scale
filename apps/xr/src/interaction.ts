@@ -64,6 +64,8 @@ export class Interaction {
     private onAction: (action: string) => void,
     /** An object was let go: the layout changed. */
     private onRelease: (id: string) => void,
+    /** An object was grabbed (the designer agent treats it as pinned). */
+    private onGrab: (id: string) => void = () => {},
   ) {
     this.setUpControllers(renderer, scene);
     this.setUpMouse(renderer.domElement);
@@ -97,6 +99,13 @@ export class Interaction {
     const node = this.physics.nodeOf(held ?? hoverId ?? this.mouseHover ?? '');
     if (node) this.halo.show(node, held ? 0.85 : 0.35);
     else this.halo.hide();
+  }
+
+  /** Everything currently in someone's hand. */
+  heldIds(): string[] {
+    const ids = this.hands.flatMap((h) => (h.grab ? [h.grab.id] : []));
+    if (this.mouseGrab) ids.push(this.mouseGrab.id);
+    return ids;
   }
 
   /** The object under whatever ray the raycaster currently holds. */
@@ -159,7 +168,10 @@ export class Interaction {
         if (item?.action) return this.onAction(item.action);
         if (item) return this.pull(hand, item);
         hand.grab = this.tryGrab();
-        if (hand.grab) hand.source?.gamepad?.hapticActuators?.[0]?.pulse?.(0.4, 40);
+        if (hand.grab) {
+          hand.source?.gamepad?.hapticActuators?.[0]?.pulse?.(0.4, 40);
+          this.onGrab(hand.grab.id);
+        }
       });
       controller.addEventListener('selectend', () => {
         hand.pulling = false;
@@ -224,6 +236,7 @@ export class Interaction {
       if (!grab) return;
       e.stopImmediatePropagation();
       this.mouseGrab = grab;
+      this.onGrab(grab.id);
       this.controls.enabled = false;
       canvas.setPointerCapture(e.pointerId);
       canvas.style.cursor = 'grabbing';

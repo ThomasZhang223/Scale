@@ -35,6 +35,22 @@
       #catalog { display: flex; flex-wrap: wrap; gap: 6px; }
       #catalog:empty { display: none; }
       #catalog button { padding: 6px 10px; font-size: 13px; }
+      #agent { display: grid; gap: 8px; padding-top: 10px; border-top: 1px solid rgba(255, 255, 255, 0.08); }
+      #agent h2 { margin: 0; font-size: 13px; font-weight: 600; color: #cfd6dd; letter-spacing: 0.02em; }
+      #agent .ask { display: flex; gap: 6px; }
+      #agent input { flex: 1; min-width: 0; font: inherit; padding: 8px 10px; border-radius: 8px; color: inherit;
+        background: #14171b; border: 1px solid rgba(255, 255, 255, 0.12); }
+      #agent-presets, #agent-buttons { display: flex; flex-wrap: wrap; gap: 6px; }
+      #agent-presets button, #agent-buttons button { padding: 6px 10px; font-size: 13px; }
+      #agent-status { color: #a9b2bc; min-height: 1.45em; }
+      #agent-status[data-state="working"] { color: #5fb3ff; }
+      #agent-status[data-state="proposed"] { color: #4cd28a; }
+      #agent-status[data-state="failed"], #agent-status[data-state="room_changed"] { color: #ffb347; }
+      #agent-log { max-height: 180px; overflow-y: auto; font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+        color: #c3cbd3; background: #14171b; border-radius: 8px; padding: 6px 8px; }
+      #agent-log:empty { display: none; }
+      #agent-log .warn { color: #ffd27a; }
+      #agent-log .decision { color: #e8edf2; }
     </style>
   </head>
   <body>
@@ -49,6 +65,17 @@
       <label class="check"><input id="colliders" type="checkbox" /> Show physics shapes</label>
       <p class="hint">Drop a room scan (.json) or scanned objects (.glb) anywhere, or add catalogue items with the buttons. Drag objects to move them; scroll while dragging to turn. In VR, pull items from the panel on your left hand.</p>
       <div id="note" role="status"></div>
+      <section id="agent">
+        <h2>Designer agent</h2>
+        <div class="ask">
+          <input id="agent-text" type="text" placeholder="e.g. Reading corner by the window" autocomplete="off" />
+          <button id="agent-ask" type="button">Ask</button>
+        </div>
+        <div id="agent-presets"></div>
+        <div id="agent-status"></div>
+        <div id="agent-buttons"></div>
+        <div id="agent-log" aria-live="polite"></div>
+      </section>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
