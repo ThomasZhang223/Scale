@@ -60,12 +60,12 @@ open it with `?scan=/room-scan.json`).
 
 ## Controls
 
-| Where | Move | Turn |
-|---|---|---|
-| Quest | Point (ray turns blue), hold the trigger, sweep across the floor | Thumbstick left/right while holding |
-| Laptop | Drag with the mouse | Scroll while dragging (15° steps) |
+| Where | Add | Move | Turn |
+|---|---|---|---|
+| Quest | Point the right ray at the palette on your left hand (ray turns green), pull the trigger on a tile, and carry the copy out | Point (ray turns blue), hold the trigger, sweep across the floor | Thumbstick left/right while holding |
+| Laptop | **Add …** buttons in the panel | Drag with the mouse | Scroll while dragging (15° steps) |
 
-Letting go leaves the object where it is.
+Letting go leaves the object where it is. Every pull from the palette is a fresh copy.
 
 ## Adding your own
 
@@ -80,8 +80,10 @@ Letting go leaves the object where it is.
 ]
 ```
 
-`name` decides matching: include a RoomPlan category (`chair`, `sofa`, `table`, `bed`,
-`storage`, `television`, …) to take that piece's place.
+Every entry appears in the palette. `name` decides what happens at start: include a
+RoomPlan category (`chair`, `sofa`, `table`, `bed`, `storage`, `television`, …) and the
+object takes that detected piece's place straight away; anything else waits in the palette
+until you pull it out.
 
 **Reset** rebuilds the room and puts every object back in its starting spot.
 

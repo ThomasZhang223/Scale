@@ -32,6 +32,9 @@
       .check { display: flex; align-items: center; gap: 8px; color: #cfd6dd; cursor: pointer; }
       .check input { accent-color: #4cd28a; width: 16px; height: 16px; }
       .hint { margin: 0; color: #8a96a3; font-size: 13px; }
+      #catalog { display: flex; flex-wrap: wrap; gap: 6px; }
+      #catalog:empty { display: none; }
+      #catalog button { padding: 6px 10px; font-size: 13px; }
     </style>
   </head>
   <body>
@@ -42,8 +45,9 @@
         <button id="reset" type="button" class="quiet">Reset</button>
       </div>
       <input id="picker" type="file" accept=".json,.glb,.gltf,application/json,model/gltf-binary" multiple hidden />
+      <div id="catalog"></div>
       <label class="check"><input id="colliders" type="checkbox" /> Show physics shapes</label>
-      <p class="hint">Drop a room scan (.json) or scanned objects (.glb) anywhere. Drag objects to move them; scroll while dragging to turn.</p>
+      <p class="hint">Drop a room scan (.json) or scanned objects (.glb) anywhere, or add catalogue items with the buttons. Drag objects to move them; scroll while dragging to turn. In VR, pull items from the panel on your left hand.</p>
       <div id="note" role="status"></div>
     </div>
     <script type="module" src="/src/main.ts"></script>

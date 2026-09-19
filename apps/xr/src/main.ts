@@ -6,6 +6,8 @@ import { ObjectLoader, type LoadedObject } from './objects';
 import { createPhysics } from './physics';
 import { Interaction } from './interaction';
 import { watchRoomScan, uploadRoomScan, supabase } from './sync';
+import { Palette, type PaletteItem } from './palette';
+import { matchDetected } from './placement';
 import roomDemo from '../../../fixtures/room-demo.json';
 
 /*
@@ -15,9 +17,10 @@ import roomDemo from '../../../fixtures/room-demo.json';
  *   the team contract). Raw RoomPlan CapturedRoom JSON works too. Built at true size, floor at y = 0.
  * Objects: loaded from /objects.json, or dropped onto the page as .glb files.
  *   - Kept at their real-world size (Object Capture exports in meters).
- *   - If a file's name contains a category RoomPlan detected ("chair.glb", "my-sofa.glb"),
- *     the object takes that piece's place and rotation, replacing its grey box.
- *   - Otherwise it's dropped at the nearest free spot in front of you.
+ *   - If its name contains a category RoomPlan detected ("chair.glb", "my-sofa.glb"),
+ *     the object takes that piece's place and rotation at start, replacing its grey box.
+ *   - Otherwise it waits in the palette on your left hand (Quest) or behind an Add
+ *     button (laptop); a dropped .glb lands at the nearest free spot in front of you.
  *   - Physics: they land on the floor, can't pass through walls or furniture, stay upright.
  *
  * Works in the Quest Browser (Enter VR) and on a laptop (orbiting view, mouse drag).
@@ -75,6 +78,7 @@ scene.add(room);
 const panel = document.getElementById('panel')!;
 const connection = document.getElementById('connection')!;
 const note = document.getElementById('note')!;
+const catalogEl = document.getElementById('catalog')!;
 panel.hidden = !SHOW_PANEL;
 const say = (text: string) => (note.textContent = text);
 
@@ -90,13 +94,15 @@ interface PlacedObject {
 let currentRoom: BuiltRoom | null = null;
 let lastScan: Record<string, unknown> | null = null;
 const objects = new Map<string, PlacedObject>();
+const catalog: PaletteItem[] = []; // everything in objects.json, placed or not
 let rise = 1; // 0..1 while the walls rise; objects are placed once it reaches 1
 let placementPending = false;
 
 async function start() {
   const physics = await createPhysics(scene);
   const loader = new ObjectLoader(renderer);
-  const interaction = new Interaction(renderer, scene, camera, controls, physics);
+  const palette = new Palette();
+  const interaction = new Interaction(renderer, scene, camera, controls, physics, palette, spawn);
 
   // ---------- room ----------
 
@@ -151,9 +157,8 @@ async function start() {
 
   /** A detected piece whose category appears in the object's name and isn't taken yet. */
   function findMatch(name: string): ScannedObject | null {
-    const lower = name.toLowerCase();
-    const taken = new Set([...objects.values()].map((o) => o.replaces?.identifier));
-    return currentRoom?.objects.find((o) => lower.includes(o.category.toLowerCase()) && !taken.has(o.identifier)) ?? null;
+    if (!currentRoom) return null;
+    return matchDetected(name, currentRoom.objects, [...objects.values()].map((o) => o.replaces?.identifier));
   }
 
   function placeAll() {
@@ -172,6 +177,39 @@ async function start() {
       console.error(`Loading ${name} failed:`, err);
       say(`Couldn’t load ${name}: ${(err as Error).message}`);
     }
+  }
+
+  /** A fresh copy of a catalogue item, at `at` or the nearest free spot. Resolves to its id. */
+  async function spawn(item: PaletteItem, at: { x: number; z: number }): Promise<string | null> {
+    if (!currentRoom || rise < 1) return null;
+    try {
+      const loaded = await loader.load(item.url, item.scale);
+      const obj: PlacedObject = { id: crypto.randomUUID(), name: item.name, loaded };
+      objects.set(obj.id, obj);
+      const spot = physics.findFreeSpot(loaded.size, 0, at);
+      scene.add(loaded.node);
+      physics.addObject(obj.id, loaded.node, loaded.size, loaded.hull, spot, 0);
+      report(obj);
+      return obj.id;
+    } catch (err) {
+      console.error(`Loading ${item.name} failed:`, err);
+      say(`Couldn’t load ${item.name}: ${(err as Error).message}`);
+      return null;
+    }
+  }
+
+  /** Laptop stand-in for the wrist palette: one Add button per catalogue item. */
+  function renderCatalog() {
+    catalogEl.replaceChildren(
+      ...catalog.map((item) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'quiet';
+        button.textContent = `Add ${item.name}`;
+        button.addEventListener('click', () => void spawn(item, { x: 0, z: -1 }));
+        return button;
+      }),
+    );
   }
 
   function report(obj: PlacedObject) {
@@ -199,14 +237,38 @@ async function start() {
   }
 
   async function loadManifest() {
+    let list: { url: string; name?: string; scale?: number }[];
     try {
       const res = await fetch(OBJECTS_URL);
       if (!res.ok) return; // no manifest is fine
-      const list = (await res.json()) as { url: string; name?: string; scale?: number }[];
-      await Promise.all(list.map((o) => addObject(o.url, o.name ?? o.url.split('/').pop()!, o.scale)));
+      list = await res.json();
     } catch (err) {
       console.warn('objects.json could not be read:', err);
+      return;
     }
+    for (const o of list) catalog.push({ url: o.url, name: o.name ?? o.url.split('/').pop()!, scale: o.scale });
+    palette.setItems(catalog);
+    renderCatalog();
+
+    // Preload every item so the first pull from the palette is instant. Only items that
+    // stand in for a detected piece are placed now; the rest wait in the palette.
+    await Promise.all(
+      catalog.map(async (item) => {
+        try {
+          const loaded = await loader.load(item.url, item.scale);
+          item.size = loaded.size;
+          if (!findMatch(item.name)) return;
+          const obj: PlacedObject = { id: crypto.randomUUID(), name: item.name, loaded };
+          objects.set(obj.id, obj);
+          if (currentRoom && rise >= 1) place(obj); // otherwise placed when the walls are up
+        } catch (err) {
+          console.error(`Loading ${item.name} failed:`, err);
+          say(`Couldn’t load ${item.name}: ${(err as Error).message}`);
+        }
+      }),
+    );
+    palette.setItems(catalog); // labels now include sizes
+    renderCatalog();
   }
 
   await loadScanFile();

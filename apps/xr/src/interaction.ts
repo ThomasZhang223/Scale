@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { XRControllerModelFactory } from 'three/examples/jsm/webxr/XRControllerModelFactory.js';
 import type { Physics } from './physics';
+import type { Palette, PaletteItem } from './palette';
 
 /*
  * Moving scanned objects, in the headset and on the laptop.
@@ -18,6 +19,7 @@ const IDLE_RAY = 0xffffff;
 const HOVER_RAY = 0x5fb3ff;
 const TURN_SPEED = 2.2;          // rad/s at full thumbstick
 const WHEEL_STEP = Math.PI / 12; // 15° per scroll notch
+const PALETTE_RAY = 0x4cd28a;
 
 interface Grab {
   id: string;
@@ -30,6 +32,7 @@ interface Hand {
   ray: THREE.Line;
   source?: XRInputSource;
   grab?: Grab;
+  pulling?: boolean; // trigger still held while a palette pull is loading
 }
 
 export class Interaction {
@@ -46,12 +49,16 @@ export class Interaction {
     private camera: THREE.Camera,
     private controls: OrbitControls,
     private physics: Physics,
+    private palette: Palette,
+    /** Puts a fresh copy of a catalogue item into the room; resolves to its id, or null. */
+    private spawn: (item: PaletteItem, at: { x: number; z: number }) => Promise<string | null>,
   ) {
     this.setUpControllers(renderer, scene);
     this.setUpMouse(renderer.domElement);
   }
 
   update(dt: number) {
+    let overPalette: PaletteItem | null = null;
     for (const hand of this.hands) {
       this.raycaster.setFromXRController(hand.controller);
       if (hand.grab) {
@@ -60,9 +67,12 @@ export class Interaction {
         this.follow(hand.grab);
         continue;
       }
-      const hovering = this.raycaster.intersectObjects(this.physics.pickables(), true).length > 0;
-      (hand.ray.material as THREE.LineBasicMaterial).color.setHex(hovering ? HOVER_RAY : IDLE_RAY);
+      const item = this.palette.hitTest(this.raycaster);
+      if (item) overPalette = item;
+      const hovering = !item && this.raycaster.intersectObjects(this.physics.pickables(), true).length > 0;
+      (hand.ray.material as THREE.LineBasicMaterial).color.setHex(item ? PALETTE_RAY : hovering ? HOVER_RAY : IDLE_RAY);
     }
+    this.palette.hover(overPalette);
     if (this.mouseGrab) {
       this.raycaster.setFromCamera(this.mouse, this.camera);
       this.follow(this.mouseGrab);
@@ -112,19 +122,43 @@ export class Interaction {
       scene.add(grip);
 
       const hand: Hand = { controller, ray };
-      controller.addEventListener('connected', (e) => (hand.source = e.data));
+      controller.addEventListener('connected', (e) => {
+        hand.source = e.data;
+        if (e.data.handedness === 'left') this.palette.attachTo(grip);
+      });
       controller.addEventListener('disconnected', () => (hand.source = undefined));
       controller.addEventListener('selectstart', () => {
         this.raycaster.setFromXRController(controller);
+        const item = this.palette.hitTest(this.raycaster);
+        if (item) return this.pull(hand, item);
         hand.grab = this.tryGrab();
         if (hand.grab) hand.source?.gamepad?.hapticActuators?.[0]?.pulse?.(0.4, 40);
       });
       controller.addEventListener('selectend', () => {
+        hand.pulling = false;
         if (hand.grab) this.physics.release(hand.grab.id);
         hand.grab = undefined;
       });
       this.hands.push(hand);
     }
+  }
+
+  /** Trigger on a palette tile: a copy appears under the ray and is carried while the trigger is held. */
+  private pull(hand: Hand, item: PaletteItem) {
+    const at = this.raycaster.ray.intersectPlane(this.floor, this.hit);
+    const spot = at ? { x: at.x, z: at.z } : this.inFront(hand.controller);
+    hand.pulling = true;
+    hand.source?.gamepad?.hapticActuators?.[0]?.pulse?.(0.4, 40);
+    void this.spawn(item, spot).then((id) => {
+      // Trigger already released while the file loaded: the object simply stays where it landed.
+      if (id && hand.pulling) hand.grab = { id, offset: new THREE.Vector3(), rotY: 0 };
+      hand.pulling = false;
+    });
+  }
+
+  private inFront(controller: THREE.Object3D): { x: number; z: number } {
+    const p = new THREE.Vector3(0, 0, -1).applyMatrix4(controller.matrixWorld);
+    return { x: p.x, z: p.z };
   }
 
   // ---------- laptop mouse ----------
