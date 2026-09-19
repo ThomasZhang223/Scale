@@ -1,0 +1,6 @@
+*
+!app/
+!app/**
+!requirements-embedding-linux-py311.txt
+**/__pycache__/
+**/*.pyc

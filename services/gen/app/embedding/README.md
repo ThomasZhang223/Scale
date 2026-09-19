@@ -100,12 +100,13 @@ Normal startup is **cache-only**; missing weights leave `/ready` at 503 while
 `EMBEDDING_API_KEY`; never reuse a provider credential or write it to Git. Then:
 
 ```powershell
-& $aniPython -m uvicorn app.main:app --host 127.0.0.1 --port 8002 --workers 1
+& $aniPython -m uvicorn app.main:app --host 127.0.0.1 --port 8004 --workers 1
 ```
 
-Docker uses the Linux lock and port 8002, matching existing compose. Mount a
-pre-downloaded model cache and inject the service token; no weights are bundled
-into the image. One worker keeps one model resident. Concurrent feature work is
+Docker uses the Linux lock and port 8004, matching the `embedding` Compose service.
+See [container and Cloudflare setup](../../EMBEDDING_DEPLOY.md) for model-volume
+initialization, the persistent result cache, and Worker configuration. No weights
+are bundled into the image. One worker keeps one model resident. Concurrent feature work is
 rejected with 429 rather than starting another model; there are no automatic
 retries. HTTP 401 is bad auth, 413 oversized input, 415 wrong content type,
 422 malformed input, 409 fingerprint mismatch, 503 unavailable model/adapter/auth,

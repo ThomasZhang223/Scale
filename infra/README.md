@@ -3,11 +3,10 @@
 **Owner:** Thomas (local-edge panel). This is the one page to read at 3am when something on
 the laptop stopped answering.
 
-## The three-process model
+## Local services and tunnels
 
-Nearly the whole backend runs on Cloudflare. Three things cannot follow it there: OR-Tools
-(no Python C++ extension on Workers), the scraper and ranker, and Justin's Vite dev server.
-Those three run here, on this laptop, and the cloud reaches them through Cloudflare quick
+Nearly the whole backend runs on Cloudflare. The solver, scraper, ranker and CPU
+embedding service run locally and the cloud reaches them through Cloudflare quick
 tunnels — one `cloudflared` process per service, each minting its own random
 `*.trycloudflare.com` hostname. There is no domain on this Cloudflare account, so a quick
 tunnel is the only kind available; see `infra/tunnel/config.yml` for the named-tunnel upgrade
@@ -21,19 +20,21 @@ path, fully commented out, for the day a domain exists.
         │  SSE /v1/sync/{roomId}       │  RoomAgent reads CONFIG KV, then
         │  (direct to the Worker,      │  fetch(origin) with X-Upstream-Token
         │   never through a tunnel)    ▼
-        │              ┌── three quick tunnels, one per service ──┐
+        │              ┌── solver, search and ingest tunnels ──┐
         └──────────────┤                                          │
                         ▼                    ▼                    ▼
-                localhost:8001        localhost:8004       localhost:8003
+                localhost:8001        localhost:8005       localhost:8003
                 services/fit          services/search      services/ingest
                 (OR-Tools CP-SAT)     (ranking)             (crawl + extract)
 
-  Iteration only, never the demo path:  localhost:5173 (Vite, apps/xr) ← a fourth quick tunnel
+  Iteration only, never the demo path:  localhost:5173 (Vite, apps/xr) ← another quick tunnel
 ```
 
-The laptop is a stateless tool the cloud agent calls, never a relay. Nothing here fetches a
-room or holds state across requests — `services/fit`, `services/search`, and
-`services/ingest` each receive everything they need in the request body.
+The cloud calls local tools directly. The embedding service keeps model weights and
+a persistent inference cache; the standalone ranker has its own in-memory index.
+
+The fourth backend tunnel serves `embedding` on localhost:8004, using a dedicated
+Bearer token. See the embedding setup section below before starting the stack.
 
 ## First-time setup
 
@@ -70,7 +71,7 @@ Five phases, each failing loud rather than guessing:
    serves whatever image was built last time, even after an edit to `services/*/app`.
 3. **tunnels** — one `cloudflared tunnel --url http://localhost:PORT` per service,
    backgrounded, with its random `trycloudflare.com` URL captured from its own log.
-4. **publish** — hands all three URLs to `infra/cloudflare/set-upstreams.sh`, which the
+4. **publish** — hands all four URLs to `infra/cloudflare/set-upstreams.sh`, which the
    Cloudflare panel owns (branch `thomas/cloudflare-infra`) and writes them into `CONFIG` KV.
    If that script isn't in your worktree yet, this phase fails loud and says so — the three
    tunnels from phase 3 are left running regardless, so they're still testable by hand.
@@ -79,14 +80,14 @@ Five phases, each failing loud rather than guessing:
    (`upstream:solver`, `upstream:search`, `upstream:ingest`). If the real script takes a
    different signature, the call site in `infra/up.sh`'s `publish()` is the one line to
    change.
-5. **print** — the three origins, the Worker URL, and a one-line health check through the
+5. **print** — the four origins, the Worker URL, and a one-line health check through the
    tunnel.
 
 ```
 bash infra/down.sh
 ```
 
-Stops the three tunnels (by pid, tracked in `infra/.run/`, gitignored — regenerated every
+Stops the four tunnels (by pid, tracked in `infra/.run/`, gitignored — regenerated every
 run) and the containers.
 
 ### The WebXR dev loop (iteration only)
@@ -110,8 +111,8 @@ hostname is random every run, so a fixed list can never match it) and
 | --- | --- | --- |
 | 8001 | `services/fit` | Container binds 8000 internally; compose maps 8001:8000. KV key `upstream:solver`. |
 | 8003 | `services/ingest` | Container binds 8080 internally; compose maps 8003:8080. KV key `upstream:ingest`. |
-| 8004 | `services/search` | Container binds 8080 internally; compose maps 8004:8080. KV key `upstream:search`. |
-| 8002 | `services/gen` | Never started locally — profile `unused`, goes to Baseten. Registered so the port is reserved, not so it runs. |
+| 8005 | `services/search` | Container binds 8080 internally; compose maps 8005:8080. KV key `upstream:search`. |
+| 8004 | `embedding` (`services/gen`) | Container binds 8004; persistent model/result volumes. KV key `upstream:embedding`. |
 | 5173 | Vite (`apps/xr`) | Iteration only. |
 | 8787 | `wrangler dev`, if run locally | Not started by anything in this directory. |
 
@@ -194,8 +195,15 @@ constraints only. The constraint list is open — a solver that doesn't implemen
   "notes": "free text shown to the user, never parsed" }
 ```
 
-**The three `CONFIG` KV keys**, and the rule that governs all three: `upstream:solver` (this
-laptop's `services/fit`, port 8001), `upstream:search` (`services/search`, port 8004),
+**The `CONFIG` KV keys**, and the rule that governs them: `upstream:solver` (this
+laptop's `services/fit`, port 8001), `upstream:search` (`services/search`, port 8005),
 `upstream:ingest` (`services/ingest`, port 8003). An unset key is a 503 naming the key to set
 — never a guessed origin, never a fallback to `localhost`. `infra/up.sh` republishes all
-three on every run precisely because the tunnel URLs are different every time.
+four on every run precisely because the tunnel URLs are different every time.
+
+## Embedding setup
+
+Before `infra/up.sh`, initialize the model volume and configure the dedicated token
+and fingerprint using [the embedding deployment guide](../services/gen/EMBEDDING_DEPLOY.md).
+Existing `infra/.env` files must change `SEARCH_PORT` to 8005. The script starts and
+publishes the embedding tunnel on port 8004 and checks `/ready`.
