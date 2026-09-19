@@ -1,5 +1,5 @@
 import type {
-  FitReport, LogEntry, Plan, PlacementV1, Preference, Proposal, RequestState, RoomState, Rule, SolverRequest, SolverResponse,
+  FitReport, LogEntry, Plan, PlacementV1, Preference, Proposal, RequestState, RoomFacts, RoomState, Rule, SolverRequest, SolverResponse,
 } from './types.ts';
 import { PRESETS, now } from './types.ts';
 import { FACING, readRoom, roomFacts, solverObjects, solverToPlacement, type RoomGeometry } from './room.ts';
@@ -57,13 +57,20 @@ export async function runLoop(input: LoopInput, deps: LoopDeps): Promise<Proposa
   } catch (err) {
     throw new AgentFailure(`Couldn't read the room: ${(err as Error).message}`);
   }
-  const pins = [...new Set([...input.pins, ...input.recentUserObjectIds.filter((id) => !requestText.toLowerCase().includes((input.state.objects[id]?.category ?? '').toLowerCase()))])];
+  // Things a person just placed stay put — unless the request is about the whole room
+  // (rearrange / tidy), or names them, or "just placed" would mean everything.
+  const wholeRoom = input.preset === 'tidy_room' || presetFromText(requestText) === 'tidy_room';
+  let recent = wholeRoom
+    ? []
+    : input.recentUserObjectIds.filter((id) => !requestText.toLowerCase().includes((input.state.objects[id]?.category ?? '').toLowerCase()));
+  if (recent.length && recent.length >= input.state.placements.length) recent = [];
+  const pins = [...new Set([...input.pins, ...recent])];
   const b = geo.bounds;
   say('data', `Room ${((b.maxX - b.minX) / 100).toFixed(1)} × ${((b.maxZ - b.minZ) / 100).toFixed(1)} m, ${input.state.placements.length} objects, ${geo.doors.length} door${geo.doors.length === 1 ? '' : 's'}, ${geo.windows.length} window${geo.windows.length === 1 ? '' : 's'}, layout ${input.baseVersionId}${pins.length ? `, pinned: ${pins.join(', ')}` : ''}.`);
 
   // 2. Cleaning
   deps.status('reading', 'Checking the data…');
-  const cleaned = cleanState(input.state, geo, pins, requestText);
+  const cleaned = cleanState(input.state, geo, pins, requestText, wholeRoom);
   for (const e of cleaned.log) deps.log(e);
   const facts = roomFacts({
     state: { ...input.state, placements: input.state.placements.filter((p) => !cleaned.excluded.includes(p.objectId)) },
@@ -78,16 +85,19 @@ export async function runLoop(input: LoopInput, deps: LoopDeps): Promise<Proposa
 
   // 3. Planning
   deps.status('planning', 'Planning…');
-  let plan = await deps.plan(facts);
+  let plan = input.preset === 'tidy_room' ? null : await deps.plan(facts);
   let usedPreset = false;
   if (!plan) {
-    const preset = input.preset ? deps.presetPlans[input.preset] : undefined;
-    if (!preset) throw new AgentFailure('The planner is offline and this request has no built-in plan. Try a preset tile.');
+    const presetId = input.preset ?? presetFromText(requestText);
+    const generated = presetId ? generatedPlan(presetId, facts) : null;
+    const preset = generated ?? (presetId ? deps.presetPlans[presetId] : undefined);
+    if (!preset) throw new AgentFailure('The planner is offline and this request has no built-in plan. Try "tidy up", or a preset tile.');
     plan = { summary: preset.summary, rules: preset.rules, remember: preset.remember };
     usedPreset = true;
-    say('plan', `Planner offline: using the built-in plan for '${preset.text}'.`, 'warn');
+    if (input.preset !== 'tidy_room') say('plan', `Planner offline: using the built-in plan for '${preset.text}'.`, 'warn');
+    else say('plan', `Tidying: ${preset.text}.`);
   }
-  let errors = validatePlan(plan, facts);
+  let errors = validatePlan(plan, facts, { trusted: usedPreset });
   if (errors.length && !usedPreset) {
     say('retry', `Plan needed fixes: ${errors.join('; ')}`, 'warn');
     const retry = await deps.plan(facts, { plan, errors });
@@ -210,6 +220,44 @@ export async function runLoop(input: LoopInput, deps: LoopDeps): Promise<Proposa
     fit: fitSummary,
     unsatisfied,
   };
+}
+
+const SEATING = ['sofa', 'couch', 'chair', 'armchair', 'bench', 'storage', 'shelf', 'bookcase', 'cabinet', 'dresser', 'bed', 'desk', 'television', 'tv'];
+const CENTRE = ['table', 'coffee', 'rug', 'ottoman'];
+
+/**
+ * A tidy room, as rules: tables toward the middle, seating and storage against the walls,
+ * wide walkways. Written per object from what's actually in the room, so it works in any
+ * room with any number of things. Everything is a strong wish, not a must, so an over-full
+ * room still solves; the walkway is the one hard rule.
+ */
+export function generatedPlan(preset: string, facts: RoomFacts): (Plan & { text: string }) | null {
+  if (preset !== 'tidy_room') return null;
+  const rules: Rule[] = [];
+  let n = 0;
+  for (const o of facts.objects) {
+    if (!o.movable) continue;
+    const cat = o.category.toLowerCase();
+    if (CENTRE.some((k) => cat.includes(k))) {
+      rules.push({ id: `t${++n}`, type: 'near', a: o.id, b: 'center', maxCm: 120, priority: 'should', weight: 6, why: `${o.category} in the middle of the room` });
+    } else if (SEATING.some((k) => cat.includes(k))) {
+      rules.push({ id: `t${++n}`, type: 'against_wall', a: o.id, wall: 'any', priority: 'should', weight: 6, why: `${o.category} against a wall` });
+    }
+  }
+  rules.push({ id: `t${++n}`, type: 'keep_clear', zone: 'walkway', marginCm: 90, priority: 'must', why: 'wide walkways' });
+  const summary = 'Tidy up the room';
+  return { text: `${rules.length - 1} pieces: tables to the middle, seating and storage to the walls, 90 cm walkways`, summary, rules, remember: [] };
+}
+
+/** Typed requests that clearly mean a preset, for when the planner is offline. */
+export function presetFromText(text: string): string | null {
+  const t = text.toLowerCase();
+  if (/tidy|clean|organi[sz]e|messy|neat/.test(t)) return 'tidy_room';
+  if (/reading|read/.test(t)) return 'reading_corner';
+  if (/open .*floor|space|room to move/.test(t)) return 'open_floor';
+  if (/door/.test(t)) return 'clear_door';
+  if (/window|view/.test(t)) return 'face_window';
+  return null;
 }
 
 export function convertBack(original: PlacementV1[], objects: SolverRequest['objects'], response: SolverResponse, geo: RoomGeometry): PlacementV1[] {

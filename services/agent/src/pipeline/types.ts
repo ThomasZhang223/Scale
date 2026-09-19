@@ -193,6 +193,7 @@ export interface Preference {
 export type RequestState = 'queued' | 'reading' | 'planning' | 'solving' | 'checking' | 'proposed' | 'failed';
 
 export const PRESETS: Record<string, string> = {
+  tidy_room: 'Tidy up the room',
   reading_corner: 'Reading corner by the window',
   open_floor: 'Open up the floor',
   clear_door: 'Clear the door',

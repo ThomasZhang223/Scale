@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 
 EXPECTED_SCHEMA_VERSION = 1
 CLEARANCE_M = 0.9  # walkway width, also the depth of the corridor kept clear at a door
-WALL_GAP_MIN_M = 0.01  # closer than this counts as touching the wall
+WALL_GAP_MIN_M = 0.015  # closer than this counts as touching the wall (the solver works in whole cm)
 WALL_GAP_MAX_M = 0.04  # further than this is deliberate, not "floating"
 WINDOW_PATCH_DEPTH_M = 0.6  # floor in front of a window that direct light reaches
 EDGE_SAMPLE_M = 0.02

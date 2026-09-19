@@ -219,6 +219,7 @@ async function start() {
           label(`Designer${s.solver === 'offline' ? ' (solver offline)' : ''}`),
           tile('Turn 90° left', 'turn:left'),
           tile('Turn 90° right', 'turn:right'),
+          tile('Rearrange', 'preset:tidy_room', true),
           ...(undoAvailable ? [tile('Undo', 'undo')] : []),
         ];
     }
@@ -399,10 +400,10 @@ async function start() {
   }
 
   agentPresets.replaceChildren(
-    ...[['Turn 90° left', 'turn:left'], ['Turn 90° right', 'turn:right']].map(([text, action]) => {
+    ...[['Turn 90° left', 'turn:left'], ['Turn 90° right', 'turn:right'], ['Rearrange', 'preset:tidy_room']].map(([text, action]) => {
       const b = document.createElement('button');
       b.type = 'button';
-      b.className = 'quiet';
+      b.className = action.startsWith('preset:') ? '' : 'quiet';
       b.textContent = text;
       b.addEventListener('click', () => onAction(action));
       return b;

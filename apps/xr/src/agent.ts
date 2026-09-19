@@ -44,6 +44,7 @@ export interface AgentRequest {
 }
 
 export const PRESETS: { id: string; label: string }[] = [
+  { id: 'tidy_room', label: 'Rearrange' },
   { id: 'reading_corner', label: 'Reading corner' },
   { id: 'open_floor', label: 'Open up the floor' },
   { id: 'clear_door', label: 'Clear the door' },
