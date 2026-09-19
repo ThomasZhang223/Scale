@@ -151,6 +151,13 @@ const REARRANGE_RULES: [string, string][] = [
   ['lamps / other', 'a wall, out of the way'],
   ['always', '90 cm walkways; doors and windows clear'],
 ];
+/** Whole-room styles: [button label, agent preset]. Each is a different set of rules in services/agent STYLES. */
+const STYLES: [string, string][] = [
+  ['Cozy', 'cozy'],
+  ['Spacious', 'spacious'],
+  ['Modern', 'modern'],
+  ['Social', 'social'],
+];
 const objects = new Map<string, PlacedObject>();
 const catalog: PaletteItem[] = []; // everything in objects.json, placed or not
 let rise = 1; // 0..1 while the walls rise; objects are placed once it reaches 1
@@ -239,6 +246,8 @@ async function start() {
           tile('Turn 90° left', 'turn:left'),
           tile('Turn 90° right', 'turn:right'),
           ...(objects.size ? [tile('Rearrange', 'preset:tidy_room', true)] : []), // nothing to rearrange until something is down
+          // Styles: the same whole-room rearrange under a different ideology (see STYLES in services/agent).
+          ...(objects.size ? STYLES.map(([name, preset]) => ({ ...tile(name, `preset:${preset}`), section: 'Style' })) : []),
           ...(undoAvailable ? [tile('Undo', 'undo')] : []),
           tile(showRules ? 'Hide rules' : 'Rules', 'rules'),
           ...(showRules ? REARRANGE_RULES.map(([kind, rule]) => label(`${kind}: ${rule}`)) : []),
@@ -268,7 +277,7 @@ async function start() {
     const button = (text: string, action: string, accent = false) => {
       const b = document.createElement('button');
       b.type = 'button';
-      b.className = accent ? '' : 'quiet';
+      b.className = accent ? 'filled' : 'gray';
       b.textContent = text;
       b.addEventListener('click', () => onAction(action));
       return b;
@@ -420,16 +429,27 @@ async function start() {
     }
   }
 
-  agentPresets.replaceChildren(
-    ...[['Turn 90° left', 'turn:left'], ['Turn 90° right', 'turn:right'], ['Rearrange', 'preset:tidy_room']].map(([text, action]) => {
+  {
+    const button = (text: string, action: string, cls: string) => {
       const b = document.createElement('button');
       b.type = 'button';
-      b.className = action.startsWith('preset:') ? '' : 'quiet';
+      b.className = cls;
       b.textContent = text;
       b.addEventListener('click', () => onAction(action));
       return b;
-    }),
-  );
+    };
+    const group = (cls: string, ...children: HTMLElement[]) => {
+      const g = document.createElement('div');
+      g.className = cls;
+      g.append(...children);
+      return g;
+    };
+    agentPresets.replaceChildren(
+      group('segmented', button('Turn 90° left', 'turn:left', ''), button('Turn 90° right', 'turn:right', '')),
+      button('Rearrange', 'preset:tidy_room', 'filled'),
+      group('styles', ...STYLES.map(([text, preset]) => button(text, `preset:${preset}`, 'tinted'))),
+    );
+  }
   document.getElementById('agent-ask')!.addEventListener('click', () => {
     const text = agentText.value.trim();
     if (text) void askAgent({ text });
@@ -580,8 +600,8 @@ async function start() {
       ...catalog.map((item) => {
         const button = document.createElement('button');
         button.type = 'button';
-        button.className = 'quiet';
-        button.textContent = `Add ${item.name}`;
+        button.className = 'gray';
+        button.textContent = item.name.length <= 2 ? item.name.toUpperCase() : item.name.charAt(0).toUpperCase() + item.name.slice(1); // sentence case; "TV"
         button.addEventListener('click', () => void spawn(item, { x: 0, z: -1 }));
         return button;
       }),
