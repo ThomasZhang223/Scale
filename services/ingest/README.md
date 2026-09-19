@@ -37,9 +37,22 @@ before the event starts (H-4–H0)** — this decides whether this whole pipelin
 
 ### Verifying them: `verify_merchants.py`
 
+Run it from `services/ingest/`. The only dependency it needs is `httpx`.
+
+**Probe one store** — the fastest way to check a candidate, and it exits 0 on success:
+
 ```
-pip install -r requirements.txt
-cp candidates.example.json candidates.json     # then put real merchants in it
+cd services/ingest
+pip install httpx
+python3 verify_merchants.py --url https://some-furniture-store.com
+```
+
+**Check the whole list** — this is the H-4 gate, so it exits non-zero below 15 usable
+merchants (override with `--require N`):
+
+```
+cp candidates.example.json candidates.json
+$EDITOR candidates.json          # replace the placeholders with merchants you picked
 python3 verify_merchants.py candidates.json --out merchants.verified.json
 ```
 

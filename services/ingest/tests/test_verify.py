@@ -130,6 +130,54 @@ def test_report_renders():
     assert "usable" in out and "reachable: 2/3" in out
 
 
+def test_output_keys_are_camel_case_like_the_example_file():
+    """merchants.verified.json must match merchants.example.json's shape — the crawler reads it."""
+    import json as _json
+    example = _json.load(open(pathlib.Path(__file__).resolve().parents[1] / "merchants.example.json"))
+    expected = set(example["merchants"][0]) - {"_comment"}
+    got = set(run("good").to_dict())
+    missing = expected - got
+    assert not missing, f"generated output is missing documented keys: {missing}"
+    snake = [k for k in got if "_" in k]
+    assert not snake, f"generated output has snake_case keys: {snake}"
+
+
+def test_cli_probe_mode_succeeds_on_one_store():
+    """A one-off --url probe is a lookup, not the H-4 gate: finding one store is not a failure."""
+    import subprocess
+    srv, base = serve("good")
+    try:
+        r = subprocess.run(
+            [sys.executable, "verify_merchants.py", "--url", base],
+            cwd=pathlib.Path(__file__).resolve().parents[1],
+            capture_output=True, text=True,
+        )
+        assert r.returncode == 0, f"probe exited {r.returncode}:\n{r.stderr}"
+        assert "usable" in r.stdout
+    finally:
+        srv.shutdown()
+
+
+def test_cli_file_mode_gates_on_merchant_count():
+    """A candidates file IS the gate, so one usable merchant must fail it."""
+    import subprocess, json as _json, tempfile, os
+    srv, base = serve("good")
+    fd, path = tempfile.mkstemp(suffix=".json")
+    try:
+        with os.fdopen(fd, "w") as f:
+            _json.dump({"merchants": [{"name": "One", "storefrontBaseUrl": base}]}, f)
+        r = subprocess.run(
+            [sys.executable, "verify_merchants.py", path],
+            cwd=pathlib.Path(__file__).resolve().parents[1],
+            capture_output=True, text=True,
+        )
+        assert r.returncode == 1
+        assert "GATE FAILED" in r.stderr
+    finally:
+        srv.shutdown()
+        os.unlink(path)
+
+
 if __name__ == "__main__":
     fails = 0
     for name, fn in sorted(globals().items()):

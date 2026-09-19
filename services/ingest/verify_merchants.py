@@ -64,8 +64,20 @@ class MerchantReport:
     note: str | None = None
 
     def to_dict(self) -> dict:
-        d = asdict(self)
-        return {k: v for k, v in d.items() if v is not None}
+        """camelCase, to match merchants.example.json — that shape is what the crawler reads."""
+        camel = {
+            "storefront_base_url": "storefrontBaseUrl",
+            "products_json_verified": "productsJsonVerified",
+            "verified_at": "verifiedAt",
+            "http_status": "httpStatus",
+            "product_count": "productCount",
+            "dimension_hit_rate": "dimensionHitRate",
+            "fully_dimensioned_rate": "fullyDimensionedRate",
+            "sample_size": "sampleSize",
+        }
+        return {
+            camel.get(k, k): v for k, v in asdict(self).items() if v is not None
+        }
 
 
 def _robots_allows(client: httpx.Client, base: str) -> tuple[bool, str | None]:
@@ -223,6 +235,11 @@ def main() -> int:
     ap.add_argument("--url", action="append", help="check one storefront (repeatable)")
     ap.add_argument("--sample", type=int, default=250, help="products to sample per merchant")
     ap.add_argument("--out", help="write the verified merchant list here")
+    ap.add_argument(
+        "--require", type=int, default=None,
+        help="exit non-zero below this many usable merchants. Defaults to 15 when checking a "
+             "candidates file (the H-4 gate) and 0 for a one-off --url probe.",
+    )
     args = ap.parse_args()
 
     if not args.candidates and not args.url:
@@ -261,10 +278,15 @@ def main() -> int:
             )
         print(f"wrote {len(usable)} verified merchants to {args.out}\n")
 
-    # Non-zero exit makes this usable as a gate in a script.
+    # Non-zero exit makes this usable as a gate in a script. A one-off --url probe is a
+    # lookup, not a gate, so it does not fail for having found only one store.
     strong = [r for r in reports if r.status == "ok"
               and (r.fully_dimensioned_rate or 0) >= MIN_DIMENSION_RATE]
-    return 0 if len(strong) >= 15 else 1
+    required = args.require if args.require is not None else (15 if args.candidates else 0)
+    if len(strong) < required:
+        print(f"GATE FAILED: {len(strong)} usable merchants, need {required}.\n", file=sys.stderr)
+        return 1
+    return 0
 
 
 if __name__ == "__main__":
