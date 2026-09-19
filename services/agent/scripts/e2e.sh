@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Whole-chain run (E1–E6 in apps/xr/docs/agent/09_END_TO_END_TESTS.md) against a live agent,
 # solver and fit service. Usage: scripts/e2e.sh [agent-base-url] [room-id]
-#   agent: wrangler dev --port 8789      solver: uvicorn app.main:app --port 8080 (SOLVER_KEY=dev-solver-key)
-#   fit:   uvicorn app.main:app --port 8000
+#   agent: wrangler dev --port 8789 (services/agent, .dev.vars holds UPSTREAM_TOKEN)
+#   fit:   the fit container on 8001 (docker compose --profile local up -d fit) — serves /fit and /solve
 set -u
 A="${1:-http://127.0.0.1:8789}/v1/agent/${2:-e2e-room}"
 HERE="$(cd "$(dirname "$0")" && pwd)"

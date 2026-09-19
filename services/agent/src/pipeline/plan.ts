@@ -67,6 +67,19 @@ export function validatePlan(plan: Plan, facts: RoomFacts, options: { trusted?: 
   const fixed = new Map(facts.objects.filter((o) => !o.movable).map((o) => [o.id, o.note ?? 'fixed']));
   const pinned = new Set(facts.pinned);
 
+  // The facts list walls as w1, doors as d1, windows as win1; the prompt asks for wall:w1 etc.
+  // Models write the bare id about half the time. Accept both by rewriting to the prefixed form.
+  const prefixed = new Map<string, string>();
+  for (const w of facts.room.walls) prefixed.set(w.id, `wall:${w.id}`);
+  for (const d of facts.room.doors) prefixed.set(d.id, `door:${d.id}`);
+  for (const w of facts.room.windows) prefixed.set(w.id, `window:${w.id}`);
+  for (const r of plan.rules ?? []) {
+    for (const key of ['wall', 'b', 'target', 'zone'] as const) {
+      const v = r[key];
+      if (typeof v === 'string' && !objectIds.includes(v) && prefixed.has(v)) r[key] = prefixed.get(v);
+    }
+  }
+
   if (!Array.isArray(plan.rules)) return ['rules must be a list'];
   // Generated preset plans have one rule per object and are trusted; the model's plans are capped.
   if (!options.trusted) {
