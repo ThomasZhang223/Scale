@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "roomId": "large-room",
+  "capturedAt": "2026-09-19T14:30:00Z",
+  "worldAlignment": "gravityAndHeading",
+  "northBearingDeg": 0.0,
+  "floor": {
+    "polygon": [[0.0, 0.0], [6.4, 0.0], [6.4, 4.8], [0.0, 4.8]],
+    "areaM2": 30.72
+  },
+  "walls": [
+    {
+      "id": "n1",
+      "transform": [1,0,0,0, 0,1,0,0, 0,0,1,0, 3.2,1.35,0.0,1],
+      "dimensions": [6.4, 2.7, 0.15],
+      "confidence": "high"
+    },
+    {
+      "id": "s1",
+      "transform": [1,0,0,0, 0,1,0,0, 0,0,1,0, 3.2,1.35,4.8,1],
+      "dimensions": [6.4, 2.7, 0.15],
+      "confidence": "high"
+    },
+    {
+      "id": "w1",
+      "transform": [0,0,-1,0, 0,1,0,0, 1,0,0,0, 0.0,1.35,2.4,1],
+      "dimensions": [4.8, 2.7, 0.15],
+      "confidence": "high"
+    },
+    {
+      "id": "e1",
+      "transform": [0,0,-1,0, 0,1,0,0, 1,0,0,0, 6.4,1.35,2.4,1],
+      "dimensions": [4.8, 2.7, 0.15],
+      "confidence": "high"
+    }
+  ],
+  "openings": [
+    {
+      "id": "d1",
+      "kind": "door",
+      "wallId": "s1",
+      "transform": [1,0,0,0, 0,1,0,0, 0,0,1,0, 1.0,1.025,4.8,1],
+      "dimensions": [0.9, 2.05, 0],
+      "hingeSide": "left",
+      "swingDeg": 90
+    },
+    {
+      "id": "d2",
+      "kind": "door",
+      "wallId": "e1",
+      "transform": [0,0,-1,0, 0,1,0,0, 1,0,0,0, 6.4,1.025,4.0,1],
+      "dimensions": [0.85, 2.05, 0],
+      "hingeSide": "right",
+      "swingDeg": 90
+    },
+    {
+      "id": "op1",
+      "kind": "opening",
+      "wallId": "e1",
+      "transform": [0,0,-1,0, 0,1,0,0, 1,0,0,0, 6.4,1.15,1.2,1],
+      "dimensions": [1.4, 2.3, 0],
+      "hingeSide": "unknown",
+      "swingDeg": 0
+    },
+    {
+      "id": "win1",
+      "kind": "window",
+      "wallId": "n1",
+      "transform": [1,0,0,0, 0,1,0,0, 0,0,1,0, 2.2,1.55,0.0,1],
+      "dimensions": [1.6, 1.3, 0],
+      "hingeSide": "unknown",
+      "swingDeg": 0
+    },
+    {
+      "id": "win2",
+      "kind": "window",
+      "wallId": "n1",
+      "transform": [1,0,0,0, 0,1,0,0, 0,0,1,0, 4.8,1.55,0.0,1],
+      "dimensions": [1.2, 1.3, 0],
+      "hingeSide": "unknown",
+      "swingDeg": 0
+    },
+    {
+      "id": "win3",
+      "kind": "window",
+      "wallId": "w1",
+      "transform": [0,0,-1,0, 0,1,0,0, 1,0,0,0, 0.0,1.6,1.4,1],
+      "dimensions": [1.0, 1.2, 0],
+      "hingeSide": "unknown",
+      "swingDeg": 0
+    }
+  ],
+  "objects": []
+}

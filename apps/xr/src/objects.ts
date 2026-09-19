@@ -3,6 +3,7 @@ import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
+import { clone as cloneWithSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.js';
 
 /**
  * Loads a scanned object (a GLB, e.g. from Object Capture) and prepares it for the room:
@@ -41,7 +42,9 @@ export class ObjectLoader {
       pending.catch(() => this.cache.delete(url));
     }
     const gltf = await pending;
-    return prepareObject(gltf.scene.clone(true), scaleOverride);
+    // SkeletonUtils.clone, not .clone(): a rigged model (a scanned person, say) keeps its
+    // skin bound to its own copy of the skeleton, so the mesh moves with the node.
+    return prepareObject(cloneWithSkeleton(gltf.scene), scaleOverride);
   }
 }
 
@@ -52,8 +55,9 @@ export function prepareObject(model: THREE.Object3D, scaleOverride?: number): Lo
 
   // 1. Units. Real furniture is between a few centimeters and a few meters.
   const raw = measure(node).getSize(new THREE.Vector3());
+  // A scaleOverride of 1 means "trust the file" (server meshes are already in metres).
   const { factor, note } = scaleOverride
-    ? { factor: scaleOverride, note: `Scaled by ${scaleOverride} as configured.` }
+    ? { factor: scaleOverride, note: scaleOverride === 1 ? null : `Scaled by ${scaleOverride} as configured.` }
     : guessUnits(Math.max(raw.x, raw.y, raw.z));
   model.scale.multiplyScalar(factor);
 

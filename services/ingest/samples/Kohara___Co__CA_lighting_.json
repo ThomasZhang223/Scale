@@ -1,6 +1,7 @@
 [
   {
     "title": "Fleece Lined Throw - Irena - Clove",
+    "handle": "fleece-lined-throw-irena-clove",
     "product_type": "Throw",
     "tags": [
       "Throw"
@@ -23,6 +24,7 @@
   },
   {
     "title": "Southwest Blanket - Throw - Etching",
+    "handle": "southwest-blanket-throw-etching",
     "product_type": "Throw",
     "tags": [
       "Throw"
@@ -45,6 +47,7 @@
   },
   {
     "title": "Hand Embroidered Ornament - Highland Cow",
+    "handle": "hand-embroidered-ornament-highland-cow",
     "product_type": "Christmas",
     "tags": [
       "Ornament"
@@ -67,6 +70,7 @@
   },
   {
     "title": "Alpaca Kids Socks - Crew",
+    "handle": "alpaca-kids-socks-crew",
     "product_type": "clothing",
     "tags": [
       "clothing",
@@ -108,6 +112,7 @@
   },
   {
     "title": "Cozy - Twisted Headband",
+    "handle": "cozy-twisted-headband",
     "product_type": "clothing",
     "tags": [
       "clothing"
@@ -142,6 +147,7 @@
   },
   {
     "title": "Alpaca Socks - Thick Print",
+    "handle": "alpaca-socks-thick-print",
     "product_type": "clothing",
     "tags": [
       "clothing",
@@ -190,6 +196,7 @@
   },
   {
     "title": "Alpaca Socks - Vivian",
+    "handle": "alpaca-socks-vivian-beige",
     "product_type": "clothing",
     "tags": [
       "clothing",
@@ -238,6 +245,7 @@
   },
   {
     "title": "Twisted Baby Alpaca Headband",
+    "handle": "twisted-baby-alpaca-headband",
     "product_type": "clothing",
     "tags": [
       "clothing"

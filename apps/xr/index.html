@@ -32,6 +32,29 @@
       .check { display: flex; align-items: center; gap: 8px; color: #cfd6dd; cursor: pointer; }
       .check input { accent-color: #4cd28a; width: 16px; height: 16px; }
       .hint { margin: 0; color: #8a96a3; font-size: 13px; }
+      #catalog { display: flex; flex-wrap: wrap; gap: 6px; }
+      #catalog:empty { display: none; }
+      #catalog button { padding: 6px 10px; font-size: 13px; }
+      #agent { display: grid; gap: 8px; padding-top: 10px; border-top: 1px solid rgba(255, 255, 255, 0.08); }
+      #agent h2 { margin: 0; font-size: 13px; font-weight: 600; color: #cfd6dd; letter-spacing: 0.02em; }
+      #agent .ask { display: flex; gap: 6px; }
+      #agent input { flex: 1; min-width: 0; font: inherit; padding: 8px 10px; border-radius: 8px; color: inherit;
+        background: #14171b; border: 1px solid rgba(255, 255, 255, 0.12); }
+      #agent-presets, #agent-buttons { display: flex; flex-wrap: wrap; gap: 6px; }
+      #agent-presets button, #agent-buttons button { padding: 6px 10px; font-size: 13px; }
+      #agent-status { color: #a9b2bc; min-height: 1.45em; }
+      #agent-status[data-state="working"] { color: #5fb3ff; }
+      #agent-status[data-state="proposed"] { color: #4cd28a; }
+      #agent-status[data-state="failed"], #agent-status[data-state="room_changed"] { color: #ffb347; }
+      #agent-log { max-height: 180px; overflow-y: auto; font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+        color: #c3cbd3; background: #14171b; border-radius: 8px; padding: 6px 8px; }
+      #agent-log:empty { display: none; }
+      #agent-log .warn { color: #ffd27a; }
+      #agent-log .decision { color: #e8edf2; }
+      #agent-rules summary { cursor: pointer; color: #a9b2bc; font-size: 13px; }
+      #agent-rules table { margin-top: 6px; border-collapse: collapse; font-size: 12px; color: #c3cbd3; }
+      #agent-rules td { padding: 3px 6px 3px 0; vertical-align: top; border-top: 1px solid rgba(255, 255, 255, 0.06); }
+      #agent-rules td:first-child { color: #e8edf2; white-space: nowrap; }
     </style>
   </head>
   <body>
@@ -42,9 +65,35 @@
         <button id="reset" type="button" class="quiet">Reset</button>
       </div>
       <input id="picker" type="file" accept=".json,.glb,.gltf,application/json,model/gltf-binary" multiple hidden />
+      <div id="catalog"></div>
       <label class="check"><input id="colliders" type="checkbox" /> Show physics shapes</label>
-      <p class="hint">Drop a room scan (.json) or scanned objects (.glb) anywhere. Drag objects to move them; scroll while dragging to turn.</p>
+      <p class="hint">Drop a room scan (.json) or scanned objects (.glb) anywhere, or add catalogue items with the buttons. Drag objects to move them; scroll while dragging to turn. In VR, pull items from the panel on your left hand.</p>
       <div id="note" role="status"></div>
+      <section id="agent">
+        <h2>Designer agent</h2>
+        <div class="ask">
+          <input id="agent-text" type="text" placeholder="e.g. Reading corner by the window" autocomplete="off" />
+          <button id="agent-ask" type="button">Ask</button>
+        </div>
+        <div id="agent-presets"></div>
+        <div id="agent-status"></div>
+        <div id="agent-buttons"></div>
+        <div id="agent-log" aria-live="polite"></div>
+        <details id="agent-rules">
+          <summary>What Rearrange does</summary>
+          <table>
+            <tr><td>sofa</td><td>back against a wall, facing into the room; faces the TV if there is one</td></tr>
+            <tr><td>TV / storage / shelf / cabinet</td><td>against a wall</td></tr>
+            <tr><td>bed</td><td>against a wall, away from the door</td></tr>
+            <tr><td>desk</td><td>against a wall, near a window for daylight</td></tr>
+            <tr><td>dining table</td><td>toward the middle of the room</td></tr>
+            <tr><td>chairs</td><td>if there's a table: pulled up to it, facing it; else grouped with the sofa around the coffee table</td></tr>
+            <tr><td>coffee table</td><td>in front of the sofa</td></tr>
+            <tr><td>lamps, plants, unknown</td><td>against a wall, out of the way</td></tr>
+            <tr><td>always</td><td>90 cm walkways between groups; doors and the 50 cm in front of windows kept clear</td></tr>
+          </table>
+        </details>
+      </section>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>

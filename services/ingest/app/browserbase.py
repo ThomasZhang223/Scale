@@ -20,9 +20,10 @@ from dataclasses import dataclass
 
 API_URL = "https://api.browserbase.com/v1/fetch"
 
-# Fetch's documented failures. 429 is a CONCURRENCY limit, not a quota — it clears on its own,
-# so it is the one worth retrying.
-RETRY_STATUS = {429, 504}
+# Fetch's documented failures. 429 is a CONCURRENCY limit, not a quota, and 502/503/504 are
+# transient upstream trouble — all clear on their own, so all are worth retrying. A first real
+# run lost four products to bare 503s that a single retry would very likely have caught.
+RETRY_STATUS = {429, 502, 503, 504}
 MAX_RETRIES = 3
 BACKOFF_S = 1.5
 
@@ -95,7 +96,8 @@ def _explain(status: int) -> str:
         400: "invalid request body",
         403: "invalid or missing BROWSERBASE_API_KEY",
         429: "concurrent request limit exceeded — slow down, this clears on its own",
-        502: "response too large, or TLS verification failed",
+        502: "response too large, TLS verification failed, or a transient upstream error",
+        503: "upstream temporarily unavailable — transient, retried",
         504: "request timed out",
     }.get(status, f"HTTP {status}")
 

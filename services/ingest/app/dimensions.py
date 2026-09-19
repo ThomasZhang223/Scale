@@ -46,8 +46,17 @@ _LABELLED_SUFFIX = re.compile(
 )
 
 # "13-24\"L x 4-7\"W" — a range across a product family, not one product's size. Parsing it
-# would invent a dimension, so the field is refused outright (standing rule 4).
+# would invent a dimension.
+#
+# Masked out of the text rather than used to refuse the whole field. Refusing the field cost
+# real data: InStyle Home fell from 57% to 42% usable because one "28-32\" H" in a description
+# discarded the "W 152 x D 76 x H 74 cm" sitting beside it.
 _RANGE = re.compile(rf"{_NUM}\s*[-–]\s*{_NUM}\s*(?:{_UNIT_ALT})?\s*(?:W|D|H|L)\b", re.IGNORECASE)
+
+
+def mask_ranges(text: str) -> str:
+    """Blank out range spans so the rest of the field can still be read."""
+    return _RANGE.sub(" ", text)
 
 # "152 x 76 x 74 cm", "60\" x 30\"", "60in x 30in x 29in"
 _SEQUENCE = re.compile(
@@ -110,8 +119,7 @@ def _to_metres(value: str, unit: str | None, fallback_unit: str | None) -> float
 
 
 def _labelled(text: str, field: str) -> DimensionHit | None:
-    if _RANGE.search(text):
-        return None  # a range is not a measurement
+    text = mask_ranges(text)
 
     found: dict[str, float] = {}
     raw_bits: list[str] = []
@@ -147,8 +155,7 @@ def _labelled(text: str, field: str) -> DimensionHit | None:
 
 
 def _sequence(text: str, field: str) -> DimensionHit | None:
-    if _RANGE.search(text):
-        return None
+    text = mask_ranges(text)
     m = _SEQUENCE.search(text)
     if not m:
         return None

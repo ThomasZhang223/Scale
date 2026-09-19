@@ -40,6 +40,55 @@ _DIMENSION_LABEL = re.compile(
     r"\b(dimension|dimensions|size|measurements|product\s+size|overall)\b", re.IGNORECASE
 )
 
+# Fetch does not execute JavaScript, so a client-rendered spec section comes back as its
+# template. Floyd's pages return blocks reading "${ product.selectedOptions[0] }" — matching
+# those wastes the spec-block pass on placeholders. A store whose specs are ONLY templates
+# needs `browse open --remote`, not Fetch.
+_TEMPLATE_PLACEHOLDER = re.compile(r"\$\{[^}]*\}|\{\{[^}]*\}\}|\[\[[^\]]*\]\]")
+
+
+def _is_unrendered_template(text: str) -> bool:
+    stripped = _TEMPLATE_PLACEHOLDER.sub("", text).strip()
+    return not stripped or len(stripped) < max(8, len(text) * 0.3)
+
+
+def _loads_tolerant(raw: str):
+    """json.loads, then fallbacks for the malformed blobs real themes ship.
+
+    Floyd's Product block fails a strict parse on an invalid control character — a literal
+    newline inside a string value — which `strict=False` is exactly for. That one line is what
+    recovers a real Product object.
+
+    The scan-for-objects fallback is last and deliberately fussy: run loosely on Floyd's block
+    it returned nineteen garbage fragments and called that success, which is worse than
+    failing. It now keeps only objects that actually carry an @type.
+    """
+    raw = raw.strip()
+    for attempt in (
+        lambda: json.loads(raw),
+        lambda: json.loads(raw, strict=False),                       # control chars in strings
+        lambda: json.loads(re.sub(r",\s*([}\]])", r"\1", raw), strict=False),  # trailing commas
+    ):
+        try:
+            return attempt()
+        except (ValueError, TypeError):
+            continue
+
+    # Several concatenated top-level objects. Only worth anything if the pieces are real
+    # JSON-LD nodes, so anything without an @type is discarded rather than counted.
+    decoder = json.JSONDecoder(strict=False)
+    out, idx = [], 0
+    while idx < len(raw):
+        try:
+            obj, end = decoder.raw_decode(raw, idx)
+        except ValueError:
+            idx += 1
+            continue
+        if isinstance(obj, dict) and obj.get("@type"):
+            out.append(obj)
+        idx = max(end, idx + 1)
+    return out or None
+
 
 def _metres_from_quantitative(node) -> float | None:
     """schema.org QuantitativeValue -> metres. Accepts a bare number only with a unit."""
@@ -83,10 +132,9 @@ def from_json_ld(html: str) -> DimensionHit | None:
     soup = BeautifulSoup(html, "html.parser")
     for tag in soup.find_all("script", attrs={"type": "application/ld+json"}):
         raw = tag.string or tag.get_text() or ""
-        try:
-            data = json.loads(raw)
-        except (ValueError, TypeError):
-            continue  # a broken blob on the page is not our problem
+        data = _loads_tolerant(raw)
+        if data is None:
+            continue
 
         # @graph, arrays, and single objects all occur.
         nodes = data if isinstance(data, list) else [data]
@@ -152,6 +200,8 @@ def _spec_texts(html: str) -> list[str]:
 def from_spec_block(html: str) -> DimensionHit | None:
     """A labelled spec row. More trustworthy than page prose, less than JSON-LD."""
     for text in _spec_texts(html):
+        if _is_unrendered_template(text):
+            continue  # a placeholder, not a spec — the page renders this client-side
         hit = regex_extract({"title": "", "body_html": text, "variants": [], "options": []})
         if hit is None:
             continue

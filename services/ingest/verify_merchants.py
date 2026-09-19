@@ -52,12 +52,41 @@ MIN_DIMENSION_RATE = 0.25
 TARGET_USABLE_PRODUCTS = 100
 
 # A small room needs one of each of these, so coverage matters as much as volume.
+# Keywords are matched as substrings, so include the spaced spellings real merchants use
+# ("night stand", not just "nightstand") — a first real run left 139 usable products
+# uncategorised, and "foyer/hall lanterns" and "night stands" were among them.
 DEMO_CATEGORIES = {
-    "seating": ("chair", "sofa", "couch", "stool", "bench", "seating", "armchair", "ottoman"),
-    "surface": ("desk", "table", "console", "nightstand"),
-    "storage": ("shelf", "shelving", "bookcase", "cabinet", "storage", "dresser", "credenza"),
-    "lighting": ("lamp", "light", "sconce", "pendant"),
+    "seating": ("chair", "sofa", "couch", "stool", "bench", "seating", "armchair", "ottoman",
+                "loveseat", "sectional", "settee", "recliner"),
+    "surface": ("desk", "table", "console", "nightstand", "night stand", "sideboard", "vanity"),
+    "storage": ("shelf", "shelv", "bookcase", "bookshelf", "cabinet", "storage", "dresser",
+                "credenza", "wardrobe", "chest", "drawer"),
+    "lighting": ("lamp", "light", "sconce", "pendant", "lantern", "chandelier", "flush mount"),
 }
+
+
+def bucket_for(ptype: str, title: str = "") -> str | None:
+    """Which demo category a product_type belongs to, or None.
+
+    Lighting wins outright: "table lamps" is a lamp, and first-match-in-dict-order put it in
+    `surface` because "table" is a surface keyword — which is how a real run reported
+    "lighting 0" while holding a lighting merchant's catalogue. Otherwise the longest matching
+    keyword wins, so "bookcase" beats a stray substring.
+    """
+    # 101 usable products came back with an EMPTY product_type on the first real run. The
+    # title names the thing in every one of those cases, so fall back to it rather than
+    # discarding the product from coverage entirely.
+    text = (ptype or "").lower() or (title or "").lower()
+    if not text:
+        return None
+    if any(w in text for w in DEMO_CATEGORIES["lighting"]):
+        return "lighting"
+    best, best_len = None, 0
+    for bucket, words in DEMO_CATEGORIES.items():
+        for w in words:
+            if w in text and len(w) > best_len:
+                best, best_len = bucket, len(w)
+    return best
 
 
 def coverage(reports: list["MerchantReport"]) -> dict[str, int]:
@@ -65,11 +94,25 @@ def coverage(reports: list["MerchantReport"]) -> dict[str, int]:
     out = {k: 0 for k in DEMO_CATEGORIES}
     for r in reports:
         for ptype, n in (r.categories or {}).items():
-            for bucket, words in DEMO_CATEGORIES.items():
-                if any(w in ptype for w in words):
-                    out[bucket] += n
-                    break
+            bucket = bucket_for(ptype)
+            if bucket:
+                out[bucket] += n
     return out
+
+
+def uncategorised(reports: list["MerchantReport"]) -> list[tuple[str, int]]:
+    """product_type values that matched no bucket, commonest first.
+
+    Without this a "no usable products in lighting" gate is unfalsifiable: you cannot tell a
+    real gap from a keyword list that does not know what this merchant calls a lamp.
+    """
+    tally: dict[str, int] = {}
+    for r in reports:
+        for ptype, n in (r.categories or {}).items():
+            if bucket_for(ptype) is not None:
+                continue
+            tally[ptype] = tally.get(ptype, 0) + n
+    return sorted(tally.items(), key=lambda kv: -kv[1])
 
 
 def classify_error(e: BaseException) -> tuple[str, str]:
@@ -184,7 +227,13 @@ def dump_samples(products: list[dict], name: str, out_dir: str, n: int = 8) -> s
             [
                 {
                     "title": p.get("title"),
+                    # handle is load-bearing: step 2.5 builds {storefront}/products/{handle},
+                    # so a sample without it cannot be used to test the page pass.
+                    "handle": p.get("handle"),
                     "product_type": p.get("product_type"),
+                    # Ani needs the image, not just the dimensions (contracts.md: "Product
+                    # images plus extracted dimensions for the pre-bake").
+                    "images": [i.get("src") for i in (p.get("images") or [])][:3],
                     "tags": p.get("tags"),
                     "body_html": p.get("body_html"),
                     "variants": [{"title": v.get("title")} for v in (p.get("variants") or [])],
@@ -328,8 +377,17 @@ def render(reports: list[MerchantReport]) -> str:
         "  " + "   ".join(f"{k} {v}" for k, v in cov.items()),
         "",
     ]
+    unmatched = uncategorised(reports)
+    if unmatched:
+        total_unmatched = sum(n for _, n in unmatched)
+        lines += [
+            f"UNCATEGORISED: {total_unmatched} usable products matched no demo category.",
+            "  " + ", ".join(f"{t or '(none)'} {n}" for t, n in unmatched[:8]),
+            "  If a lamp is in there, widen DEMO_CATEGORIES rather than hunting a new merchant.",
+            "",
+        ]
     if missing:
-        lines.append(f"GAP: no usable products in {', '.join(missing)} — find a merchant for each.")
+        lines.append(f"GAP: no usable products in {', '.join(missing)} — check UNCATEGORISED first.")
     lines += [
         "Products, not merchants, are the requirement. Two good catalogues can satisfy it and",
         "fifteen dimensionless ones cannot. Category coverage is the other half: a small room",

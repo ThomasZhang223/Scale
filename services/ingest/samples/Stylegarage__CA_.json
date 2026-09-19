@@ -1,6 +1,7 @@
 [
   {
     "title": "CozyPad Sofabed",
+    "handle": "cozypad-sofabed",
     "product_type": "Sofa",
     "tags": [
       "Sofabeds"
@@ -27,6 +28,7 @@
   },
   {
     "title": "Kitchen Shelf with Hanger",
+    "handle": "kitchen-shelf-with-hanger",
     "product_type": "Shelving",
     "tags": [
       "Fixtures",
@@ -58,6 +60,7 @@
   },
   {
     "title": "Dunes Rug",
+    "handle": "dunes-rug",
     "product_type": "Floor Covering",
     "tags": [],
     "body_html": "<p data-mce-fragment=\"1\">The Dunes rug is made from hand spun sheep's wool which has been hand-knotted using Persian techniques to deliver a looser, high-pile finish. Character, durability and texture are supremely melded with quality and a wonderfully soft, casual - yet sophisticated - vibe.</p>",
@@ -96,6 +99,7 @@
   },
   {
     "title": "Beat Floor Lamp",
+    "handle": "beat-floor-lamp",
     "product_type": "Lighting",
     "tags": [
       "Floor Lamps"
@@ -122,6 +126,7 @@
   },
   {
     "title": "Jack Portable Light",
+    "handle": "jack-portable-light",
     "product_type": "Lighting",
     "tags": [],
     "body_html": "<p>Jack is a playful portable light designed for effortless indoor and outdoor use. Lightweight, stackable and easy to move, it\u2019s made from durable polyethylene using an air rotation-moulding process making it lightweight and dynamic.\u00a0</p>\n<p>The matte white shade creates a soft, diffused glow from an integrated and replaceable 5W LED, delivering warm 2700K light. A dimmer allows smooth, continuous brightness control, while a remote can pair and control up to three lights simutaneously. Rechargeable via USB-C, JACK provides up to 8 hours of light. Fully IP65 rated, it\u2019s built for outdoor use and long-term durability, with replaceable electrical components.</p>",
@@ -142,6 +147,7 @@
   },
   {
     "title": "Unda Office Chair",
+    "handle": "unda-office-chair",
     "product_type": "Chair",
     "tags": [
       "Chairs",
@@ -183,6 +189,7 @@
   },
   {
     "title": "Unda Dining Table",
+    "handle": "unda-dining-table",
     "product_type": "Dining Table",
     "tags": [
       "Dining Tables"
@@ -205,6 +212,7 @@
   },
   {
     "title": "Sequence Dining Table",
+    "handle": "sequence-dining-table",
     "product_type": "Dining Table",
     "tags": [
       "Dining Tables"

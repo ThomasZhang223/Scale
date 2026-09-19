@@ -190,6 +190,40 @@ def test_coverage_counts_a_real_product_type():
         srv.shutdown()
 
 
+def test_a_table_lamp_is_lighting_not_a_surface():
+    """First-match-in-dict-order put "table lamps" in `surface` because "table" is a surface
+    keyword, so a real run reported "lighting 0" while holding a lighting merchant's catalogue."""
+    assert vm.bucket_for("table lamps") == "lighting"
+    assert vm.bucket_for("floor lamp") == "lighting"
+    assert vm.bucket_for("dining table") == "surface"
+
+
+def test_an_empty_product_type_falls_back_to_the_title():
+    """101 usable products came back with no product_type at all on a real run; the title
+    names the thing in every one of those cases."""
+    assert vm.bucket_for("", "Brass Floor Lamp") == "lighting"
+    assert vm.bucket_for("", "Oak Bookshelf") == "storage"
+    assert vm.bucket_for("", "") is None
+
+
+def test_spaced_and_plural_spellings_match():
+    """'foyer/hall lanterns' and 'night stands' were both uncategorised on a real run."""
+    assert vm.bucket_for("foyer/hall lanterns") == "lighting"
+    assert vm.bucket_for("night stands") == "surface"
+
+
+def test_longest_keyword_wins_outside_lighting():
+    assert vm.bucket_for("bookcase") == "storage"
+    assert vm.bucket_for("sofas") == "seating"
+
+
+def test_uncategorised_lists_what_matched_nothing():
+    r = run("good")
+    r.categories = {"table lamps": 4, "throws & blankets": 9}
+    assert vm.coverage([r])["lighting"] == 4
+    assert vm.uncategorised([r]) == [("throws & blankets", 9)]
+
+
 def test_output_keys_are_camel_case_like_the_example_file():
     """merchants.verified.json must match merchants.example.json's shape — the crawler reads it."""
     import json as _json

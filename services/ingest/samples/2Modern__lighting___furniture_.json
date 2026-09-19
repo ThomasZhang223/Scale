@@ -1,6 +1,7 @@
 [
   {
     "title": "Holiday Gingerbread Tealight Holder Set",
+    "handle": "holiday-gingerbread-tealight-holder-set",
     "product_type": "Decor/Home Decor/Candle Holders",
     "tags": [
       "Brand: Blomus",
@@ -32,6 +33,7 @@
   },
   {
     "title": "Nutcracker Mug and Treat Tower (Set of 2)",
+    "handle": "nutcracker-mug-and-treat-tower-set-of-2",
     "product_type": "Kitchen & Table/Dinnerware/Mugs & Teacups",
     "tags": [
       "Brand: Blomus",
@@ -41,7 +43,6 @@
       "Dinnerware",
       "Drinkware",
       "Feature: Handmade",
-      "Feature: Quick Ship",
       "Indoor",
       "Mug",
       "New",
@@ -67,13 +68,13 @@
   },
   {
     "title": "Holiday Village House Tealight Holder",
+    "handle": "holiday-village-house-tealight-holder",
     "product_type": "Decor/Home Decor/Candle Holders",
     "tags": [
       "Brand: Blomus",
       "Candle Holder",
       "Collection: Village House",
       "Feature: Handmade",
-      "Feature: Quick Ship",
       "Indoor",
       "New",
       "PFA Status: None",
@@ -102,6 +103,7 @@
   },
   {
     "title": "Nutcracker Mug and Treat Tower Set",
+    "handle": "nutcracker-mug-and-treat-tower-set",
     "product_type": "Kitchen & Table/Dinnerware/Mugs & Teacups",
     "tags": [
       "Brand: Blomus",
@@ -111,7 +113,6 @@
       "Dinnerware",
       "Drinkware",
       "Feature: Handmade",
-      "Feature: Quick Ship",
       "Indoor",
       "Mug",
       "New",
@@ -141,6 +142,7 @@
   },
   {
     "title": "Juhla Ornament (Set of 8)",
+    "handle": "juhla-ornament-set-of-8",
     "product_type": "Decor/Home Decor/Decorative Objects/Figurines & Statues",
     "tags": [
       "Brand: Blomus",
@@ -196,6 +198,7 @@
   },
   {
     "title": "Kitai Glass Ornament with Ring (Set of 4)",
+    "handle": "kitai-glass-ornament-with-ring-set-of-4",
     "product_type": "Decor/Home Decor/Decorative Objects/Figurines & Statues",
     "tags": [
       "Brand: Blomus",
@@ -231,6 +234,7 @@
   },
   {
     "title": "Thatched Roof Houses and Figurines Set",
+    "handle": "thatched-roof-houses-and-figurines-set",
     "product_type": "Decor/Home Decor/Decorative Objects/Figurines & Statues",
     "tags": [
       "Brand: Blomus",
@@ -263,6 +267,7 @@
   },
   {
     "title": "Vela Candle Holder",
+    "handle": "vela-candle-holder",
     "product_type": "Decor/Home Decor/Candle Holders",
     "tags": [
       "Brand: Blomus",
@@ -270,7 +275,6 @@
       "Collection: Vela",
       "Designer: Frederike Martens",
       "Feature: Handmade",
-      "Feature: Quick Ship",
       "Female Designer",
       "Indoor",
       "New",

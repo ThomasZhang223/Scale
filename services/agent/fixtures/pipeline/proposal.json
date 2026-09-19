@@ -1,0 +1,28 @@
+{
+  "requestId": "stub-req-1",
+  "versionId": "ver_stub_proposal",
+  "baseVersionId": "ver_stub_base",
+  "summary": "Reading corner by the window",
+  "explanation": "Moved the chair next to the window, facing into the room, and slid the sofa 95 cm east to make space.",
+  "tradeoffs": [],
+  "moves": [
+    {
+      "objectId": "obj_sofa",
+      "from": { "placementId": "pl_sofa", "objectId": "obj_sofa", "p": [0.7, -1.4, -0.34], "yawDeg": 0, "scale": 1, "lockedToWallId": null, "flags": [] },
+      "to":   { "placementId": "pl_sofa", "objectId": "obj_sofa", "p": [1.65, -1.4, -0.34], "yawDeg": 0, "scale": 1, "lockedToWallId": null, "flags": [] }
+    },
+    {
+      "objectId": "obj_chair",
+      "from": { "placementId": "pl_chair", "objectId": "obj_chair", "p": [2.1, -1.4, 1.2], "yawDeg": 270, "scale": 1, "lockedToWallId": null, "flags": [] },
+      "to":   { "placementId": "pl_chair", "objectId": "obj_chair", "p": [-0.47, -1.4, -0.52], "yawDeg": 0, "scale": 1, "lockedToWallId": null, "flags": [] }
+    }
+  ],
+  "placements": [
+    { "placementId": "pl_sofa", "objectId": "obj_sofa", "p": [1.65, -1.4, -0.34], "yawDeg": 0, "scale": 1, "lockedToWallId": null, "flags": [] },
+    { "placementId": "pl_chair", "objectId": "obj_chair", "p": [-0.47, -1.4, -0.52], "yawDeg": 0, "scale": 1, "lockedToWallId": null, "flags": [] },
+    { "placementId": "pl_table", "objectId": "obj_table", "p": [0.7, -1.4, 1.18], "yawDeg": 0, "scale": 1, "lockedToWallId": null, "flags": [] },
+    { "placementId": "pl_storage", "objectId": "obj_storage", "p": [-1.15, -1.4, 1.7], "yawDeg": 90, "scale": 1, "lockedToWallId": null, "flags": [] }
+  ],
+  "fit": { "red": 0, "amber": 0 },
+  "unsatisfied": []
+}

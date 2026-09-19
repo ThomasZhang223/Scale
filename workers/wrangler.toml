@@ -1,38 +1,110 @@
+# Owner: Thomas. Cloudflare resource bindings for the Full Scale backend.
+#
+# Free-plan facts this file is built around. Each one is a deploy failure if you get it wrong:
+#   * Durable Objects on the free plan are SQLite-backed ONLY. `new_classes` (the key-value
+#     backend) is paid-plan, so every migration below uses `new_sqlite_classes`.
+#   * Queues ARE on the free plan: 10,000 operations/day, 24h message retention.
+#   * Workflows are on the free plan: 1,024 steps/instance, 100 concurrent instances,
+#     unlimited wall-clock per step. That last one is why a 20-second Baseten call is a step.
+#   * Vectorize, Workers AI and Browser Run have NO local simulation. `remote = true` makes
+#     `wrangler dev` reach the real service instead of failing silently. They need internet.
+#
+# Run `bash ../infra/provision.sh` to create the resources and fill in the ids below.
+
 name = "full-scale-workers"
 main = "src/index.ts"
 compatibility_date = "2026-09-19"
+compatibility_flags = ["nodejs_compat"]
 
-# R2 bucket: room captures, object frames, meshes, thumbnails. Key layout in .claude/contracts.md.
+# Logs in the dashboard. Free, and the only way to debug a Workflow step at 3am.
+[observability]
+enabled = true
+
+# --- Storage -------------------------------------------------------------------------------
+
+# R2: room captures, object frames, meshes, thumbnails. Key layout in .claude/contracts.md.
+# The bucket is NOT public. Objects are served through GET /v1/assets/* so that CORS and the
+# key -> URL conversion stay in one function, once. See src/lib/keys.ts.
 [[r2_buckets]]
 binding = "BUCKET"
 bucket_name = "full-scale-objects"
-# TODO: fill in the real bucket name before deploying.
 
-# D1 database: rooms, versions, objects, jobs. Schema in src/schema.sql.
+# D1: rooms, versions, objects, jobs. Schema in src/schema.sql.
 [[d1_databases]]
 binding = "DB"
 database_name = "full-scale-db"
-database_id = "00000000-0000-0000-0000-000000000000"
-# TODO: fill in the real database_id from `wrangler d1 create` before deploying.
+database_id = "7e9a53b7-ddbf-4c47-9725-279a382a797b"
 
-# Vectorize index: objects-v1, 768-dim google/siglip2-base-patch16-224 embeddings, cosine metric.
+# KV: upload tokens (short TTL) and the upstream service origins the tunnel publishes.
+# Origins live in KV rather than in [vars] so that rotating a quick-tunnel URL is one
+# `wrangler kv key put` and not a redeploy. See src/lib/config.ts.
+[[kv_namespaces]]
+binding = "CONFIG"
+id = "601059204ab74578a49b99ace41c9e4a"
+
+# Vectorize: objects-v1, 768-dim google/siglip2-base-patch16-224 embeddings, cosine metric.
+# The w_mm/h_mm/d_mm range filter only works if the metadata indexes exist — provision.sh
+# creates them. Without them the fit filter silently matches nothing.
 [[vectorize]]
 binding = "OBJECTS_INDEX"
 index_name = "objects-v1"
+remote = true
 
-# Queue: background work (mesh generation kickoff, catalog ingestion, etc).
+# --- Compute -------------------------------------------------------------------------------
+
+# Workers AI: the brain for both agent loops, and the LLM/VLM passes in catalog extraction.
+# Chosen over a third-party API because it needs no key and keeps the agent inside Workers,
+# which is what the Cloudflare track is graded on.
+[ai]
+binding = "AI"
+remote = true
+
+# Browser Run (formerly Browser Rendering): headless Chrome for listings that have no
+# /products.json. Free plan. Only reached on Paul's non-Shopify path.
+[browser]
+binding = "BROWSER"
+remote = true
+
+# --- Orchestration -------------------------------------------------------------------------
+
+# Queue: admission control for the unattended catalog pre-bake. It exists to throttle, not to
+# transport: 60-100 products would blow past the free plan's 100 concurrent Workflow
+# instances, so the consumer starts at most `max_concurrency` workflows at a time.
 [[queues.producers]]
 binding = "JOB_QUEUE"
 queue = "full-scale-jobs"
 
 [[queues.consumers]]
 queue = "full-scale-jobs"
+max_batch_size = 1
+max_concurrency = 3
+max_retries = 3
 
-# Durable Object: one instance per room, fans out SSE for GET /sync/{roomId}.
+# Workflows: the two multi-step pipelines. Each step.do() is durably retried on its own, which
+# is what a flaky GPU endpoint and a flaky merchant storefront both need.
+[[workflows]]
+name = "generate-mesh"
+binding = "GENERATE_MESH"
+class_name = "GenerateMeshWorkflow"
+
+[[workflows]]
+name = "ingest-merchant"
+binding = "INGEST_MERCHANT"
+class_name = "IngestMerchantWorkflow"
+
+# --- Durable Objects -----------------------------------------------------------------------
+
+# One RoomAgent per room. It holds the SSE fan-out for GET /v1/sync/{roomId} AND the layout
+# agent's memory, because they are the same thing: per-room durable state.
 [[durable_objects.bindings]]
-name = "ROOM_SYNC"
-class_name = "RoomSync"
+name = "ROOM_AGENT"
+class_name = "RoomAgent"
+
+# One ScoutAgent per search session. Remembers which merchants it has already ingested.
+[[durable_objects.bindings]]
+name = "SCOUT_AGENT"
+class_name = "ScoutAgent"
 
 [[migrations]]
 tag = "v1"
-new_classes = ["RoomSync"]
+new_sqlite_classes = ["RoomAgent", "ScoutAgent"]

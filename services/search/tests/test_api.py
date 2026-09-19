@@ -5,16 +5,23 @@ last two bugs in this project's other service were both in the entrypoint rather
 logic behind it.
 """
 
-import sys, pathlib
+import os, sys, pathlib
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+
+# app.auth refuses to import without this — an auth check that silently passes when
+# unconfigured is worse than no auth, so it fails at startup rather than at request time.
+# Must be set before `app` is imported.
+TOKEN = "test-upstream-token"
+os.environ.setdefault("UPSTREAM_TOKEN", TOKEN)
+TOKEN = os.environ["UPSTREAM_TOKEN"]
 
 from fastapi.testclient import TestClient
 
 from app import main
 from app.index import BruteForceIndex, candidate_from_object_v1
 
-client = TestClient(main.app)
+client = TestClient(main.app, headers={"X-Upstream-Token": TOKEN})
 
 OAK, WHITE = "#b5834a", "#f5f5f0"
 
@@ -151,6 +158,26 @@ def test_metres_to_millimetre_rounding_is_exact():
     load([obj("a", 0.3126, 0.0155, 0.2212)])
     c = main.INDEX.get("a")
     assert (c.w_mm, c.h_mm, c.d_mm) == (313, 16, 221)
+
+
+def test_search_without_the_token_is_401():
+    """The service sits behind a public quick-tunnel URL, so this header is the only thing
+    between the open internet and it."""
+    load([obj("a", 0.6, 1.8, 0.3)])
+    bare = TestClient(main.app)
+    assert bare.post("/search", json={}).status_code == 401
+    assert bare.post("/index", json={"objects": []}).status_code == 401
+
+
+def test_a_wrong_token_is_401():
+    load([obj("a", 0.6, 1.8, 0.3)])
+    wrong = TestClient(main.app, headers={"X-Upstream-Token": "nope"})
+    assert wrong.post("/search", json={}).status_code == 401
+
+
+def test_health_needs_no_token():
+    """Liveness has to answer before anyone has configured a secret."""
+    assert TestClient(main.app).get("/health").status_code == 200
 
 
 def test_health_reports_index_size():

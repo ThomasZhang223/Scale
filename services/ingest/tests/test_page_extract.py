@@ -43,6 +43,20 @@ DEF_LIST = """
 </dl></body></html>
 """
 
+# The realistic shape, and the one my first fixtures were too optimistic about: the theme emits
+# Product JSON-LD but fills only name/image/offers/sku. No dimensions in the structured data at
+# all, so the spec block has to carry it.
+JSON_LD_WITHOUT_DIMENSIONS = """
+<html><head><script type="application/ld+json">
+{"@context":"https://schema.org/","@type":"Product","name":"The Floyd Bed",
+ "image":["https://cdn.shopify.com/x.jpg"],"sku":"BED-Q",
+ "offers":{"@type":"Offer","price":"995.00","priceCurrency":"USD"}}
+</script></head><body>
+<details><summary>Dimensions</summary><div>Queen: 60" W x 80" L x 14" H</div></details>
+<p>Ships in 3-5 days.</p>
+</body></html>
+"""
+
 NOISE_ONLY = """
 <html><body>
  <p>Ships in 3-5 days. Free returns within 30 days. Rated 4.8 by 120 reviews.</p>
@@ -119,6 +133,46 @@ def test_a_partial_hit_is_kept_rather_than_discarded():
     assert hit.w is not None
 
 
+def test_json_ld_without_dimension_keys_falls_through_to_the_spec_block():
+    """Most themes emit Product JSON-LD with only name/image/offers/sku. The structured path
+    must yield nothing rather than something wrong, and the spec block must still win."""
+    assert from_json_ld(JSON_LD_WITHOUT_DIMENSIONS) is None
+    hit = extract_from_page(JSON_LD_WITHOUT_DIMENSIONS)
+    assert hit.as_bbox() is not None
+    assert hit.source_field == "spec_block"
+
+
+def test_suffix_labels_map_to_the_right_axes():
+    """60" W x 80" L x 14" H — L is depth, not height. Getting this wrong puts a bed on its end."""
+    hit = extract_from_page(JSON_LD_WITHOUT_DIMENSIONS)
+    box = hit.as_bbox()
+    assert abs(box["w"] - 1.524) < 1e-3, box   # 60 in
+    assert abs(box["d"] - 2.032) < 1e-3, box   # 80 in  (L)
+    assert abs(box["h"] - 0.3556) < 1e-3, box  # 14 in
+
+
+def test_shipping_days_are_not_read_as_a_dimension():
+    hit = extract_from_page(JSON_LD_WITHOUT_DIMENSIONS)
+    for v in hit.as_bbox().values():
+        assert v not in (0.03, 0.05), "'Ships in 3-5 days' leaked into the dimensions"
+
+
+def test_control_character_inside_a_string_still_parses():
+    """Floyd's Product block fails a strict parse on a literal newline inside a description.
+    json.loads(strict=False) is exactly for that, and without it the block is skipped."""
+    from app.page_extract import _loads_tolerant
+    raw = '{"@context":"http://schema.org/","@type":"Product","description":"line one\nline two"}'
+    d = _loads_tolerant(raw)
+    assert isinstance(d, dict) and d["@type"] == "Product"
+
+
+def test_the_object_scan_fallback_rejects_fragments():
+    """Run loosely on Floyd's block this returned nineteen garbage fragments and called it
+    success, which is worse than failing. Only real JSON-LD nodes count."""
+    from app.page_extract import _loads_tolerant
+    assert _loads_tolerant("12 34 [] {} 'nope'") is None
+
+
 def test_product_url_is_built_from_the_handle():
     assert product_url("https://shop.com/", "oak-desk") == "https://shop.com/products/oak-desk"
     try:
@@ -159,6 +213,31 @@ def test_fetch_returns_page_content():
     res = f.fetch("https://shop.com/products/oak-desk")
     assert res.status_code == 200 and "Dimensions" in res.content
     assert extract_from_page(res.content).as_bbox() is not None
+
+
+def test_a_transient_503_is_retried():
+    """A real run lost four products to bare 503s. Transient upstream trouble is exactly what
+    a retry is for."""
+    import app.browserbase as bb
+    saved, bb.BACKOFF_S = bb.BACKOFF_S, 0
+    calls = []
+
+    class FakeClient:
+        def post(self, url, headers=None, json=None):
+            calls.append(1)
+            class R:
+                status_code = 503
+                def json(self): return {}
+            return R()
+
+    try:
+        bb.BrowserbaseFetch(api_key="k", client=FakeClient()).fetch("https://x.com")
+        raise AssertionError("should have raised")
+    except FetchError as e:
+        assert e.status == 503
+    finally:
+        bb.BACKOFF_S = saved
+    assert len(calls) == bb.MAX_RETRIES, f"503 should retry, got {len(calls)}"
 
 
 def test_a_403_is_raised_not_retried():

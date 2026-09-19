@@ -1,0 +1,32 @@
+# apps/xr on Cloudflare: the built three.js page as static assets, plus a few lines of Worker
+# that forward /v1 to Thomas's Worker and /v1/agent to the designer agent. The browser (and
+# the Quest) then talks to exactly one HTTPS origin, the same shape the Vite dev server gives
+# it through its proxy — so no CORS, and WebXR's secure-context requirement is met without a
+# cloudflared quick tunnel whose hostname changes every restart (infra/README.md).
+#
+#   npm run deploy        # tsc + vite build, then wrangler deploy → https://full-scale-xr.<subdomain>.workers.dev
+#   npm run dev:cf        # same, served locally by wrangler on 8790 (no HMR; use `npm run dev` to iterate)
+#
+# This is NOT the demo path for the backend: the page still reaches everything through the
+# one front door, full-scale-workers. It only replaces "tunnel to localhost:5173".
+name = "full-scale-xr"
+main = "worker/index.ts"
+compatibility_date = "2026-09-19"
+
+[observability]
+enabled = true
+
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+# The page is a single index.html; anything that isn't a file should still get it.
+not_found_handling = "single-page-application"
+# Only /v1 goes through the Worker; every other path is served straight from the asset store.
+run_worker_first = ["/v1/*"]
+
+[vars]
+# Where /v1 goes. The only front door — never a tunnel URL (infra/README.md).
+API_ORIGIN = "https://full-scale-workers.thomaszhangdev.workers.dev"
+# Where /v1/agent goes: services/agent, deployed as its own Worker. Empty means "send it to
+# API_ORIGIN too" (Thomas's Worker can forward /v1/agent/* in one line).
+AGENT_ORIGIN = ""

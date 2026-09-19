@@ -15,7 +15,27 @@ schema and endpoint this consumes is in `.claude/contracts.md`; transform conven
 npm install
 npm run dev          # laptop: http://localhost:5173
 npm run quest        # Quest over USB: adb reverse, then open http://localhost:5173 → Enter VR
+npm run deploy       # Cloudflare: tsc + vite build, then wrangler deploy (see below)
 ```
+
+### Deploying the page (Cloudflare Workers)
+
+WebXR needs a secure context, so the Quest needs HTTPS. Until now that meant a cloudflared
+quick tunnel to the Vite dev server, whose hostname changes every restart (`infra/README.md`).
+`wrangler.toml` instead deploys `dist/` as static assets behind a stable URL,
+`https://full-scale-xr.<subdomain>.workers.dev`, with `worker/index.ts` forwarding `/v1` to
+Thomas's Worker (`API_ORIGIN`) and `/v1/agent` to the designer agent (`AGENT_ORIGIN`; empty
+means "same as `/v1`"). The browser sees one origin, exactly as it does through the Vite proxy.
+
+```bash
+npx wrangler login   # once per machine
+npm run deploy       # build + deploy
+npm run dev:cf       # the same build, served locally by wrangler on http://localhost:8790
+```
+
+`VITE_*` values are baked in at build time: set `VITE_API_STUB=0` (and, if you use it,
+`VITE_ROOM_ID`) in `.env` before `npm run deploy` to point the deployed page at real data.
+The dev loop stays `npm run dev` — the wrangler path has no hot reload.
 
 The room from `fixtures/room-demo.json` (the team's `RoomCapture v1` sample, at the repo
 root) rises out of the floor. The sample chair drops into the spot where a chair was
@@ -60,12 +80,12 @@ open it with `?scan=/room-scan.json`).
 
 ## Controls
 
-| Where | Move | Turn |
-|---|---|---|
-| Quest | Point (ray turns blue), hold the trigger, sweep across the floor | Thumbstick left/right while holding |
-| Laptop | Drag with the mouse | Scroll while dragging (15° steps) |
+| Where | Add | Move | Turn |
+|---|---|---|---|
+| Quest | Point the right ray at the palette on your left hand (ray turns green), pull the trigger on a tile, and carry the copy out | Point (ray turns blue), hold the trigger, sweep across the floor | Thumbstick left/right while holding |
+| Laptop | **Add …** buttons in the panel | Drag with the mouse | Scroll while dragging (15° steps) |
 
-Letting go leaves the object where it is.
+Letting go leaves the object where it is. Every pull from the palette is a fresh copy.
 
 ## Adding your own
 
@@ -80,8 +100,10 @@ Letting go leaves the object where it is.
 ]
 ```
 
-`name` decides matching: include a RoomPlan category (`chair`, `sofa`, `table`, `bed`,
-`storage`, `television`, …) to take that piece's place.
+Every entry appears in the palette. `name` decides what happens at start: include a
+RoomPlan category (`chair`, `sofa`, `table`, `bed`, `storage`, `television`, …) and the
+object takes that detected piece's place straight away; anything else waits in the palette
+until you pull it out.
 
 **Reset** rebuilds the room and puts every object back in its starting spot.
 
@@ -94,7 +116,14 @@ Letting go leaves the object where it is.
 | `src/objects.ts` | GLB → real-size object with a bottom-center origin and hull points; fixes cm/mm files |
 | `src/physics.ts` | Rapier world: solid room, upright objects, free-spot search, collision-aware dragging |
 | `src/interaction.ts` | Quest controllers and laptop mouse, both moving objects through physics |
-| `src/sync.ts` | Optional Supabase live room updates |
+| `src/api.ts` | The team's `/v1` API: room, objects by `glbUrl`, the SSE live feed, schema and bbox checks |
+| `src/agent.ts` | The designer agent client: request, poll + SSE, accept / reject / undo, offline fallback |
+| `src/apply.ts` | Applies a proposal through physics drag targets (2 cm / 2° arrival, 4 s give-up) |
+| `src/ghosts.ts` | Ghost outlines and movement lines for a proposal |
+| `src/fit.ts` | Red / amber fit ribbons on the floor |
+| `src/placements.ts` | Version v1 placements ↔ scene coordinates |
+| `src/palette.ts` | The wrist palette in VR |
+| `src/halo.ts` | Blue halo on the pointed-at / held object |
 | `public/room-scan.json` | Sample room (off-center like a real ARKit scan) |
 | `public/objects.json` | Objects loaded at start |
 | `public/objects/` | Sample chair and sofa (CC BY 4.0, see `ATTRIBUTION.md`) |
@@ -123,8 +152,39 @@ the controller ray, and textures (the Node test couldn't decode them). If frame 
 drops, optimize the GLBs first:
 `npx @gltf-transform/cli optimize in.glb out.glb --compress draco --texture-compress webp`.
 
-## Optional: live room scans
+## The designer agent
 
-Create a Supabase project, run `supabase/schema.sql`, copy `.env.example` to `.env` with
-the URL and anon key. Room scans written to the `rooms` row (id `demo`) appear live in
-every open headset. Objects are local to each page for now.
+Pull a **Designer** tile on the wrist (*Reading corner*, *Open up the floor*, *Clear the
+door*, *Face the window*) or type a request on the laptop. The wrist shows the agent
+working ("Reading room…", the last three decisions), then ghost outlines where things will
+go with a line from where they are, the explanation and any trade-off, and **Accept** /
+**Reject** / **Ask again**. Accept glides the furniture into place through physics (it still
+stops at walls; movers ignore each other so swaps don't jam); **Undo** puts it back.
+Whatever you're holding is pinned. The laptop panel keeps the full decision log — that's
+the evidence of how the agent handled messy data.
+
+The agent itself is `services/agent` (a Cloudflare Worker, one Durable Object per room);
+the page reaches it at `/v1/agent`, proxied by Vite to `VITE_AGENT_PROXY` (default
+`http://127.0.0.1:8789`). With the agent down, the built-in sample proposal plays and the
+wrist says "Offline". `?agentstub=1` uses the agent's fixture timeline. See
+`docs/agent/` for the whole design.
+
+## The server
+
+The page talks to the team's Worker (Thomas's, `workers/`) exactly as `.claude/contracts.md`
+lays out, and every request carries `X-Stub: 1` by default, so his committed fixtures come
+back until the real backend exists:
+
+- `GET /v1/rooms/{id}` — the room at start (`?room=<id>`; default `VITE_ROOM_ID`, else the
+  fixture's id). If the server doesn't answer, the committed fixture is shown and the panel
+  says so.
+- `GET /v1/objects/{id}` — `?object=<id>[,<id>]` loads objects by their `glbUrl` at scale 1.
+  A GLB is never rescaled here; if its box differs from `bboxMeters` by more than 1 mm, the
+  panel says the normalisation contract broke upstream.
+- `GET /v1/sync/{roomId}` — the room's live feed. Every `object` event with `state: "ready"`
+  is loaded and placed. `version` and `fit` events are logged for now.
+
+In dev, Vite proxies `/v1` to `VITE_API_PROXY` (default `http://127.0.0.1:8787`, i.e.
+`wrangler dev` in `workers/`), so there's no CORS to configure and the Quest reaches it over
+the same USB port-forward. Copy `.env.example` to `.env` to change any of this;
+`VITE_API_STUB=0` drops the stub header.

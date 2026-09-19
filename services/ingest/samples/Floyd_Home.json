@@ -1,6 +1,7 @@
 [
   {
     "title": "Headboard Add-On - Cherry",
+    "handle": "headboard-add-on-cherry",
     "product_type": "Add On/Expansion",
     "tags": [
       "Discount %|0",
@@ -42,6 +43,7 @@
   },
   {
     "title": "Bed Frame Expansion Kit - Cherry",
+    "handle": "shed-sale-bed-frame-expansion-kit-copy",
     "product_type": "Add On/Expansion",
     "tags": [
       "Discount %|0",
@@ -76,6 +78,7 @@
   },
   {
     "title": "Linen Duvet Cover",
+    "handle": "linen-duvet",
     "product_type": "Duvet Covers",
     "tags": [
       "Discount %|0",
@@ -140,6 +143,7 @@
   },
   {
     "title": "The Floyd Bed \u2014 Upholstered, Original",
+    "handle": "the-floyd-bed-original-upholstered",
     "product_type": "Beds",
     "tags": [
       "Discount %|20",
@@ -327,6 +331,7 @@
   },
   {
     "title": "The Floyd Bed \u2014 Upholstered, Lift Off",
+    "handle": "the-floyd-bed-lift-off-upholstered",
     "product_type": "Beds",
     "tags": [
       "Discount %|20",
@@ -660,6 +665,7 @@
   },
   {
     "title": "The Upholstered Bed Frame \u2014 Add On",
+    "handle": "the-upholstered-bed-frame-add-on",
     "product_type": "Bed Add-Ons",
     "tags": [
       "Discount %|20",
@@ -767,6 +773,7 @@
   },
   {
     "title": "The Upholstered Headboard \u2014 Add On",
+    "handle": "the-upholstered-headboard-add-on",
     "product_type": "Bed Add-Ons",
     "tags": [
       "Discount %|20",
@@ -836,6 +843,7 @@
   },
   {
     "title": "Upholstered Bed Frame Swatches",
+    "handle": "upholstered-bed-frame-swatches",
     "product_type": "Swatch",
     "tags": [
       "Discount %|0",
