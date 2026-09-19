@@ -165,22 +165,6 @@ const routes: Route[] = [
   route("GET", "/v1/sync/{roomId}", undefined, stubSync),
 ];
 
-// ceiling: registration-only stub so `wrangler dev` starts — wrangler.toml declares the
-// ROOM_SYNC Durable Object binding but nothing exported the class. GET /v1/sync/{roomId}
-// under X-Stub: 1 answers directly from the Worker (stubSync above) and never reaches this
-// object yet. The real per-room SSE fan-out — session tracking, broadcast on POST /push and
-// on job completion — lands here when /sync goes from stub to real.
-export class RoomSync {
-  constructor(_state: DurableObjectState, _env: Env) {}
-
-  async fetch(_req: Request): Promise<Response> {
-    return new Response(JSON.stringify({ error: "not implemented", route: "RoomSync" }), {
-      status: 501,
-      headers: { "content-type": "application/json" },
-    });
-  }
-}
-
 // --- Real dispatch ---------------------------------------------------------------------------
 //
 // Order is deliberate: preflight, then assets, then the stub layer, then real logic. The stub

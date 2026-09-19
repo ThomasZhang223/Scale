@@ -43,6 +43,26 @@ export async function callUpstream<T>(
   body: unknown,
   timeoutMs = 25_000,
 ): Promise<T> {
+  const res = await callUpstreamRaw(env, which, path, body, timeoutMs);
+  return (await res.json()) as T;
+}
+
+/**
+ * The same call, returning the Response instead of the parsed body.
+ *
+ * `/v1/search` needs this: Paul's service answers with its own `X-Fit-Relaxed` and
+ * `X-Search-Degraded` headers, and those say something the body does not — that the results
+ * were widened, or that the embedder was down. Parsing straight to JSON throws them away, and
+ * a widened result set that does not announce itself is exactly the failure RANKING.md is
+ * written to prevent.
+ */
+export async function callUpstreamRaw(
+  env: Env,
+  which: Upstream,
+  path: string,
+  body: unknown,
+  timeoutMs = 25_000,
+): Promise<Response> {
   const origin = await upstreamOrigin(env, which);
   const url = `${origin}${path}`;
 
@@ -75,5 +95,5 @@ export async function callUpstream<T>(
       `The ${which} service answered ${res.status}: ${detail}`,
     );
   }
-  return (await res.json()) as T;
+  return res;
 }
