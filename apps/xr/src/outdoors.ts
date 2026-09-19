@@ -8,6 +8,9 @@ import * as THREE from 'three';
 
 const SKY_RADIUS = 300;
 const GRASS_SIZE = 600;
+const BLADES = 60000;          // instanced blades around the room
+const BLADE_RADIUS = 45;       // how far out they reach
+const CLEAR_X = 3.6, CLEAR_Z = 2.8; // no blades inside the room's footprint (6.4 × 4.8 m + a margin)
 
 const skyVertex = /* glsl */ `
   varying vec3 vDir;
@@ -46,12 +49,18 @@ const skyFragment = /* glsl */ `
 
     if (h > 0.01) {
       // Cloud layer at a fixed height: where the view ray meets it, sampled with the wind.
-      vec2 uv = d.xz / (h + 0.08) * 1.6 + vec2(uTime * 0.012, uTime * 0.004);
-      float n = fbm(uv);
-      float cover = smoothstep(0.50, 0.72, n);          // where the clouds are
-      float lit = 0.85 + 0.15 * smoothstep(0.55, 0.9, n); // brighter in their middles
-      float fade = smoothstep(0.02, 0.25, h);           // thin out toward the horizon
-      sky = mix(sky, vec3(lit), cover * fade * 0.95);
+      float fade = smoothstep(0.02, 0.22, h);           // thin out toward the horizon
+      // Two layers: big cumulus low and slow, a thinner wispy layer higher and faster.
+      vec2 uv1 = d.xz / (h + 0.10) * 1.2 + vec2(uTime * 0.010, uTime * 0.003);
+      float n1 = fbm(uv1);
+      float cover1 = smoothstep(0.42, 0.62, n1);
+      float lit1 = 0.80 + 0.20 * smoothstep(0.5, 0.85, n1);   // bright tops, grey undersides
+      vec3 cloud1 = mix(vec3(0.78, 0.80, 0.86), vec3(1.0), lit1);
+      sky = mix(sky, cloud1, cover1 * fade);
+      vec2 uv2 = d.xz / (h + 0.06) * 2.8 + vec2(-uTime * 0.02, uTime * 0.008) + 40.0;
+      float n2 = fbm(uv2);
+      float cover2 = smoothstep(0.55, 0.75, n2);
+      sky = mix(sky, vec3(0.97), cover2 * fade * 0.6);
     }
 
     // The sun: a soft disc plus glow, high in the sky, same direction as the scene's light.
@@ -96,9 +105,71 @@ function grassTexture(): THREE.Texture {
   return tex;
 }
 
+/** A field of tapered blades, instanced, swaying in the vertex shader. */
+function grassBlades(): THREE.InstancedMesh {
+  // Two stacked quads per blade so it can bend: 0.04 wide at the base, tapering to a point.
+  const geometry = new THREE.BufferGeometry();
+  const pos: number[] = [], idx: number[] = [];
+  const h = 0.32;
+  const rings = [[0, 0.02], [0.5 * h, 0.012], [h, 0]];
+  for (const [y, w] of rings) pos.push(-w, y, 0, w, y, 0);
+  idx.push(0, 1, 2, 1, 3, 2, 2, 3, 4, 3, 5, 4);
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geometry.setIndex(idx);
+  geometry.computeVertexNormals();
+
+  const material = new THREE.MeshLambertMaterial({ color: 0x6db54a, side: THREE.DoubleSide });
+  const uniforms = { uTime: { value: 0 } };
+  material.onBeforeCompile = (shader) => {
+    shader.uniforms.uTime = uniforms.uTime;
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nuniform float uTime;\nvarying float vHeight;')
+      .replace('#include <begin_vertex>', `
+        vec3 transformed = vec3(position);
+        vHeight = position.y / ${h.toFixed(2)};
+        // Bend from the base with a wind that varies across the field.
+        vec4 world = instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0);
+        float wind = sin(uTime * 1.6 + world.x * 0.7 + world.z * 0.5) * 0.5 + sin(uTime * 2.7 + world.z * 1.3) * 0.25;
+        transformed.x += vHeight * vHeight * wind * 0.12;
+        transformed.z += vHeight * vHeight * wind * 0.06;
+      `);
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying float vHeight;')
+      .replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb *= mix(0.55, 1.15, vHeight); // dark at the roots, bright tips');
+  };
+  material.userData.uniforms = uniforms;
+
+  const mesh = new THREE.InstancedMesh(geometry, material, BLADES);
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), p = new THREE.Vector3(), sc = new THREE.Vector3();
+  const up = new THREE.Vector3(0, 1, 0);
+  let seed = 3;
+  const rand = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 0x100000000);
+  const color = new THREE.Color();
+  let i = 0;
+  while (i < BLADES) {
+    // Denser near the room, thinning outward: radius ∝ sqrt of a biased random.
+    const r = 1.5 + Math.pow(rand(), 0.7) * BLADE_RADIUS;
+    const a = rand() * Math.PI * 2;
+    const x = Math.cos(a) * r, z = Math.sin(a) * r;
+    if (Math.abs(x) < CLEAR_X && Math.abs(z) < CLEAR_Z) continue;
+    p.set(x, 0, z);
+    q.setFromAxisAngle(up, rand() * Math.PI);
+    const s = 0.7 + rand() * 0.8;
+    sc.set(s, s, s);
+    mesh.setMatrixAt(i, m.compose(p, q, sc));
+    mesh.setColorAt(i, color.setHSL(0.26 + rand() * 0.06, 0.55 + rand() * 0.2, 0.36 + rand() * 0.14));
+    i++;
+  }
+  mesh.instanceMatrix.needsUpdate = true;
+  if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  mesh.frustumCulled = false;
+  return mesh;
+}
+
 export class Outdoors {
   readonly group = new THREE.Group();
   private readonly sky: THREE.ShaderMaterial;
+  private readonly blades: THREE.InstancedMesh;
 
   constructor() {
     this.sky = new THREE.ShaderMaterial({
@@ -121,10 +192,14 @@ export class Outdoors {
     grass.rotation.x = -Math.PI / 2;
     grass.position.y = -0.01; // just under the room's floor so the floor wins where they overlap
     this.group.add(grass);
+
+    this.blades = grassBlades();
+    this.group.add(this.blades);
   }
 
   /** Drift the clouds. Seconds since load. */
   update(timeSeconds: number) {
     this.sky.uniforms.uTime.value = timeSeconds;
+    (this.blades.material as THREE.Material).userData.uniforms.uTime.value = timeSeconds;
   }
 }
