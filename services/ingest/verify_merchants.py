@@ -52,15 +52,20 @@ MIN_DIMENSION_RATE = 0.25
 TARGET_USABLE_PRODUCTS = 100
 
 # A small room needs one of each of these, so coverage matters as much as volume.
+# Keywords are matched as substrings, so include the spaced spellings real merchants use
+# ("night stand", not just "nightstand") — a first real run left 139 usable products
+# uncategorised, and "foyer/hall lanterns" and "night stands" were among them.
 DEMO_CATEGORIES = {
-    "seating": ("chair", "sofa", "couch", "stool", "bench", "seating", "armchair", "ottoman"),
-    "surface": ("desk", "table", "console", "nightstand"),
-    "storage": ("shelf", "shelving", "bookcase", "cabinet", "storage", "dresser", "credenza"),
-    "lighting": ("lamp", "light", "sconce", "pendant"),
+    "seating": ("chair", "sofa", "couch", "stool", "bench", "seating", "armchair", "ottoman",
+                "loveseat", "sectional", "settee", "recliner"),
+    "surface": ("desk", "table", "console", "nightstand", "night stand", "sideboard", "vanity"),
+    "storage": ("shelf", "shelv", "bookcase", "bookshelf", "cabinet", "storage", "dresser",
+                "credenza", "wardrobe", "chest", "drawer"),
+    "lighting": ("lamp", "light", "sconce", "pendant", "lantern", "chandelier", "flush mount"),
 }
 
 
-def bucket_for(ptype: str) -> str | None:
+def bucket_for(ptype: str, title: str = "") -> str | None:
     """Which demo category a product_type belongs to, or None.
 
     Lighting wins outright: "table lamps" is a lamp, and first-match-in-dict-order put it in
@@ -68,13 +73,18 @@ def bucket_for(ptype: str) -> str | None:
     "lighting 0" while holding a lighting merchant's catalogue. Otherwise the longest matching
     keyword wins, so "bookcase" beats a stray substring.
     """
-    ptype = (ptype or "").lower()
-    if any(w in ptype for w in DEMO_CATEGORIES["lighting"]):
+    # 101 usable products came back with an EMPTY product_type on the first real run. The
+    # title names the thing in every one of those cases, so fall back to it rather than
+    # discarding the product from coverage entirely.
+    text = (ptype or "").lower() or (title or "").lower()
+    if not text:
+        return None
+    if any(w in text for w in DEMO_CATEGORIES["lighting"]):
         return "lighting"
     best, best_len = None, 0
     for bucket, words in DEMO_CATEGORIES.items():
         for w in words:
-            if w in ptype and len(w) > best_len:
+            if w in text and len(w) > best_len:
                 best, best_len = bucket, len(w)
     return best
 

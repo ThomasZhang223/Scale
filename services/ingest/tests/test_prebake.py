@@ -154,6 +154,14 @@ def test_browserbase_rescues_products_the_api_had_no_dimensions_for():
         assert r["extractedFrom"] == "spec_block"
     assert m["step2_5"]["recovered"] == 6
     assert m["step2_5"]["failed"] == 0
+    assert m["fromPageFetch"] == 6
+    assert all(r["via"] == "page" for r in rescued)
+
+
+def test_api_rows_are_tagged_as_such():
+    m, _ = run_cli(limit="12")
+    assert all(r["via"] == "api" for r in m["products"])
+    assert m["fromPageFetch"] == 0
 
 
 def test_browserbase_without_a_key_refuses_rather_than_skipping():

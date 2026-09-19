@@ -198,6 +198,20 @@ def test_a_table_lamp_is_lighting_not_a_surface():
     assert vm.bucket_for("dining table") == "surface"
 
 
+def test_an_empty_product_type_falls_back_to_the_title():
+    """101 usable products came back with no product_type at all on a real run; the title
+    names the thing in every one of those cases."""
+    assert vm.bucket_for("", "Brass Floor Lamp") == "lighting"
+    assert vm.bucket_for("", "Oak Bookshelf") == "storage"
+    assert vm.bucket_for("", "") is None
+
+
+def test_spaced_and_plural_spellings_match():
+    """'foyer/hall lanterns' and 'night stands' were both uncategorised on a real run."""
+    assert vm.bucket_for("foyer/hall lanterns") == "lighting"
+    assert vm.bucket_for("night stands") == "surface"
+
+
 def test_longest_keyword_wins_outside_lighting():
     assert vm.bucket_for("bookcase") == "storage"
     assert vm.bucket_for("sofas") == "seating"

@@ -215,6 +215,31 @@ def test_fetch_returns_page_content():
     assert extract_from_page(res.content).as_bbox() is not None
 
 
+def test_a_transient_503_is_retried():
+    """A real run lost four products to bare 503s. Transient upstream trouble is exactly what
+    a retry is for."""
+    import app.browserbase as bb
+    saved, bb.BACKOFF_S = bb.BACKOFF_S, 0
+    calls = []
+
+    class FakeClient:
+        def post(self, url, headers=None, json=None):
+            calls.append(1)
+            class R:
+                status_code = 503
+                def json(self): return {}
+            return R()
+
+    try:
+        bb.BrowserbaseFetch(api_key="k", client=FakeClient()).fetch("https://x.com")
+        raise AssertionError("should have raised")
+    except FetchError as e:
+        assert e.status == 503
+    finally:
+        bb.BACKOFF_S = saved
+    assert len(calls) == bb.MAX_RETRIES, f"503 should retry, got {len(calls)}"
+
+
 def test_a_403_is_raised_not_retried():
     calls = []
 

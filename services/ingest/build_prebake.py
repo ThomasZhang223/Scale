@@ -64,7 +64,7 @@ def pull_catalogue(client: httpx.Client, base: str, pages: int = 2) -> list[dict
 
 
 def _row(merchant: str, base: str, p: dict, bbox: dict, confidence: float,
-         image: str, extracted_from: str) -> dict:
+         image: str, extracted_from: str, via: str) -> dict:
     return {
         "productId": str(p.get("id")),
         "merchant": slug(merchant),
@@ -74,13 +74,16 @@ def _row(merchant: str, base: str, p: dict, bbox: dict, confidence: float,
         "imageUrl": image,
         "r2Key": f"catalog/{slug(merchant)}/{p.get('id')}/source.jpg",
         "category": (p.get("product_type") or "").strip().lower() or None,
-        "bucket": bucket_for((p.get("product_type") or "").strip().lower()),
+        "bucket": bucket_for((p.get("product_type") or "").strip().lower(), p.get("title") or ""),
         "bboxMeters": bbox,
         # contracts.md allows lidar|extracted|declared, and a page read is still extraction —
         # inventing a fourth value would be a schema change. Which surface it came from is
         # recorded beside it instead.
         "measure": {"method": "extracted", "confidence": confidence},
         "extractedFrom": extracted_from,
+        # Which pass produced this row. Inferring it from extractedFrom was guesswork — the
+        # field names overlap between the API pass and the page pass.
+        "via": via,
         "source": "catalog",
     }
 
@@ -103,7 +106,8 @@ def candidates_from(merchant: str, base: str, products: list[dict]) -> tuple[lis
             if p.get("handle"):
                 needs_page.append(p)
             continue
-        out.append(_row(merchant, base, p, bbox, hit.confidence, images[0], hit.source_field))
+        out.append(_row(merchant, base, p, bbox, hit.confidence, images[0],
+                        hit.source_field, via="api"))
     return out, needs_page
 
 
@@ -130,7 +134,8 @@ def enrich_from_pages(merchant: str, base: str, products: list[dict], fetcher,
         if not bbox:
             continue
         image = next(i.get("src") for i in p["images"] if i.get("src"))
-        recovered.append(_row(merchant, base, p, bbox, hit.confidence, image, hit.source_field))
+        recovered.append(_row(merchant, base, p, bbox, hit.confidence, image,
+                              hit.source_field, via="page"))
         stats["recovered"] += 1
     return recovered, stats
 
@@ -258,9 +263,7 @@ def main() -> int:
         "byCategory": {k: sum(1 for c in picked if (c["bucket"] or "other") == k)
                        for k in list(DEMO_CATEGORIES) + ["other"]},
         "imagesDownloaded": downloaded,
-        "fromPageFetch": sum(1 for c in picked if c.get("extractedFrom") in
-                             ("json_ld", "spec_block", "page_text")
-                             or str(c.get("extractedFrom", "")).startswith(("spec_block", "page_text"))),
+        "fromPageFetch": sum(1 for c in picked if c.get("via") == "page"),
         "step2_5": page_stats if args.browserbase else None,
         "products": picked,
     }
