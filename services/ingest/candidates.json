@@ -3,21 +3,82 @@
   "_generated": "2026-09-19, from web search. Egress policy prevented checking any endpoint.",
   "_target": "15-25 USABLE merchants. Expect roughly half of these to fail, so add more as you find them.",
   "merchants": [
-    { "name": "Burrow", "storefrontBaseUrl": "https://burrow.com" },
-    { "name": "Floyd Home", "storefrontBaseUrl": "https://floydhome.com" },
-    { "name": "Poly & Bark", "storefrontBaseUrl": "https://polyandbark.com" },
-    { "name": "Fyrn", "storefrontBaseUrl": "https://fyrn.com" },
-    { "name": "Bend Goods", "storefrontBaseUrl": "https://bendgoods.com" },
-    { "name": "Arhaus", "storefrontBaseUrl": "https://arhaus.com" },
-    { "name": "Herman Miller", "storefrontBaseUrl": "https://hermanmiller.com" },
-    { "name": "Article", "storefrontBaseUrl": "https://article.com" },
-    { "name": "Wazo Furniture (CA)", "storefrontBaseUrl": "https://wazofurniture.com" },
-    { "name": "Woodcraft (CA)", "storefrontBaseUrl": "https://www.woodcraft.ca" },
-    { "name": "Stylegarage (CA)", "storefrontBaseUrl": "https://stylegarage.com" },
-    { "name": "Buckshee Woodshop (CA)", "storefrontBaseUrl": "https://buckshee.ca" },
-    { "name": "Omba (CA)", "storefrontBaseUrl": "https://omba.ca" },
-    { "name": "Cold Steal Creations (CA)", "storefrontBaseUrl": "https://coldstealcreations.com" },
-    { "name": "Stoney Creek Furniture (CA)", "storefrontBaseUrl": "https://www.stoneycreekfurniture.com" },
-    { "name": "InStyle Home (CA)", "storefrontBaseUrl": "https://instylehome.ca" }
-  ]
+    {
+      "name": "Floyd Home",
+      "storefrontBaseUrl": "https://floydhome.com"
+    },
+    {
+      "name": "Poly & Bark",
+      "storefrontBaseUrl": "https://polyandbark.com"
+    },
+    {
+      "name": "Fyrn",
+      "storefrontBaseUrl": "https://fyrn.com"
+    },
+    {
+      "name": "Bend Goods",
+      "storefrontBaseUrl": "https://bendgoods.com"
+    },
+    {
+      "name": "Stylegarage (CA)",
+      "storefrontBaseUrl": "https://stylegarage.com"
+    },
+    {
+      "name": "Buckshee Woodshop (CA)",
+      "storefrontBaseUrl": "https://buckshee.ca"
+    },
+    {
+      "name": "InStyle Home (CA)",
+      "storefrontBaseUrl": "https://instylehome.ca"
+    },
+    {
+      "name": "2Modern (lighting + furniture)",
+      "storefrontBaseUrl": "https://www.2modern.com"
+    },
+    {
+      "name": "Lulu and Georgia",
+      "storefrontBaseUrl": "https://www.luluandgeorgia.com"
+    },
+    {
+      "name": "Kohara + Co (CA lighting)",
+      "storefrontBaseUrl": "https://koharaco.com"
+    },
+    {
+      "name": "Finesse Decor (lighting)",
+      "storefrontBaseUrl": "https://finessedecor.com"
+    },
+    {
+      "name": "Branch Furniture (office)",
+      "storefrontBaseUrl": "https://www.branchfurniture.com"
+    },
+    {
+      "name": "Autonomous (desks)",
+      "storefrontBaseUrl": "https://www.autonomous.ai"
+    },
+    {
+      "name": "Vari (desks)",
+      "storefrontBaseUrl": "https://www.vari.com"
+    },
+    {
+      "name": "Room & Board",
+      "storefrontBaseUrl": "https://www.roomandboard.com"
+    },
+    {
+      "name": "Sabai Design",
+      "storefrontBaseUrl": "https://sabai.design"
+    },
+    {
+      "name": "Industry West",
+      "storefrontBaseUrl": "https://industrywest.com"
+    },
+    {
+      "name": "Rove Concepts (CA)",
+      "storefrontBaseUrl": "https://www.roveconcepts.com"
+    },
+    {
+      "name": "EQ3 (CA)",
+      "storefrontBaseUrl": "https://www.eq3.com"
+    }
+  ],
+  "_note_round2": "Round 2 added after the first live run: 2/16 merchants usable, but ~390 usable products already. These target the CATEGORY gaps (surface, storage, lighting), not merchant count. Still unverified."
 }
