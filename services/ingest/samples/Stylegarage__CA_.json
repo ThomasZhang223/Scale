@@ -1,0 +1,232 @@
+[
+  {
+    "title": "CozyPad Sofabed",
+    "product_type": "Sofa",
+    "tags": [
+      "Sofabeds"
+    ],
+    "body_html": "<div class=\"product-description\">\n<meta charset=\"utf-8\">\n<div class=\"product-description\">\n<p>Meet CozyPad. Originally dreamed up by Flemming H\u00f8jfeldt \u2013 founder of Innovation Living \u2013 in the early '70s, it was part of a groovy collection of sleeper sofas that all shared the same easygoing spirit. Having emerged from Copenhagen\u2019s vibrant hippie scene, where his creative journey began with handcrafted candles and leather belts, his focus shifted to bean bags\u2014the ultimate symbol of the informal floor-life living that defined the 1970s.</p>\n<p>Inspired by this free-spirited lifestyle, Flemming launched a playful collection of what he called \u201cplayboy couches\u201d\u2014basic, multifunctional, foam-based pieces that brought effortless comfort to laid-back interiors in Europe.</p>\n<p>CozyPad is a modular sofa bed concept \u2013 free of limitations, yet full of possibilities, flexibility, and comfortable sleeping space. The modular elements and loose cushions can easily be rearranged, allowing the room to transform and adapt to whatever the day brings.</p>\n<p>The Purem mattress is made from 20 cm of high-density, high-resilience Oeko-Tex certified foam. It is durable and provides a high degree of support for a comfortable sleep. The mattress also offers strong motion isolation, making it easy to share while ensuring constant support.</p>\n<ul>\n<li>Can be used as a double bed or two single beds</li>\n<li>Sofa, lounge and sleep all in one sofa bed</li>\n<li>Detachable cover (included)</li>\n<li>Angled back/arm cushions (included)</li>\n<li>Movable cushions</li>\n</ul>\n</div>\n</div>",
+    "variants": [
+      {
+        "title": "Esina Rust Orange"
+      },
+      {
+        "title": "Tarua Cappucino"
+      }
+    ],
+    "options": [
+      {
+        "name": "Fabric",
+        "position": 1,
+        "values": [
+          "Esina Rust Orange",
+          "Tarua Cappucino"
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Kitchen Shelf with Hanger",
+    "product_type": "Shelving",
+    "tags": [
+      "Fixtures",
+      "Shelving"
+    ],
+    "body_html": "<p>A heavy-duty shelf made from laser cut 4mm sheet aluminium, press bent into shape and powder coated. The shelf features a hand polished, 12 mm hand polished solid metal guard rail and 20mm pan rail, both finished with matching Buster + Punch coin screws. The shelf comes with 6x S hooks to hang utensils off the pan rail\u00a0</p>",
+    "variants": [
+      {
+        "title": "Brass"
+      },
+      {
+        "title": "Gun Metal"
+      },
+      {
+        "title": "Steel"
+      }
+    ],
+    "options": [
+      {
+        "name": "Finish",
+        "position": 1,
+        "values": [
+          "Brass",
+          "Gun Metal",
+          "Steel"
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Dunes Rug",
+    "product_type": "Floor Covering",
+    "tags": [],
+    "body_html": "<p data-mce-fragment=\"1\">The Dunes rug is made from hand spun sheep's wool which has been hand-knotted using Persian techniques to deliver a looser, high-pile finish. Character, durability and texture are supremely melded with quality and a wonderfully soft, casual - yet sophisticated - vibe.</p>",
+    "variants": [
+      {
+        "title": "6'5\"x9'10\" / Sand"
+      },
+      {
+        "title": "6'5\"x9'10\" / Cumin"
+      },
+      {
+        "title": "8'2\"x11'5\" / Sand"
+      },
+      {
+        "title": "8'2\"x11'5\" / Cumin"
+      }
+    ],
+    "options": [
+      {
+        "name": "Size",
+        "position": 1,
+        "values": [
+          "6'5\"x9'10\"",
+          "8'2\"x11'5\""
+        ]
+      },
+      {
+        "name": "Colour",
+        "position": 2,
+        "values": [
+          "Sand",
+          "Cumin"
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Beat Floor Lamp",
+    "product_type": "Lighting",
+    "tags": [
+      "Floor Lamps"
+    ],
+    "body_html": "<p>The Beat collection transforms traditional water vessels and brass cooking pots into expressive silhouettes designed to refract a warm, golden light. Each piece is meticulously hand-raised, welded, beaten, and skimmed over a four-day process, resulting in a unique illuminated sculpture. Now re-engineered for an energy-efficient future with a custom integrated LED module. The collection features a refined exterior finish that creates a contemporary contrast against the rich, hand-beaten interior.</p>",
+    "variants": [
+      {
+        "title": "Black"
+      },
+      {
+        "title": "Brass"
+      }
+    ],
+    "options": [
+      {
+        "name": "Finish",
+        "position": 1,
+        "values": [
+          "Black",
+          "Brass"
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Jack Portable Light",
+    "product_type": "Lighting",
+    "tags": [],
+    "body_html": "<p>Jack is a playful portable light designed for effortless indoor and outdoor use. Lightweight, stackable and easy to move, it\u2019s made from durable polyethylene using an air rotation-moulding process making it lightweight and dynamic.\u00a0</p>\n<p>The matte white shade creates a soft, diffused glow from an integrated and replaceable 5W LED, delivering warm 2700K light. A dimmer allows smooth, continuous brightness control, while a remote can pair and control up to three lights simutaneously. Rechargeable via USB-C, JACK provides up to 8 hours of light. Fully IP65 rated, it\u2019s built for outdoor use and long-term durability, with replaceable electrical components.</p>",
+    "variants": [
+      {
+        "title": "Default Title"
+      }
+    ],
+    "options": [
+      {
+        "name": "Title",
+        "position": 1,
+        "values": [
+          "Default Title"
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Unda Office Chair",
+    "product_type": "Chair",
+    "tags": [
+      "Chairs",
+      "Desk Chairs"
+    ],
+    "body_html": "<p>Experience comfort throughout the workday with the Unda office chair. Defined by its blend of materials and fluid lines, crafted piping traces the contours of the upholstered shell, while the carefully considered base options bring flexibility to a variety of workspaces and meeting settings. Designed by Studio Segers, known for their pure and honest approach, every detail reflects a balance of sophistication, comfort and functionality.</p>\n<p>Chairs optioned with casters offer an adjustable seating height. Features flat weave upholstery with black metal base.</p>",
+    "variants": [
+      {
+        "title": "Charcoal / With Casters"
+      },
+      {
+        "title": "Charcoal / Without Casters"
+      },
+      {
+        "title": "Salt / With Casters"
+      },
+      {
+        "title": "Salt / Without Casters"
+      }
+    ],
+    "options": [
+      {
+        "name": "Fabric",
+        "position": 1,
+        "values": [
+          "Charcoal",
+          "Salt"
+        ]
+      },
+      {
+        "name": "Configuration",
+        "position": 2,
+        "values": [
+          "With Casters",
+          "Without Casters"
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Unda Dining Table",
+    "product_type": "Dining Table",
+    "tags": [
+      "Dining Tables"
+    ],
+    "body_html": "<p>The Unda dining table balances generous proportions with refined simplicity. Defined by clean lines and subtle detailing within the base, its round form encourages gathering and conversation while offering comfortable seating for larger groups. Designed by Studio Segers, the table reflects a pure and honest approach where solid craftsmanship and thoughtful proportions create a timeless presence within the dining space.</p>\n<p>Made from solid oak with a hardwax oil finish.</p>",
+    "variants": [
+      {
+        "title": "Oak"
+      }
+    ],
+    "options": [
+      {
+        "name": "Finish",
+        "position": 1,
+        "values": [
+          "Oak"
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Sequence Dining Table",
+    "product_type": "Dining Table",
+    "tags": [
+      "Dining Tables"
+    ],
+    "body_html": "<p>Inspired by the rhythmic flow of repetition and variation, the Sequence dining table brings a sense of movement to your space. Solid wooden elements form a sculptural base, where alternating shapes create a balanced interplay of presence and openness. A smooth tabletop provides a quiet contrast, grounding the design in simplicity.</p>\n<p>Made from solid oak with a hardwax oil finish or dark brown tainted mahogany with a varnish finish.</p>",
+    "variants": [
+      {
+        "title": "Dark Brown Mahogany"
+      },
+      {
+        "title": "Oak"
+      }
+    ],
+    "options": [
+      {
+        "name": "Finish",
+        "position": 1,
+        "values": [
+          "Dark Brown Mahogany",
+          "Oak"
+        ]
+      }
+    ]
+  }
+]

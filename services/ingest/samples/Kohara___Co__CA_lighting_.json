@@ -1,0 +1,293 @@
+[
+  {
+    "title": "Fleece Lined Throw - Irena - Clove",
+    "product_type": "Throw",
+    "tags": [
+      "Throw"
+    ],
+    "body_html": "<ul>\n<li>\n<b>Size: </b>50\"W x 70\"L</li>\n</ul>\n<p><br></p>\n<ul>\n<li>\n<b>Composition:</b> 100% Turkish cotton blanket with 100% polyester fleece lining</li>\n</ul>\n<p><br></p>\n<ul>\n<li>\n<b>Care: </b>Cold, delicate machine wash. Hang to dry for longevity, machine dryable.</li>\n</ul>\n<p><br></p>\n<ul>\n<li>\n<b>Origin:</b> Made in Turkey</li>\n</ul>",
+    "variants": [
+      {
+        "title": "Default Title"
+      }
+    ],
+    "options": [
+      {
+        "name": "Title",
+        "position": 1,
+        "values": [
+          "Default Title"
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Southwest Blanket - Throw - Etching",
+    "product_type": "Throw",
+    "tags": [
+      "Throw"
+    ],
+    "body_html": "<div>\n<ul>\n<li>\n<b>Size: </b>50\" W x 68\" L</li>\n</ul>\n<br>\n<ul>\n<li>\n<b>Composition:</b> 20% alpaca, 80% acrylic</li>\n</ul>\n<br>\n<ul>\n<li>\n<b>Care: </b>Cold, delicate machine wash, hang to dry</li>\n</ul>\n<br>\n<ul>\n<li>\n<b>Origin:</b> Made in Ecuador</li>\n</ul>\n</div>",
+    "variants": [
+      {
+        "title": "Default Title"
+      }
+    ],
+    "options": [
+      {
+        "name": "Title",
+        "position": 1,
+        "values": [
+          "Default Title"
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Hand Embroidered Ornament - Highland Cow",
+    "product_type": "Christmas",
+    "tags": [
+      "Ornament"
+    ],
+    "body_html": "<ul>\n<li>\n<b>Size: </b>10cm</li>\n</ul>\n<p><br></p>\n<ul>\n<li>\n<b>Composition:</b> 100% synthetic felt base embroidered with 20% alpaca 80% synthetic yarn</li>\n</ul>\n<p><br></p>\n<ul>\n<li>\n<b>Care: </b>Hand or spot wash cold, hang to dry</li>\n</ul>\n<p><br></p>\n<ul>\n<li>\n<b>Origin:</b> Made in Peru</li>\n</ul>",
+    "variants": [
+      {
+        "title": "Default Title"
+      }
+    ],
+    "options": [
+      {
+        "name": "Title",
+        "position": 1,
+        "values": [
+          "Default Title"
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Alpaca Kids Socks - Crew",
+    "product_type": "clothing",
+    "tags": [
+      "clothing",
+      "Socks"
+    ],
+    "body_html": "<div>\n<ul>\n<li>\n<b>Size: </b>2-4Y</li>\n</ul>\n<br>\n<ul>\n<li>\n<b>Composition:</b> 70% baby alpaca 25% nylon and 5% spandex</li>\n</ul>\n<br>\n<ul>\n<li>\n<b>Care: </b>Machine wash cold, hang to dry</li>\n</ul>\n<br>\n<ul>\n<li>\n<b>Origin:</b> Made in Peru</li>\n</ul>\n</div>",
+    "variants": [
+      {
+        "title": "Multi Aqua / 2-4Y"
+      },
+      {
+        "title": "Multi Aqua / 4-8Y"
+      },
+      {
+        "title": "Multi Grey / 2-4Y"
+      },
+      {
+        "title": "Multi Grey / 4-8Y"
+      }
+    ],
+    "options": [
+      {
+        "name": "Colour",
+        "position": 1,
+        "values": [
+          "Multi Aqua",
+          "Multi Grey"
+        ]
+      },
+      {
+        "name": "Size",
+        "position": 2,
+        "values": [
+          "2-4Y",
+          "4-8Y"
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Cozy - Twisted Headband",
+    "product_type": "clothing",
+    "tags": [
+      "clothing"
+    ],
+    "body_html": "<ul>\n<li>\n<b>Size: </b>One-Size</li>\n</ul>\n<p><br></p>\n<ul>\n<li>\n<b>Composition:</b> 20% mohair 5% polyester 75% synthetic</li>\n</ul>\n<p><br></p>\n<ul>\n<li>\n<b>Care: </b>Cold, delicate wash and hang to dry</li>\n</ul>\n<p><br></p>\n<ul>\n<li>\n<b>Origin:</b> Made in Indonesia</li>\n</ul>",
+    "variants": [
+      {
+        "title": "Beige"
+      },
+      {
+        "title": "Leaves"
+      },
+      {
+        "title": "Stone"
+      },
+      {
+        "title": "Charcoal"
+      }
+    ],
+    "options": [
+      {
+        "name": "Colour",
+        "position": 1,
+        "values": [
+          "Beige",
+          "Leaves",
+          "Stone",
+          "Charcoal"
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Alpaca Socks - Thick Print",
+    "product_type": "clothing",
+    "tags": [
+      "clothing",
+      "Socks"
+    ],
+    "body_html": "<ul>\n<li>\n<b>Composition:</b> 50% Peruvian alpaca, 50% acrylic</li>\n</ul>\n<p><br></p>\n<ul>\n<li>\n<b>Care: </b>Cold, delicate machine wash, hang to dry</li>\n</ul>\n<p><br></p>\n<ul>\n<li>\n<b>Origin:</b> Made in Peru</li>\n</ul>",
+    "variants": [
+      {
+        "title": "Holiday / S/M"
+      },
+      {
+        "title": "Holiday / L/XL"
+      },
+      {
+        "title": "Dark Vanilla / S/M"
+      },
+      {
+        "title": "Dark Vanilla / L/XL"
+      },
+      {
+        "title": "Tortilla / S/M"
+      },
+      {
+        "title": "Tortilla / L/XL"
+      }
+    ],
+    "options": [
+      {
+        "name": "Colour",
+        "position": 1,
+        "values": [
+          "Holiday",
+          "Dark Vanilla",
+          "Tortilla"
+        ]
+      },
+      {
+        "name": "Size",
+        "position": 2,
+        "values": [
+          "S/M",
+          "L/XL"
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Alpaca Socks - Vivian",
+    "product_type": "clothing",
+    "tags": [
+      "clothing",
+      "Socks"
+    ],
+    "body_html": "<ul>\n<li>\n<b>Composition:</b> 70% Peruvian baby alpaca 25% nylon 5% spandex</li>\n</ul>\n<p><br></p>\n<ul>\n<li>\n<b>Care: </b>Cold, delicate machine wash, hang to dry</li>\n</ul>\n<p><br></p>\n<ul>\n<li>\n<b>Origin:</b> Made in Peru</li>\n</ul>",
+    "variants": [
+      {
+        "title": "S/M / Beige"
+      },
+      {
+        "title": "S/M / Snow"
+      },
+      {
+        "title": "S/M / Grey"
+      },
+      {
+        "title": "L/XL / Beige"
+      },
+      {
+        "title": "L/XL / Snow"
+      },
+      {
+        "title": "L/XL / Grey"
+      }
+    ],
+    "options": [
+      {
+        "name": "Size",
+        "position": 1,
+        "values": [
+          "S/M",
+          "L/XL"
+        ]
+      },
+      {
+        "name": "Colour",
+        "position": 2,
+        "values": [
+          "Beige",
+          "Snow",
+          "Grey"
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Twisted Baby Alpaca Headband",
+    "product_type": "clothing",
+    "tags": [
+      "clothing"
+    ],
+    "body_html": "<ul>\n<li>\n<b>Size: </b>1-size</li>\n</ul>\n<p><br></p>\n<ul>\n<li>\n<b>Composition:</b> 93% Peruvian baby alpaca 7% spandex</li>\n</ul>\n<p><br></p>\n<ul>\n<li>\n<b>Care: </b>Hand wash cold &amp; lay flat to dry</li>\n</ul>\n<p><br></p>\n<ul>\n<li>\n<b>Origin:</b> Made in Peru</li>\n</ul>",
+    "variants": [
+      {
+        "title": "Linen"
+      },
+      {
+        "title": "Affogato"
+      },
+      {
+        "title": "Petina"
+      },
+      {
+        "title": "Black"
+      },
+      {
+        "title": "Ivory"
+      },
+      {
+        "title": "Charcoal"
+      },
+      {
+        "title": "Denim"
+      },
+      {
+        "title": "Woodland"
+      },
+      {
+        "title": "Wine"
+      }
+    ],
+    "options": [
+      {
+        "name": "Coloiur",
+        "position": 1,
+        "values": [
+          "Linen",
+          "Affogato",
+          "Petina",
+          "Black",
+          "Ivory",
+          "Charcoal",
+          "Denim",
+          "Woodland",
+          "Wine"
+        ]
+      }
+    ]
+  }
+]

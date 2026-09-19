@@ -1,0 +1,281 @@
+[
+  {
+    "title": "Ergonomic Chair Lite",
+    "product_type": "",
+    "tags": [
+      "All",
+      "bestsellers",
+      "bundle-discount-chairs",
+      "Chairs",
+      "comp-chart-chair",
+      "LS-RETURN-40",
+      "Office Chairs",
+      "pdp-core",
+      "quiz",
+      "quiz-workstation",
+      "WARRANTY-7",
+      "work-from-home"
+    ],
+    "body_html": "<h3>Overview</h3>\n<p>The Ergonomic Chair Lite pairs the performance mesh and build quality of our Ergonomic Chair Pro with a high back and focused set of five adjustments. Built for remote workers or teams of all sizes who want exceptional style and support on a budget.</p>\n<h3>Benefits</h3>\n<ul>\n<li>Five points of adjustment: seat height, seat depth, armrest height, arm pad depth, tilt and tilt lock with four stops</li>\n<li>Locking arm pads hold position and release with a press when you need to readjust</li>\n<li>Weight-activated mechanism adjusts recline force to your body weight</li>\n<li>Performance mesh made from flocked super soft yarn for all-day airflow, available in five colors</li>\n<li>High-density cushion provides ample support for a full day of work</li>\n<li>Meets the BIFMA x5.1 standard for commercial-grade use; supports 275 lbs</li>\n<li>Backed by the Branch Warranty for seven years</li>\n</ul>\n<h3>Find Your Fit</h3>\n<ul>\n<li>Want more lumbar or back support? Take a look at our classic <a href=\"/products/ergonomic-chair\">Ergonomic Chair</a>\n</li>\n<li>Interested in more materials or adjustability? Try the <a href=\"/products/ergonomic-chair-pro\">Ergonomic Chair Pro</a>\n</li>\n<li>\n<span style=\"font-weight: 400;\">Not sure which chair is right for you? <small class=\"comparison-chart__quick-view-link\">Compare chairs</small></span><br>\n</li>\n<li style=\"font-weight: 400;\"><span style=\"font-weight: 400;\">Want a personalized recommendation? <a href=\"/pages/quiz?quiz=chair\">Take our quiz</a></span></li>\n</ul>",
+    "variants": [
+      {
+        "title": "Black"
+      },
+      {
+        "title": "Boulder"
+      },
+      {
+        "title": "Everglade"
+      },
+      {
+        "title": "Shore"
+      },
+      {
+        "title": "Mineral"
+      }
+    ],
+    "options": [
+      {
+        "name": "Color",
+        "position": 1,
+        "values": [
+          "Black",
+          "Boulder",
+          "Everglade",
+          "Shore",
+          "Mineral"
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Gamer Bundle",
+    "product_type": "",
+    "tags": [
+      "bundle"
+    ],
+    "body_html": "",
+    "variants": [
+      {
+        "title": "Default Title"
+      }
+    ],
+    "options": [
+      {
+        "name": "Title",
+        "position": 1,
+        "values": [
+          "Default Title"
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Monochrome Bundle",
+    "product_type": "",
+    "tags": [
+      "bundle"
+    ],
+    "body_html": "",
+    "variants": [
+      {
+        "title": "Default Title"
+      }
+    ],
+    "options": [
+      {
+        "name": "Title",
+        "position": 1,
+        "values": [
+          "Default Title"
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Big & Tall Bundle",
+    "product_type": "",
+    "tags": [
+      "bundle"
+    ],
+    "body_html": "",
+    "variants": [
+      {
+        "title": "Default Title"
+      }
+    ],
+    "options": [
+      {
+        "name": "Title",
+        "position": 1,
+        "values": [
+          "Default Title"
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Executive Bundle",
+    "product_type": "",
+    "tags": [
+      "bundle"
+    ],
+    "body_html": "",
+    "variants": [
+      {
+        "title": "Default Title"
+      }
+    ],
+    "options": [
+      {
+        "name": "Title",
+        "position": 1,
+        "values": [
+          "Default Title"
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Adjustable Bundle",
+    "product_type": "",
+    "tags": [
+      "bundle"
+    ],
+    "body_html": "",
+    "variants": [
+      {
+        "title": "Default Title"
+      }
+    ],
+    "options": [
+      {
+        "name": "Title",
+        "position": 1,
+        "values": [
+          "Default Title"
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Open Box - Swivel Chair",
+    "product_type": "",
+    "tags": [
+      "HIDDEN",
+      "HighQ Parcel",
+      "Lounge",
+      "partner-Gather Collection",
+      "WARRANTY-3"
+    ],
+    "body_html": "<h3>Overview</h3>\n<p>Designed for movement and collaboration, the Swivel Chair makes it easy to shift between team conversation and brief work sprints. A compact frame and smooth rotation provide no-frills support without taking up unnecessary space.</p>\n<h3>Benefits</h3>\n<ul>\n<li>Compact frame that fits seamlessly in any workspace</li>\n<li>Smooth swivel for easy collaboration</li>\n<li>Available in durable fabric or boucl\u00e9</li>\n<li>Adjustable height for flexible comfort</li>\n<li>Supports up to 275 lbs</li>\n<li>Meets BIFMA standards for commercial-grade use</li>\n<li>Backed by 5-year warranty</li>\n</ul>\n<h3>Find Your Fit</h3>\n<ul>\n<li>Recommended for collaboration, multi-use spaces and brief sprints</li>\n<li>Pairs with the\u00a0<a href=\"/collections/gather\">Gather Collection</a>\n</li>\n<li>Want a personalized recommendation? <a href=\"/pages/quiz?quiz=chair\">Take our quiz</a>\n</li>\n</ul>",
+    "variants": [
+      {
+        "title": "Bone / Like New"
+      },
+      {
+        "title": "Overcast / Like New"
+      },
+      {
+        "title": "Sunflower / Like New"
+      },
+      {
+        "title": "Ivory Boucle / Like New"
+      }
+    ],
+    "options": [
+      {
+        "name": "Color & Material",
+        "position": 1,
+        "values": [
+          "Bone",
+          "Overcast",
+          "Sunflower",
+          "Ivory Boucle"
+        ]
+      },
+      {
+        "name": "Condition",
+        "position": 2,
+        "values": [
+          "Like New"
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Magnetic Storyboard",
+    "product_type": "The Storyboard",
+    "tags": [
+      "Accessory",
+      "Accessory-discount",
+      "Curated by Branch",
+      "LS-RETURN-15",
+      "Mustard Made US",
+      "partner-Branch x Mustard Made",
+      "pdp-core",
+      "Shopify Collective",
+      "Wall Accessories",
+      "WARRANTY-2"
+    ],
+    "body_html": "<h3>\n<meta charset=\"utf-8\">Overview</h3>\n<p>The Magnetic Storyboard by Mustard Made is your wall's new favorite thing. A powder-coated steel magnetic board available in 12 bold colors, it's the perfect place to pin photos, plans, and everything that inspires you and is ready to hang the moment it arrives.</p>\n<h3>Benefits</h3>\n<ul>\n<li>Magnetic powder-coated steel surface holds photos, notes, cards, and memos with ease</li>\n<li>Hang portrait or landscape to fit your wall and your style</li>\n<li>Available in 12 colors to match or mix with your Mustard Made collection</li>\n<li>Ready to hang out of the box; no assembly required</li>\n<li>Pairs perfectly with <a href=\"/products/magnetic-buttons\">Magnetic Buttons</a>\n</li>\n</ul>",
+    "variants": [
+      {
+        "title": "Blush"
+      },
+      {
+        "title": "Chalk"
+      },
+      {
+        "title": "Mustard"
+      },
+      {
+        "title": "Navy"
+      },
+      {
+        "title": "Ocean"
+      },
+      {
+        "title": "Olive"
+      },
+      {
+        "title": "Sage"
+      },
+      {
+        "title": "Slate"
+      },
+      {
+        "title": "Poppy"
+      },
+      {
+        "title": "Berry"
+      },
+      {
+        "title": "Butter"
+      },
+      {
+        "title": "Lilac"
+      }
+    ],
+    "options": [
+      {
+        "name": "Color",
+        "position": 1,
+        "values": [
+          "Blush",
+          "Chalk",
+          "Mustard",
+          "Navy",
+          "Ocean",
+          "Olive",
+          "Sage",
+          "Slate",
+          "Poppy",
+          "Berry",
+          "Butter",
+          "Lilac"
+        ]
+      }
+    ]
+  }
+]
