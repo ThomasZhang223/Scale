@@ -628,10 +628,11 @@ export async function getSync(env: Env, roomId: string): Promise<Response> {
  * configuration. One GET answers which.
  */
 export async function getHealth(env: Env): Promise<Response> {
-  const [solver, search, ingest] = await Promise.all([
+  const [solver, search, ingest, layout] = await Promise.all([
     env.CONFIG.get("upstream:solver"),
     env.CONFIG.get("upstream:search"),
     env.CONFIG.get("upstream:ingest"),
+    env.CONFIG.get("upstream:layout"),
   ]);
 
   let d1 = "unreachable";
@@ -650,6 +651,7 @@ export async function getHealth(env: Env): Promise<Response> {
       solver: solver ?? null,
       search: search ?? null,
       ingest: ingest ?? null,
+      layout: layout ?? null,
     },
     secrets: {
       UPSTREAM_TOKEN: Boolean(env.UPSTREAM_TOKEN),
@@ -657,7 +659,7 @@ export async function getHealth(env: Env): Promise<Response> {
       BASETEN_API_KEY: Boolean(env.BASETEN_API_KEY),
     },
     notes: [
-      "upstreams null -> POST /v1/fit, /v1/solve return 503 naming the kv key to set.",
+      "upstream:solver unset -> POST /v1/fit returns 503. upstream:layout unset -> POST /v1/solve returns 503.",
       "BASETEN_URL unset -> /v1/search uses the d1-fallback ranker and /v1/objects/{id}/generate fails.",
     ],
   });

@@ -73,54 +73,85 @@ export interface FitReportV1 {
   violations: unknown[];
 }
 
-// --- ConstraintPlan v1 — PROPOSED, not yet in .claude/contracts.md -------------------------
+// --- The layout solver contract — Justin's, and now the authority -------------------------
 //
-// This is the entire output of the layout agent's language model. It contains no coordinates,
-// by construction, because standing rule 3 in CLAUDE.md says an LLM turns intent into an
-// objective and constraints, and a solver places things. The tool schema the model is given
-// has no field that could hold an x or a z, so the rule is enforced by the type rather than
-// by asking the model nicely.
+// Source: apps/xr/docs/agent/01_CONTRACT.md section 6, and 02_LAYOUT_SOLVER.md. This replaces
+// the ConstraintPlan v1 that was proposed from this side. Thomas settled it: where the two
+// disagreed, Justin's shape wins, because his OR-Tools model is the thing that actually has to
+// be satisfiable, and it was specified first and in more detail.
 //
-// The constraint list is deliberately open. A solver ignores a `kind` it does not implement
-// and reports which ones it honoured, so adding a kind never breaks the solver.
+// TWO CONVERSIONS THE WORKER OWNS, stated here because both fail silently if they are missed.
+//
+// 1. UNITS. The solver speaks INTEGER CENTIMETRES; everything else in this project speaks
+//    metres (CLAUDE.md standing rule 1). "The Worker does all coordinate conversion" is his
+//    contract's wording, so this is the UI edge the rule allows converting at, and it is the
+//    only place in the codebase where centimetres may appear.
+//
+// 2. ROTATION. His frame puts an object's front at +Z when rotDeg is 0. Ours puts the front at
+//    −Z (the mesh normalisation contract). Working the four quarter-turns through both
+//    conventions gives rotDeg = (yawDeg + 180) % 360, which is its own inverse. A missed 180°
+//    turns every chair to face the wall, and nothing throws.
 
-export type ConstraintPlanObjective =
-  | "maximize_walkway"
-  | "maximize_free_floor"
-  | "minimize_wall_gap"
-  | "group_seating";
+export type LayoutRuleType = "pin" | "against_wall" | "near" | "far_from" | "facing" | "keep_clear";
 
-export type Constraint =
-  | { kind: "min_clearance"; meters: number }
-  | { kind: "against_wall"; objectId: string; wallId: string | null }
-  | { kind: "keep_clear"; openingId: string }
-  | { kind: "near"; objectId: string; otherObjectId: string; maxMeters: number }
-  | { kind: "budget"; cents: number };
-
-export interface ConstraintPlanV1 {
-  schemaVersion: number;
-  objective: ConstraintPlanObjective;
-  constraints: Constraint[];
-  /** Free text shown to the user. Never parsed. */
-  notes: string;
+/** A rule as the model writes it. Targets are object ids, or door:{id} / window:{id} / wall:{id} / center. */
+export interface LayoutRule {
+  id: string;
+  type: LayoutRuleType;
+  a?: string;
+  b?: string;
+  wall?: string;
+  target?: string;
+  zone?: string;
+  maxCm?: number;
+  minCm?: number;
+  marginCm?: number;
+  /** "must" is a hard constraint. "should" is soft, weight 1-10, and the solver may break it. */
+  priority: "must" | "should";
+  weight?: number;
+  why?: string;
 }
 
-/** Request body for POST {solverOrigin}/solve. Fully hydrated: the solver fetches nothing. */
+/** What the language model outputs. It still cannot express a coordinate. */
+export interface LayoutPlan {
+  summary: string;
+  /** Optional. Default is every object that is not pinned. */
+  movable?: string[];
+  rules: LayoutRule[];
+}
+
 export interface SolveRequest {
-  schemaVersion: number;
-  room: RoomCaptureV1;
-  candidates: ObjectV1[];
-  fixed: PlacementV1[];
-  plan: ConstraintPlanV1;
+  room: {
+    boundsCm: { minX: number; maxX: number; minZ: number; maxZ: number };
+    doors: { id: string; keepOut: { minX: number; maxX: number; minZ: number; maxZ: number } }[];
+    windows: { id: string; xCm: number; zCm: number; widthCm: number; side: string }[];
+    walls: { id: string; side: string }[];
+  };
+  objects: {
+    id: string;
+    widthCm: number;
+    depthCm: number;
+    xCm: number;
+    zCm: number;
+    rotDeg: number;
+    movable: boolean;
+  }[];
+  rules: LayoutRule[];
+  settings: { walkwayCm: number; timeLimitMs: number };
 }
 
 export interface SolveResponse {
-  placements: PlacementV1[];
-  objective: number;
-  infeasible?: string | null;
+  status: "OPTIMAL" | "FEASIBLE" | "INFEASIBLE" | "TIMEOUT";
+  placements: { id: string; xCm: number; zCm: number; rotDeg: number }[];
+  satisfied: string[];
+  violated: { ruleId: string; amountCm: number }[];
+  /** When INFEASIBLE: a small set of must-rules that cannot all hold. */
+  conflicts: string[];
+  movedCm?: number;
+  solveMs?: number;
 }
 
-/** Request body for POST {solverOrigin}/fit. Also fully hydrated. */
+/** Request body for POST {solverOrigin}/fit. Unchanged — the validator is a separate service. */
 export interface FitRequest {
   schemaVersion: number;
   room: RoomCaptureV1;

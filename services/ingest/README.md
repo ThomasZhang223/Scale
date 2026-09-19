@@ -22,8 +22,62 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload --port 8081
 ```
 
-Endpoints are declared but not implemented — see `app/main.py`. Both return HTTP 501 until the
-crawl/extract pipeline lands.
+## The service the Worker calls
+
+`infra/README.md` runs this on the laptop at `localhost:8003` behind a quick tunnel, because
+the scraper cannot follow the rest of the backend to Workers. The Worker's
+`IngestMerchantWorkflow` owns orchestration — durability, per-step retries, the D1 write — and
+calls here for the extraction itself, the same way it calls `services/fit` and
+`services/search`. **One implementation of the pipeline, not two.**
+
+| | Body | Returns |
+| --- | --- | --- |
+| `POST /crawl` | `{ storefront, collection?, pages? }` | `{ products: [raw], count }` |
+| `POST /extract` | `{ merchant, storefront, products[], browserbase?, pageLimit? }` | `{ objects: [Object v1], stats }` |
+| `GET /health` | — | liveness; no token needed |
+
+Split in two so a caller can cache the raw pull and re-extract without re-fetching — which is
+most of how this pipeline got debugged.
+
+`/extract` returns rows in the `Object v1` shape from `.claude/contracts.md`, `state:"measured"`
+with `glbUrl: null`, ready to insert. It never generates a mesh and never writes anywhere: the
+caller owns storage. Each row carries an extra `extraction` block — `via`, `sourceField`,
+`flags`, `notes`, `unverified` — because a low confidence score has to be explainable or
+"unverified fit" is just a shrug.
+
+`/crawl` and `/extract` sit behind `X-Upstream-Token`, same as `services/search`. Run them with
+`UPSTREAM_TOKEN=dev uvicorn app.main:app --port 8003`.
+
+### Steps 2 and 3: `app/ai_extract.py`
+
+OpenAI over raw HTTP, matching `services/agent/src/pipeline/planner.ts` — same
+`OPENAI_API_KEY` / `OPENAI_MODEL`, same optional `OPENAI_GATEWAY_URL` /
+`OPENAI_GATEWAY_TOKEN`, same strict `json_schema`. No SDK, since this service already has
+`httpx`.
+
+`OPENAI_MODEL` should match what the rest of the project uses — `services/agent/wrangler.toml`
+sets `gpt-4o-mini`, which is plenty for step 2: reading a stated number out of prose under a
+strict schema is an easy extraction task. Step 3 is the harder read — small callout text on a
+dimension diagram — and the lowest volume, since it runs only on what every cheaper source
+failed, so `OPENAI_VLM_MODEL` can point it at something stronger without paying for that on
+every step-2 call. It defaults to `OPENAI_MODEL`.
+
+Pass `"llm": true` and `"vlm": true` on `/extract`. Both are additive — they run only over
+products steps 1 and 2.5 failed on, capped by `aiLimit` — so an unconfigured key skips them and
+`stats.llm_skipped` says why. The strict schema is also the defence against a stranger writing
+"ignore previous instructions" into product copy: no field in it can express anything else.
+
+### Steps 4 and 5: `app/validate.py`
+
+Steps 1–3 answer "what number is on the page". Step 4 answers "should we believe it", which is
+what the Rox rubric rewards. Three checks: unit sanity (a sofa is not 8 cm wide), category
+priors (a dining chair is 40–50 cm), and axis plausibility (depth exceeding both width and
+height usually means W and D were swapped, which reads as plausible furniture and places
+completely wrong).
+
+A number that fails validation outright is **rejected**. One that merely disagrees with its
+prior is **kept and scored down**, so the UI says "unverified fit" rather than showing a
+confident wrong box. That distinction is step 5.
 
 ## Shopify catalog access
 
