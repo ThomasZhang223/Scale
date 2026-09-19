@@ -63,26 +63,43 @@ export class Palette {
     this.group.visible = items.length > 0;
     if (!items.length) return;
 
-    const height = items.length * (TILE_H + GAP) - GAP + 2 * PAD;
+    // Two columns of tiles so a full catalogue stays within reach; text lines span both.
+    const slots: { item: PaletteItem; col: number; row: number; wide: boolean }[] = [];
+    let row = 0, col = 0;
+    for (const item of items) {
+      if (item.label) {
+        if (col > 0) { row++; col = 0; }
+        slots.push({ item, col: 0, row, wide: true });
+        row++;
+      } else {
+        slots.push({ item, col, row, wide: false });
+        if (++col === 2) { col = 0; row++; }
+      }
+    }
+    const rows = col > 0 ? row + 1 : row;
+    const width = 2 * TILE_W + GAP + 2 * PAD;
+    const height = rows * (TILE_H + GAP) - GAP + 2 * PAD;
     const back = new THREE.Mesh(
-      new THREE.PlaneGeometry(TILE_W + 2 * PAD, height),
+      new THREE.PlaneGeometry(width, height),
       new THREE.MeshBasicMaterial({ color: PANEL, side: THREE.DoubleSide, transparent: true, opacity: 0.9 }),
     );
     back.position.z = -0.001;
     back.raycast = () => {}; // only tiles are hit-tested
     this.group.add(back);
 
-    items.forEach((item, i) => {
+    for (const s of slots) {
+      const w = s.wide ? 2 * TILE_W + GAP : TILE_W;
       const tile = new THREE.Mesh(
-        new THREE.PlaneGeometry(TILE_W, TILE_H),
-        new THREE.MeshBasicMaterial({ color: tileColor(item), side: THREE.DoubleSide, map: label(item) }),
+        new THREE.PlaneGeometry(w, TILE_H),
+        new THREE.MeshBasicMaterial({ color: tileColor(s.item), side: THREE.DoubleSide, map: label(s.item, s.wide) }),
       );
-      tile.position.y = height / 2 - PAD - TILE_H / 2 - i * (TILE_H + GAP);
-      tile.userData.item = item;
-      if (item.label) tile.raycast = () => {}; // text lines are never hit
+      tile.position.x = s.wide ? 0 : (s.col === 0 ? -1 : 1) * (TILE_W + GAP) / 2;
+      tile.position.y = height / 2 - PAD - TILE_H / 2 - s.row * (TILE_H + GAP);
+      tile.userData.item = s.item;
+      if (s.item.label) tile.raycast = () => {}; // text lines are never hit
       else this.tiles.push(tile);
       this.group.add(tile);
-    });
+    }
   }
 
   /** The item under the ray, if any. */
@@ -103,10 +120,10 @@ export class Palette {
 }
 
 /** Name and size drawn onto a small canvas. Skipped where there's no DOM (tests). */
-function label(item: PaletteItem): THREE.Texture | null {
+function label(item: PaletteItem, wide = false): THREE.Texture | null {
   if (typeof document === 'undefined') return null;
   const canvas = document.createElement('canvas');
-  canvas.width = 512;
+  canvas.width = wide ? 1040 : 512;
   canvas.height = 136;
   const ctx = canvas.getContext('2d')!;
   // Dark text on white: the tile's colour multiplies through the texture, so the
