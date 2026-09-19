@@ -11,7 +11,7 @@ import {
 } from './api';
 import { FitOverlay, type FitReport } from './fit';
 import { fromPlacement, layoutToVersion, toPlacement, type PlacedLayout } from './placements';
-import { AgentClient, browserEvents, PRESETS, type AgentSnapshot, type Proposal, type RoomStateUpload } from './agent';
+import { AgentClient, browserEvents, type AgentSnapshot, type Proposal, type RoomStateUpload } from './agent';
 import { ProposalApplier } from './apply';
 import { Ghosts, type GhostTarget } from './ghosts';
 import offlineProposal from '../../../services/agent/fixtures/pipeline/proposal.json';
@@ -132,6 +132,7 @@ let lastScan: Record<string, unknown> | null = null;
 let currentVersionId: string | null = null; // parent for the next version we push
 let lastFitReport: FitReport | null = null;
 let undoAvailable = false;
+let lastTouchedId: string | null = null; // what the turn buttons act on when nothing is held
 const objects = new Map<string, PlacedObject>();
 const catalog: PaletteItem[] = []; // everything in objects.json, placed or not
 let rise = 1; // 0..1 while the walls rise; objects are placed once it reaches 1
@@ -158,6 +159,8 @@ async function start() {
     if (action === 'reset' && lastScan) showScan(lastScan, 'Room reset');
     if (action === 'clear') clearObjects();
     if (action.startsWith('preset:')) void askAgent({ preset: action.slice(7) });
+    if (action === 'turn:left') turnLast(Math.PI / 2);
+    if (action === 'turn:right') turnLast(-Math.PI / 2);
     if (action === 'accept') void acceptProposal();
     if (action === 'reject') void rejectProposal();
     if (action === 'ask_again') void agent.askAgain();
@@ -167,7 +170,19 @@ async function start() {
 
   /** The person grabbed something: if a proposal is being applied, that object stays in their hand. */
   function onGrab(id: string) {
+    lastTouchedId = id;
     if (applier.active) applier.exclude(id);
+  }
+
+  /** Turns the held object (or the last one touched) a quarter turn; left is counter-clockwise from above. */
+  function turnLast(delta: number) {
+    const id = interaction.heldIds()[0] ?? lastTouchedId ?? [...objects.keys()].pop() ?? null;
+    const obj = id ? objects.get(id) : undefined;
+    if (!id || !obj) return say('Grab or add an object first, then turn it.');
+    const n = obj.loaded.node;
+    physics.moveTo(id, n.position.x, n.position.z, physics.rotationY(id) + delta);
+    say(`${obj.name}: turned ${delta > 0 ? 'left' : 'right'} 90°.`);
+    layoutChanged(id);
   }
 
   // ---------- the designer agent ----------
@@ -198,7 +213,8 @@ async function start() {
       default:
         return [
           label(`Designer${s.solver === 'offline' ? ' (solver offline)' : ''}`),
-          ...PRESETS.map((p) => tile(p.label, `preset:${p.id}`)),
+          tile('Turn 90° left', 'turn:left'),
+          tile('Turn 90° right', 'turn:right'),
           ...(undoAvailable ? [tile('Undo', 'undo')] : []),
         ];
     }
@@ -379,12 +395,12 @@ async function start() {
   }
 
   agentPresets.replaceChildren(
-    ...PRESETS.map((p) => {
+    ...[['Turn 90° left', 'turn:left'], ['Turn 90° right', 'turn:right']].map(([text, action]) => {
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'quiet';
-      b.textContent = p.label;
-      b.addEventListener('click', () => void askAgent({ preset: p.id }));
+      b.textContent = text;
+      b.addEventListener('click', () => onAction(action));
       return b;
     }),
   );
@@ -511,6 +527,7 @@ async function start() {
       const loaded = await loader.load(item.url, item.scale);
       const obj: PlacedObject = { id: crypto.randomUUID(), objectId: item.objectId ?? localId(item.name), name: item.name, loaded };
       objects.set(obj.id, obj);
+      lastTouchedId = obj.id;
       const spot = physics.findFreeSpot(loaded.size, 0, at);
       scene.add(loaded.node);
       // Straight onto the floor under the ray, no drop: it's being carried, not delivered.
