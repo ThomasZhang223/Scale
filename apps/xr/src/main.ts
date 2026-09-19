@@ -17,6 +17,9 @@ import { Ghosts, type GhostTarget } from './ghosts';
 import offlineProposal from '../../../services/agent/fixtures/pipeline/proposal.json';
 import { Palette, type PaletteItem } from './palette';
 import { matchDetected } from './placement';
+import { measuredBox } from './objects';
+import { Voice, type VoiceState } from './voice';
+import { findListings, needFromDetected, needFromText, isShoppingRequest, type Listing, type ListingsResult, type Need } from './listings';
 import { Outdoors } from './outdoors';
 import roomDemo from '../../../fixtures/room-demo.json';
 import roomLarge from '../public/room-large.json';
@@ -118,6 +121,12 @@ const panel = document.getElementById('panel')!;
 const connection = document.getElementById('connection')!;
 const note = document.getElementById('note')!;
 const catalogEl = document.getElementById('catalog')!;
+const scannedEl = document.getElementById('scanned')!;
+const listingText = document.getElementById('listing-text') as HTMLInputElement;
+const listingSearch = document.getElementById('listing-search')!;
+const listingNote = document.getElementById('listing-note')!;
+const listingCards = document.getElementById('listing-cards')!;
+const micButton = document.getElementById('agent-mic') as HTMLButtonElement;
 panel.hidden = !SHOW_PANEL;
 const say = (text: string) => (note.textContent = text);
 
@@ -129,6 +138,8 @@ interface PlacedObject {
   name: string;        // file or manifest name; matched against detected categories
   loaded: LoadedObject;
   replaces?: ScannedObject;
+  category?: string;   // when known (a listing, a replacement): matched against detected categories instead of the name
+  listing?: Listing;   // the merchant listing this stands for, when it came from one
 }
 
 const localId = (name: string) => `local:${name}`;
@@ -140,6 +151,12 @@ let lastFitReport: FitReport | null = null;
 let undoAvailable = false;
 let lastTouchedId: string | null = null; // what the turn buttons act on when nothing is held
 let showRules = false; // the Rearrange guidelines, expanded on the wrist
+let listings: ListingsResult | null = null; // the last recommendation set, shown on the wrist and the laptop
+let listingsNeed: Need | null = null;
+let listingsBusy = false;
+let voiceState: VoiceState = 'idle';
+let voiceDetail: string | undefined; // the last error or transcript shown on the wrist
+let lastHeard: string | null = null;
 
 /** What Rearrange does with each kind of object (mirrors services/agent generatedPlan). */
 const REARRANGE_RULES: [string, string][] = [
@@ -170,6 +187,17 @@ async function start() {
   const loader = new ObjectLoader(renderer);
   const palette = new Palette();
   const applier = new ProposalApplier(physics);
+  // Built before the first showPalette(): the talk row reads voice.supported.
+  const voice = new Voice({
+    onState(state, detail) {
+      voiceState = state;
+      voiceDetail = detail;
+      micButton.dataset.state = state;
+      micButton.title = state === 'recording' ? 'Release to send' : state === 'error' ? detail ?? 'Voice error' : 'Hold to talk';
+      if (state === 'error' && detail) say(`Voice: ${detail}`);
+      showPalette();
+    },
+  });
   const agent = new AgentClient({
     roomId: ROOM_ID,
     stub: AGENT_STUB,
@@ -179,7 +207,7 @@ async function start() {
   });
   const interaction = new Interaction(renderer, scene, camera, controls, physics, palette, spawn, onAction, layoutChanged, onGrab);
   // Designer tiles first (closest to the hand), then the catalogue, then Reset / Clear.
-  const showPalette = () => palette.setItems([...designerTiles(agent.snapshot), ...catalog, ...PALETTE_ACTIONS]);
+  const showPalette = () => palette.setItems([...designerTiles(agent.snapshot), ...scannedTiles(), ...listingTiles(), ...catalog, ...PALETTE_ACTIONS]);
   showPalette();
   renderAgentPanel(agent.snapshot);
 
@@ -199,7 +227,203 @@ async function start() {
     if (action === 'ask_again') void agent.askAgain();
     if (action === 'try_again') agent.reset();
     if (action === 'undo') void undoLayout();
+    if (action === 'hold:talk:down') void talkDown();
+    if (action === 'hold:talk:up') void talkUp();
+    if (action.startsWith('scan:')) void findForScanned(action.slice(5));
+    if (action.startsWith('listing:')) void addListing(action.slice(8));
   }
+
+  // ---------- scanned pieces and merchant listings ----------
+
+  const fmtDims = (d: [number, number, number]) => d.map((m) => `${Math.round(m * 100)}`).join(' × ') + ' cm';
+
+  /** A scanned piece is "taken" when a placed object stands in its place. */
+  function replacedBy(identifier: string): PlacedObject | undefined {
+    return [...objects.values()].find((o) => o.replaces?.identifier === identifier);
+  }
+
+  /** Wrist rows for what LiDAR found: category and size; trigger finds listings that fit in its place. */
+  function scannedTiles(): PaletteItem[] {
+    if (!currentRoom?.objects.length) return [];
+    return currentRoom.objects.map((box) => {
+      const taken = replacedBy(box.identifier);
+      return {
+        url: '',
+        name: `${box.category} · ${fmtDims(box.dimensions)}${taken ? ' · replaced' : ''}`,
+        action: `scan:${box.identifier}`,
+        section: 'Scanned',
+        accent: listingsNeed?.replaces?.identifier === box.identifier,
+      };
+    });
+  }
+
+  /** Wrist rows for the current recommendations: name, merchant and width; trigger puts one in the room. */
+  function listingTiles(): PaletteItem[] {
+    const items: PaletteItem[] = [];
+    if (listingsBusy) return [{ url: '', name: 'Searching listings…', label: true, section: 'Listings' }];
+    if (!listings) return items;
+    if (listings.note) items.push({ url: '', name: listings.note, label: true, severity: 'warn', section: 'Listings' });
+    if (!listings.recommendations.length) items.push({ url: '', name: 'Nothing fits that. Try a wider gap or another kind.', label: true, section: 'Listings' });
+    for (const r of listings.recommendations.slice(0, 6)) {
+      const l = r.listing;
+      items.push({
+        url: '',
+        name: `${l.name.length > 26 ? l.name.slice(0, 25) + '…' : l.name} · ${Math.round(l.bboxMeters.w * 100)} cm`,
+        action: `listing:${l.objectId}`,
+        objectId: l.objectId,
+        section: 'Listings',
+      });
+    }
+    return items;
+  }
+
+  /** Listings that would fit in a scanned piece's place. */
+  async function findForScanned(identifier: string) {
+    const box = currentRoom?.objects.find((o) => o.identifier === identifier);
+    if (!box) return say(`No scanned piece ${identifier} in this room.`);
+    const taken = replacedBy(identifier);
+    if (taken) say(`${box.category}: already replaced by ${taken.name}. Remove it first to try another.`);
+    await findFor(needFromDetected(box));
+  }
+
+  /** Runs a search, keeps the result, and redraws both surfaces. Live first, bundled with a note. */
+  async function findFor(need: Need) {
+    listingsNeed = need;
+    listingsBusy = true;
+    showPalette();
+    renderListings();
+    try {
+      listings = await findListings(need, 8);
+    } catch (err) {
+      listings = { recommendations: [], source: 'bundled', note: `Listings unavailable: ${(err as Error).message}` };
+    } finally {
+      listingsBusy = false;
+    }
+    showPalette();
+    renderListings();
+    const top = listings.recommendations[0];
+    const what = need.replaces ? `for the ${need.replaces.category}` : need.text ? `for "${need.text}"` : '';
+    const spoken = top
+      ? `${listings.recommendations.length} listings ${what}. Top pick: ${top.listing.name} from ${top.listing.merchant ?? 'the catalogue'}, ${top.reasons.join(', ')}.`
+      : `Nothing for sale fits ${what}.`;
+    say(spoken);
+    if (need.text && lastHeard === need.text) speak(spoken); // only answer aloud when it was asked aloud
+    return listings;
+  }
+
+  /**
+   * Puts a listing in the room: its GLB when the mesh is ready, else a box of exactly its
+   * bboxMeters. If the search was for a scanned piece, it takes that piece's place.
+   */
+  async function addListing(objectId: string) {
+    const rec = listings?.recommendations.find((r) => r.listing.objectId === objectId);
+    if (!rec) return say('That listing is no longer in the results.');
+    const l = rec.listing;
+    let loaded: LoadedObject;
+    try {
+      // scale 1: the mesh normalisation contract; a measured box is already exact.
+      loaded = l.state === 'ready' && l.glbUrl ? await loader.load(l.glbUrl, 1) : measuredBox(l.bboxMeters, l.name);
+    } catch (err) {
+      return say(`Couldn't load ${l.name}: ${(err as Error).message}`);
+    }
+    const replaces = listingsNeed?.replaces;
+    const obj: PlacedObject = {
+      id: crypto.randomUUID(),
+      objectId: l.objectId,
+      name: l.name,
+      loaded,
+      listing: l,
+      // The category decides which scanned piece it stands in for; a Shopify title rarely contains "chair".
+      category: replaces && !replacedBy(replaces.identifier) ? replaces.category : l.category,
+    };
+    objects.set(obj.id, obj);
+    lastTouchedId = obj.id;
+    if (currentRoom && rise >= 1) place(obj);
+    showPalette();
+    renderCatalog();
+    layoutChanged(obj.id);
+  }
+
+  /** Laptop: the LiDAR pieces as rows with a Find-a-match button. */
+  function renderScanned() {
+    const rows = (currentRoom?.objects ?? []).map((box) => {
+      const row = document.createElement('div');
+      row.className = 'row';
+      const label = document.createElement('span');
+      label.className = 'label';
+      const taken = replacedBy(box.identifier);
+      label.innerHTML = `${box.category.charAt(0).toUpperCase() + box.category.slice(1)} <span class="dims">${fmtDims(box.dimensions)}${taken ? ` · replaced by ${taken.name}` : ''}</span>`;
+      const find = document.createElement('button');
+      find.type = 'button';
+      find.className = listingsNeed?.replaces?.identifier === box.identifier ? 'tinted' : 'gray';
+      find.textContent = 'Find a match';
+      find.addEventListener('click', () => void findForScanned(box.identifier));
+      row.append(label, find);
+      return row;
+    });
+    scannedEl.replaceChildren(...rows);
+  }
+
+  /** Laptop: photo cards for the recommendations, the top one outlined, with why it was chosen. */
+  function renderListings() {
+    listingNote.textContent = listingsBusy
+      ? 'Searching…'
+      : listings
+        ? [listings.note, listings.source === 'live' ? 'From the live catalogue.' : null, listingsNeed?.replaces ? `Fits where the scanned ${listingsNeed.replaces.category} stands.` : null].filter(Boolean).join(' ')
+        : 'Pick a scanned piece above, or describe what you need.';
+    const cards = (listings?.recommendations ?? []).map((r, i) => {
+      const l = r.listing;
+      const card = document.createElement('div');
+      card.className = i === 0 ? 'card top' : 'card';
+      const img = document.createElement('img');
+      img.loading = 'lazy';
+      img.alt = l.name;
+      if (l.imageUrl) img.src = l.imageUrl;
+      img.addEventListener('error', () => (img.style.visibility = 'hidden')); // a missing thumb is not a broken card
+      const body = document.createElement('div');
+      body.className = 'body';
+      const name = document.createElement('div');
+      name.className = 'name';
+      name.textContent = l.name;
+      name.title = l.name;
+      const meta = document.createElement('div');
+      meta.className = 'meta';
+      const { w, h, d } = l.bboxMeters;
+      meta.textContent = `${l.merchant ?? l.source} · ${Math.round(w * 100)} × ${Math.round(h * 100)} × ${Math.round(d * 100)} cm${l.price ? ` · ${(l.price.cents / 100).toFixed(0)} ${l.price.currency}` : ''}`;
+      const why = document.createElement('div');
+      why.className = 'why';
+      why.textContent = `${Math.round(r.score * 100)}% · ${r.reasons.join(' · ')}`;
+      const actions = document.createElement('div');
+      actions.className = 'actions';
+      const add = document.createElement('button');
+      add.type = 'button';
+      add.className = i === 0 ? 'filled' : 'tinted';
+      add.textContent = l.glbUrl ? 'Add' : 'Add as box';
+      add.addEventListener('click', () => void addListing(l.objectId));
+      actions.append(add);
+      if (l.productUrl) {
+        const open = document.createElement('a');
+        open.href = l.productUrl;
+        open.target = '_blank';
+        open.rel = 'noopener';
+        open.textContent = 'Open';
+        actions.append(open);
+      }
+      body.append(name, meta, why, actions);
+      card.append(img, body);
+      return card;
+    });
+    listingCards.replaceChildren(...cards);
+  }
+
+  listingSearch.addEventListener('click', () => {
+    const text = listingText.value.trim();
+    if (text) void findFor(needFromText(text));
+  });
+  listingText.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') listingSearch.click();
+  });
+  renderListings();
 
   /** The person grabbed something: if a proposal is being applied, that object stays in their hand. */
   function onGrab(id: string) {
@@ -235,9 +459,61 @@ async function start() {
     }
     fitOverlay.clear(); // ceiling: the overlay is per-report, not per-object; the next report redraws it
     say(`${obj.name} removed.`);
+    renderScanned();
     showPalette();
     layoutChanged(id);
   }
+
+  // ---------- voice: push-to-talk in, spoken proposals out ----------
+
+
+  /** The talk row: hold the trigger on it, speak, let go. Shows what was heard, or what went wrong. */
+  function voiceTiles(label: (n: string, s?: 'info' | 'warn') => PaletteItem, tile: (n: string, a: string, accent?: boolean) => PaletteItem): PaletteItem[] {
+    if (!voice.supported) return [label('No microphone in this browser', 'warn')];
+    const rows: PaletteItem[] = [];
+    if (voiceState === 'recording') rows.push({ ...tile('Listening… release to send', 'hold:talk', true), destructive: true });
+    else if (voiceState === 'transcribing') rows.push(label('Transcribing…'));
+    else rows.push(tile(voiceState === 'speaking' ? 'Hold to talk (interrupts)' : 'Hold to talk', 'hold:talk', true));
+    if (voiceState === 'error' && voiceDetail) rows.push(label(voiceDetail, 'warn'));
+    else if (lastHeard) rows.push(label(`Heard: ${lastHeard}`));
+    return rows;
+  }
+
+  async function talkDown() {
+    voice.stopSpeaking();
+    try {
+      await voice.start();
+    } catch (err) {
+      say(`Voice: ${(err as Error).message}`);
+    }
+  }
+
+  async function talkUp() {
+    const text = await voice.stop();
+    if (!text) return;
+    lastHeard = text;
+    agentText.value = text;
+    say(`Heard: "${text}"`);
+    showPalette();
+    await routeRequest(text);
+  }
+
+  /** Spoken output; a failure here is shown, never thrown, so voice never blocks the layout work. */
+  function speak(text: string) {
+    if (!voice.supported || !text) return;
+    voice.speak(text).catch((err) => say(`Voice: ${(err as Error).message}`));
+  }
+
+  // Laptop: hold the mic button. The first press also asks for microphone permission.
+  micButton.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    micButton.setPointerCapture(e.pointerId);
+    void talkDown();
+  });
+  micButton.addEventListener('pointerup', () => void talkUp());
+  micButton.addEventListener('pointercancel', () => void talkUp());
+  // The Quest hides permission prompts inside the immersive session, so ask on the way in.
+  document.getElementById('VRButton')?.addEventListener('click', () => void voice.warmUp(), { once: true });
 
   // ---------- the designer agent ----------
 
@@ -267,6 +543,7 @@ async function start() {
       default:
         return [
           ...(s.solver === 'offline' ? [label('Solver offline', 'warn')] : []),
+          ...voiceTiles(label, tile),
           tile('Turn 90° left', 'turn:left'),
           tile('Turn 90° right', 'turn:right'),
           ...(objects.size ? [tile('Remove', 'remove')] : []),
@@ -280,9 +557,20 @@ async function start() {
     }
   }
 
+  let spokenFor: string | null = null; // the last proposal (or failure) read aloud, so a redraw never repeats it
   function onAgentChange(s: AgentSnapshot) {
     showPalette();
     renderAgentPanel(s);
+    if (s.state === 'proposed' && s.proposal) {
+      const key = `proposed:${s.proposal.summary}`;
+      if (spokenFor !== key) {
+        spokenFor = key;
+        speak([s.proposal.summary, s.proposal.explanation, s.proposal.tradeoffs[0] ? `One trade-off: ${s.proposal.tradeoffs[0]}` : ''].filter(Boolean).join(' '));
+      }
+    } else if (s.state === 'failed' && s.error && spokenFor !== `failed:${s.error}`) {
+      spokenFor = `failed:${s.error}`;
+      speak(`That didn't work: ${s.error}`);
+    }
     if (s.state === 'proposed' && s.proposal) showGhosts(s.proposal);
     else if (s.state !== 'applying') ghosts.clear();
   }
@@ -477,8 +765,17 @@ async function start() {
   }
   document.getElementById('agent-ask')!.addEventListener('click', () => {
     const text = agentText.value.trim();
-    if (text) void askAgent({ text });
+    if (text) void routeRequest(text);
   });
+
+  /** A sentence from the keyboard or the microphone: shopping goes to listings, everything else to the designer. */
+  function routeRequest(text: string) {
+    if (isShoppingRequest(text)) {
+      listingText.value = text;
+      return findFor(needFromText(text));
+    }
+    return askAgent({ text });
+  }
   agentText.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') document.getElementById('agent-ask')!.click();
   });
@@ -525,6 +822,11 @@ async function start() {
 
     const { width, depth } = built.size;
     say(`${source}: ${width.toFixed(1)} × ${depth.toFixed(1)} m, ${built.objects.length} pieces of furniture detected.`);
+    renderScanned();
+    showPalette();
+    // Start with a recommendation for the largest scanned piece; the person can pick another.
+    const largest = [...built.objects].sort((a, b) => b.dimensions[0] * b.dimensions[2] - a.dimensions[0] * a.dimensions[2])[0];
+    if (largest && !listings) void findFor(needFromDetected(largest));
   }
 
   /** Draws a FitReport and says what's wrong. */
@@ -551,7 +853,7 @@ async function start() {
   /** Puts an object in the current room: in a detected piece's place, or the nearest free spot. */
   function place(obj: PlacedObject) {
     if (!currentRoom) return;
-    const match = findMatch(obj.name);
+    const match = findMatch(obj.category ?? obj.name);
     obj.replaces = match ?? undefined;
 
     let spot = { x: 0, z: -1 }; // in front of where you stand when entering VR
@@ -566,6 +868,7 @@ async function start() {
     scene.add(obj.loaded.node);
     physics.addObject(obj.id, obj.loaded.node, obj.loaded.size, obj.loaded.hull, spot, rotY);
     report(obj);
+    renderScanned();
   }
 
   /** A detected piece whose category appears in the object's name and isn't taken yet. */

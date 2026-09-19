@@ -1,8 +1,37 @@
-import { defineConfig, loadEnv } from 'vite';
+import { defineConfig, loadEnv, type Plugin } from 'vite';
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), 'VITE_');
+  // loadEnv only exposes the prefixes you name; the ElevenLabs values are deliberately NOT
+  // VITE_ so they can never be baked into the page bundle. They are read here, server-side.
+  const eleven = loadEnv(mode, process.cwd(), 'ELEVENLABS_');
+  const elevenKey = eleven.ELEVENLABS_API_KEY?.trim() ?? '';
+  // Same premade voice as wrangler.toml [vars], so the key alone is enough on a laptop.
+  const elevenVoice = eleven.ELEVENLABS_VOICE_ID?.trim() || 'JBFqnCBsd6RMkjVDRZzb';
+
+  // Dev-only stand-in for the /v1/voice routes worker/index.ts serves in production. It answers
+  // the same 501 JSON when unconfigured instead of forwarding a request that will only 401.
+  const voiceGuard: Plugin = {
+    name: 'full-scale-voice-guard',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        if (!req.url?.startsWith('/v1/voice')) return next();
+        const missing = !elevenKey
+          ? 'ELEVENLABS_API_KEY is not set: add it to apps/xr/.env (dev) or wrangler secret put ELEVENLABS_API_KEY (deploy)'
+          : req.url.startsWith('/v1/voice/tts') && !elevenVoice
+            ? 'ELEVENLABS_VOICE_ID is not set: add it to apps/xr/.env (dev) or wrangler.toml [vars] (deploy)'
+            : null;
+        if (!missing) return next();
+        res.statusCode = 501;
+        res.setHeader('content-type', 'application/json');
+        res.setHeader('cache-control', 'no-store');
+        res.end(JSON.stringify({ error: missing }));
+      });
+    },
+  };
+
   return {
+    plugins: [voiceGuard],
     server: {
       host: true,
       port: 5173,
@@ -21,6 +50,25 @@ export default defineConfig(({ mode }) => {
       // Thomas's Worker (`wrangler dev`) sends no CORS headers, so /v1 is proxied to it and the
       // browser only ever talks to this origin. Works on the Quest too, via adb reverse.
       proxy: {
+        // Voice goes straight to ElevenLabs from the dev server, key attached here. Longest
+        // prefix first. The proxy cannot rewrite a multipart or JSON body, so src/voice.ts
+        // itself sends model_id on both routes; in production worker/index.ts does the same job.
+        '/v1/voice': {
+          target: 'https://api.elevenlabs.io',
+          changeOrigin: true,
+          rewrite: (path) =>
+            path.startsWith('/v1/voice/stt')
+              ? '/v1/speech-to-text'
+              : path.startsWith('/v1/voice/tts')
+                ? `/v1/text-to-speech/${encodeURIComponent(elevenVoice)}?output_format=mp3_44100_64`
+                : path,
+          configure(proxy) {
+            proxy.on('proxyReq', (proxyReq) => {
+              proxyReq.setHeader('xi-api-key', elevenKey);
+              proxyReq.removeHeader('cookie');
+            });
+          },
+        },
         // The designer agent is its own Worker (services/agent); longer prefix first.
         '/v1/agent': env.VITE_AGENT_PROXY ?? 'http://127.0.0.1:8789',
         '/v1': env.VITE_API_PROXY ?? 'http://127.0.0.1:8787',

@@ -86,6 +86,24 @@
       button.destructive { color: var(--red); }
       button.large { min-height: 44px; width: 100%; font-size: 17px; letter-spacing: -0.43px; }
       .wrap { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 12px; }
+      /* Listings: photo cards, the recommendation's reasons under the name. */
+      .cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+      .cards:empty { display: none; }
+      .card { background: var(--bg-cell); border-radius: var(--radius-md); overflow: hidden; display: flex; flex-direction: column; }
+      .card img { width: 100%; aspect-ratio: 1; object-fit: cover; background: #2C2C2E; display: block; }
+      .card .body { padding: 8px 10px 10px; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+      .card .name { font-size: 13px; font-weight: 600; line-height: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .card .meta { font-size: 12px; line-height: 15px; color: var(--label-secondary); }
+      .card .why { font-size: 11px; line-height: 14px; color: var(--label-secondary); }
+      .card .actions { display: flex; gap: 6px; margin-top: 4px; }
+      .card .actions button, .card .actions a { flex: 1; min-height: 28px; font-size: 12px; text-align: center; }
+      .card .actions a { color: var(--accent); text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
+      .card.top { outline: 1.5px solid var(--accent); }
+      #scanned .row .dims { font-size: 12px; color: var(--label-secondary); }
+      #agent-mic { min-width: 36px; padding: 4px 8px; font-size: 16px; }
+      #agent-mic[data-state="recording"] { background: var(--red, #FF453A); color: #fff; }
+      #agent-mic[data-state="transcribing"], #agent-mic[data-state="speaking"] { background: color-mix(in srgb, var(--accent) 18%, transparent); }
+      #agent-mic[data-state="error"] { outline: 1.5px solid #FF9F0A; }
       .wrap:empty { display: none; }
       .wrap button { min-height: 32px; padding: 5px 12px; font-size: 14px; }
 
@@ -177,10 +195,29 @@
         </div>
       </section>
 
+      <section id="scanned-section">
+        <h2>Scanned by LiDAR</h2>
+        <div class="group" id="scanned"></div>
+        <div class="footer">What RoomPlan found in the room. Find a match searches listings that fit in its place.</div>
+      </section>
+
+      <section id="listings-section">
+        <h2>Listings</h2>
+        <div class="group">
+          <div class="row" id="listing-ask-row">
+            <input id="listing-text" type="text" placeholder="Find, e.g. a lamp under 1.5 m for the 80 cm gap" autocomplete="off" />
+            <button id="listing-search" type="button" class="tinted">Find</button>
+          </div>
+        </div>
+        <div id="listing-note" class="footer"></div>
+        <div id="listing-cards" class="cards"></div>
+      </section>
+
       <section id="agent">
         <div class="group">
           <div class="row" id="agent-ask-row">
             <input id="agent-text" type="text" placeholder="Ask, e.g. reading corner by the window" autocomplete="off" />
+            <button id="agent-mic" type="button" class="gray" title="Hold to talk" aria-label="Hold to talk">🎙</button>
             <button id="agent-ask" type="button" class="tinted">Ask</button>
           </div>
           <div id="agent-presets"></div>
