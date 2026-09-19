@@ -15,7 +15,27 @@ schema and endpoint this consumes is in `.claude/contracts.md`; transform conven
 npm install
 npm run dev          # laptop: http://localhost:5173
 npm run quest        # Quest over USB: adb reverse, then open http://localhost:5173 → Enter VR
+npm run deploy       # Cloudflare: tsc + vite build, then wrangler deploy (see below)
 ```
+
+### Deploying the page (Cloudflare Workers)
+
+WebXR needs a secure context, so the Quest needs HTTPS. Until now that meant a cloudflared
+quick tunnel to the Vite dev server, whose hostname changes every restart (`infra/README.md`).
+`wrangler.toml` instead deploys `dist/` as static assets behind a stable URL,
+`https://full-scale-xr.<subdomain>.workers.dev`, with `worker/index.ts` forwarding `/v1` to
+Thomas's Worker (`API_ORIGIN`) and `/v1/agent` to the designer agent (`AGENT_ORIGIN`; empty
+means "same as `/v1`"). The browser sees one origin, exactly as it does through the Vite proxy.
+
+```bash
+npx wrangler login   # once per machine
+npm run deploy       # build + deploy
+npm run dev:cf       # the same build, served locally by wrangler on http://localhost:8790
+```
+
+`VITE_*` values are baked in at build time: set `VITE_API_STUB=0` (and, if you use it,
+`VITE_ROOM_ID`) in `.env` before `npm run deploy` to point the deployed page at real data.
+The dev loop stays `npm run dev` — the wrangler path has no hot reload.
 
 The room from `fixtures/room-demo.json` (the team's `RoomCapture v1` sample, at the repo
 root) rises out of the floor. The sample chair drops into the spot where a chair was
