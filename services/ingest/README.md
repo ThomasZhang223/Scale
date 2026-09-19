@@ -123,6 +123,28 @@ endpoints only. Re-run it on the day — a store can turn the endpoint off at an
 `candidates.example.json` is the input shape (placeholders, not real merchants);
 `merchants.verified.json` is the generated output and is what the crawler should read.
 
+## The pre-bake handoff to Ani: `build_prebake.py`
+
+`.claude/contracts.md` owes Ani "product images plus extracted dimensions for the pre-bake" at
+H14, keyed `catalog/{merchant}/{productId}/source.jpg`.
+
+```
+python3 verify_merchants.py candidates.json --out merchants.verified.json
+python3 build_prebake.py merchants.verified.json --limit 100 --out prebake/ --download
+```
+
+Writes `prebake/manifest.json` — one row per product with a real `bboxMeters`, an image URL, and
+the R2 key the image belongs at — and with `--download`, the images themselves in that layout.
+
+**It curates rather than dumps.** The ceiling is not how many products were extracted, it is how
+many get a mesh, and that is Ani's generation throughput: 60–100 (`BUILD_DOC.md`). So selection
+is round-robin across the four demo categories, highest confidence first inside each. Taking the
+top 100 by confidence would hand him whatever the biggest merchant sells most of, and 245 sofas
+do not furnish a room.
+
+A product needs **both** a bbox and an image to make the list: a mesh needs a picture, a
+placement needs a size.
+
 ## Dimensions are the hard part
 
 Shopify has a `weight` field but **no standard dimensions field**. Expect the real answer to live

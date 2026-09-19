@@ -221,6 +221,9 @@ def dump_samples(products: list[dict], name: str, out_dir: str, n: int = 8) -> s
                     # so a sample without it cannot be used to test the page pass.
                     "handle": p.get("handle"),
                     "product_type": p.get("product_type"),
+                    # Ani needs the image, not just the dimensions (contracts.md: "Product
+                    # images plus extracted dimensions for the pre-bake").
+                    "images": [i.get("src") for i in (p.get("images") or [])][:3],
                     "tags": p.get("tags"),
                     "body_html": p.get("body_html"),
                     "variants": [{"title": v.get("title")} for v in (p.get("variants") or [])],
