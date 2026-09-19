@@ -14,8 +14,12 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
+# Anchored to repo root: an unanchored `lib/` matches any nested `src/lib/`
+# too, which silently swallowed apps/mobile/src/lib/api.ts. This is the root
+# cause of a prior commit ("add src/lib/api.js") whose file never actually
+# landed — git add skipped it as ignored, with no error.
+/lib/
+/lib64/
 parts/
 sdist/
 var/
