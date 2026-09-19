@@ -5,12 +5,29 @@ the request/response shape matches .claude/contracts.md exactly. Ranking is decl
 not implemented. See ../README.md and ../RANKING.md.
 """
 
-from fastapi import FastAPI
+from fastapi import APIRouter, Depends, FastAPI
+
+from .auth import require_upstream_token
 
 app = FastAPI(title="search")
 
+# local-edge patch: token gate for the tunnel hop (app/auth.py), plus /healthz for the
+# container healthcheck. The gate is a router dependency, not a FastAPI(dependencies=...)
+# global one — a global app-level dependency covers every included router too, including
+# /healthz, and the container healthcheck carries no token. See infra/README.md. Ranking
+# logic below is untouched.
+health_router = APIRouter()
 
-@app.post("/search")
+
+@health_router.get("/healthz")
+def healthz():
+    return {"status": "ok"}
+
+
+api_router = APIRouter(dependencies=[Depends(require_upstream_token)])
+
+
+@api_router.post("/search")
 def search():
     """Rank catalog/scan objects by style (vector similarity) filtered by fit (w_mm/h_mm/d_mm
     integer range), with the empty-result relaxed-fallback rule from ../RANKING.md.
@@ -20,3 +37,7 @@ def search():
     from fastapi.responses import JSONResponse
 
     return JSONResponse(status_code=501, content={"error": "not_implemented", "endpoint": "search"})
+
+
+app.include_router(health_router)
+app.include_router(api_router)
