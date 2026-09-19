@@ -1,0 +1,38 @@
+name = "full-scale-workers"
+main = "src/index.ts"
+compatibility_date = "2026-09-19"
+
+# R2 bucket: room captures, object frames, meshes, thumbnails. Key layout in .claude/contracts.md.
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "full-scale-objects"
+# TODO: fill in the real bucket name before deploying.
+
+# D1 database: rooms, versions, objects, jobs. Schema in src/schema.sql.
+[[d1_databases]]
+binding = "DB"
+database_name = "full-scale-db"
+database_id = "00000000-0000-0000-0000-000000000000"
+# TODO: fill in the real database_id from `wrangler d1 create` before deploying.
+
+# Vectorize index: objects-v1, 768-dim CLIP ViT-L/14 embeddings, cosine metric.
+[[vectorize]]
+binding = "OBJECTS_INDEX"
+index_name = "objects-v1"
+
+# Queue: background work (mesh generation kickoff, catalog ingestion, etc).
+[[queues.producers]]
+binding = "JOB_QUEUE"
+queue = "full-scale-jobs"
+
+[[queues.consumers]]
+queue = "full-scale-jobs"
+
+# Durable Object: one instance per room, fans out SSE for GET /sync/{roomId}.
+[[durable_objects.bindings]]
+name = "ROOM_SYNC"
+class_name = "RoomSync"
+
+[[migrations]]
+tag = "v1"
+new_classes = ["RoomSync"]

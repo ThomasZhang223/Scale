@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "objectId": "42d37a2f-9975-418b-9a41-d427b252023b",
+  "source": "scan",
+  "state": "ready",
+  "name": "MacBook Pro 14",
+  "category": "laptop",
+  "glbUrl": "https://assets.example.dev/objects/42d37a2f-9975-418b-9a41-d427b252023b/mesh.glb",
+  "bboxMeters": {
+    "w": 0.3126,
+    "h": 0.0155,
+    "d": 0.2212
+  },
+  "measure": {
+    "method": "lidar",
+    "confidence": 0.94
+  },
+  "caption": "matte space-grey aluminium laptop, closed",
+  "palette": [
+    "#3a3a3c",
+    "#8e8e93"
+  ],
+  "price": null,
+  "productUrl": null,
+  "merchant": null,
+  "createdAt": "2026-09-19T18:07:41Z"
+}

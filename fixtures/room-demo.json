@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 1,
+  "roomId": "8b371353-29a8-4872-8dce-45b7d50576a7",
+  "capturedAt": "2026-09-19T18:04:22Z",
+  "worldAlignment": "gravityAndHeading",
+  "northBearingDeg": 0.0,
+  "floor": {
+    "polygon": [[0.0, 0.0], [4.0, 0.0], [4.0, 3.5], [0.0, 3.5]],
+    "areaM2": 14.0
+  },
+  "walls": [
+    {
+      "id": "838d678c-9de2-4bba-bd25-9e84cf97efb9",
+      "transform": [1,0,0,0, 0,1,0,0, 0,0,1,0, 2.0,1.2,0.0,1],
+      "dimensions": [4.0, 2.4, 0.12],
+      "confidence": "high"
+    },
+    {
+      "id": "df58db2c-43f1-4a8d-ab6d-1d33c088b24f",
+      "transform": [1,0,0,0, 0,1,0,0, 0,0,1,0, 2.0,1.2,3.5,1],
+      "dimensions": [4.0, 2.4, 0.12],
+      "confidence": "high"
+    },
+    {
+      "id": "7016098b-eeef-4d7f-b6bf-8b48c16aa88c",
+      "transform": [0,0,-1,0, 0,1,0,0, 1,0,0,0, 0.0,1.2,1.75,1],
+      "dimensions": [3.5, 2.4, 0.12],
+      "confidence": "high"
+    },
+    {
+      "id": "51e06902-4fcf-402b-8a2a-b49ee2b9b0e0",
+      "transform": [0,0,-1,0, 0,1,0,0, 1,0,0,0, 4.0,1.2,1.75,1],
+      "dimensions": [3.5, 2.4, 0.12],
+      "confidence": "medium"
+    }
+  ],
+  "openings": [
+    {
+      "id": "e6b6ff22-d92f-4d90-af34-18be7143095a",
+      "kind": "door",
+      "wallId": "838d678c-9de2-4bba-bd25-9e84cf97efb9",
+      "transform": [1,0,0,0, 0,1,0,0, 0,0,1,0, 1.2,1.015,0.0,1],
+      "dimensions": [0.9, 2.03, 0],
+      "hingeSide": "left",
+      "swingDeg": 90
+    },
+    {
+      "id": "6f7a39c0-8875-42fe-b336-548ff8bce1f5",
+      "kind": "window",
+      "wallId": "df58db2c-43f1-4a8d-ab6d-1d33c088b24f",
+      "transform": [1,0,0,0, 0,1,0,0, 0,0,1,0, 2.8,1.4,3.5,1],
+      "dimensions": [1.2, 1.0, 0],
+      "hingeSide": "unknown",
+      "swingDeg": 0
+    }
+  ],
+  "objects": [
+    {
+      "id": "d5fac74e-d837-4457-82b6-e55b44b04144",
+      "category": "table",
+      "transform": [1,0,0,0, 0,1,0,0, 0,0,1,0, 2.0,0.375,1.0,1],
+      "dimensions": [1.2, 0.75, 0.6],
+      "confidence": "high"
+    },
+    {
+      "id": "9a1406a5-a5a0-4625-95a9-1dd5765dbab2",
+      "category": "chair",
+      "transform": [0.7071067812,0,-0.7071067812,0, 0,1,0,0, 0.7071067812,0,0.7071067812,0, 1.5,0.45,2.0,1],
+      "dimensions": [0.5, 0.9, 0.5],
+      "confidence": "medium"
+    }
+  ]
+}

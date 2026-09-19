@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "ok": false,
+  "checkedAt": "2026-09-19T18:11:03Z",
+  "violations": [
+    {
+      "kind": "door_swing",
+      "severity": "block",
+      "placementId": "b8057a62-55ba-4325-9da4-d91ed2546c2b",
+      "detailMeters": 0.11,
+      "message": "blocks the door swing by 11 cm",
+      "geometry": {
+        "type": "arc",
+        "center": [
+          1.2,
+          0.0
+        ],
+        "radiusM": 0.9,
+        "startDeg": 0,
+        "endDeg": 90
+      }
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+# Owner: Thomas. Nobody else edits this file — see CLAUDE.md "Shared files nobody may edit
+# casually".
+#
+# Every service is registered here now, including three that haven't been started yet, so
+# that nobody has to add an entry later and collide with someone else's edit. An empty
+# placeholder costs nothing; a merge conflict at hour 20 costs the demo.
+
+services:
+  fit:
+    # Owner: Justin. Solver service — reads RoomCapture v1 and bboxMeters, answers /solve.
+    build: ./services/fit
+    ports:
+      - "8001:8001"
+
+  gen:
+    # Owner: Ani. Baseten image-to-3D, the scale binding, embeddings.
+    build: ./services/gen
+    ports:
+      - "8002:8002"
+
+  ingest:
+    # Owner: Paul. Catalog scraper and extractor.
+    build: ./services/ingest
+    ports:
+      - "8003:8003"
+
+  search:
+    # Owner: Paul. Ranking service, answers /search.
+    build: ./services/search
+    ports:
+      - "8004:8004"
