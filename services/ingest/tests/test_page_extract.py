@@ -43,6 +43,20 @@ DEF_LIST = """
 </dl></body></html>
 """
 
+# The realistic shape, and the one my first fixtures were too optimistic about: the theme emits
+# Product JSON-LD but fills only name/image/offers/sku. No dimensions in the structured data at
+# all, so the spec block has to carry it.
+JSON_LD_WITHOUT_DIMENSIONS = """
+<html><head><script type="application/ld+json">
+{"@context":"https://schema.org/","@type":"Product","name":"The Floyd Bed",
+ "image":["https://cdn.shopify.com/x.jpg"],"sku":"BED-Q",
+ "offers":{"@type":"Offer","price":"995.00","priceCurrency":"USD"}}
+</script></head><body>
+<details><summary>Dimensions</summary><div>Queen: 60" W x 80" L x 14" H</div></details>
+<p>Ships in 3-5 days.</p>
+</body></html>
+"""
+
 NOISE_ONLY = """
 <html><body>
  <p>Ships in 3-5 days. Free returns within 30 days. Rated 4.8 by 120 reviews.</p>
@@ -117,6 +131,30 @@ def test_a_partial_hit_is_kept_rather_than_discarded():
     hit = extract_from_page(html)
     assert hit is not None and hit.as_bbox() is None, "two axes is a partial, not a bbox"
     assert hit.w is not None
+
+
+def test_json_ld_without_dimension_keys_falls_through_to_the_spec_block():
+    """Most themes emit Product JSON-LD with only name/image/offers/sku. The structured path
+    must yield nothing rather than something wrong, and the spec block must still win."""
+    assert from_json_ld(JSON_LD_WITHOUT_DIMENSIONS) is None
+    hit = extract_from_page(JSON_LD_WITHOUT_DIMENSIONS)
+    assert hit.as_bbox() is not None
+    assert hit.source_field == "spec_block"
+
+
+def test_suffix_labels_map_to_the_right_axes():
+    """60" W x 80" L x 14" H — L is depth, not height. Getting this wrong puts a bed on its end."""
+    hit = extract_from_page(JSON_LD_WITHOUT_DIMENSIONS)
+    box = hit.as_bbox()
+    assert abs(box["w"] - 1.524) < 1e-3, box   # 60 in
+    assert abs(box["d"] - 2.032) < 1e-3, box   # 80 in  (L)
+    assert abs(box["h"] - 0.3556) < 1e-3, box  # 14 in
+
+
+def test_shipping_days_are_not_read_as_a_dimension():
+    hit = extract_from_page(JSON_LD_WITHOUT_DIMENSIONS)
+    for v in hit.as_bbox().values():
+        assert v not in (0.03, 0.05), "'Ships in 3-5 days' leaked into the dimensions"
 
 
 def test_product_url_is_built_from_the_handle():

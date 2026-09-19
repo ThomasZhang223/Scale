@@ -184,6 +184,9 @@ def dump_samples(products: list[dict], name: str, out_dir: str, n: int = 8) -> s
             [
                 {
                     "title": p.get("title"),
+                    # handle is load-bearing: step 2.5 builds {storefront}/products/{handle},
+                    # so a sample without it cannot be used to test the page pass.
+                    "handle": p.get("handle"),
                     "product_type": p.get("product_type"),
                     "tags": p.get("tags"),
                     "body_html": p.get("body_html"),
