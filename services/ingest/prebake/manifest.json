@@ -1,67 +1,87 @@
 {
   "_comment": "Pre-bake handoff for Ani (component C). Every row has a real bboxMeters and an image. r2Key is where the image belongs per contracts.md.",
-  "generatedAt": "2026-09-19T19:54:40Z",
+  "generatedAt": "2026-09-19T22:59:20Z",
   "count": 100,
   "byCategory": {
-    "seating": 23,
-    "surface": 23,
-    "storage": 10,
-    "lighting": 22,
-    "other": 22
+    "seating": 20,
+    "surface": 20,
+    "storage": 20,
+    "lighting": 20,
+    "other": 20
   },
   "imagesDownloaded": 100,
-  "fromPageFetch": 42,
+  "fromPageFetch": 25,
   "step2_5": {
-    "attempted": 548,
-    "recovered": 252,
-    "failed": 4
+    "attempted": 544,
+    "recovered": 251,
+    "failed": 0
+  },
+  "ai": {
+    "llm": 25,
+    "vlm": 0,
+    "llm_errors": 0,
+    "vlm_errors": 0
+  },
+  "byVia": {
+    "api": 73,
+    "llm": 2,
+    "page": 25,
+    "vlm": 0
   },
   "products": [
     {
-      "productId": "9240389320866",
+      "productId": "9246282842274",
       "merchant": "Floyd_Home",
-      "title": "The Gere Easy Chair - Chalk, Granite, & Blush",
-      "handle": "the-gere-easy-chair-chalk-granite",
-      "productUrl": "https://floydhome.com/products/the-gere-easy-chair-chalk-granite",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/0462/1706/8706/files/5_302e7090-4fe1-4cca-95c7-5dc238ab264e.png?v=1701097733",
-      "r2Key": "catalog/Floyd_Home/9240389320866/source.jpg",
-      "category": "chairs",
+      "title": "Two-Piece Form Sectional - In Stock",
+      "handle": "two-piece-form-sectional-warehouse-final",
+      "productUrl": "https://floydhome.com/products/two-piece-form-sectional-warehouse-final",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/0462/1706/8706/products/Tonus_TerraCotta_Config15_Qtr0001.png?v=1670019793",
+      "r2Key": "catalog/Floyd_Home/9246282842274/source.jpg",
+      "category": "sectionals",
       "bucket": "seating",
       "bboxMeters": {
-        "w": 0.7874,
-        "h": 0.7366,
-        "d": 0.7874
+        "w": 2.286,
+        "h": 0.696,
+        "d": 0.9271
       },
       "measure": {
         "method": "extracted",
-        "confidence": 0.85
+        "confidence": 0.9
+      },
+      "validation": {
+        "flags": [],
+        "unverified": false
       },
       "extractedFrom": "spec_block",
-      "source": "catalog",
-      "bytes": 1001895
+      "via": "page",
+      "source": "catalog"
     },
     {
-      "productId": "8915805733026",
-      "merchant": "Floyd_Home",
-      "title": "The Lift Off Bench",
-      "handle": "the-lift-off-bench",
-      "productUrl": "https://floydhome.com/products/the-lift-off-bench",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/0462/1706/8706/files/Birch_Black_LiftOffCoffeeTable_Single.png?v=1755780322",
-      "r2Key": "catalog/Floyd_Home/8915805733026/source.jpg",
-      "category": "tables",
+      "productId": "8668094300440",
+      "merchant": "Bend_Goods",
+      "title": "Terrazzo Switch Table",
+      "handle": "terrazzo-switch-table",
+      "productUrl": "https://bendgoods.com/products/terrazzo-switch-table",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/0231/7507/files/terrazzo-switch_wh-02.png?v=1769713770",
+      "r2Key": "catalog/Bend_Goods/8668094300440/source.jpg",
+      "category": "side tables",
       "bucket": "surface",
       "bboxMeters": {
         "w": 0.4572,
-        "h": 0.381,
-        "d": 1.7018
+        "h": 0.4572,
+        "d": 0.4572
       },
       "measure": {
         "method": "extracted",
-        "confidence": 0.85
+        "confidence": 0.9
+      },
+      "validation": {
+        "flags": [],
+        "unverified": false
       },
       "extractedFrom": "spec_block",
-      "source": "catalog",
-      "bytes": 185019
+      "via": "page",
+      "source": "catalog"
     },
     {
       "productId": "8936217018530",
@@ -80,100 +100,123 @@
       },
       "measure": {
         "method": "extracted",
-        "confidence": 0.85
+        "confidence": 0.9
+      },
+      "validation": {
+        "flags": [],
+        "unverified": false
       },
       "extractedFrom": "spec_block",
-      "source": "catalog",
-      "bytes": 99271
+      "via": "page",
+      "source": "catalog"
     },
     {
-      "productId": "15360102793289",
-      "merchant": "Poly___Bark",
-      "title": "Zeno Globe Wall Sconce | Brushed Brass/Clear",
-      "handle": "zeno-globe-wall-sconce-brushed-brass-clear",
-      "productUrl": "https://polyandbark.com/products/zeno-globe-wall-sconce-brushed-brass-clear",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/LS-W264-BB-CL_1_02d5a6d9-e9bb-40ef-a2a1-ce1bf3252765.jpg?v=1774360415",
-      "r2Key": "catalog/Poly___Bark/15360102793289/source.jpg",
-      "category": "wall sconces",
+      "productId": "9316326637790",
+      "merchant": "InStyle_Home__CA",
+      "title": "AERO Dining Chair GY-DC-2666 Light Brown fabric",
+      "handle": "aero-dining-chair-gy-dc-2666-light-brown-fabric",
+      "productUrl": "https://instylehome.ca/products/aero-dining-chair-gy-dc-2666-light-brown-fabric",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/0262/8947/1541/files/aerobrown.png?v=1787434130",
+      "r2Key": "catalog/InStyle_Home__CA/9316326637790/source.jpg",
+      "category": null,
       "bucket": "lighting",
       "bboxMeters": {
-        "w": 1.016,
-        "h": 0.2667,
-        "d": 0.2032
+        "w": 0.508,
+        "h": 0.889,
+        "d": 0.5715
       },
       "measure": {
         "method": "extracted",
         "confidence": 0.75
       },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
       "extractedFrom": "body_html",
-      "source": "catalog"
+      "via": "api",
+      "source": "catalog",
+      "bytes": 445707
     },
     {
-      "productId": "9286863519906",
+      "productId": "9286983614626",
       "merchant": "Floyd_Home",
-      "title": "The Floyd Bed \u2014 Upholstered, Original",
-      "handle": "the-floyd-bed-original-upholstered",
-      "productUrl": "https://floydhome.com/products/the-floyd-bed-original-upholstered",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/0462/1706/8706/files/OG_Queen_Birch_Black_Crypton_Sandstone_Upholstered.png?v=1787021744",
-      "r2Key": "catalog/Floyd_Home/9286863519906/source.jpg",
+      "title": "The Floyd Bed \u2014 Upholstered, Lift Off",
+      "handle": "the-floyd-bed-lift-off-upholstered",
+      "productUrl": "https://floydhome.com/products/the-floyd-bed-lift-off-upholstered",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/0462/1706/8706/files/Lift_Off_Queen_HB_Black_Crypton_Sandstone_Upholstered.png?v=1787023028",
+      "r2Key": "catalog/Floyd_Home/9286983614626/source.jpg",
       "category": "beds",
       "bucket": null,
       "bboxMeters": {
         "w": 1.7018,
-        "h": 0.1905,
+        "h": 0.3683,
         "d": 2.1844
       },
       "measure": {
         "method": "extracted",
-        "confidence": 0.85
+        "confidence": 0.9
+      },
+      "validation": {
+        "flags": [],
+        "unverified": false
       },
       "extractedFrom": "spec_block",
-      "source": "catalog",
-      "bytes": 499111
+      "via": "page",
+      "source": "catalog"
     },
     {
-      "productId": "534930227235",
-      "merchant": "Bend_Goods",
-      "title": "Bunny Lounge Chair",
-      "handle": "bunny-lounge-chair",
-      "productUrl": "https://bendgoods.com/products/bunny-lounge-chair",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/0231/7507/files/bunnylounge-neonylw_002.png?v=1787264977",
-      "r2Key": "catalog/Bend_Goods/534930227235/source.jpg",
-      "category": "lounge chair",
+      "productId": "9240389320866",
+      "merchant": "Floyd_Home",
+      "title": "The Gere Easy Chair - Chalk, Granite, & Blush",
+      "handle": "the-gere-easy-chair-chalk-granite",
+      "productUrl": "https://floydhome.com/products/the-gere-easy-chair-chalk-granite",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/0462/1706/8706/files/5_302e7090-4fe1-4cca-95c7-5dc238ab264e.png?v=1701097733",
+      "r2Key": "catalog/Floyd_Home/9240389320866/source.jpg",
+      "category": "chairs",
       "bucket": "seating",
       "bboxMeters": {
-        "w": 0.6159,
+        "w": 0.7874,
         "h": 0.7366,
-        "d": 0.6604
+        "d": 0.7874
       },
       "measure": {
         "method": "extracted",
-        "confidence": 0.85
+        "confidence": 0.9
+      },
+      "validation": {
+        "flags": [],
+        "unverified": false
       },
       "extractedFrom": "spec_block",
-      "source": "catalog",
-      "bytes": 1004748
+      "via": "page",
+      "source": "catalog"
     },
     {
-      "productId": "8732662497442",
-      "merchant": "Floyd_Home",
-      "title": "The Lift Off Coffee Table",
-      "handle": "the-lift-off-coffee-table",
-      "productUrl": "https://floydhome.com/products/the-lift-off-coffee-table",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/0462/1706/8706/files/Birch_Black_LiftOffCoffeeTable_Single.png?v=1755780322",
-      "r2Key": "catalog/Floyd_Home/8732662497442/source.jpg",
+      "productId": "534931406883",
+      "merchant": "Bend_Goods",
+      "title": "Coffee Table",
+      "handle": "coffee-table",
+      "productUrl": "https://bendgoods.com/products/coffee-table",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/0231/7507/files/coffeetable_blk_glass_01.png?v=1738367003",
+      "r2Key": "catalog/Bend_Goods/534931406883/source.jpg",
       "category": "tables",
       "bucket": "surface",
       "bboxMeters": {
-        "w": 0.4572,
-        "h": 0.381,
-        "d": 1.7018
+        "w": 0.9144,
+        "h": 0.9144,
+        "d": 0.4064
       },
       "measure": {
         "method": "extracted",
-        "confidence": 0.75
+        "confidence": 0.9
       },
-      "extractedFrom": "variant.title",
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
+      "extractedFrom": "spec_block",
+      "via": "page",
       "source": "catalog"
     },
     {
@@ -195,98 +238,123 @@
         "method": "extracted",
         "confidence": 0.75
       },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
       "extractedFrom": "body_html",
+      "via": "api",
       "source": "catalog"
     },
     {
-      "productId": "15360130875465",
-      "merchant": "Poly___Bark",
-      "title": "Modena 3-Light Island Light | Modern Bronze/Clear",
-      "handle": "modena-3-light-island-light-modern-bronze-clear",
-      "productUrl": "https://polyandbark.com/products/modena-3-light-island-light-modern-bronze-clear",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/LS-C307-BZ-CL_1_20c34fd6-9f56-4539-a26a-3455e154025d.jpg?v=1774449111",
-      "r2Key": "catalog/Poly___Bark/15360130875465/source.jpg",
-      "category": "ceiling lights",
+      "productId": "9421220708585",
+      "merchant": "Kohara___Co__CA_lighting",
+      "title": "Deer Lantern (2 Sizes)",
+      "handle": "deer-lantern-2-sizes",
+      "productUrl": "https://koharaco.com/products/deer-lantern-2-sizes",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/0529/4591/1968/files/83221_lg.jpg?v=1789226430",
+      "r2Key": "catalog/Kohara___Co__CA_lighting/9421220708585/source.jpg",
+      "category": "foyer/hall lanterns",
       "bucket": "lighting",
       "bboxMeters": {
-        "w": 1.524,
-        "h": 0.4826,
-        "d": 1.0668
+        "w": 0.2286,
+        "h": 0.1778,
+        "d": 0.1778
       },
       "measure": {
         "method": "extracted",
         "confidence": 0.75
       },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
       "extractedFrom": "body_html",
-      "source": "catalog"
+      "via": "api",
+      "source": "catalog",
+      "bytes": 38972
     },
     {
-      "productId": "9286983614626",
+      "productId": "8751821521058",
       "merchant": "Floyd_Home",
-      "title": "The Floyd Bed \u2014 Upholstered, Lift Off",
-      "handle": "the-floyd-bed-lift-off-upholstered",
-      "productUrl": "https://floydhome.com/products/the-floyd-bed-lift-off-upholstered",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/0462/1706/8706/files/Lift_Off_Queen_HB_Black_Crypton_Sandstone_Upholstered.png?v=1787023028",
-      "r2Key": "catalog/Floyd_Home/9286983614626/source.jpg",
-      "category": "beds",
+      "title": "The Mattress 2.0",
+      "handle": "the-mattress",
+      "productUrl": "https://floydhome.com/products/the-mattress",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/0462/1706/8706/files/The_Mattress_TwinXL.jpg?v=1756409729",
+      "r2Key": "catalog/Floyd_Home/8751821521058/source.jpg",
+      "category": "mattresses",
       "bucket": null,
       "bboxMeters": {
-        "w": 1.7018,
-        "h": 0.3683,
-        "d": 2.1844
+        "w": 0.9652,
+        "h": 0.3048,
+        "d": 2.032
       },
       "measure": {
         "method": "extracted",
-        "confidence": 0.85
+        "confidence": 0.9
+      },
+      "validation": {
+        "flags": [],
+        "unverified": false
       },
       "extractedFrom": "spec_block",
-      "source": "catalog",
-      "bytes": 558604
+      "via": "page",
+      "source": "catalog"
     },
     {
-      "productId": "534906896419",
-      "merchant": "Bend_Goods",
-      "title": "Lucy Bar Stool",
-      "handle": "bar-stool",
-      "productUrl": "https://bendgoods.com/products/bar-stool",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/0231/7507/files/lucybarstool_blk_01.png?v=1741638291",
-      "r2Key": "catalog/Bend_Goods/534906896419/source.jpg",
-      "category": "stool",
+      "productId": "8836821057698",
+      "merchant": "Floyd_Home",
+      "title": "Sink Down Lounge Chair",
+      "handle": "sink-down-lounge-chair-configs",
+      "productUrl": "https://floydhome.com/products/sink-down-lounge-chair-configs",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/0462/1706/8706/products/FSD-LoungeChair-Sand_1500x1500_9cf069d4-f906-4965-9f8e-f9490a286513.png?v=1763563023",
+      "r2Key": "catalog/Floyd_Home/8836821057698/source.jpg",
+      "category": "sectionals",
       "bucket": "seating",
       "bboxMeters": {
-        "w": 0.4826,
-        "h": 1.1176,
-        "d": 0.5461
+        "w": 2.3368,
+        "h": 0.8128,
+        "d": 1.143
       },
       "measure": {
         "method": "extracted",
-        "confidence": 0.85
+        "confidence": 0.9
+      },
+      "validation": {
+        "flags": [],
+        "unverified": false
       },
       "extractedFrom": "spec_block",
-      "source": "catalog",
-      "bytes": 859448
+      "via": "page",
+      "source": "catalog"
     },
     {
-      "productId": "15649495351369",
-      "merchant": "Poly___Bark",
-      "title": "Taro Lift-Top Coffee Table | Walnut Acacia",
-      "handle": "taro-lift-top-coffee-table-walnut-acacia",
-      "productUrl": "https://polyandbark.com/products/taro-lift-top-coffee-table-walnut-acacia",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/LR-T1081-WAL.jpg?v=1786709772",
-      "r2Key": "catalog/Poly___Bark/15649495351369/source.jpg",
-      "category": "accent tables",
+      "productId": "8622813348120",
+      "merchant": "Bend_Goods",
+      "title": "Tube Side Table",
+      "handle": "tube-side-table",
+      "productUrl": "https://bendgoods.com/products/tube-side-table",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/0231/7507/files/sidetubetable-blk_new02_1.webp?v=1758841766",
+      "r2Key": "catalog/Bend_Goods/8622813348120/source.jpg",
+      "category": "side tables",
       "bucket": "surface",
       "bboxMeters": {
-        "w": 1.2002,
-        "h": 0.3937,
-        "d": 0.6096
+        "w": 0.635,
+        "h": 0.3302,
+        "d": 0.635
       },
       "measure": {
         "method": "extracted",
-        "confidence": 0.75
+        "confidence": 0.9
       },
-      "extractedFrom": "body_html",
-      "source": "catalog"
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
+      "extractedFrom": "spec_block",
+      "via": "page",
+      "source": "catalog",
+      "bytes": 1009001
     },
     {
       "productId": "15485789306953",
@@ -307,98 +375,124 @@
         "method": "extracted",
         "confidence": 0.75
       },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
       "extractedFrom": "body_html",
+      "via": "api",
       "source": "catalog"
     },
     {
-      "productId": "15360130842697",
-      "merchant": "Poly___Bark",
-      "title": "Modena 3-Light Island Light | Satin Nickel/Smokey",
-      "handle": "modena-3-light-island-light-satin-nickel-smokey",
-      "productUrl": "https://polyandbark.com/products/modena-3-light-island-light-satin-nickel-smokey",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/LS-C307-SN-SMK_1_6fd80fdb-27ff-4a7f-a374-83aabd7119e5.jpg?v=1774449181",
-      "r2Key": "catalog/Poly___Bark/15360130842697/source.jpg",
-      "category": "ceiling lights",
+      "productId": "9338223591657",
+      "merchant": "Kohara___Co__CA_lighting",
+      "title": "Lunaria Terra Rattan Solar Garden Lantern",
+      "handle": "lunaria-terra-rattan-solar-garden-lantern",
+      "productUrl": "https://koharaco.com/products/lunaria-terra-rattan-solar-garden-lantern",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/0529/4591/1968/files/51689cb4e749d4c5c931d3a50c061f018f191b08ef8b70317cdecebc9e5dd076.jpg?v=1783359523",
+      "r2Key": "catalog/Kohara___Co__CA_lighting/9338223591657/source.jpg",
+      "category": "foyer/hall lanterns",
       "bucket": "lighting",
       "bboxMeters": {
-        "w": 1.524,
-        "h": 0.4826,
-        "d": 1.0668
+        "w": 0.225,
+        "h": 0.235,
+        "d": 0.225
       },
       "measure": {
         "method": "extracted",
         "confidence": 0.75
       },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
       "extractedFrom": "body_html",
-      "source": "catalog"
+      "via": "api",
+      "source": "catalog",
+      "bytes": 203019
     },
     {
-      "productId": "9305690144930",
-      "merchant": "Floyd_Home",
-      "title": "The Upholstered Headboard \u2014 Add On",
-      "handle": "the-upholstered-headboard-add-on",
-      "productUrl": "https://floydhome.com/products/the-upholstered-headboard-add-on",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/0462/1706/8706/files/Queen_Upholstered_Headboard_Sandstone.png?v=1787242115",
-      "r2Key": "catalog/Floyd_Home/9305690144930/source.jpg",
-      "category": "bed add-ons",
+      "productId": "15626447192137",
+      "merchant": "Poly___Bark",
+      "title": "Orbit Bed | Serene Brown | King",
+      "handle": "orbit-bed-serene-brown-king",
+      "productUrl": "https://polyandbark.com/products/orbit-bed-serene-brown-king",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/P-D988-KG-SEBR_1_6a8fc469-e9ae-4694-9251-076a2f917a69.jpg?v=1788451202",
+      "r2Key": "catalog/Poly___Bark/15626447192137/source.jpg",
+      "category": "beds",
       "bucket": null,
       "bboxMeters": {
-        "w": 1.9558,
-        "h": 0.5588,
-        "d": 0.0762
-      },
-      "measure": {
-        "method": "extracted",
-        "confidence": 0.85
-      },
-      "extractedFrom": "spec_block",
-      "source": "catalog",
-      "bytes": 439237
-    },
-    {
-      "productId": "534972727331",
-      "merchant": "Bend_Goods",
-      "title": "Stacking Lucy",
-      "handle": "stacking-lucy-dining-chair",
-      "productUrl": "https://bendgoods.com/products/stacking-lucy-dining-chair",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/0231/7507/files/stacklucy-blk_001.png?v=1762990934",
-      "r2Key": "catalog/Bend_Goods/534972727331/source.jpg",
-      "category": "dining chair",
-      "bucket": "seating",
-      "bboxMeters": {
-        "w": 0.5651,
-        "h": 0.8128,
-        "d": 0.5397
-      },
-      "measure": {
-        "method": "extracted",
-        "confidence": 0.85
-      },
-      "extractedFrom": "spec_block",
-      "source": "catalog",
-      "bytes": 848293
-    },
-    {
-      "productId": "15608340643913",
-      "merchant": "Poly___Bark",
-      "title": "Preston 96\" Dining Table | Walnut",
-      "handle": "preston-dining-table-96-walnut",
-      "productUrl": "https://polyandbark.com/products/preston-dining-table-96-walnut",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/DI-G320-WAL-96.jpg?v=1784006173",
-      "r2Key": "catalog/Poly___Bark/15608340643913/source.jpg",
-      "category": "dining tables",
-      "bucket": "surface",
-      "bboxMeters": {
-        "w": 2.4384,
-        "h": 0.762,
-        "d": 1.0668
+        "w": 2.1971,
+        "h": 1.1684,
+        "d": 2.3622
       },
       "measure": {
         "method": "extracted",
         "confidence": 0.75
       },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
       "extractedFrom": "body_html",
+      "via": "api",
+      "source": "catalog",
+      "bytes": 40168
+    },
+    {
+      "productId": "8830910103714",
+      "merchant": "Floyd_Home",
+      "title": "Soft Serve Lounge Chair",
+      "handle": "lounge-chair-soft-serve-sectional",
+      "productUrl": "https://floydhome.com/products/lounge-chair-soft-serve-sectional",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/0462/1706/8706/files/Nomad_Umami_Soft_Serve_Lounge_Chair.png?v=1762528073",
+      "r2Key": "catalog/Floyd_Home/8830910103714/source.jpg",
+      "category": "sectionals",
+      "bucket": "seating",
+      "bboxMeters": {
+        "w": 1.3462,
+        "h": 0.7112,
+        "d": 1.0668
+      },
+      "measure": {
+        "method": "extracted",
+        "confidence": 0.9
+      },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
+      "extractedFrom": "spec_block",
+      "via": "page",
       "source": "catalog"
+    },
+    {
+      "productId": "1475560964131",
+      "merchant": "Bend_Goods",
+      "title": "Terrazzo Side Table",
+      "handle": "terrazzo-table",
+      "productUrl": "https://bendgoods.com/products/terrazzo-table",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/0231/7507/files/terrazzotable-blk_sq03.png?v=1787936824",
+      "r2Key": "catalog/Bend_Goods/1475560964131/source.jpg",
+      "category": "side tables",
+      "bucket": "surface",
+      "bboxMeters": {
+        "w": 0.508,
+        "h": 0.4572,
+        "d": 0.508
+      },
+      "measure": {
+        "method": "extracted",
+        "confidence": 0.9
+      },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
+      "extractedFrom": "spec_block",
+      "via": "page",
+      "source": "catalog",
+      "bytes": 966585
     },
     {
       "productId": "15610666844233",
@@ -419,7 +513,288 @@
         "method": "extracted",
         "confidence": 0.75
       },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
       "extractedFrom": "body_html",
+      "via": "api",
+      "source": "catalog"
+    },
+    {
+      "productId": "9338223526121",
+      "merchant": "Kohara___Co__CA_lighting",
+      "title": "Lunaria Maris Solar Rattan Style Lantern",
+      "handle": "lunaria-maris-solar-rattan-style-lantern",
+      "productUrl": "https://koharaco.com/products/lunaria-maris-solar-rattan-style-lantern",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/0529/4591/1968/files/ce91da0ab3b5ab3261bbdc7de0ed78abe017951f3c1c4424b6c767fae47f29ee.jpg?v=1783359519",
+      "r2Key": "catalog/Kohara___Co__CA_lighting/9338223526121/source.jpg",
+      "category": "foyer/hall lanterns",
+      "bucket": "lighting",
+      "bboxMeters": {
+        "w": 0.21,
+        "h": 0.27,
+        "d": 0.21
+      },
+      "measure": {
+        "method": "extracted",
+        "confidence": 0.75
+      },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
+      "extractedFrom": "body_html",
+      "via": "api",
+      "source": "catalog",
+      "bytes": 196646
+    },
+    {
+      "productId": "15587326132297",
+      "merchant": "Poly___Bark",
+      "title": "Adela Bed | Serene Sand | King",
+      "handle": "adela-bed-serene-sand-king",
+      "productUrl": "https://polyandbark.com/products/adela-bed-serene-sand-king",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/BD-K093-KG-SRSA_a88b65f9-da5f-48f7-8121-2b1ecf009b82.jpg?v=1788451125",
+      "r2Key": "catalog/Poly___Bark/15587326132297/source.jpg",
+      "category": "beds",
+      "bucket": null,
+      "bboxMeters": {
+        "w": 2.0574,
+        "h": 1.27,
+        "d": 2.2352
+      },
+      "measure": {
+        "method": "extracted",
+        "confidence": 0.75
+      },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
+      "extractedFrom": "body_html",
+      "via": "api",
+      "source": "catalog",
+      "bytes": 43485
+    },
+    {
+      "productId": "8691192299682",
+      "merchant": "Floyd_Home",
+      "title": "Three-Piece Soft Serve Sectional",
+      "handle": "three-piece-soft-serve-sectional",
+      "productUrl": "https://floydhome.com/products/three-piece-soft-serve-sectional",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/0462/1706/8706/files/3Seater_SoftServe_NomadCrema_3s1.png?v=1750107052",
+      "r2Key": "catalog/Floyd_Home/8691192299682/source.jpg",
+      "category": "sectionals",
+      "bucket": "seating",
+      "bboxMeters": {
+        "w": 3.1242,
+        "h": 0.7112,
+        "d": 1.0668
+      },
+      "measure": {
+        "method": "extracted",
+        "confidence": 0.9
+      },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
+      "extractedFrom": "spec_block",
+      "via": "page",
+      "source": "catalog"
+    },
+    {
+      "productId": "8979314901272",
+      "merchant": "Bend_Goods",
+      "title": "Cono Side Table with Stone",
+      "handle": "cono-table-with-stone",
+      "productUrl": "https://bendgoods.com/products/cono-table-with-stone",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/0231/7507/files/stone-cono_blk_001.png?v=1749230047",
+      "r2Key": "catalog/Bend_Goods/8979314901272/source.jpg",
+      "category": "side tables",
+      "bucket": "surface",
+      "bboxMeters": {
+        "w": 0.5588,
+        "h": 0.508,
+        "d": 0.5588
+      },
+      "measure": {
+        "method": "extracted",
+        "confidence": 0.9
+      },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
+      "extractedFrom": "spec_block",
+      "via": "page",
+      "source": "catalog",
+      "bytes": 849987
+    },
+    {
+      "productId": "15610829307977",
+      "merchant": "Poly___Bark",
+      "title": "Noir Sideboard | Walnut",
+      "handle": "noir-sideboard-walnut",
+      "productUrl": "https://polyandbark.com/products/noir-sideboard-walnut",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/LR-P175-WAL_259767a6-60e7-49ee-9b7e-217815023131.jpg?v=1789532053",
+      "r2Key": "catalog/Poly___Bark/15610829307977/source.jpg",
+      "category": "storage",
+      "bucket": "storage",
+      "bboxMeters": {
+        "w": 1.651,
+        "h": 0.8128,
+        "d": 0.4572
+      },
+      "measure": {
+        "method": "extracted",
+        "confidence": 0.75
+      },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
+      "extractedFrom": "body_html",
+      "via": "api",
+      "source": "catalog"
+    },
+    {
+      "productId": "9338223558889",
+      "merchant": "Kohara___Co__CA_lighting",
+      "title": "Boulette Decorative Solar Silhouette Lantern",
+      "handle": "boulette-decorative-solar-silhouette-lantern",
+      "productUrl": "https://koharaco.com/products/boulette-decorative-solar-silhouette-lantern",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/0529/4591/1968/files/6a9823ef305d73fdeb849d0b5e5b2f0d80915a0ee5b7a64f2b4044dfa7e15dd1.jpg?v=1783359521",
+      "r2Key": "catalog/Kohara___Co__CA_lighting/9338223558889/source.jpg",
+      "category": "foyer/hall lanterns",
+      "bucket": "lighting",
+      "bboxMeters": {
+        "w": 0.18,
+        "h": 0.185,
+        "d": 0.18
+      },
+      "measure": {
+        "method": "extracted",
+        "confidence": 0.75
+      },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
+      "extractedFrom": "body_html",
+      "via": "api",
+      "source": "catalog",
+      "bytes": 242303
+    },
+    {
+      "productId": "15521869824073",
+      "merchant": "Poly___Bark",
+      "title": "Truro Bed with Leather Cushions | Olivine Green | King",
+      "handle": "truro-bed-with-leather-cushions-olivine-green-king",
+      "productUrl": "https://polyandbark.com/products/truro-bed-with-leather-cushions-olivine-green-king",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/BD-C301-695-WOLG-KG.png?v=1776052945",
+      "r2Key": "catalog/Poly___Bark/15521869824073/source.jpg",
+      "category": "beds",
+      "bucket": null,
+      "bboxMeters": {
+        "w": 2.0383,
+        "h": 1.1176,
+        "d": 2.1971
+      },
+      "measure": {
+        "method": "extracted",
+        "confidence": 0.75
+      },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
+      "extractedFrom": "body_html",
+      "via": "api",
+      "source": "catalog",
+      "bytes": 690121
+    },
+    {
+      "productId": "8691171557538",
+      "merchant": "Floyd_Home",
+      "title": "Two-Piece Soft Serve Sectional",
+      "handle": "two-piece-soft-serve-sectional",
+      "productUrl": "https://floydhome.com/products/two-piece-soft-serve-sectional",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/0462/1706/8706/files/2_Seater_Soft_Serve_Nomad_Crema_2s1.png?v=1750106524",
+      "r2Key": "catalog/Floyd_Home/8691171557538/source.jpg",
+      "category": "sectionals",
+      "bucket": "seating",
+      "bboxMeters": {
+        "w": 2.2352,
+        "h": 0.7112,
+        "d": 1.0668
+      },
+      "measure": {
+        "method": "extracted",
+        "confidence": 0.9
+      },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
+      "extractedFrom": "spec_block",
+      "via": "page",
+      "source": "catalog"
+    },
+    {
+      "productId": "8841151873304",
+      "merchant": "Bend_Goods",
+      "title": "Coffee Table - Limited Item",
+      "handle": "35-4-coffee-table",
+      "productUrl": "https://bendgoods.com/products/35-4-coffee-table",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/0231/7507/files/coffeetable_gd_glass_01.png?v=1738698042",
+      "r2Key": "catalog/Bend_Goods/8841151873304/source.jpg",
+      "category": "tables",
+      "bucket": "surface",
+      "bboxMeters": {
+        "w": 0.9144,
+        "h": 0.9144,
+        "d": 0.4064
+      },
+      "measure": {
+        "method": "extracted",
+        "confidence": 0.9
+      },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
+      "extractedFrom": "spec_block",
+      "via": "page",
+      "source": "catalog",
+      "bytes": 925208
+    },
+    {
+      "productId": "15561087385673",
+      "merchant": "Poly___Bark",
+      "title": "Cura 35.5\" Cabinet | Walnut",
+      "handle": "cura-cabinet-walnut",
+      "productUrl": "https://polyandbark.com/products/cura-cabinet-walnut",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/LR-K052-WAL_1_4e2ebb36-aca4-4d74-af09-d0429db67e05.jpg?v=1781790417",
+      "r2Key": "catalog/Poly___Bark/15561087385673/source.jpg",
+      "category": "bookcases",
+      "bucket": "storage",
+      "bboxMeters": {
+        "w": 0.9017,
+        "h": 2.032,
+        "d": 0.4572
+      },
+      "measure": {
+        "method": "extracted",
+        "confidence": 0.75
+      },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
+      "extractedFrom": "body_html",
+      "via": "api",
       "source": "catalog"
     },
     {
@@ -441,97 +816,122 @@
         "method": "extracted",
         "confidence": 0.75
       },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
       "extractedFrom": "body_html",
+      "via": "api",
       "source": "catalog"
     },
     {
-      "productId": "9239485317282",
-      "merchant": "Floyd_Home",
-      "title": "The Block Party",
-      "handle": "block-party-bed-configuration-06",
-      "productUrl": "https://floydhome.com/products/block-party-bed-configuration-06",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/0462/1706/8706/files/Storage_Birch_Black_Queen_HB_001_Bedding_Sides_4Blocks.png?v=1783111980",
-      "r2Key": "catalog/Floyd_Home/9239485317282/source.jpg",
-      "category": null,
+      "productId": "15521863893065",
+      "merchant": "Poly___Bark",
+      "title": "Truro Bed with Leather Cushions | Bridle Brown | King",
+      "handle": "truro-bed-with-leather-cushions-bridle-brown-king",
+      "productUrl": "https://polyandbark.com/products/truro-bed-with-leather-cushions-bridle-brown-king",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/BD-C301-695-WBRIB-KG.png?v=1776052881",
+      "r2Key": "catalog/Poly___Bark/15521863893065/source.jpg",
+      "category": "beds",
       "bucket": null,
       "bboxMeters": {
-        "w": 1.143,
-        "h": 0.3683,
-        "d": 2.1844
-      },
-      "measure": {
-        "method": "extracted",
-        "confidence": 0.85
-      },
-      "extractedFrom": "spec_block",
-      "source": "catalog",
-      "bytes": 476723
-    },
-    {
-      "productId": "9752668668184",
-      "merchant": "Bend_Goods",
-      "title": "Stacking Ethel Chair - Limited Release",
-      "handle": "stacking-ethel-chair",
-      "productUrl": "https://bendgoods.com/products/stacking-ethel-chair",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/0231/7507/files/stackingethel_wh.png?v=1747857911",
-      "r2Key": "catalog/Bend_Goods/9752668668184/source.jpg",
-      "category": "dining chair",
-      "bucket": "seating",
-      "bboxMeters": {
-        "w": 0.5651,
-        "h": 0.8128,
-        "d": 0.5397
-      },
-      "measure": {
-        "method": "extracted",
-        "confidence": 0.85
-      },
-      "extractedFrom": "spec_block",
-      "source": "catalog",
-      "bytes": 789244
-    },
-    {
-      "productId": "15579187740745",
-      "merchant": "Poly___Bark",
-      "title": "Gomera Outdoor Coffee Table | Light Teak",
-      "handle": "gomera-outdoor-coffee-table-light-teak",
-      "productUrl": "https://polyandbark.com/products/gomera-outdoor-coffee-table-light-teak",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/OD-I060-TABLE.jpg?v=1782736806",
-      "r2Key": "catalog/Poly___Bark/15579187740745/source.jpg",
-      "category": "accent tables",
-      "bucket": "surface",
-      "bboxMeters": {
-        "w": 0.7976,
-        "h": 0.5588,
-        "d": 0.7976
+        "w": 2.0383,
+        "h": 1.1176,
+        "d": 2.1971
       },
       "measure": {
         "method": "extracted",
         "confidence": 0.75
       },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
       "extractedFrom": "body_html",
+      "via": "api",
+      "source": "catalog",
+      "bytes": 723562
+    },
+    {
+      "productId": "534930227235",
+      "merchant": "Bend_Goods",
+      "title": "Bunny Lounge Chair",
+      "handle": "bunny-lounge-chair",
+      "productUrl": "https://bendgoods.com/products/bunny-lounge-chair",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/0231/7507/files/bunnylounge-neonylw_002.png?v=1787264977",
+      "r2Key": "catalog/Bend_Goods/534930227235/source.jpg",
+      "category": "lounge chair",
+      "bucket": "seating",
+      "bboxMeters": {
+        "w": 0.6159,
+        "h": 0.7366,
+        "d": 0.6604
+      },
+      "measure": {
+        "method": "extracted",
+        "confidence": 0.9
+      },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
+      "extractedFrom": "spec_block",
+      "via": "page",
       "source": "catalog"
     },
     {
-      "productId": "15610829307977",
+      "productId": "15373841825837",
+      "merchant": "2Modern__lighting___furniture",
+      "title": "Adammer Cabinet",
+      "handle": "adammer-cabinet",
+      "productUrl": "https://www.2modern.com/products/adammer-cabinet",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/0265/0083/files/pastoe-adammer-cabinet.jpg?v=1789359728",
+      "r2Key": "catalog/2Modern__lighting___furniture/15373841825837/source.jpg",
+      "category": "furniture/dining room furniture/sideboards & buffets",
+      "bucket": "surface",
+      "bboxMeters": {
+        "w": 0.3708,
+        "h": 1.6993,
+        "d": 0.3708
+      },
+      "measure": {
+        "method": "extracted",
+        "confidence": 0.8
+      },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
+      "extractedFrom": "variant.title",
+      "via": "api",
+      "source": "catalog",
+      "bytes": 27287
+    },
+    {
+      "productId": "15539724877897",
       "merchant": "Poly___Bark",
-      "title": "Noir Sideboard | Walnut",
-      "handle": "noir-sideboard-walnut",
-      "productUrl": "https://polyandbark.com/products/noir-sideboard-walnut",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/LR-P175-WAL_259767a6-60e7-49ee-9b7e-217815023131.jpg?v=1789532053",
-      "r2Key": "catalog/Poly___Bark/15610829307977/source.jpg",
+      "title": "Kaldo 64\" Sideboard | Burnished Brown",
+      "handle": "kaldo-sideboard-64-burnished-brown",
+      "productUrl": "https://polyandbark.com/products/kaldo-sideboard-64-burnished-brown",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/LR-K018-BBR.jpg?v=1779156173",
+      "r2Key": "catalog/Poly___Bark/15539724877897/source.jpg",
       "category": "storage",
       "bucket": "storage",
       "bboxMeters": {
-        "w": 1.651,
-        "h": 0.8128,
-        "d": 0.4572
+        "w": 1.6065,
+        "h": 0.8065,
+        "d": 0.4064
       },
       "measure": {
         "method": "extracted",
         "confidence": 0.75
       },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
       "extractedFrom": "body_html",
+      "via": "api",
       "source": "catalog"
     },
     {
@@ -553,410 +953,94 @@
         "method": "extracted",
         "confidence": 0.75
       },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
       "extractedFrom": "body_html",
+      "via": "api",
       "source": "catalog"
     },
     {
-      "productId": "8922323910818",
-      "merchant": "Floyd_Home",
-      "title": "The Floyd Bed in Oak",
-      "handle": "the-floyd-bed-in-oak",
-      "productUrl": "https://floydhome.com/products/the-floyd-bed-in-oak",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/0462/1706/8706/files/Queen_HB_Oak_Black_OG.png?v=1748024389",
-      "r2Key": "catalog/Floyd_Home/8922323910818/source.jpg",
+      "productId": "15521709195337",
+      "merchant": "Poly___Bark",
+      "title": "Truro Bed with Leather Cushions | Bridle Brown | Queen",
+      "handle": "truro-bed-with-leather-cushions-bridle-brown-queen",
+      "productUrl": "https://polyandbark.com/products/truro-bed-with-leather-cushions-bridle-brown-queen",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/BD-C201-15170-WBRIB-QN.png?v=1776052806",
+      "r2Key": "catalog/Poly___Bark/15521709195337/source.jpg",
       "category": "beds",
       "bucket": null,
       "bboxMeters": {
-        "w": 1.143,
-        "h": 0.1905,
+        "w": 1.6129,
+        "h": 1.1176,
         "d": 2.1844
       },
       "measure": {
         "method": "extracted",
-        "confidence": 0.85
+        "confidence": 0.75
       },
-      "extractedFrom": "spec_block",
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
+      "extractedFrom": "body_html",
+      "via": "api",
       "source": "catalog",
-      "bytes": 416461
+      "bytes": 727195
     },
     {
-      "productId": "8881066705176",
+      "productId": "534972727331",
       "merchant": "Bend_Goods",
-      "title": "Tube Ottoman",
-      "handle": "tube-ottoman",
-      "productUrl": "https://bendgoods.com/products/tube-ottoman",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/0231/7507/files/tube-ottoman_blk_001.png?v=1749153203",
-      "r2Key": "catalog/Bend_Goods/8881066705176/source.jpg",
-      "category": "lounge chair",
+      "title": "Stacking Lucy",
+      "handle": "stacking-lucy-dining-chair",
+      "productUrl": "https://bendgoods.com/products/stacking-lucy-dining-chair",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/0231/7507/files/stacklucy-blk_001.png?v=1762990934",
+      "r2Key": "catalog/Bend_Goods/534972727331/source.jpg",
+      "category": "dining chair",
       "bucket": "seating",
       "bboxMeters": {
-        "w": 0.7112,
-        "h": 0.4064,
+        "w": 0.5651,
+        "h": 0.8128,
+        "d": 0.5397
+      },
+      "measure": {
+        "method": "extracted",
+        "confidence": 0.9
+      },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
+      "extractedFrom": "spec_block",
+      "via": "page",
+      "source": "catalog"
+    },
+    {
+      "productId": "15649495351369",
+      "merchant": "Poly___Bark",
+      "title": "Taro Lift-Top Coffee Table | Walnut Acacia",
+      "handle": "taro-lift-top-coffee-table-walnut-acacia",
+      "productUrl": "https://polyandbark.com/products/taro-lift-top-coffee-table-walnut-acacia",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/LR-T1081-WAL.jpg?v=1786709772",
+      "r2Key": "catalog/Poly___Bark/15649495351369/source.jpg",
+      "category": "accent tables",
+      "bucket": "surface",
+      "bboxMeters": {
+        "w": 1.2002,
+        "h": 0.3937,
         "d": 0.6096
       },
       "measure": {
         "method": "extracted",
-        "confidence": 0.85
-      },
-      "extractedFrom": "spec_block",
-      "source": "catalog",
-      "bytes": 814885
-    },
-    {
-      "productId": "15551738773577",
-      "merchant": "Poly___Bark",
-      "title": "Torre Game Table | Walnut",
-      "handle": "torre-game-table-walnut",
-      "productUrl": "https://polyandbark.com/products/torre-game-table-walnut",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/LR-K028-WAL.jpg?v=1781241952",
-      "r2Key": "catalog/Poly___Bark/15551738773577/source.jpg",
-      "category": "accent tables",
-      "bucket": "surface",
-      "bboxMeters": {
-        "w": 0.4572,
-        "h": 0.6096,
-        "d": 0.4572
-      },
-      "measure": {
-        "method": "extracted",
         "confidence": 0.75
       },
-      "extractedFrom": "body_html",
-      "source": "catalog"
-    },
-    {
-      "productId": "15564037685321",
-      "merchant": "Poly___Bark",
-      "title": "Cura Wardrobe / Armoire | Walnut",
-      "handle": "cura-wardrobe-armoire-walnut",
-      "productUrl": "https://polyandbark.com/products/cura-wardrobe-armoire-walnut",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/BD-K049-WAL_1_9dda00e6-0216-456b-93f8-84f988e62c98.jpg?v=1781968915",
-      "r2Key": "catalog/Poly___Bark/15564037685321/source.jpg",
-      "category": "dressers and armoire",
-      "bucket": "storage",
-      "bboxMeters": {
-        "w": 0.9525,
-        "h": 1.8796,
-        "d": 0.5461
-      },
-      "measure": {
-        "method": "extracted",
-        "confidence": 0.75
+      "validation": {
+        "flags": [],
+        "unverified": false
       },
       "extractedFrom": "body_html",
-      "source": "catalog"
-    },
-    {
-      "productId": "9321534226665",
-      "merchant": "Kohara___Co__CA_lighting",
-      "title": "Forge Large Wall Mount Barn Light",
-      "handle": "forge-large-wall-mount-barn-light",
-      "productUrl": "https://koharaco.com/products/forge-large-wall-mount-barn-light",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/0529/4591/1968/files/12076bk_0b42502a-321f-427d-bd01-1cd2dd79ff40.webp?v=1782151809",
-      "r2Key": "catalog/Kohara___Co__CA_lighting/9321534226665/source.jpg",
-      "category": "wall sconce",
-      "bucket": "lighting",
-      "bboxMeters": {
-        "w": 0.4064,
-        "h": 0.3175,
-        "d": 0.6604
-      },
-      "measure": {
-        "method": "extracted",
-        "confidence": 0.75
-      },
-      "extractedFrom": "body_html",
-      "source": "catalog"
-    },
-    {
-      "productId": "9244428501154",
-      "merchant": "Floyd_Home",
-      "title": "The Sleep System",
-      "handle": "sleep-system-bed-configuration-19",
-      "productUrl": "https://floydhome.com/products/sleep-system-bed-configuration-19",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/0462/1706/8706/files/Sleep_Birch_Black_Queen_HB_002_Mattress.png?v=1782276966",
-      "r2Key": "catalog/Floyd_Home/9244428501154/source.jpg",
-      "category": null,
-      "bucket": null,
-      "bboxMeters": {
-        "w": 1.143,
-        "h": 0.3683,
-        "d": 2.1844
-      },
-      "measure": {
-        "method": "extracted",
-        "confidence": 0.85
-      },
-      "extractedFrom": "spec_block",
-      "source": "catalog",
-      "bytes": 527483
-    },
-    {
-      "productId": "8549637226776",
-      "merchant": "Bend_Goods",
-      "title": "Tube Lounge Chair",
-      "handle": "tube-lounge-chair",
-      "productUrl": "https://bendgoods.com/products/tube-lounge-chair",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/0231/7507/files/tube-lounge_blk_001.png?v=1749153414",
-      "r2Key": "catalog/Bend_Goods/8549637226776/source.jpg",
-      "category": "lounge chair",
-      "bucket": "seating",
-      "bboxMeters": {
-        "w": 0.7112,
-        "h": 0.7112,
-        "d": 0.9047
-      },
-      "measure": {
-        "method": "extracted",
-        "confidence": 0.85
-      },
-      "extractedFrom": "spec_block",
-      "source": "catalog",
-      "bytes": 831518
-    },
-    {
-      "productId": "15547970682953",
-      "merchant": "Poly___Bark",
-      "title": "Folda 18\" Side Table | Green Marble",
-      "handle": "folda-18-side-table-green-marble",
-      "productUrl": "https://polyandbark.com/products/folda-18-side-table-green-marble",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/LR-H171-GRN_1.jpg?v=1780428543",
-      "r2Key": "catalog/Poly___Bark/15547970682953/source.jpg",
-      "category": "accent tables",
-      "bucket": "surface",
-      "bboxMeters": {
-        "w": 0.4572,
-        "h": 0.508,
-        "d": 0.4572
-      },
-      "measure": {
-        "method": "extracted",
-        "confidence": 0.75
-      },
-      "extractedFrom": "body_html",
-      "source": "catalog"
-    },
-    {
-      "productId": "15561087385673",
-      "merchant": "Poly___Bark",
-      "title": "Cura 35.5\" Cabinet | Walnut",
-      "handle": "cura-cabinet-walnut",
-      "productUrl": "https://polyandbark.com/products/cura-cabinet-walnut",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/LR-K052-WAL_1_4e2ebb36-aca4-4d74-af09-d0429db67e05.jpg?v=1781790417",
-      "r2Key": "catalog/Poly___Bark/15561087385673/source.jpg",
-      "category": "bookcases",
-      "bucket": "storage",
-      "bboxMeters": {
-        "w": 0.9017,
-        "h": 2.032,
-        "d": 0.4572
-      },
-      "measure": {
-        "method": "extracted",
-        "confidence": 0.75
-      },
-      "extractedFrom": "body_html",
-      "source": "catalog"
-    },
-    {
-      "productId": "9321386475753",
-      "merchant": "Kohara___Co__CA_lighting",
-      "title": "Ava Wall Sconce",
-      "handle": "ava-wall-sconce",
-      "productUrl": "https://koharaco.com/products/ava-wall-sconce",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/0529/4591/1968/files/e1bd304e64603a5bf705e25af3420f50-57472LCB-CO_Ava_alt4.jpg?v=1782145906",
-      "r2Key": "catalog/Kohara___Co__CA_lighting/9321386475753/source.jpg",
-      "category": "wall sconce",
-      "bucket": "lighting",
-      "bboxMeters": {
-        "w": 0.1206,
-        "h": 0.4064,
-        "d": 0.1714
-      },
-      "measure": {
-        "method": "extracted",
-        "confidence": 0.75
-      },
-      "extractedFrom": "body_html",
-      "source": "catalog"
-    },
-    {
-      "productId": "9239597482146",
-      "merchant": "Floyd_Home",
-      "title": "The Studio",
-      "handle": "studio-bed-configuration-02",
-      "productUrl": "https://floydhome.com/products/studio-bed-configuration-02",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/0462/1706/8706/files/Studio_Birch_White_Twin_001_Pop_LightCharger_Bedding.png?v=1783091002",
-      "r2Key": "catalog/Floyd_Home/9239597482146/source.jpg",
-      "category": "beds",
-      "bucket": null,
-      "bboxMeters": {
-        "w": 1.8034,
-        "h": 0.1905,
-        "d": 2.1844
-      },
-      "measure": {
-        "method": "extracted",
-        "confidence": 0.85
-      },
-      "extractedFrom": "spec_block",
-      "source": "catalog",
-      "bytes": 395326
-    },
-    {
-      "productId": "8451502113048",
-      "merchant": "Bend_Goods",
-      "title": "Rita Arm Chair",
-      "handle": "rita-dining-chair",
-      "productUrl": "https://bendgoods.com/products/rita-dining-chair",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/0231/7507/files/ritaarm_tan_001.png?v=1749146019",
-      "r2Key": "catalog/Bend_Goods/8451502113048/source.jpg",
-      "category": "dining chair",
-      "bucket": "seating",
-      "bboxMeters": {
-        "w": 0.5969,
-        "h": 0.8077,
-        "d": 0.5334
-      },
-      "measure": {
-        "method": "extracted",
-        "confidence": 0.85
-      },
-      "extractedFrom": "spec_block",
-      "source": "catalog",
-      "bytes": 824002
-    },
-    {
-      "productId": "15387576827977",
-      "merchant": "Poly___Bark",
-      "title": "Torno 90\"-112\" Extendable Dining Table | Walnut",
-      "handle": "torno-90-112-extendable-dining-table-walnut",
-      "productUrl": "https://polyandbark.com/products/torno-90-112-extendable-dining-table-walnut",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/DI-A582-EXT-WAL_1566e49b-64bb-48d4-bcf1-70893ef7400d.jpg?v=1781183500",
-      "r2Key": "catalog/Poly___Bark/15387576827977/source.jpg",
-      "category": "dining tables",
-      "bucket": "surface",
-      "bboxMeters": {
-        "w": 2.8448,
-        "h": 0.762,
-        "d": 1.0668
-      },
-      "measure": {
-        "method": "extracted",
-        "confidence": 0.75
-      },
-      "extractedFrom": "body_html",
-      "source": "catalog"
-    },
-    {
-      "productId": "15539724877897",
-      "merchant": "Poly___Bark",
-      "title": "Kaldo 64\" Sideboard | Burnished Brown",
-      "handle": "kaldo-sideboard-64-burnished-brown",
-      "productUrl": "https://polyandbark.com/products/kaldo-sideboard-64-burnished-brown",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/LR-K018-BBR.jpg?v=1779156173",
-      "r2Key": "catalog/Poly___Bark/15539724877897/source.jpg",
-      "category": "storage",
-      "bucket": "storage",
-      "bboxMeters": {
-        "w": 1.6065,
-        "h": 0.8065,
-        "d": 0.4064
-      },
-      "measure": {
-        "method": "extracted",
-        "confidence": 0.75
-      },
-      "extractedFrom": "body_html",
-      "source": "catalog"
-    },
-    {
-      "productId": "9321256124649",
-      "merchant": "Kohara___Co__CA_lighting",
-      "title": "Max Medium Wall Sconce",
-      "handle": "max-medium-wall-sconce",
-      "productUrl": "https://koharaco.com/products/max-medium-wall-sconce",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/0529/4591/1968/files/d3c46c0918061ae3774cad673c43fa97187f4878e3f61b0a1326c91fed4e9d9b.jpg?v=1782137134",
-      "r2Key": "catalog/Kohara___Co__CA_lighting/9321256124649/source.jpg",
-      "category": "wall sconce",
-      "bucket": "lighting",
-      "bboxMeters": {
-        "w": 0.1905,
-        "h": 0.508,
-        "d": 0.1524
-      },
-      "measure": {
-        "method": "extracted",
-        "confidence": 0.75
-      },
-      "extractedFrom": "body_html",
-      "source": "catalog"
-    },
-    {
-      "productId": "9239610327202",
-      "merchant": "Floyd_Home",
-      "title": "The Classic",
-      "handle": "classic-bed-configuration-03",
-      "productUrl": "https://floydhome.com/products/classic-bed-configuration-03",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/0462/1706/8706/files/Classic_Birch_White_Queen_001.png?v=1783105109",
-      "r2Key": "catalog/Floyd_Home/9239610327202/source.jpg",
-      "category": "beds",
-      "bucket": null,
-      "bboxMeters": {
-        "w": 1.8034,
-        "h": 0.1905,
-        "d": 2.1844
-      },
-      "measure": {
-        "method": "extracted",
-        "confidence": 0.85
-      },
-      "extractedFrom": "spec_block",
-      "source": "catalog",
-      "bytes": 428863
-    },
-    {
-      "productId": "15793957371977",
-      "merchant": "Poly___Bark",
-      "title": "Este Bench | Shadow Brown",
-      "handle": "este-55-5-bench-shadow-brown",
-      "productUrl": "https://polyandbark.com/products/este-55-5-bench-shadow-brown",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/LR-C1417-SDBR.jpg?v=1789571669",
-      "r2Key": "catalog/Poly___Bark/15793957371977/source.jpg",
-      "category": "benches, stools & ottomans",
-      "bucket": "seating",
-      "bboxMeters": {
-        "w": 1.4097,
-        "h": 0.4318,
-        "d": 0.4699
-      },
-      "measure": {
-        "method": "extracted",
-        "confidence": 0.75
-      },
-      "extractedFrom": "body_html",
-      "source": "catalog"
-    },
-    {
-      "productId": "15522838741065",
-      "merchant": "Poly___Bark",
-      "title": "Allora 46\" Dining Table | Drift Oak",
-      "handle": "allora-dining-table-46-drift-oak",
-      "productUrl": "https://polyandbark.com/products/allora-dining-table-46-drift-oak",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/DI-B066-DOK1.jpg?v=1776208878",
-      "r2Key": "catalog/Poly___Bark/15522838741065/source.jpg",
-      "category": "dining tables",
-      "bucket": "surface",
-      "bboxMeters": {
-        "w": 1.1684,
-        "h": 0.7683,
-        "d": 1.1684
-      },
-      "measure": {
-        "method": "extracted",
-        "confidence": 0.75
-      },
-      "extractedFrom": "body_html",
+      "via": "api",
       "source": "catalog"
     },
     {
@@ -978,97 +1062,123 @@
         "method": "extracted",
         "confidence": 0.75
       },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
       "extractedFrom": "body_html",
+      "via": "api",
       "source": "catalog"
     },
     {
-      "productId": "9316244422889",
+      "productId": "9321386475753",
       "merchant": "Kohara___Co__CA_lighting",
-      "title": "Path Light- PL600",
-      "handle": "path-light-pl600",
-      "productUrl": "https://koharaco.com/products/path-light-pl600",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/0529/4591/1968/files/Alliance_PL600-LED_01.jpg?v=1781787165",
-      "r2Key": "catalog/Kohara___Co__CA_lighting/9316244422889/source.jpg",
-      "category": "landscape lighting",
+      "title": "Ava Wall Sconce",
+      "handle": "ava-wall-sconce",
+      "productUrl": "https://koharaco.com/products/ava-wall-sconce",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/0529/4591/1968/files/e1bd304e64603a5bf705e25af3420f50-57472LCB-CO_Ava_alt4.jpg?v=1782145906",
+      "r2Key": "catalog/Kohara___Co__CA_lighting/9321386475753/source.jpg",
+      "category": "wall sconce",
       "bucket": "lighting",
       "bboxMeters": {
-        "w": 0.0889,
-        "h": 0.5842,
-        "d": 0.1397
+        "w": 0.1206,
+        "h": 0.4064,
+        "d": 0.1714
       },
       "measure": {
         "method": "extracted",
         "confidence": 0.75
       },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
       "extractedFrom": "body_html",
+      "via": "api",
       "source": "catalog"
     },
     {
-      "productId": "9246282842274",
-      "merchant": "Floyd_Home",
-      "title": "Two-Piece Form Sectional - In Stock",
-      "handle": "two-piece-form-sectional-warehouse-final",
-      "productUrl": "https://floydhome.com/products/two-piece-form-sectional-warehouse-final",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/0462/1706/8706/products/Tonus_TerraCotta_Config15_Qtr0001.png?v=1670019793",
-      "r2Key": "catalog/Floyd_Home/9246282842274/source.jpg",
-      "category": "sectionals",
+      "productId": "15356806266953",
+      "merchant": "Poly___Bark",
+      "title": "Truro Bed with Leather Cushions | Cognac Tan | King",
+      "handle": "truro-queen-bed-frame-with-leather-cushions-cognac-tan-king",
+      "productUrl": "https://polyandbark.com/products/truro-queen-bed-frame-with-leather-cushions-cognac-tan-king",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/BD-C304-15867-WTAN-KG.jpg?v=1774425447",
+      "r2Key": "catalog/Poly___Bark/15356806266953/source.jpg",
+      "category": "beds",
       "bucket": null,
       "bboxMeters": {
-        "w": 2.286,
-        "h": 0.696,
-        "d": 0.9271
+        "w": 1.6129,
+        "h": 1.1176,
+        "d": 2.1844
       },
       "measure": {
         "method": "extracted",
-        "confidence": 0.85
+        "confidence": 0.75
       },
-      "extractedFrom": "spec_block",
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
+      "extractedFrom": "body_html",
+      "via": "api",
       "source": "catalog",
-      "bytes": 171320
+      "bytes": 54825
     },
     {
-      "productId": "15797869215817",
-      "merchant": "Poly___Bark",
-      "title": "Aspen 157\" Modular 6-Piece L-Shaped Sectional | Linen White",
-      "handle": "aspen-157-modular-6-piece-l-shaped-sectional-linen-white",
-      "productUrl": "https://polyandbark.com/products/aspen-157-modular-6-piece-l-shaped-sectional-linen-white",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/LR-MS2-17-LIWH.jpg?v=1789732473",
-      "r2Key": "catalog/Poly___Bark/15797869215817/source.jpg",
-      "category": "modular sofas",
+      "productId": "9752668668184",
+      "merchant": "Bend_Goods",
+      "title": "Stacking Ethel Chair - Limited Release",
+      "handle": "stacking-ethel-chair",
+      "productUrl": "https://bendgoods.com/products/stacking-ethel-chair",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/0231/7507/files/stackingethel_wh.png?v=1747857911",
+      "r2Key": "catalog/Bend_Goods/9752668668184/source.jpg",
+      "category": "dining chair",
       "bucket": "seating",
       "bboxMeters": {
-        "w": 3.9624,
-        "h": 0.8572,
-        "d": 2.9718
+        "w": 0.5651,
+        "h": 0.8128,
+        "d": 0.5397
       },
       "measure": {
         "method": "extracted",
-        "confidence": 0.75
+        "confidence": 0.9
       },
-      "extractedFrom": "body_html",
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
+      "extractedFrom": "spec_block",
+      "via": "page",
       "source": "catalog"
     },
     {
-      "productId": "15329534640201",
+      "productId": "15643975417929",
       "merchant": "Poly___Bark",
-      "title": "Ronda Extension Dining Table (43\"-59\") | Oak",
-      "handle": "ronda-extension-dining-table-43-59-oak",
-      "productUrl": "https://polyandbark.com/products/ronda-extension-dining-table-43-59-oak",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/DI-D019-EXT-OAK.png?v=1778755576",
-      "r2Key": "catalog/Poly___Bark/15329534640201/source.jpg",
-      "category": "dining tables",
+      "title": "Aledo Nightstand | Walnut",
+      "handle": "aledo-nightstand-walnut",
+      "productUrl": "https://polyandbark.com/products/aledo-nightstand-walnut",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/BD-D018-WAL.jpg?v=1786132896",
+      "r2Key": "catalog/Poly___Bark/15643975417929/source.jpg",
+      "category": "night stands",
       "bucket": "surface",
       "bboxMeters": {
-        "w": 1.4986,
-        "h": 0.7493,
-        "d": 1.0985
+        "w": 0.5588,
+        "h": 0.5588,
+        "d": 0.3493
       },
       "measure": {
         "method": "extracted",
         "confidence": 0.75
       },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
       "extractedFrom": "body_html",
-      "source": "catalog"
+      "via": "api",
+      "source": "catalog",
+      "bytes": 90805
     },
     {
       "productId": "15360099582025",
@@ -1089,97 +1199,288 @@
         "method": "extracted",
         "confidence": 0.75
       },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
       "extractedFrom": "body_html",
+      "via": "api",
       "source": "catalog"
     },
     {
-      "productId": "9305280381161",
+      "productId": "9321256124649",
       "merchant": "Kohara___Co__CA_lighting",
-      "title": "Bullet Light- BL900",
-      "handle": "bullet-light-bl900",
-      "productUrl": "https://koharaco.com/products/bullet-light-bl900",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/0529/4591/1968/files/BL900-BL.jpg?v=1781189683",
-      "r2Key": "catalog/Kohara___Co__CA_lighting/9305280381161/source.jpg",
-      "category": "landscape lighting",
+      "title": "Max Medium Wall Sconce",
+      "handle": "max-medium-wall-sconce",
+      "productUrl": "https://koharaco.com/products/max-medium-wall-sconce",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/0529/4591/1968/files/d3c46c0918061ae3774cad673c43fa97187f4878e3f61b0a1326c91fed4e9d9b.jpg?v=1782137134",
+      "r2Key": "catalog/Kohara___Co__CA_lighting/9321256124649/source.jpg",
+      "category": "wall sconce",
       "bucket": "lighting",
       "bboxMeters": {
-        "w": 0.0571,
-        "h": 0.0444,
-        "d": 0.1854
+        "w": 0.1905,
+        "h": 0.508,
+        "d": 0.1524
       },
       "measure": {
         "method": "extracted",
         "confidence": 0.75
       },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
       "extractedFrom": "body_html",
+      "via": "api",
       "source": "catalog"
     },
     {
-      "productId": "9077008498850",
-      "merchant": "Floyd_Home",
-      "title": "The Pop Bedside Table",
-      "handle": "the-pop-bedside-table",
-      "productUrl": "https://floydhome.com/products/the-pop-bedside-table",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/0462/1706/8706/files/Pop_BST_Black.png?v=1777066357",
-      "r2Key": "catalog/Floyd_Home/9077008498850/source.jpg",
-      "category": "bed add-ons",
+      "productId": "15356806299721",
+      "merchant": "Poly___Bark",
+      "title": "Truro Bed with Leather Cushions | Onyx Black | King",
+      "handle": "truro-queen-bed-frame-with-leather-cushions-onyx-black-king",
+      "productUrl": "https://polyandbark.com/products/truro-queen-bed-frame-with-leather-cushions-onyx-black-king",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/BD-C301-15554-WBLK-KG_7dc9312f-1f6f-40b3-99bb-d1bc406b31ed.jpg?v=1777299150",
+      "r2Key": "catalog/Poly___Bark/15356806299721/source.jpg",
+      "category": "beds",
       "bucket": null,
       "bboxMeters": {
-        "w": 0.381,
-        "h": 0.254,
-        "d": 0.381
-      },
-      "measure": {
-        "method": "extracted",
-        "confidence": 0.85
-      },
-      "extractedFrom": "spec_block",
-      "source": "catalog",
-      "bytes": 278429
-    },
-    {
-      "productId": "15797666709577",
-      "merchant": "Poly___Bark",
-      "title": "Aspen 157\" Modular 7-Piece L-Shaped Sectional with Chaise | Linen White",
-      "handle": "aspen-157-modular-7-piece-l-shaped-sectional-with-chaise-linen-white",
-      "productUrl": "https://polyandbark.com/products/aspen-157-modular-7-piece-l-shaped-sectional-with-chaise-linen-white",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/LR-MS2-16-LIWH_1_e40cce15-46d9-4e33-96b0-537635275658.jpg?v=1789722228",
-      "r2Key": "catalog/Poly___Bark/15797666709577/source.jpg",
-      "category": "modular sofas",
-      "bucket": "seating",
-      "bboxMeters": {
-        "w": 3.9624,
-        "h": 0.8572,
-        "d": 2.9718
+        "w": 1.6129,
+        "h": 1.1176,
+        "d": 2.1844
       },
       "measure": {
         "method": "extracted",
         "confidence": 0.75
       },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
       "extractedFrom": "body_html",
-      "source": "catalog"
+      "via": "api",
+      "source": "catalog",
+      "bytes": 50389
     },
     {
-      "productId": "15329534672969",
+      "productId": "9325175505176",
+      "merchant": "Bend_Goods",
+      "title": "Stick Stool",
+      "handle": "stick-stool",
+      "productUrl": "https://bendgoods.com/products/stick-stool",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/0231/7507/files/stickcounter_blk.png?v=1751401103",
+      "r2Key": "catalog/Bend_Goods/9325175505176/source.jpg",
+      "category": null,
+      "bucket": "seating",
+      "bboxMeters": {
+        "w": 0.4699,
+        "h": 0.6604,
+        "d": 0.4699
+      },
+      "measure": {
+        "method": "extracted",
+        "confidence": 0.9
+      },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
+      "extractedFrom": "spec_block",
+      "via": "page",
+      "source": "catalog",
+      "bytes": 823450
+    },
+    {
+      "productId": "15608340643913",
       "merchant": "Poly___Bark",
-      "title": "Ronda Extension Dining Table (43\"-59\") | Walnut",
-      "handle": "ronda-extension-dining-table-43-59-walnut",
-      "productUrl": "https://polyandbark.com/products/ronda-extension-dining-table-43-59-walnut",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/DI-D019-EXT-WAL.png?v=1778756639",
-      "r2Key": "catalog/Poly___Bark/15329534672969/source.jpg",
+      "title": "Preston 96\" Dining Table | Walnut",
+      "handle": "preston-dining-table-96-walnut",
+      "productUrl": "https://polyandbark.com/products/preston-dining-table-96-walnut",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/DI-G320-WAL-96.jpg?v=1784006173",
+      "r2Key": "catalog/Poly___Bark/15608340643913/source.jpg",
       "category": "dining tables",
       "bucket": "surface",
       "bboxMeters": {
-        "w": 1.4986,
-        "h": 0.7493,
-        "d": 1.0985
+        "w": 2.4384,
+        "h": 0.762,
+        "d": 1.0668
       },
       "measure": {
         "method": "extracted",
         "confidence": 0.75
       },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
       "extractedFrom": "body_html",
+      "via": "api",
       "source": "catalog"
+    },
+    {
+      "productId": "9346772533470",
+      "merchant": "InStyle_Home__CA",
+      "title": "Gia 6 Drawer Dresser - Whitewash",
+      "handle": "gia-6-drawer-dresser-whitewash-gia006-ww",
+      "productUrl": "https://instylehome.ca/products/gia-6-drawer-dresser-whitewash-gia006-ww",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/0262/8947/1541/files/GIA006-WW.jpg?v=1789838031",
+      "r2Key": "catalog/InStyle_Home__CA/9346772533470/source.jpg",
+      "category": null,
+      "bucket": "storage",
+      "bboxMeters": {
+        "w": 1.5494,
+        "h": 0.8001,
+        "d": 0.4496
+      },
+      "measure": {
+        "method": "extracted",
+        "confidence": 0.75
+      },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
+      "extractedFrom": "body_html",
+      "via": "api",
+      "source": "catalog",
+      "bytes": 64056
+    },
+    {
+      "productId": "9316244422889",
+      "merchant": "Kohara___Co__CA_lighting",
+      "title": "Path Light- PL600",
+      "handle": "path-light-pl600",
+      "productUrl": "https://koharaco.com/products/path-light-pl600",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/0529/4591/1968/files/Alliance_PL600-LED_01.jpg?v=1781787165",
+      "r2Key": "catalog/Kohara___Co__CA_lighting/9316244422889/source.jpg",
+      "category": "landscape lighting",
+      "bucket": "lighting",
+      "bboxMeters": {
+        "w": 0.0889,
+        "h": 0.5842,
+        "d": 0.1397
+      },
+      "measure": {
+        "method": "extracted",
+        "confidence": 0.75
+      },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
+      "extractedFrom": "body_html",
+      "via": "api",
+      "source": "catalog"
+    },
+    {
+      "productId": "15356806332489",
+      "merchant": "Poly___Bark",
+      "title": "Truro Bed with Leather Cushions | Cognac Tan | Queen",
+      "handle": "truro-queen-bed-frame-with-leather-cushions-cognac-tan-queen",
+      "productUrl": "https://polyandbark.com/products/truro-queen-bed-frame-with-leather-cushions-cognac-tan-queen",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/BD-C204-15483-WTAN-QN.jpg?v=1774337093",
+      "r2Key": "catalog/Poly___Bark/15356806332489/source.jpg",
+      "category": "beds",
+      "bucket": null,
+      "bboxMeters": {
+        "w": 1.6129,
+        "h": 1.1176,
+        "d": 2.1844
+      },
+      "measure": {
+        "method": "extracted",
+        "confidence": 0.75
+      },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
+      "extractedFrom": "body_html",
+      "via": "api",
+      "source": "catalog",
+      "bytes": 54268
+    },
+    {
+      "productId": "8451502113048",
+      "merchant": "Bend_Goods",
+      "title": "Rita Arm Chair",
+      "handle": "rita-dining-chair",
+      "productUrl": "https://bendgoods.com/products/rita-dining-chair",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/0231/7507/files/ritaarm_tan_001.png?v=1749146019",
+      "r2Key": "catalog/Bend_Goods/8451502113048/source.jpg",
+      "category": "dining chair",
+      "bucket": "seating",
+      "bboxMeters": {
+        "w": 0.5969,
+        "h": 0.8077,
+        "d": 0.5334
+      },
+      "measure": {
+        "method": "extracted",
+        "confidence": 0.9
+      },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
+      "extractedFrom": "spec_block",
+      "via": "page",
+      "source": "catalog"
+    },
+    {
+      "productId": "15579187740745",
+      "merchant": "Poly___Bark",
+      "title": "Gomera Outdoor Coffee Table | Light Teak",
+      "handle": "gomera-outdoor-coffee-table-light-teak",
+      "productUrl": "https://polyandbark.com/products/gomera-outdoor-coffee-table-light-teak",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/OD-I060-TABLE.jpg?v=1782736806",
+      "r2Key": "catalog/Poly___Bark/15579187740745/source.jpg",
+      "category": "accent tables",
+      "bucket": "surface",
+      "bboxMeters": {
+        "w": 0.7976,
+        "h": 0.5588,
+        "d": 0.7976
+      },
+      "measure": {
+        "method": "extracted",
+        "confidence": 0.75
+      },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
+      "extractedFrom": "body_html",
+      "via": "api",
+      "source": "catalog"
+    },
+    {
+      "productId": "8701570941150",
+      "merchant": "InStyle_Home__CA",
+      "title": "ATHENA 6 DRAWERS DRESSER GY-2104 62x19x34 inches",
+      "handle": "athena-6-drawers-dresser-gy-2104-62x19x34-inches",
+      "productUrl": "https://instylehome.ca/products/athena-6-drawers-dresser-gy-2104-62x19x34-inches",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/0262/8947/1541/files/NolaHandcraftedWoodDresserFront.jpg?v=1758308990",
+      "r2Key": "catalog/InStyle_Home__CA/8701570941150/source.jpg",
+      "category": null,
+      "bucket": "storage",
+      "bboxMeters": {
+        "w": 1.5748,
+        "h": 0.8636,
+        "d": 0.4826
+      },
+      "measure": {
+        "method": "extracted",
+        "confidence": 0.75
+      },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
+      "extractedFrom": "body_html",
+      "via": "api",
+      "source": "catalog",
+      "bytes": 52708
     },
     {
       "productId": "9298981945577",
@@ -1200,612 +1501,543 @@
         "method": "extracted",
         "confidence": 0.75
       },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
       "extractedFrom": "body_html",
+      "via": "api",
       "source": "catalog"
     },
     {
-      "productId": "8836821057698",
-      "merchant": "Floyd_Home",
-      "title": "Sink Down Lounge Chair",
-      "handle": "sink-down-lounge-chair-configs",
-      "productUrl": "https://floydhome.com/products/sink-down-lounge-chair-configs",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/0462/1706/8706/products/FSD-LoungeChair-Sand_1500x1500_9cf069d4-f906-4965-9f8e-f9490a286513.png?v=1763563023",
-      "r2Key": "catalog/Floyd_Home/8836821057698/source.jpg",
-      "category": "sectionals",
+      "productId": "15356806365257",
+      "merchant": "Poly___Bark",
+      "title": "Truro Bed with Leather Cushions | Onyx Black | Queen",
+      "handle": "truro-queen-bed-frame-with-leather-cushions-onyx-black-queen",
+      "productUrl": "https://polyandbark.com/products/truro-queen-bed-frame-with-leather-cushions-onyx-black-queen",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/BD-C201-15170-WBLK-QN.jpg?v=1774425101",
+      "r2Key": "catalog/Poly___Bark/15356806365257/source.jpg",
+      "category": "beds",
       "bucket": null,
       "bboxMeters": {
-        "w": 2.3368,
-        "h": 0.8128,
-        "d": 1.143
+        "w": 1.6129,
+        "h": 1.1176,
+        "d": 2.1844
       },
       "measure": {
         "method": "extracted",
-        "confidence": 0.85
+        "confidence": 0.75
       },
-      "extractedFrom": "spec_block",
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
+      "extractedFrom": "body_html",
+      "via": "api",
       "source": "catalog",
-      "bytes": 271571
+      "bytes": 49395
     },
     {
-      "productId": "15797391851593",
-      "merchant": "Poly___Bark",
-      "title": "Aspen 118\" Modular 5-Piece L-Shaped Corner Sectional | Linen White",
-      "handle": "aspen-118-modular-5-piece-l-shaped-corner-sectional-linen-white",
-      "productUrl": "https://polyandbark.com/products/aspen-118-modular-5-piece-l-shaped-corner-sectional-linen-white",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/LR-MS2-15-LIWH.jpg?v=1789712174",
-      "r2Key": "catalog/Poly___Bark/15797391851593/source.jpg",
-      "category": "modular sofas",
-      "bucket": "seating",
-      "bboxMeters": {
-        "w": 2.9718,
-        "h": 0.8572,
-        "d": 2.9718
-      },
-      "measure": {
-        "method": "extracted",
-        "confidence": 0.75
-      },
-      "extractedFrom": "body_html",
-      "source": "catalog"
-    },
-    {
-      "productId": "15360096337993",
-      "merchant": "Poly___Bark",
-      "title": "Naples Horseshoe Side Table | Black Concrete",
-      "handle": "naples-horseshoe-side-table-black-concrete",
-      "productUrl": "https://polyandbark.com/products/naples-horseshoe-side-table-black-concrete",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/LR-C712-CN-BLK.jpg?v=1774428161",
-      "r2Key": "catalog/Poly___Bark/15360096337993/source.jpg",
-      "category": "accent tables",
-      "bucket": "surface",
-      "bboxMeters": {
-        "w": 0.508,
-        "h": 0.4826,
-        "d": 0.4318
-      },
-      "measure": {
-        "method": "extracted",
-        "confidence": 0.75
-      },
-      "extractedFrom": "body_html",
-      "source": "catalog"
-    },
-    {
-      "productId": "9420686229737",
-      "merchant": "Kohara___Co__CA_lighting",
-      "title": "Glass Natural Small Lamps",
-      "handle": "glass-natural-small-lamps",
-      "productUrl": "https://koharaco.com/products/glass-natural-small-lamps",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/0529/4591/1968/files/82621_lg.jpg?v=1789151480",
-      "r2Key": "catalog/Kohara___Co__CA_lighting/9420686229737/source.jpg",
-      "category": "table lamp",
-      "bucket": "lighting",
-      "bboxMeters": {
-        "w": 0.1143,
-        "h": 0.254,
-        "d": 0.1143
-      },
-      "measure": {
-        "method": "extracted",
-        "confidence": 0.55
-      },
-      "extractedFrom": "body_html",
-      "source": "catalog"
-    },
-    {
-      "productId": "8830910103714",
-      "merchant": "Floyd_Home",
-      "title": "Soft Serve Lounge Chair",
-      "handle": "lounge-chair-soft-serve-sectional",
-      "productUrl": "https://floydhome.com/products/lounge-chair-soft-serve-sectional",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/0462/1706/8706/files/Nomad_Umami_Soft_Serve_Lounge_Chair.png?v=1762528073",
-      "r2Key": "catalog/Floyd_Home/8830910103714/source.jpg",
-      "category": "sectionals",
-      "bucket": null,
-      "bboxMeters": {
-        "w": 1.3462,
-        "h": 0.7112,
-        "d": 1.0668
-      },
-      "measure": {
-        "method": "extracted",
-        "confidence": 0.85
-      },
-      "extractedFrom": "spec_block",
-      "source": "catalog",
-      "bytes": 430959
-    },
-    {
-      "productId": "15796244021321",
-      "merchant": "Poly___Bark",
-      "title": "Aspen 118\" Modular 4-Piece L-Shaped Sectional | Linen White",
-      "handle": "aspen-118-modular-4-piece-l-shaped-sectional-linen-white-1",
-      "productUrl": "https://polyandbark.com/products/aspen-118-modular-4-piece-l-shaped-sectional-linen-white-1",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/LR-MS2-14-LIWH.jpg?v=1789662333",
-      "r2Key": "catalog/Poly___Bark/15796244021321/source.jpg",
-      "category": "modular sofas",
-      "bucket": "seating",
-      "bboxMeters": {
-        "w": 3.9624,
-        "h": 0.8572,
-        "d": 1.9812
-      },
-      "measure": {
-        "method": "extracted",
-        "confidence": 0.75
-      },
-      "extractedFrom": "body_html",
-      "source": "catalog"
-    },
-    {
-      "productId": "15360096272457",
-      "merchant": "Poly___Bark",
-      "title": "Naples Horseshoe Side Table | Ivory Concrete",
-      "handle": "naples-horseshoe-side-table-ivory-concrete",
-      "productUrl": "https://polyandbark.com/products/naples-horseshoe-side-table-ivory-concrete",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/LR-C712-CN-IVY.jpg?v=1774338939",
-      "r2Key": "catalog/Poly___Bark/15360096272457/source.jpg",
-      "category": "accent tables",
-      "bucket": "surface",
-      "bboxMeters": {
-        "w": 0.508,
-        "h": 0.4826,
-        "d": 0.4318
-      },
-      "measure": {
-        "method": "extracted",
-        "confidence": 0.75
-      },
-      "extractedFrom": "body_html",
-      "source": "catalog"
-    },
-    {
-      "productId": "9299128877289",
-      "merchant": "Kohara___Co__CA_lighting",
-      "title": "Lelevelle- Economy Series Transformer (60W or 150W)",
-      "handle": "lelevelle-economy-series-transformer-60w-or-150w",
-      "productUrl": "https://koharaco.com/products/lelevelle-economy-series-transformer-60w-or-150w",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/0529/4591/1968/files/2020-09-2109.36.36-1.jpg?v=1780600623",
-      "r2Key": "catalog/Kohara___Co__CA_lighting/9299128877289/source.jpg",
-      "category": "landscape lighting",
-      "bucket": "lighting",
-      "bboxMeters": {
-        "w": 0.1727,
-        "h": 0.0914,
-        "d": 0.0914
-      },
-      "measure": {
-        "method": "extracted",
-        "confidence": 0.55
-      },
-      "extractedFrom": "body_html",
-      "source": "catalog"
-    },
-    {
-      "productId": "8751821521058",
-      "merchant": "Floyd_Home",
-      "title": "The Mattress 2.0",
-      "handle": "the-mattress",
-      "productUrl": "https://floydhome.com/products/the-mattress",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/0462/1706/8706/files/The_Mattress_TwinXL.jpg?v=1756409729",
-      "r2Key": "catalog/Floyd_Home/8751821521058/source.jpg",
-      "category": "mattresses",
-      "bucket": null,
-      "bboxMeters": {
-        "w": 0.9652,
-        "h": 0.3048,
-        "d": 2.032
-      },
-      "measure": {
-        "method": "extracted",
-        "confidence": 0.85
-      },
-      "extractedFrom": "spec_block",
-      "source": "catalog",
-      "bytes": 130206
-    },
-    {
-      "productId": "15796021329993",
-      "merchant": "Poly___Bark",
-      "title": "Aspen 157\" Modular 8-Piece Pit Lounge Sectional | Linen White",
-      "handle": "aspen-157-modular-8-piece-pit-lounge-sectional-linen-white",
-      "productUrl": "https://polyandbark.com/products/aspen-157-modular-8-piece-pit-lounge-sectional-linen-white",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/LR-MS2-13-LIWH.jpg?v=1789651009",
-      "r2Key": "catalog/Poly___Bark/15796021329993/source.jpg",
-      "category": "modular sofas",
-      "bucket": "seating",
-      "bboxMeters": {
-        "w": 3.9624,
-        "h": 0.8572,
-        "d": 1.9812
-      },
-      "measure": {
-        "method": "extracted",
-        "confidence": 0.75
-      },
-      "extractedFrom": "body_html",
-      "source": "catalog"
-    },
-    {
-      "productId": "15360097910857",
-      "merchant": "Poly___Bark",
-      "title": "Minori Side Table | Black",
-      "handle": "minori-side-table-black",
-      "productUrl": "https://polyandbark.com/products/minori-side-table-black",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/LR-C9075-CN-BLK_2_c3bc8f1e-98dd-47d6-8cff-9bd75373fe69.jpg?v=1773305499",
-      "r2Key": "catalog/Poly___Bark/15360097910857/source.jpg",
-      "category": "accent tables",
-      "bucket": "surface",
-      "bboxMeters": {
-        "w": 0.4508,
-        "h": 0.4508,
-        "d": 0.3048
-      },
-      "measure": {
-        "method": "extracted",
-        "confidence": 0.75
-      },
-      "extractedFrom": "body_html",
-      "source": "catalog"
-    },
-    {
-      "productId": "9299127927017",
-      "merchant": "Kohara___Co__CA_lighting",
-      "title": "Lelevelle- Professional Series Transformer (150W or 300W)",
-      "handle": "lelevelle-professional-series-transformer-150w-or-300w",
-      "productUrl": "https://koharaco.com/products/lelevelle-professional-series-transformer-150w-or-300w",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/0529/4591/1968/files/FUSION-Transformer_1ee78655-0a22-4d08-a864-855f9781d149.jpg?v=1780600432",
-      "r2Key": "catalog/Kohara___Co__CA_lighting/9299127927017/source.jpg",
-      "category": "landscape lighting",
-      "bucket": "lighting",
-      "bboxMeters": {
-        "w": 0.2667,
-        "h": 0.127,
-        "d": 0.143
-      },
-      "measure": {
-        "method": "extracted",
-        "confidence": 0.55
-      },
-      "extractedFrom": "body_html",
-      "source": "catalog"
-    },
-    {
-      "productId": "8608650657954",
-      "merchant": "Floyd_Home",
-      "title": "Sofa Ottoman 2.0 Legs & Hardware",
-      "handle": "sofa-ottoman-2-0-legs-hardware-1",
-      "productUrl": "https://floydhome.com/products/sofa-ottoman-2-0-legs-hardware-1",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/0462/1706/8706/files/Sofa_Ottoman_Legs.jpg?v=1769096334",
-      "r2Key": "catalog/Floyd_Home/8608650657954/source.jpg",
-      "category": null,
-      "bucket": null,
-      "bboxMeters": {
-        "w": 1.8161,
-        "h": 0.4699,
-        "d": 1.1557
-      },
-      "measure": {
-        "method": "extracted",
-        "confidence": 0.85
-      },
-      "extractedFrom": "spec_block",
-      "source": "catalog",
-      "bytes": 37358
-    },
-    {
-      "productId": "15795933904969",
-      "merchant": "Poly___Bark",
-      "title": "Aspen 118\" Modular 6-Piece Pit Lounge Sectional | Linen White",
-      "handle": "aspen-118-modular-6-piece-pit-lounge-sectional-linen-white",
-      "productUrl": "https://polyandbark.com/products/aspen-118-modular-6-piece-pit-lounge-sectional-linen-white",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/LR-MS2-12-LIWH.jpg?v=1789646960",
-      "r2Key": "catalog/Poly___Bark/15795933904969/source.jpg",
-      "category": "modular sofas",
-      "bucket": "seating",
-      "bboxMeters": {
-        "w": 2.9718,
-        "h": 0.8572,
-        "d": 1.9812
-      },
-      "measure": {
-        "method": "extracted",
-        "confidence": 0.75
-      },
-      "extractedFrom": "body_html",
-      "source": "catalog"
-    },
-    {
-      "productId": "15360097878089",
-      "merchant": "Poly___Bark",
-      "title": "Minori Side Table | White",
-      "handle": "minori-side-table-white",
-      "productUrl": "https://polyandbark.com/products/minori-side-table-white",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/LR-C9075-CN-IVY_2_0c49a074-9ef4-46e3-b1e1-e57346559893.jpg?v=1773305017",
-      "r2Key": "catalog/Poly___Bark/15360097878089/source.jpg",
-      "category": "accent tables",
-      "bucket": "surface",
-      "bboxMeters": {
-        "w": 0.4508,
-        "h": 0.4508,
-        "d": 0.3048
-      },
-      "measure": {
-        "method": "extracted",
-        "confidence": 0.75
-      },
-      "extractedFrom": "body_html",
-      "source": "catalog"
-    },
-    {
-      "productId": "15353340985389",
+      "productId": "15373841956909",
       "merchant": "2Modern__lighting___furniture",
-      "title": "Forest Lit Trees LED Light",
-      "handle": "forest-lit-trees-led-light",
-      "productUrl": "https://www.2modern.com/products/forest-lit-trees-led-light",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/0265/0083/files/blomus-forest-lit-trees-led-light.jpg?v=1787977025",
-      "r2Key": "catalog/2Modern__lighting___furniture/15353340985389/source.jpg",
-      "category": "lighting/lamps/table lamps/accent table lamps",
-      "bucket": "lighting",
-      "bboxMeters": {
-        "w": 0.3099,
-        "h": 0.2997,
-        "d": 0.1067
-      },
-      "measure": {
-        "method": "extracted",
-        "confidence": 0.4
-      },
-      "extractedFrom": "page_text",
-      "source": "catalog",
-      "bytes": 19888
-    },
-    {
-      "productId": "8608648855714",
-      "merchant": "Floyd_Home",
-      "title": "Sofa 2.0 Legs & Hardware",
-      "handle": "sofa-2-0-legs-hardware-1",
-      "productUrl": "https://floydhome.com/products/sofa-2-0-legs-hardware-1",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/0462/1706/8706/files/sofa_legs.jpg?v=1769096334",
-      "r2Key": "catalog/Floyd_Home/8608648855714/source.jpg",
-      "category": null,
-      "bucket": null,
-      "bboxMeters": {
-        "w": 1.8161,
-        "h": 0.4699,
-        "d": 1.1557
-      },
-      "measure": {
-        "method": "extracted",
-        "confidence": 0.85
-      },
-      "extractedFrom": "spec_block",
-      "source": "catalog",
-      "bytes": 68208
-    },
-    {
-      "productId": "15795399000137",
-      "merchant": "Poly___Bark",
-      "title": "Aspen 157\" Modular 5-Piece L-Shaped Sectional with Reversible Ottoman | Linen White",
-      "handle": "aspen-157-modular-5-piece-l-shaped-sectional-with-reversible-ottoman-linen-white",
-      "productUrl": "https://polyandbark.com/products/aspen-157-modular-5-piece-l-shaped-sectional-with-reversible-ottoman-linen-white",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/LR-MS2-11-LIWH.jpg?v=1789628040",
-      "r2Key": "catalog/Poly___Bark/15795399000137/source.jpg",
-      "category": "modular sofas",
+      "title": "BZ Bench",
+      "handle": "bz-bench",
+      "productUrl": "https://www.2modern.com/products/bz-bench",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/0265/0083/files/pastoe-bz-bench.jpg?v=1789359820",
+      "r2Key": "catalog/2Modern__lighting___furniture/15373841956909/source.jpg",
+      "category": "furniture/living room furniture/benches",
       "bucket": "seating",
       "bboxMeters": {
-        "w": 3.9624,
-        "h": 0.8572,
-        "d": 1.9812
+        "w": 1.6002,
+        "h": 0.3988,
+        "d": 0.4191
+      },
+      "measure": {
+        "method": "extracted",
+        "confidence": 0.8
+      },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
+      "extractedFrom": "variant.title",
+      "via": "api",
+      "source": "catalog",
+      "bytes": 17371
+    },
+    {
+      "productId": "15551738773577",
+      "merchant": "Poly___Bark",
+      "title": "Torre Game Table | Walnut",
+      "handle": "torre-game-table-walnut",
+      "productUrl": "https://polyandbark.com/products/torre-game-table-walnut",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/LR-K028-WAL.jpg?v=1781241952",
+      "r2Key": "catalog/Poly___Bark/15551738773577/source.jpg",
+      "category": "accent tables",
+      "bucket": "surface",
+      "bboxMeters": {
+        "w": 0.4572,
+        "h": 0.6096,
+        "d": 0.4572
       },
       "measure": {
         "method": "extracted",
         "confidence": 0.75
       },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
       "extractedFrom": "body_html",
+      "via": "api",
       "source": "catalog"
     },
     {
-      "productId": "8955099480286",
+      "productId": "9316319854814",
       "merchant": "InStyle_Home__CA",
-      "title": "MULTI-LEVEL Brushed Gold Coffee Table",
-      "handle": "multi-level-gy-ct-8166bg-brushed-gold-coffee-table-w100-d100-h51cm",
-      "productUrl": "https://instylehome.ca/products/multi-level-gy-ct-8166bg-brushed-gold-coffee-table-w100-d100-h51cm",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/0262/8947/1541/files/LivingRoom_CoffeeTable_9cb4fb88-080a-45d0-9e39-d9d3f3be74dc.jpg?v=1758308080",
-      "r2Key": "catalog/InStyle_Home__CA/8955099480286/source.jpg",
-      "category": "occasional table",
-      "bucket": "surface",
-      "bboxMeters": {
-        "w": 1.0008,
-        "h": 0.5105,
-        "d": 1.0008
-      },
-      "measure": {
-        "method": "extracted",
-        "confidence": 0.75
-      },
-      "extractedFrom": "body_html",
-      "source": "catalog"
-    },
-    {
-      "productId": "15353341050925",
-      "merchant": "2Modern__lighting___furniture",
-      "title": "Nativity House LED Christmas Accent Lamp",
-      "handle": "nativity-house-led-christmas-accent-lamp",
-      "productUrl": "https://www.2modern.com/products/nativity-house-led-christmas-accent-lamp",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/0265/0083/files/blomus-nativity-house-led-christmas-accent-lamp.jpg?v=1787978012",
-      "r2Key": "catalog/2Modern__lighting___furniture/15353341050925/source.jpg",
-      "category": "lighting/lamps/table lamps/accent table lamps",
-      "bucket": "lighting",
-      "bboxMeters": {
-        "w": 0.1168,
-        "h": 0.1092,
-        "d": 0.1041
-      },
-      "measure": {
-        "method": "extracted",
-        "confidence": 0.4
-      },
-      "extractedFrom": "page_text",
-      "source": "catalog",
-      "bytes": 22770
-    },
-    {
-      "productId": "8691260522658",
-      "merchant": "Floyd_Home",
-      "title": "Five-Piece Soft Serve Sectional",
-      "handle": "five-piece-soft-serve-sectional",
-      "productUrl": "https://floydhome.com/products/five-piece-soft-serve-sectional",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/0462/1706/8706/files/5_Seater_Soft_Serve_Nomad_Umami_5s2.png?v=1750455299",
-      "r2Key": "catalog/Floyd_Home/8691260522658/source.jpg",
-      "category": "sectionals",
-      "bucket": null,
-      "bboxMeters": {
-        "w": 3.0226,
-        "h": 0.7112,
-        "d": 3.0226
-      },
-      "measure": {
-        "method": "extracted",
-        "confidence": 0.85
-      },
-      "extractedFrom": "spec_block",
-      "source": "catalog",
-      "bytes": 2271807
-    },
-    {
-      "productId": "15794247106633",
-      "merchant": "Poly___Bark",
-      "title": "Aspen 118\" Modular 5-Piece U-Shaped Double Chaise Sectional | Linen White",
-      "handle": "aspen-118-modular-5-piece-u-shaped-double-chaise-sectional-linen-white-1",
-      "productUrl": "https://polyandbark.com/products/aspen-118-modular-5-piece-u-shaped-double-chaise-sectional-linen-white-1",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/LR-MS2-10-LIWH.jpg?v=1789579654",
-      "r2Key": "catalog/Poly___Bark/15794247106633/source.jpg",
-      "category": "modular sofas",
-      "bucket": "seating",
-      "bboxMeters": {
-        "w": 2.9718,
-        "h": 0.8572,
-        "d": 1.9812
-      },
-      "measure": {
-        "method": "extracted",
-        "confidence": 0.75
-      },
-      "extractedFrom": "body_html",
-      "source": "catalog"
-    },
-    {
-      "productId": "8955099742430",
-      "merchant": "InStyle_Home__CA",
-      "title": "Aries End Table",
-      "handle": "aries-end-table-gy-et-8207",
-      "productUrl": "https://instylehome.ca/products/aries-end-table-gy-et-8207",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/0262/8947/1541/files/MoonEndtable_3257fac1-7f38-4116-9a2e-a59c4e93621f.jpg?v=1758308062",
-      "r2Key": "catalog/InStyle_Home__CA/8955099742430/source.jpg",
-      "category": "occasional table",
-      "bucket": "surface",
-      "bboxMeters": {
-        "w": 0.4318,
-        "h": 0.5334,
-        "d": 0.4318
-      },
-      "measure": {
-        "method": "extracted",
-        "confidence": 0.75
-      },
-      "extractedFrom": "body_html",
-      "source": "catalog"
-    },
-    {
-      "productId": "15373989314605",
-      "merchant": "2Modern__lighting___furniture",
-      "title": "Visual Comfort Signature x Chapman and Myers Bernardo Chandelier",
-      "handle": "visual-comfort-signature-x-chapman-and-myers-bernardo-chandelier",
-      "productUrl": "https://www.2modern.com/products/visual-comfort-signature-x-chapman-and-myers-bernardo-chandelier",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/0265/0083/files/visual-comfort-co-bernardo-chandelier.jpg?v=1789378248",
-      "r2Key": "catalog/2Modern__lighting___furniture/15373989314605/source.jpg",
-      "category": "lighting/ceiling lights/chandeliers",
-      "bucket": "lighting",
-      "bboxMeters": {
-        "w": 1.524,
-        "h": 0.7683,
-        "d": 0.762
-      },
-      "measure": {
-        "method": "extracted",
-        "confidence": 0.4
-      },
-      "extractedFrom": "page_text",
-      "source": "catalog",
-      "bytes": 36293
-    },
-    {
-      "productId": "8691303252130",
-      "merchant": "Floyd_Home",
-      "title": "Soft Serve Sectional Units",
-      "handle": "soft-serve-sectional-units",
-      "productUrl": "https://floydhome.com/products/soft-serve-sectional-units",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/0462/1706/8706/files/SoftServe_LeftArmChaise_NomadCrema.png?v=1750189297",
-      "r2Key": "catalog/Floyd_Home/8691303252130/source.jpg",
-      "category": "sectionals",
-      "bucket": null,
+      "title": "Caged Tall Cabinet - Variance from ARC-SHA-73",
+      "handle": "caged-tall-cabinet-variance-from-arc-sha-73-xarc-sha-73",
+      "productUrl": "https://instylehome.ca/products/caged-tall-cabinet-variance-from-arc-sha-73-xarc-sha-73",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/0262/8947/1541/files/ARCSHA73_2154c634-e7b2-46e0-baaa-583072a29d9e.jpg?v=1787433397",
+      "r2Key": "catalog/InStyle_Home__CA/9316319854814/source.jpg",
+      "category": null,
+      "bucket": "storage",
       "bboxMeters": {
         "w": 0.889,
-        "h": 0.7112,
+        "h": 1.7272,
+        "d": 0.4064
+      },
+      "measure": {
+        "method": "extracted",
+        "confidence": 0.75
+      },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
+      "extractedFrom": "body_html",
+      "via": "api",
+      "source": "catalog",
+      "bytes": 48340
+    },
+    {
+      "productId": "9346772467934",
+      "merchant": "InStyle_Home__CA",
+      "title": "D-Bodhi Elements Pendant - Large",
+      "handle": "d-bodhi-elements-lampshade-large-dba140-l",
+      "productUrl": "https://instylehome.ca/products/d-bodhi-elements-lampshade-large-dba140-l",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/0262/8947/1541/files/DBA140L_1d7b6b8f-f07c-4faa-b7b6-12eb8868d4a8.jpg?v=1789838028",
+      "r2Key": "catalog/InStyle_Home__CA/9346772467934/source.jpg",
+      "category": null,
+      "bucket": "lighting",
+      "bboxMeters": {
+        "w": 0.889,
+        "h": 0.4826,
+        "d": 0.889
+      },
+      "measure": {
+        "method": "extracted",
+        "confidence": 0.6
+      },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
+      "extractedFrom": "llm",
+      "via": "llm",
+      "source": "catalog",
+      "bytes": 115464
+    },
+    {
+      "productId": "15356806627401",
+      "merchant": "Poly___Bark",
+      "title": "Truro Bed with Leather Cushions | Midnight Blue | King",
+      "handle": "truro-queen-bed-frame-with-leather-cushions-midnight-blue-king",
+      "productUrl": "https://polyandbark.com/products/truro-queen-bed-frame-with-leather-cushions-midnight-blue-king",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/BD-C302-15625-WBLU-KG.jpg?v=1774425335",
+      "r2Key": "catalog/Poly___Bark/15356806627401/source.jpg",
+      "category": "beds",
+      "bucket": null,
+      "bboxMeters": {
+        "w": 1.6129,
+        "h": 1.1176,
+        "d": 2.1844
+      },
+      "measure": {
+        "method": "extracted",
+        "confidence": 0.75
+      },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
+      "extractedFrom": "body_html",
+      "via": "api",
+      "source": "catalog",
+      "bytes": 50217
+    },
+    {
+      "productId": "15790740045897",
+      "merchant": "Poly___Bark",
+      "title": "Aspen 118\" Modular 3-Piece Sofa | Linen White",
+      "handle": "aspen-118-modular-3-piece-sofa-linen-white",
+      "productUrl": "https://polyandbark.com/products/aspen-118-modular-3-piece-sofa-linen-white",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/LR-MS2-2-LIWH_1_45eb2fb1-e500-4ea6-adc2-820f24c1ce53.jpg?v=1789461067",
+      "r2Key": "catalog/Poly___Bark/15790740045897/source.jpg",
+      "category": "modular sofas",
+      "bucket": "seating",
+      "bboxMeters": {
+        "w": 2.9718,
+        "h": 0.8572,
+        "d": 0.9906
+      },
+      "measure": {
+        "method": "extracted",
+        "confidence": 0.75
+      },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
+      "extractedFrom": "body_html",
+      "via": "api",
+      "source": "catalog",
+      "bytes": 36644
+    },
+    {
+      "productId": "15547970682953",
+      "merchant": "Poly___Bark",
+      "title": "Folda 18\" Side Table | Green Marble",
+      "handle": "folda-18-side-table-green-marble",
+      "productUrl": "https://polyandbark.com/products/folda-18-side-table-green-marble",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/LR-H171-GRN_1.jpg?v=1780428543",
+      "r2Key": "catalog/Poly___Bark/15547970682953/source.jpg",
+      "category": "accent tables",
+      "bucket": "surface",
+      "bboxMeters": {
+        "w": 0.4572,
+        "h": 0.508,
+        "d": 0.4572
+      },
+      "measure": {
+        "method": "extracted",
+        "confidence": 0.75
+      },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
+      "extractedFrom": "body_html",
+      "via": "api",
+      "source": "catalog"
+    },
+    {
+      "productId": "9304001052894",
+      "merchant": "InStyle_Home__CA",
+      "title": "Amoli 1 Drawer Accent Table",
+      "handle": "amoli-1-drawer-accent-table",
+      "productUrl": "https://instylehome.ca/products/amoli-1-drawer-accent-table",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/0262/8947/1541/files/102-069NAT.jpg?v=1786207239",
+      "r2Key": "catalog/InStyle_Home__CA/9304001052894/source.jpg",
+      "category": null,
+      "bucket": "storage",
+      "bboxMeters": {
+        "w": 0.508,
+        "h": 0.6096,
+        "d": 0.3556
+      },
+      "measure": {
+        "method": "extracted",
+        "confidence": 0.75
+      },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
+      "extractedFrom": "body_html",
+      "via": "api",
+      "source": "catalog",
+      "bytes": 128873
+    },
+    {
+      "productId": "9321534226665",
+      "merchant": "Kohara___Co__CA_lighting",
+      "title": "Forge Large Wall Mount Barn Light",
+      "handle": "forge-large-wall-mount-barn-light",
+      "productUrl": "https://koharaco.com/products/forge-large-wall-mount-barn-light",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/0529/4591/1968/files/12076bk_0b42502a-321f-427d-bd01-1cd2dd79ff40.webp?v=1782151809",
+      "r2Key": "catalog/Kohara___Co__CA_lighting/9321534226665/source.jpg",
+      "category": "wall sconce",
+      "bucket": "lighting",
+      "bboxMeters": {
+        "w": 0.4064,
+        "h": 0.3175,
+        "d": 0.6604
+      },
+      "measure": {
+        "method": "extracted",
+        "confidence": 0.6
+      },
+      "validation": {
+        "flags": [
+          "axis_suspect"
+        ],
+        "unverified": false
+      },
+      "extractedFrom": "body_html",
+      "via": "api",
+      "source": "catalog"
+    },
+    {
+      "productId": "15356806594633",
+      "merchant": "Poly___Bark",
+      "title": "Truro Bed with Leather Cushions | Midnight Blue | Queen",
+      "handle": "truro-queen-bed-frame-with-leather-cushions-midnight-blue-queen",
+      "productUrl": "https://polyandbark.com/products/truro-queen-bed-frame-with-leather-cushions-midnight-blue-queen",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/BD-C202-15241-WBLU-QN.jpg?v=1774425196",
+      "r2Key": "catalog/Poly___Bark/15356806594633/source.jpg",
+      "category": "beds",
+      "bucket": null,
+      "bboxMeters": {
+        "w": 1.6129,
+        "h": 1.1176,
+        "d": 2.1844
+      },
+      "measure": {
+        "method": "extracted",
+        "confidence": 0.75
+      },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
+      "extractedFrom": "body_html",
+      "via": "api",
+      "source": "catalog",
+      "bytes": 50334
+    },
+    {
+      "productId": "15790641315913",
+      "merchant": "Poly___Bark",
+      "title": "Aspen 78.5\" Modular 2-Piece Apartment Sofa | Linen White",
+      "handle": "aspen-78-5-modular-2-piece-apartment-sofa-linen-white",
+      "productUrl": "https://polyandbark.com/products/aspen-78-5-modular-2-piece-apartment-sofa-linen-white",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/LR-MS2-1-LIWH.jpg?v=1789455522",
+      "r2Key": "catalog/Poly___Bark/15790641315913/source.jpg",
+      "category": "modular sofas",
+      "bucket": "seating",
+      "bboxMeters": {
+        "w": 1.9812,
+        "h": 0.8572,
+        "d": 0.9906
+      },
+      "measure": {
+        "method": "extracted",
+        "confidence": 0.75
+      },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
+      "extractedFrom": "body_html",
+      "via": "api",
+      "source": "catalog",
+      "bytes": 43685
+    },
+    {
+      "productId": "15537483120713",
+      "merchant": "Poly___Bark",
+      "title": "Pino Nightstand | Reposado Oak",
+      "handle": "pino-nightstand-reposado-oak",
+      "productUrl": "https://polyandbark.com/products/pino-nightstand-reposado-oak",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/BD-D401-ROK_1_16fd00a5-cca1-466a-996b-347d03930685.jpg?v=1778405904",
+      "r2Key": "catalog/Poly___Bark/15537483120713/source.jpg",
+      "category": "night stands",
+      "bucket": "surface",
+      "bboxMeters": {
+        "w": 0.6096,
+        "h": 0.6096,
+        "d": 0.4318
+      },
+      "measure": {
+        "method": "extracted",
+        "confidence": 0.75
+      },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
+      "extractedFrom": "body_html",
+      "via": "api",
+      "source": "catalog",
+      "bytes": 88699
+    },
+    {
+      "productId": "9304000954590",
+      "merchant": "InStyle_Home__CA",
+      "title": "Akhila 2 Drawer Accent Table",
+      "handle": "akhila-2-drawer-accent-table",
+      "productUrl": "https://instylehome.ca/products/akhila-2-drawer-accent-table",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/0262/8947/1541/files/102-070NAT.jpg?v=1786207232",
+      "r2Key": "catalog/InStyle_Home__CA/9304000954590/source.jpg",
+      "category": null,
+      "bucket": "storage",
+      "bboxMeters": {
+        "w": 0.508,
+        "h": 0.6096,
+        "d": 0.4064
+      },
+      "measure": {
+        "method": "extracted",
+        "confidence": 0.75
+      },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
+      "extractedFrom": "body_html",
+      "via": "api",
+      "source": "catalog",
+      "bytes": 147087
+    },
+    {
+      "productId": "8948086767838",
+      "merchant": "InStyle_Home__CA",
+      "title": "TABLE LAMP",
+      "handle": "table-lamp-w26108-1",
+      "productUrl": "https://instylehome.ca/products/table-lamp-w26108-1",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/0262/8947/1541/files/W26108-1-63214-7.jpg?v=1774116343",
+      "r2Key": "catalog/InStyle_Home__CA/8948086767838/source.jpg",
+      "category": null,
+      "bucket": "lighting",
+      "bboxMeters": {
+        "w": 0.635,
+        "h": 0.762,
+        "d": 0.635
+      },
+      "measure": {
+        "method": "extracted",
+        "confidence": 0.5
+      },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
+      "extractedFrom": "page_text",
+      "via": "page",
+      "source": "catalog",
+      "bytes": 142744
+    },
+    {
+      "productId": "15360129826889",
+      "merchant": "Poly___Bark",
+      "title": "Truro Bed | Walnut | Queen",
+      "handle": "truro-bed-frame-in-queen-walnut-queen",
+      "productUrl": "https://polyandbark.com/products/truro-bed-frame-in-queen-walnut-queen",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/BD-593-1-QN.jpg?v=1774251239",
+      "r2Key": "catalog/Poly___Bark/15360129826889/source.jpg",
+      "category": "beds",
+      "bucket": null,
+      "bboxMeters": {
+        "w": 1.6129,
+        "h": 1.1176,
+        "d": 2.1844
+      },
+      "measure": {
+        "method": "extracted",
+        "confidence": 0.75
+      },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
+      "extractedFrom": "body_html",
+      "via": "api",
+      "source": "catalog",
+      "bytes": 64767
+    },
+    {
+      "productId": "15776864632905",
+      "merchant": "Poly___Bark",
+      "title": "Davos 122\" Modular 3-Piece Sofa | Linen White",
+      "handle": "davos-122-modular-3-piece-sofa-linen-white",
+      "productUrl": "https://polyandbark.com/products/davos-122-modular-3-piece-sofa-linen-white",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/LR-MS4-2-LIWH.jpg?v=1789036739",
+      "r2Key": "catalog/Poly___Bark/15776864632905/source.jpg",
+      "category": "modular sofas",
+      "bucket": "seating",
+      "bboxMeters": {
+        "w": 3.048,
+        "h": 0.889,
+        "d": 1.016
+      },
+      "measure": {
+        "method": "extracted",
+        "confidence": 0.75
+      },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
+      "extractedFrom": "body_html",
+      "via": "api",
+      "source": "catalog",
+      "bytes": 35276
+    },
+    {
+      "productId": "15387576827977",
+      "merchant": "Poly___Bark",
+      "title": "Torno 90\"-112\" Extendable Dining Table | Walnut",
+      "handle": "torno-90-112-extendable-dining-table-walnut",
+      "productUrl": "https://polyandbark.com/products/torno-90-112-extendable-dining-table-walnut",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/DI-A582-EXT-WAL_1566e49b-64bb-48d4-bcf1-70893ef7400d.jpg?v=1781183500",
+      "r2Key": "catalog/Poly___Bark/15387576827977/source.jpg",
+      "category": "dining tables",
+      "bucket": "surface",
+      "bboxMeters": {
+        "w": 2.8448,
+        "h": 0.762,
         "d": 1.0668
       },
       "measure": {
         "method": "extracted",
-        "confidence": 0.85
-      },
-      "extractedFrom": "spec_block",
-      "source": "catalog",
-      "bytes": 423883
-    },
-    {
-      "productId": "15793229201481",
-      "merchant": "Poly___Bark",
-      "title": "Aspen 157\" Modular 6-Piece U-Shaped Double Chaise Sectional | Linen White",
-      "handle": "aspen-157-modular-6-piece-u-shaped-double-chaise-sectional-linen-white",
-      "productUrl": "https://polyandbark.com/products/aspen-157-modular-6-piece-u-shaped-double-chaise-sectional-linen-white",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/LR-MS2-9-LIWH.jpg?v=1789566561",
-      "r2Key": "catalog/Poly___Bark/15793229201481/source.jpg",
-      "category": "modular sofas",
-      "bucket": "seating",
-      "bboxMeters": {
-        "w": 3.9624,
-        "h": 0.8572,
-        "d": 1.9812
-      },
-      "measure": {
-        "method": "extracted",
         "confidence": 0.75
       },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
       "extractedFrom": "body_html",
+      "via": "api",
       "source": "catalog"
     },
     {
-      "productId": "8955099807966",
+      "productId": "8726021341406",
       "merchant": "InStyle_Home__CA",
-      "title": "IDA coffee table",
-      "handle": "ida-coffee-table-xc-53740",
-      "productUrl": "https://instylehome.ca/products/ida-coffee-table-xc-53740",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/0262/8947/1541/files/Tilly-Silver-Coffee-Table-1_1.jpg?v=1757015624",
-      "r2Key": "catalog/InStyle_Home__CA/8955099807966/source.jpg",
-      "category": "coffee table",
-      "bucket": "surface",
+      "title": "West 6 Drawer Dresser",
+      "handle": "wes004-west-dresser-6-drawers",
+      "productUrl": "https://instylehome.ca/products/wes004-west-dresser-6-drawers",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/0262/8947/1541/files/WES004_1800x1800_539e559d-461f-4478-9730-d34f8525b175.jpg?v=1755289610",
+      "r2Key": "catalog/InStyle_Home__CA/8726021341406/source.jpg",
+      "category": null,
+      "bucket": "storage",
       "bboxMeters": {
-        "w": 1.1989,
-        "h": 0.4496,
-        "d": 0.5994
+        "w": 1.4986,
+        "h": 0.7976,
+        "d": 0.4496
       },
       "measure": {
         "method": "extracted",
-        "confidence": 0.75
+        "confidence": 0.6
       },
-      "extractedFrom": "body_html",
-      "source": "catalog"
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
+      "extractedFrom": "llm",
+      "via": "llm",
+      "source": "catalog",
+      "bytes": 76516
     },
     {
       "productId": "15373989347373",
@@ -1824,440 +2056,752 @@
       },
       "measure": {
         "method": "extracted",
-        "confidence": 0.4
+        "confidence": 0.5
+      },
+      "validation": {
+        "flags": [],
+        "unverified": false
       },
       "extractedFrom": "page_text",
-      "source": "catalog",
-      "bytes": 32238
+      "via": "page",
+      "source": "catalog"
     },
     {
-      "productId": "8691227394210",
-      "merchant": "Floyd_Home",
-      "title": "Four-Piece Soft Serve Sectional",
-      "handle": "four-piece-soft-serve-sectional",
-      "productUrl": "https://floydhome.com/products/four-piece-soft-serve-sectional",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/0462/1706/8706/files/4Seater_SoftServe_NomadCrema_4s1.png?v=1750107500",
-      "r2Key": "catalog/Floyd_Home/8691227394210/source.jpg",
-      "category": "sectionals",
+      "productId": "15360129957961",
+      "merchant": "Poly___Bark",
+      "title": "Truro Bed | Walnut | King",
+      "handle": "truro-bed-frame-in-queen-walnut-king",
+      "productUrl": "https://polyandbark.com/products/truro-bed-frame-in-queen-walnut-king",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/BD-593_BD-613.jpg?v=1788448854",
+      "r2Key": "catalog/Poly___Bark/15360129957961/source.jpg",
+      "category": "beds",
       "bucket": null,
       "bboxMeters": {
-        "w": 4.0132,
-        "h": 0.7112,
-        "d": 1.0668
+        "w": 1.6129,
+        "h": 1.1176,
+        "d": 2.1844
       },
       "measure": {
         "method": "extracted",
-        "confidence": 0.85
+        "confidence": 0.75
       },
-      "extractedFrom": "spec_block",
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
+      "extractedFrom": "body_html",
+      "via": "api",
       "source": "catalog",
-      "bytes": 2354260
+      "bytes": 57022
     },
     {
-      "productId": "15792973185097",
+      "productId": "15774995742793",
       "merchant": "Poly___Bark",
-      "title": "Aspen 118\" Modular 5-Piece Reversible L-Shaped Sectional | Linen White",
-      "handle": "aspen-118-modular-5-piece-reversible-l-shaped-sectional-linen-white",
-      "productUrl": "https://polyandbark.com/products/aspen-118-modular-5-piece-reversible-l-shaped-sectional-linen-white",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/LR-MS2-8-LIWH.jpg?v=1789536907",
-      "r2Key": "catalog/Poly___Bark/15792973185097/source.jpg",
+      "title": "Davos 81\" Modular 2-Piece Apartment Sofa | Linen White",
+      "handle": "davos-81-modular-2-piece-apartment-sofa-linen-white",
+      "productUrl": "https://polyandbark.com/products/davos-81-modular-2-piece-apartment-sofa-linen-white",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/LR-MS4-1-LIWH.jpg?v=1788969117",
+      "r2Key": "catalog/Poly___Bark/15774995742793/source.jpg",
       "category": "modular sofas",
       "bucket": "seating",
       "bboxMeters": {
-        "w": 2.9718,
-        "h": 0.8572,
-        "d": 1.9812
+        "w": 2.032,
+        "h": 0.889,
+        "d": 1.016
       },
       "measure": {
         "method": "extracted",
         "confidence": 0.75
       },
-      "extractedFrom": "body_html",
-      "source": "catalog"
-    },
-    {
-      "productId": "8960728826078",
-      "merchant": "InStyle_Home__CA",
-      "title": "Belvin End table SET OF 2 WHITE MARBLE",
-      "handle": "belvin-end-table-xc-52977-set-of-2-white-marble",
-      "productUrl": "https://instylehome.ca/products/belvin-end-table-xc-52977-set-of-2-white-marble",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/0262/8947/1541/files/Cane_White-End-Tables-White-Marble-5_399c4bf5-5930-4465-a004-0bb30feec48f.jpg?v=1758308056",
-      "r2Key": "catalog/InStyle_Home__CA/8960728826078/source.jpg",
-      "category": "occasional table",
-      "bucket": "surface",
-      "bboxMeters": {
-        "w": 0.3988,
-        "h": 0.5207,
-        "d": 0.3988
-      },
-      "measure": {
-        "method": "extracted",
-        "confidence": 0.75
+      "validation": {
+        "flags": [],
+        "unverified": false
       },
       "extractedFrom": "body_html",
-      "source": "catalog"
-    },
-    {
-      "productId": "15373989380141",
-      "merchant": "2Modern__lighting___furniture",
-      "title": "Visual Comfort Signature x Chapman and Myers Ruhlmann Chandelier",
-      "handle": "visual-comfort-signature-x-chapman-and-myers-ruhlmann-chandelier",
-      "productUrl": "https://www.2modern.com/products/visual-comfort-signature-x-chapman-and-myers-ruhlmann-chandelier",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/0265/0083/files/visual-comfort-signature-visual-comfort-signature-x-chapman-and-myers-ruhlmann-chandelier.jpg?v=1789377881",
-      "r2Key": "catalog/2Modern__lighting___furniture/15373989380141/source.jpg",
-      "category": "lighting/ceiling lights/chandeliers",
-      "bucket": "lighting",
-      "bboxMeters": {
-        "w": 1.524,
-        "h": 0.635,
-        "d": 0.8128
-      },
-      "measure": {
-        "method": "extracted",
-        "confidence": 0.4
-      },
-      "extractedFrom": "page_text",
+      "via": "api",
       "source": "catalog",
-      "bytes": 39169
+      "bytes": 39717
     },
     {
-      "productId": "8691192299682",
-      "merchant": "Floyd_Home",
-      "title": "Three-Piece Soft Serve Sectional",
-      "handle": "three-piece-soft-serve-sectional",
-      "productUrl": "https://floydhome.com/products/three-piece-soft-serve-sectional",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/0462/1706/8706/files/3Seater_SoftServe_NomadCrema_3s1.png?v=1750107052",
-      "r2Key": "catalog/Floyd_Home/8691192299682/source.jpg",
-      "category": "sectionals",
-      "bucket": null,
-      "bboxMeters": {
-        "w": 3.1242,
-        "h": 0.7112,
-        "d": 1.0668
-      },
-      "measure": {
-        "method": "extracted",
-        "confidence": 0.85
-      },
-      "extractedFrom": "spec_block",
-      "source": "catalog",
-      "bytes": 2173870
-    },
-    {
-      "productId": "15791501246537",
+      "productId": "15522838741065",
       "merchant": "Poly___Bark",
-      "title": "Aspen 118\" Modular 5-Piece Pit Lounge Sectional | Linen White",
-      "handle": "aspen-118-modular-5-piece-pit-lounge-sectional-linen-white-copy",
-      "productUrl": "https://polyandbark.com/products/aspen-118-modular-5-piece-pit-lounge-sectional-linen-white-copy",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/LR-MS2-7-LIWH.jpg?v=1789489119",
-      "r2Key": "catalog/Poly___Bark/15791501246537/source.jpg",
-      "category": "modular sofas",
-      "bucket": "seating",
-      "bboxMeters": {
-        "w": 2.9718,
-        "h": 0.8572,
-        "d": 1.9812
-      },
-      "measure": {
-        "method": "extracted",
-        "confidence": 0.75
-      },
-      "extractedFrom": "body_html",
-      "source": "catalog"
-    },
-    {
-      "productId": "8695995990238",
-      "merchant": "InStyle_Home__CA",
-      "title": "LUXOR BLACK Console Table",
-      "handle": "luxor-black-console-table",
-      "productUrl": "https://instylehome.ca/products/luxor-black-console-table",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/0262/8947/1541/files/100246-2_19fce2fa-6302-4d19-a2bc-75fb3d00306e.jpg?v=1746218093",
-      "r2Key": "catalog/InStyle_Home__CA/8695995990238/source.jpg",
-      "category": "console table",
+      "title": "Allora 46\" Dining Table | Drift Oak",
+      "handle": "allora-dining-table-46-drift-oak",
+      "productUrl": "https://polyandbark.com/products/allora-dining-table-46-drift-oak",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/DI-B066-DOK1.jpg?v=1776208878",
+      "r2Key": "catalog/Poly___Bark/15522838741065/source.jpg",
+      "category": "dining tables",
       "bucket": "surface",
       "bboxMeters": {
-        "w": 1.1989,
-        "h": 0.7798,
-        "d": 0.3988
+        "w": 1.1684,
+        "h": 0.7683,
+        "d": 1.1684
       },
       "measure": {
         "method": "extracted",
         "confidence": 0.75
       },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
       "extractedFrom": "body_html",
+      "via": "api",
       "source": "catalog"
     },
     {
-      "productId": "15373989412909",
-      "merchant": "2Modern__lighting___furniture",
-      "title": "Visual Comfort Signature x Julie Neill Alberto Chandelier",
-      "handle": "visual-comfort-signature-x-julie-neill-alberto-chandelier",
-      "productUrl": "https://www.2modern.com/products/visual-comfort-signature-x-julie-neill-alberto-chandelier",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/0265/0083/files/visual-comfort-co-alberto-chandelier.jpg?v=1789377347",
-      "r2Key": "catalog/2Modern__lighting___furniture/15373989412909/source.jpg",
-      "category": "lighting/ceiling lights/chandeliers",
-      "bucket": "lighting",
-      "bboxMeters": {
-        "w": 0.1397,
-        "h": 0.6858,
-        "d": 0.762
-      },
-      "measure": {
-        "method": "extracted",
-        "confidence": 0.4
-      },
-      "extractedFrom": "page_text",
-      "source": "catalog",
-      "bytes": 45489
-    },
-    {
-      "productId": "8691171557538",
-      "merchant": "Floyd_Home",
-      "title": "Two-Piece Soft Serve Sectional",
-      "handle": "two-piece-soft-serve-sectional",
-      "productUrl": "https://floydhome.com/products/two-piece-soft-serve-sectional",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/0462/1706/8706/files/2_Seater_Soft_Serve_Nomad_Crema_2s1.png?v=1750106524",
-      "r2Key": "catalog/Floyd_Home/8691171557538/source.jpg",
-      "category": "sectionals",
-      "bucket": null,
-      "bboxMeters": {
-        "w": 2.2352,
-        "h": 0.7112,
-        "d": 1.0668
-      },
-      "measure": {
-        "method": "extracted",
-        "confidence": 0.85
-      },
-      "extractedFrom": "spec_block",
-      "source": "catalog",
-      "bytes": 1850797
-    },
-    {
-      "productId": "15791407988809",
-      "merchant": "Poly___Bark",
-      "title": "Aspen 118\" Modular 5-Piece U-Shaped Double Chaise Sectional | Linen White",
-      "handle": "aspen-118-modular-5-piece-u-shaped-double-chaise-sectional-linen-white",
-      "productUrl": "https://polyandbark.com/products/aspen-118-modular-5-piece-u-shaped-double-chaise-sectional-linen-white",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/LR-MS2-6-LIWH.jpg?v=1789484451",
-      "r2Key": "catalog/Poly___Bark/15791407988809/source.jpg",
-      "category": "modular sofas",
-      "bucket": "seating",
-      "bboxMeters": {
-        "w": 2.9718,
-        "h": 0.8572,
-        "d": 1.9812
-      },
-      "measure": {
-        "method": "extracted",
-        "confidence": 0.75
-      },
-      "extractedFrom": "body_html",
-      "source": "catalog"
-    },
-    {
-      "productId": "9013924069598",
+      "productId": "9232108945630",
       "merchant": "InStyle_Home__CA",
-      "title": "LUXOR Console Table",
-      "handle": "luxor-console-table-gy-cst-7745-_pos-3-_fid-127a88623-_ss-c",
-      "productUrl": "https://instylehome.ca/products/luxor-console-table-gy-cst-7745-_pos-3-_fid-127a88623-_ss-c",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/0262/8947/1541/files/Octavia-console-table_1.jpg?v=1757971169",
-      "r2Key": "catalog/InStyle_Home__CA/9013924069598/source.jpg",
-      "category": "console table",
-      "bucket": "surface",
-      "bboxMeters": {
-        "w": 1.1989,
-        "h": 0.7798,
-        "d": 0.3988
-      },
-      "measure": {
-        "method": "extracted",
-        "confidence": 0.75
-      },
-      "extractedFrom": "body_html",
-      "source": "catalog"
-    },
-    {
-      "productId": "15373989445677",
-      "merchant": "2Modern__lighting___furniture",
-      "title": "Visual Comfort Signature x Chapman and Myers Classic Mini Ring Chandelier",
-      "handle": "visual-comfort-signature-x-chapman-and-myers-classic-mini-ring-chandelier",
-      "productUrl": "https://www.2modern.com/products/visual-comfort-signature-x-chapman-and-myers-classic-mini-ring-chandelier",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/0265/0083/files/visual-comfort-co-classic-mini-ring-chandelier.jpg?v=1789377087",
-      "r2Key": "catalog/2Modern__lighting___furniture/15373989445677/source.jpg",
-      "category": "lighting/ceiling lights/chandeliers",
-      "bucket": "lighting",
-      "bboxMeters": {
-        "w": 1.016,
-        "h": 0.7112,
-        "d": 0.6858
-      },
-      "measure": {
-        "method": "extracted",
-        "confidence": 0.4
-      },
-      "extractedFrom": "page_text",
-      "source": "catalog",
-      "bytes": 41561
-    },
-    {
-      "productId": "8640584778008",
-      "merchant": "Bend_Goods",
-      "title": "Slim Cube Ottoman",
-      "handle": "cube-slim-ottoman",
-      "productUrl": "https://bendgoods.com/products/cube-slim-ottoman",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/0231/7507/files/slimottoman-greyboucle.png?v=1723747172",
-      "r2Key": "catalog/Bend_Goods/8640584778008/source.jpg",
+      "title": "Wesson Wine Cabinet",
+      "handle": "wesson-wine-cabinet",
+      "productUrl": "https://instylehome.ca/products/wesson-wine-cabinet",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/0262/8947/1541/files/112499_5a7934be-f77b-427d-8bdf-f0679fae027b.jpg?v=1780438001",
+      "r2Key": "catalog/InStyle_Home__CA/9232108945630/source.jpg",
       "category": null,
-      "bucket": null,
+      "bucket": "storage",
       "bboxMeters": {
-        "w": 1.0414,
-        "h": 0.7112,
-        "d": 1.0414
+        "w": 0.635,
+        "h": 0.762,
+        "d": 0.635
       },
       "measure": {
         "method": "extracted",
-        "confidence": 0.85
+        "confidence": 0.5
       },
-      "extractedFrom": "spec_block",
-      "source": "catalog",
-      "bytes": 856236
-    },
-    {
-      "productId": "15791127429193",
-      "merchant": "Poly___Bark",
-      "title": "Aspen 118\" Modular 4-Piece L-Shaped Sectional with Reversible Ottoman | Linen White",
-      "handle": "aspen-118-modular-4-piece-l-shaped-sectional-with-reversible-ottoman-linen-white",
-      "productUrl": "https://polyandbark.com/products/aspen-118-modular-4-piece-l-shaped-sectional-with-reversible-ottoman-linen-white",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/LR-MS2-4-LIWH.jpg?v=1789478655",
-      "r2Key": "catalog/Poly___Bark/15791127429193/source.jpg",
-      "category": "modular sofas",
-      "bucket": "seating",
-      "bboxMeters": {
-        "w": 2.9718,
-        "h": 0.8572,
-        "d": 1.9812
-      },
-      "measure": {
-        "method": "extracted",
-        "confidence": 0.75
-      },
-      "extractedFrom": "body_html",
-      "source": "catalog"
-    },
-    {
-      "productId": "8668094300440",
-      "merchant": "Bend_Goods",
-      "title": "Terrazzo Switch Table",
-      "handle": "terrazzo-switch-table",
-      "productUrl": "https://bendgoods.com/products/terrazzo-switch-table",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/0231/7507/files/terrazzo-switch_wh-02.png?v=1769713770",
-      "r2Key": "catalog/Bend_Goods/8668094300440/source.jpg",
-      "category": "side tables",
-      "bucket": "surface",
-      "bboxMeters": {
-        "w": 0.4572,
-        "h": 0.4572,
-        "d": 0.4572
-      },
-      "measure": {
-        "method": "extracted",
-        "confidence": 0.7000000000000001
-      },
-      "extractedFrom": "spec_block",
-      "source": "catalog",
-      "bytes": 257867
-    },
-    {
-      "productId": "15373990166573",
-      "merchant": "2Modern__lighting___furniture",
-      "title": "Visual Comfort Signature x Chapman and Myers Ruhlmann 2 Tier Chandelier",
-      "handle": "visual-comfort-signature-x-chapman-and-myers-ruhlmann-2-tier-chandelier",
-      "productUrl": "https://www.2modern.com/products/visual-comfort-signature-x-chapman-and-myers-ruhlmann-2-tier-chandelier",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/0265/0083/files/visual-comfort-signature-visual-comfort-signature-x-chapman-and-myers-ruhlmann-2-tier-chandelier.jpg?v=1789376759",
-      "r2Key": "catalog/2Modern__lighting___furniture/15373990166573/source.jpg",
-      "category": "lighting/ceiling lights/chandeliers",
-      "bucket": "lighting",
-      "bboxMeters": {
-        "w": 1.524,
-        "h": 0.8001,
-        "d": 0.7874
-      },
-      "measure": {
-        "method": "extracted",
-        "confidence": 0.4
+      "validation": {
+        "flags": [],
+        "unverified": false
       },
       "extractedFrom": "page_text",
+      "via": "page",
       "source": "catalog",
-      "bytes": 34594
+      "bytes": 50457
     },
     {
-      "productId": "8640583926040",
-      "merchant": "Bend_Goods",
-      "title": "Slim Cube Lounge",
-      "handle": "cube-slim-lounge",
-      "productUrl": "https://bendgoods.com/products/cube-slim-lounge",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/0231/7507/files/slimlounge-greychenille_b2835d7c-7e46-40a7-b55e-e865625f4eb0.png?v=1723753742",
-      "r2Key": "catalog/Bend_Goods/8640583926040/source.jpg",
-      "category": null,
-      "bucket": null,
+      "productId": "15347614973997",
+      "merchant": "2Modern__lighting___furniture",
+      "title": "Zeta Floor Lamp",
+      "handle": "zeta-floor-lamp",
+      "productUrl": "https://www.2modern.com/products/zeta-floor-lamp",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/0265/0083/files/lzf-zeta-floor-lamp.jpg?v=1787797658",
+      "r2Key": "catalog/2Modern__lighting___furniture/15347614973997/source.jpg",
+      "category": "lighting/lamps/floor lamps/accent floor lamps",
+      "bucket": "lighting",
       "bboxMeters": {
-        "w": 1.0414,
-        "h": 0.7112,
-        "d": 1.0414
-      },
-      "measure": {
-        "method": "extracted",
-        "confidence": 0.85
-      },
-      "extractedFrom": "spec_block",
-      "source": "catalog",
-      "bytes": 856232
-    },
-    {
-      "productId": "15791039479881",
-      "merchant": "Poly___Bark",
-      "title": "Aspen 78.5\" Modular 3-Piece L-Shaped Sectional with Reversible Ottoman | Linen White",
-      "handle": "aspen-78-5-modular-3-piece-l-shaped-sectional-with-reversible-ottoman-linen-white",
-      "productUrl": "https://polyandbark.com/products/aspen-78-5-modular-3-piece-l-shaped-sectional-with-reversible-ottoman-linen-white",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/LR-MS2-3-LIWH_1_73a0b701-1b60-496d-b93c-36dd417b5851.jpg?v=1789474566",
-      "r2Key": "catalog/Poly___Bark/15791039479881/source.jpg",
-      "category": "modular sofas",
-      "bucket": "seating",
-      "bboxMeters": {
-        "w": 1.9812,
-        "h": 0.8572,
-        "d": 1.9812
-      },
-      "measure": {
-        "method": "extracted",
-        "confidence": 0.75
-      },
-      "extractedFrom": "body_html",
-      "source": "catalog"
-    },
-    {
-      "productId": "534931406883",
-      "merchant": "Bend_Goods",
-      "title": "Coffee Table",
-      "handle": "coffee-table",
-      "productUrl": "https://bendgoods.com/products/coffee-table",
-      "imageUrl": "https://cdn.shopify.com/s/files/1/0231/7507/files/coffeetable_blk_glass_01.png?v=1738367003",
-      "r2Key": "catalog/Bend_Goods/534931406883/source.jpg",
-      "category": "tables",
-      "bucket": "surface",
-      "bboxMeters": {
-        "w": 0.9144,
-        "h": 0.9144,
+        "w": 0.2159,
+        "h": 1.3995,
         "d": 0.4064
       },
       "measure": {
         "method": "extracted",
-        "confidence": 0.7000000000000001
+        "confidence": 0.5
       },
-      "extractedFrom": "spec_block",
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
+      "extractedFrom": "page_text",
+      "via": "page",
       "source": "catalog",
-      "bytes": 875545
+      "bytes": 16767
+    },
+    {
+      "productId": "15360131563593",
+      "merchant": "Poly___Bark",
+      "title": "Orbit Bed | Froth White Boucle | Queen",
+      "handle": "orbit-queen-size-bed-froth-white-boucle-queen",
+      "productUrl": "https://polyandbark.com/products/orbit-queen-size-bed-froth-white-boucle-queen",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/BD-D981-110_4fe85455-fe5e-47e0-a715-17f6297ab44b.jpg?v=1788450147",
+      "r2Key": "catalog/Poly___Bark/15360131563593/source.jpg",
+      "category": "beds",
+      "bucket": null,
+      "bboxMeters": {
+        "w": 1.7907,
+        "h": 0.2032,
+        "d": 2.3622
+      },
+      "measure": {
+        "method": "extracted",
+        "confidence": 0.75
+      },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
+      "extractedFrom": "body_html",
+      "via": "api",
+      "source": "catalog",
+      "bytes": 55189
+    },
+    {
+      "productId": "15774909005897",
+      "merchant": "Poly___Bark",
+      "title": "Arlo Leather Dining Chair | Walnut/Green",
+      "handle": "arlo-leather-dining-chair-walnut-green",
+      "productUrl": "https://polyandbark.com/products/arlo-leather-dining-chair-walnut-green",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/DI-107-GNWL.jpg?v=1788965204",
+      "r2Key": "catalog/Poly___Bark/15774909005897/source.jpg",
+      "category": "dining chairs",
+      "bucket": "seating",
+      "bboxMeters": {
+        "w": 0.4508,
+        "h": 0.8065,
+        "d": 0.508
+      },
+      "measure": {
+        "method": "extracted",
+        "confidence": 0.75
+      },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
+      "extractedFrom": "body_html",
+      "via": "api",
+      "source": "catalog",
+      "bytes": 51704
+    },
+    {
+      "productId": "15523038789705",
+      "merchant": "Poly___Bark",
+      "title": "Laso Nightstand | English Walnut",
+      "handle": "laso-nightstand-english-walnut",
+      "productUrl": "https://polyandbark.com/products/laso-nightstand-english-walnut",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/BD-F702-WAL_1_fbdf2afd-4323-4da0-b941-8bcfaccda359.jpg?v=1776208949",
+      "r2Key": "catalog/Poly___Bark/15523038789705/source.jpg",
+      "category": "night stands",
+      "bucket": "surface",
+      "bboxMeters": {
+        "w": 0.6096,
+        "h": 0.6096,
+        "d": 0.4064
+      },
+      "measure": {
+        "method": "extracted",
+        "confidence": 0.75
+      },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
+      "extractedFrom": "body_html",
+      "via": "api",
+      "source": "catalog",
+      "bytes": 115769
+    },
+    {
+      "productId": "9232108912862",
+      "merchant": "InStyle_Home__CA",
+      "title": "Novak Wine Cabinet",
+      "handle": "novak-wine-cabinet",
+      "productUrl": "https://instylehome.ca/products/novak-wine-cabinet",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/0262/8947/1541/files/112499_75899634-1adf-4cf8-90ac-e9a0704ee2d6.jpg?v=1780437999",
+      "r2Key": "catalog/InStyle_Home__CA/9232108912862/source.jpg",
+      "category": null,
+      "bucket": "storage",
+      "bboxMeters": {
+        "w": 0.635,
+        "h": 0.762,
+        "d": 0.635
+      },
+      "measure": {
+        "method": "extracted",
+        "confidence": 0.5
+      },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
+      "extractedFrom": "page_text",
+      "via": "page",
+      "source": "catalog",
+      "bytes": 50457
+    },
+    {
+      "productId": "15360102793289",
+      "merchant": "Poly___Bark",
+      "title": "Zeno Globe Wall Sconce | Brushed Brass/Clear",
+      "handle": "zeno-globe-wall-sconce-brushed-brass-clear",
+      "productUrl": "https://polyandbark.com/products/zeno-globe-wall-sconce-brushed-brass-clear",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/LS-W264-BB-CL_1_02d5a6d9-e9bb-40ef-a2a1-ce1bf3252765.jpg?v=1774360415",
+      "r2Key": "catalog/Poly___Bark/15360102793289/source.jpg",
+      "category": "wall sconces",
+      "bucket": "lighting",
+      "bboxMeters": {
+        "w": 1.016,
+        "h": 0.2667,
+        "d": 0.2032
+      },
+      "measure": {
+        "method": "extracted",
+        "confidence": 0.488
+      },
+      "validation": {
+        "flags": [
+          "prior_mismatch"
+        ],
+        "unverified": true
+      },
+      "extractedFrom": "body_html",
+      "via": "api",
+      "source": "catalog"
+    },
+    {
+      "productId": "15360131596361",
+      "merchant": "Poly___Bark",
+      "title": "Orbit Bed | Froth White Boucle | King",
+      "handle": "orbit-queen-size-bed-froth-white-boucle-king",
+      "productUrl": "https://polyandbark.com/products/orbit-queen-size-bed-froth-white-boucle-king",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/BD-D988-KG-110_82ba83b1-de95-4958-8ab8-276f08e5b206.jpg?v=1788450215",
+      "r2Key": "catalog/Poly___Bark/15360131596361/source.jpg",
+      "category": "beds",
+      "bucket": null,
+      "bboxMeters": {
+        "w": 1.7907,
+        "h": 0.2032,
+        "d": 2.3622
+      },
+      "measure": {
+        "method": "extracted",
+        "confidence": 0.75
+      },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
+      "extractedFrom": "body_html",
+      "via": "api",
+      "source": "catalog",
+      "bytes": 47531
+    },
+    {
+      "productId": "15774839177289",
+      "merchant": "Poly___Bark",
+      "title": "Arlo Leather Dining Chair | Walnut/Black",
+      "handle": "arlo-leather-dining-chair-walnut-black",
+      "productUrl": "https://polyandbark.com/products/arlo-leather-dining-chair-walnut-black",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/DI-107-BKWL.jpg?v=1788962802",
+      "r2Key": "catalog/Poly___Bark/15774839177289/source.jpg",
+      "category": "dining chairs",
+      "bucket": "seating",
+      "bboxMeters": {
+        "w": 0.4508,
+        "h": 0.8065,
+        "d": 0.508
+      },
+      "measure": {
+        "method": "extracted",
+        "confidence": 0.75
+      },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
+      "extractedFrom": "body_html",
+      "via": "api",
+      "source": "catalog",
+      "bytes": 47826
+    },
+    {
+      "productId": "15360237011017",
+      "merchant": "Poly___Bark",
+      "title": "Laso Nightstand | Black",
+      "handle": "laso-nightstand-black",
+      "productUrl": "https://polyandbark.com/products/laso-nightstand-black",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/BD-F702-BLK_634bf5bc-e672-478f-925d-e318daf879ac.jpg?v=1777011806",
+      "r2Key": "catalog/Poly___Bark/15360237011017/source.jpg",
+      "category": "night stands",
+      "bucket": "surface",
+      "bboxMeters": {
+        "w": 0.6096,
+        "h": 0.6096,
+        "d": 0.4064
+      },
+      "measure": {
+        "method": "extracted",
+        "confidence": 0.75
+      },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
+      "extractedFrom": "body_html",
+      "via": "api",
+      "source": "catalog",
+      "bytes": 60738
+    },
+    {
+      "productId": "15564037685321",
+      "merchant": "Poly___Bark",
+      "title": "Cura Wardrobe / Armoire | Walnut",
+      "handle": "cura-wardrobe-armoire-walnut",
+      "productUrl": "https://polyandbark.com/products/cura-wardrobe-armoire-walnut",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/BD-K049-WAL_1_9dda00e6-0216-456b-93f8-84f988e62c98.jpg?v=1781968915",
+      "r2Key": "catalog/Poly___Bark/15564037685321/source.jpg",
+      "category": "dressers and armoire",
+      "bucket": "storage",
+      "bboxMeters": {
+        "w": 0.9525,
+        "h": 1.8796,
+        "d": 0.5461
+      },
+      "measure": {
+        "method": "extracted",
+        "confidence": 0.488
+      },
+      "validation": {
+        "flags": [
+          "prior_mismatch"
+        ],
+        "unverified": true
+      },
+      "extractedFrom": "body_html",
+      "via": "api",
+      "source": "catalog"
+    },
+    {
+      "productId": "9338223657193",
+      "merchant": "Kohara___Co__CA_lighting",
+      "title": "Firefly Solar Glass Jar Lantern",
+      "handle": "firefly-solar-glass-jar-lantern",
+      "productUrl": "https://koharaco.com/products/firefly-solar-glass-jar-lantern",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/0529/4591/1968/files/19b117ec268515f8186d81edd88127a971ef15ad31783a267c321aea30b2a0bf.jpg?v=1783359525",
+      "r2Key": "catalog/Kohara___Co__CA_lighting/9338223657193/source.jpg",
+      "category": "foyer/hall lanterns",
+      "bucket": "lighting",
+      "bboxMeters": {
+        "w": 0.11,
+        "h": 0.115,
+        "d": 0.11
+      },
+      "measure": {
+        "method": "extracted",
+        "confidence": 0.488
+      },
+      "validation": {
+        "flags": [
+          "prior_mismatch"
+        ],
+        "unverified": true
+      },
+      "extractedFrom": "body_html",
+      "via": "api",
+      "source": "catalog",
+      "bytes": 184434
+    },
+    {
+      "productId": "9346772828382",
+      "merchant": "InStyle_Home__CA",
+      "title": "Gia Queen Bed - Whitewash",
+      "handle": "gia-queen-bed-whitewash-gia001qb-ww",
+      "productUrl": "https://instylehome.ca/products/gia-queen-bed-whitewash-gia001qb-ww",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/0262/8947/1541/files/GIA001QB-WW.jpg?v=1789838044",
+      "r2Key": "catalog/InStyle_Home__CA/9346772828382/source.jpg",
+      "category": null,
+      "bucket": null,
+      "bboxMeters": {
+        "w": 1.7145,
+        "h": 1.1049,
+        "d": 2.159
+      },
+      "measure": {
+        "method": "extracted",
+        "confidence": 0.75
+      },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
+      "extractedFrom": "body_html",
+      "via": "api",
+      "source": "catalog",
+      "bytes": 48633
+    },
+    {
+      "productId": "15773871964233",
+      "merchant": "Poly___Bark",
+      "title": "Arlo Leather Dining Chair | Walnut/Brown",
+      "handle": "arlo-leather-dining-chair-walnut-brown",
+      "productUrl": "https://polyandbark.com/products/arlo-leather-dining-chair-walnut-brown",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/DI-107-BNWL.jpg?v=1788938121",
+      "r2Key": "catalog/Poly___Bark/15773871964233/source.jpg",
+      "category": "dining chairs",
+      "bucket": "seating",
+      "bboxMeters": {
+        "w": 0.4508,
+        "h": 0.8065,
+        "d": 0.508
+      },
+      "measure": {
+        "method": "extracted",
+        "confidence": 0.75
+      },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
+      "extractedFrom": "body_html",
+      "via": "api",
+      "source": "catalog",
+      "bytes": 49948
+    },
+    {
+      "productId": "15523039445065",
+      "merchant": "Poly___Bark",
+      "title": "Arcade Nightstand | English Walnut",
+      "handle": "arcade-nightstand-english-walnut",
+      "productUrl": "https://polyandbark.com/products/arcade-nightstand-english-walnut",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/BD-G965-WAL1.jpg?v=1776208910",
+      "r2Key": "catalog/Poly___Bark/15523039445065/source.jpg",
+      "category": "night stands",
+      "bucket": "surface",
+      "bboxMeters": {
+        "w": 0.6667,
+        "h": 0.5715,
+        "d": 0.4572
+      },
+      "measure": {
+        "method": "extracted",
+        "confidence": 0.75
+      },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
+      "extractedFrom": "body_html",
+      "via": "api",
+      "source": "catalog",
+      "bytes": 100512
+    },
+    {
+      "productId": "9304001347806",
+      "merchant": "InStyle_Home__CA",
+      "title": "Draga Sofa with Reversible Chaise & Bed & Storage",
+      "handle": "draga-sofa-with-reversible-chaise-bed-storage",
+      "productUrl": "https://instylehome.ca/products/draga-sofa-with-reversible-chaise-bed-storage",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/0262/8947/1541/files/700-562BG.jpg?v=1786207261",
+      "r2Key": "catalog/InStyle_Home__CA/9304001347806/source.jpg",
+      "category": null,
+      "bucket": "storage",
+      "bboxMeters": {
+        "w": 2.3685,
+        "h": 0.9525,
+        "d": 1.5684
+      },
+      "measure": {
+        "method": "extracted",
+        "confidence": 0.488
+      },
+      "validation": {
+        "flags": [
+          "prior_mismatch"
+        ],
+        "unverified": true
+      },
+      "extractedFrom": "body_html",
+      "via": "api",
+      "source": "catalog",
+      "bytes": 162908
+    },
+    {
+      "productId": "9299128877289",
+      "merchant": "Kohara___Co__CA_lighting",
+      "title": "Lelevelle- Economy Series Transformer (60W or 150W)",
+      "handle": "lelevelle-economy-series-transformer-60w-or-150w",
+      "productUrl": "https://koharaco.com/products/lelevelle-economy-series-transformer-60w-or-150w",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/0529/4591/1968/files/2020-09-2109.36.36-1.jpg?v=1780600623",
+      "r2Key": "catalog/Kohara___Co__CA_lighting/9299128877289/source.jpg",
+      "category": "landscape lighting",
+      "bucket": "lighting",
+      "bboxMeters": {
+        "w": 0.1727,
+        "h": 0.0914,
+        "d": 0.0914
+      },
+      "measure": {
+        "method": "extracted",
+        "confidence": 0.488
+      },
+      "validation": {
+        "flags": [
+          "prior_mismatch"
+        ],
+        "unverified": true
+      },
+      "extractedFrom": "body_html",
+      "via": "api",
+      "source": "catalog"
+    },
+    {
+      "productId": "9346772566238",
+      "merchant": "InStyle_Home__CA",
+      "title": "Gia King Bed - Whitewash",
+      "handle": "gia-king-bed-whitewash-gia001kb-ww",
+      "productUrl": "https://instylehome.ca/products/gia-king-bed-whitewash-gia001kb-ww",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/0262/8947/1541/files/GIA001KB-WW.jpg?v=1789838033",
+      "r2Key": "catalog/InStyle_Home__CA/9346772566238/source.jpg",
+      "category": null,
+      "bucket": null,
+      "bboxMeters": {
+        "w": 2.1158,
+        "h": 1.1049,
+        "d": 2.159
+      },
+      "measure": {
+        "method": "extracted",
+        "confidence": 0.75
+      },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
+      "extractedFrom": "body_html",
+      "via": "api",
+      "source": "catalog",
+      "bytes": 48633
+    },
+    {
+      "productId": "15701729771593",
+      "merchant": "Poly___Bark",
+      "title": "Davos 122\" Modular 3-Piece Sofa | Sable Brown",
+      "handle": "davos-122-modular-3-piece-sofa-sable-brown",
+      "productUrl": "https://polyandbark.com/products/davos-122-modular-3-piece-sofa-sable-brown",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/LR-MS4-2-SAB.jpg?v=1787897868",
+      "r2Key": "catalog/Poly___Bark/15701729771593/source.jpg",
+      "category": "modular sofas",
+      "bucket": "seating",
+      "bboxMeters": {
+        "w": 3.048,
+        "h": 0.889,
+        "d": 1.016
+      },
+      "measure": {
+        "method": "extracted",
+        "confidence": 0.75
+      },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
+      "extractedFrom": "body_html",
+      "via": "api",
+      "source": "catalog",
+      "bytes": 56590
+    },
+    {
+      "productId": "15518432067657",
+      "merchant": "Poly___Bark",
+      "title": "Flascio Nightstand | Walnut",
+      "handle": "flascio-nightstand-walnut",
+      "productUrl": "https://polyandbark.com/products/flascio-nightstand-walnut",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/1150/6518/files/BD-H055-WAL.jpg?v=1775243272",
+      "r2Key": "catalog/Poly___Bark/15518432067657/source.jpg",
+      "category": "night stands",
+      "bucket": "surface",
+      "bboxMeters": {
+        "w": 0.6604,
+        "h": 0.5651,
+        "d": 0.4572
+      },
+      "measure": {
+        "method": "extracted",
+        "confidence": 0.75
+      },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
+      "extractedFrom": "body_html",
+      "via": "api",
+      "source": "catalog",
+      "bytes": 94603
+    },
+    {
+      "productId": "9304001085662",
+      "merchant": "InStyle_Home__CA",
+      "title": "Aniza 54\" Double Platform Bed with Drawer",
+      "handle": "aniza-54-double-platform-bed-with-drawer",
+      "productUrl": "https://instylehome.ca/products/aniza-54-double-platform-bed-with-drawer",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/0262/8947/1541/files/101-156D-BRN.jpg?v=1786207245",
+      "r2Key": "catalog/InStyle_Home__CA/9304001085662/source.jpg",
+      "category": null,
+      "bucket": "storage",
+      "bboxMeters": {
+        "w": 2.1018,
+        "h": 1.2891,
+        "d": 1.4414
+      },
+      "measure": {
+        "method": "extracted",
+        "confidence": 0.488
+      },
+      "validation": {
+        "flags": [
+          "prior_mismatch"
+        ],
+        "unverified": true
+      },
+      "extractedFrom": "body_html",
+      "via": "api",
+      "source": "catalog",
+      "bytes": 123043
+    },
+    {
+      "productId": "9299127927017",
+      "merchant": "Kohara___Co__CA_lighting",
+      "title": "Lelevelle- Professional Series Transformer (150W or 300W)",
+      "handle": "lelevelle-professional-series-transformer-150w-or-300w",
+      "productUrl": "https://koharaco.com/products/lelevelle-professional-series-transformer-150w-or-300w",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/0529/4591/1968/files/FUSION-Transformer_1ee78655-0a22-4d08-a864-855f9781d149.jpg?v=1780600432",
+      "r2Key": "catalog/Kohara___Co__CA_lighting/9299127927017/source.jpg",
+      "category": "landscape lighting",
+      "bucket": "lighting",
+      "bboxMeters": {
+        "w": 0.2667,
+        "h": 0.127,
+        "d": 0.143
+      },
+      "measure": {
+        "method": "extracted",
+        "confidence": 0.488
+      },
+      "validation": {
+        "flags": [
+          "prior_mismatch"
+        ],
+        "unverified": true
+      },
+      "extractedFrom": "body_html",
+      "via": "api",
+      "source": "catalog"
+    },
+    {
+      "productId": "9316326572254",
+      "merchant": "InStyle_Home__CA",
+      "title": "Emberrest Queen Size Bed",
+      "handle": "emberrest-queen-size-bed",
+      "productUrl": "https://instylehome.ca/products/emberrest-queen-size-bed",
+      "imageUrl": "https://cdn.shopify.com/s/files/1/0262/8947/1541/files/104614_8f372dc1-1277-463d-85f5-737bb0411120.jpg?v=1787434126",
+      "r2Key": "catalog/InStyle_Home__CA/9316326572254/source.jpg",
+      "category": null,
+      "bucket": null,
+      "bboxMeters": {
+        "w": 1.8415,
+        "h": 1.0846,
+        "d": 2.3495
+      },
+      "measure": {
+        "method": "extracted",
+        "confidence": 0.75
+      },
+      "validation": {
+        "flags": [],
+        "unverified": false
+      },
+      "extractedFrom": "body_html",
+      "via": "api",
+      "source": "catalog",
+      "bytes": 56864
     }
   ]
 }
