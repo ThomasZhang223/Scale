@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Bring up the laptop half of the stack: the three local services, then a quick tunnel to
-# each, then publish the three tunnel origins to the Worker's CONFIG KV. See infra/README.md
+# Bring up the laptop half of the stack: the four local services, then a quick tunnel to
+# each, then publish the four tunnel origins to the Worker's CONFIG KV. See infra/README.md
 # for the full picture — this script is the laptop side of one hop in it.
 #
 # Every phase fails loud. Nothing here guesses a URL or falls back to localhost — an unset
@@ -51,6 +51,11 @@ preflight() {
   if [ -z "${SEARCH_PORT:-}" ]; then die "SEARCH_PORT is unset in infra/.env."; fi
   if [ -z "${INGEST_PORT:-}" ]; then die "INGEST_PORT is unset in infra/.env."; fi
 
+  # Explicit ports must agree with Compose, including existing local .env files.
+  if [ "$SEARCH_PORT" != "8005" ]; then die "Set SEARCH_PORT=8005; embeddings now use 8004."; fi
+  EMBEDDING_PORT=8004
+  if [ -z "${EMBEDDING_API_KEY:-}" ]; then die "Set EMBEDDING_API_KEY in infra/.env (also a Worker secret)."; fi
+
   # `npx wrangler`, not bare `wrangler`. This project installs wrangler as a devDependency of
   # workers/, so it is never on PATH — the preflight rejected a perfectly working setup.
   # infra/cloudflare/set-upstreams.sh, which this script calls, already uses npx.
@@ -82,12 +87,12 @@ preflight() {
 # Phase 2: containers
 # ---------------------------------------------------------------------------
 wait_for_health() {
-  local name="$1" port="$2" tries=0
-  echo "waiting for $name (:$port) /health..."
-  until curl -sf "http://localhost:$port/health" >/dev/null 2>&1; do
+  local name="$1" port="$2" path="${3:-health}" max_tries="${4:-$HEALTH_TIMEOUT_TRIES}" tries=0
+  echo "waiting for $name (:$port) /$path..."
+  until curl -sf "http://localhost:$port/$path" >/dev/null 2>&1; do
     tries=$((tries + 1))
-    if [ "$tries" -ge "$HEALTH_TIMEOUT_TRIES" ]; then
-      die "$name never answered /health on :$port. Check: docker compose logs $name"
+    if [ "$tries" -ge "$max_tries" ]; then
+      die "$name never answered /$path on :$port. Check: docker compose logs $name"
     fi
     sleep 2
   done
@@ -102,6 +107,7 @@ containers() {
   # keeps a no-op re-run fast.
   ( cd "$REPO_ROOT" && docker compose --profile local up -d --build )
 
+  wait_for_health embedding "$EMBEDDING_PORT" ready 90
   wait_for_health fit "$FIT_PORT"
   wait_for_health search "$SEARCH_PORT"
   wait_for_health ingest "$INGEST_PORT"
@@ -115,7 +121,7 @@ cleanup_partial_tunnels() {
   local status=$?
   if [ "$status" -ne 0 ]; then
     echo "tunnels phase failed — stopping anything it started so nothing is left running" >&2
-    for name in fit search ingest; do
+    for name in fit search ingest embedding; do
       if [ -f "$RUN_DIR/$name.pid" ]; then
         kill "$(cat "$RUN_DIR/$name.pid")" 2>/dev/null || true
         rm -f "$RUN_DIR/$name.pid" "$RUN_DIR/$name.url"
@@ -154,10 +160,11 @@ tunnels() {
   mkdir -p "$RUN_DIR"
 
   # Scoped to this phase only: if fit's tunnel comes up but search's times out, both should
-  # be torn down rather than left as a half-published set. Cleared once all three are up, so
+  # be torn down rather than left as a half-published set. Cleared once all four are up, so
   # a later phase failing (publish, below) does not tear down tunnels that are working fine —
   # they stay live and testable even if the Worker side isn't ready yet.
   trap cleanup_partial_tunnels EXIT
+  start_tunnel embedding "$EMBEDDING_PORT"
   start_tunnel fit "$FIT_PORT"
   start_tunnel search "$SEARCH_PORT"
   start_tunnel ingest "$INGEST_PORT"
@@ -175,7 +182,7 @@ publish() {
   if [ ! -f "$SET_UPSTREAMS" ]; then
     die "infra/cloudflare/set-upstreams.sh not found. The Cloudflare panel ships this on
 branch thomas/cloudflare-infra — pull it in, then re-run. This script does not reimplement
-it. The three tunnels above are still running; infra/down.sh stops them when you're done."
+it. The four tunnels above are still running; infra/down.sh stops them when you're done."
   fi
   if [ ! -x "$SET_UPSTREAMS" ]; then
     die "infra/cloudflare/set-upstreams.sh exists but is not executable. chmod +x it and re-run."
@@ -186,11 +193,8 @@ it. The three tunnels above are still running; infra/down.sh stops them when you
   search_url="$(cat "$RUN_DIR/search.url")"
   ingest_url="$(cat "$RUN_DIR/ingest.url")"
 
-  # Positional order matches the three CONFIG KV keys: upstream:solver (fit), upstream:search,
-  # upstream:ingest. This calling convention is assumed, not confirmed with the Cloudflare
-  # panel, because the script does not exist yet — see infra/README.md, "Contract additions,
-  # proposed." If the real script takes a different signature, this is the one line to change.
-  "$SET_UPSTREAMS" "$fit_url" "$search_url" "$ingest_url"
+  # Optional fourth argument publishes upstream:embedding.
+  "$SET_UPSTREAMS" "$fit_url" "$search_url" "$ingest_url" "$(cat "$RUN_DIR/embedding.url")"
 
   echo "publish OK"
 }
@@ -203,6 +207,7 @@ print_summary() {
   echo "fit    (upstream:solver)  -> $(cat "$RUN_DIR/fit.url")"
   echo "search (upstream:search)  -> $(cat "$RUN_DIR/search.url")"
   echo "ingest (upstream:ingest)  -> $(cat "$RUN_DIR/ingest.url")"
+  echo "embedding (upstream:embedding) -> $(cat "$RUN_DIR/embedding.url")"
   echo "Worker: $WORKER_BASE_URL"
   echo
   echo "One-line health check, no token needed, through the tunnel:"
