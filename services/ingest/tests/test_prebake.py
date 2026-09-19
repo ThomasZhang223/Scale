@@ -209,6 +209,44 @@ def test_image_width_is_requested_from_the_cdn():
     assert bp.sized("https://cdn.shopify.com/x.jpg", None) == "https://cdn.shopify.com/x.jpg"
 
 
+def test_llm_and_vlm_without_a_key_refuse_rather_than_skipping():
+    """Same reason as --browserbase: a quietly smaller manifest looks exactly like the
+    merchants having no dimensions."""
+    srv, base = serve()
+    tmp = tempfile.mkdtemp()
+    v = os.path.join(tmp, "v.json")
+    with open(v, "w") as f:
+        json.dump({"merchants": [{"name": "X", "storefrontBaseUrl": base,
+                                  "productsJsonVerified": True}]}, f)
+    env = {k: val for k, val in os.environ.items()
+           if k not in ("OPENAI_API_KEY", "OPENAI_MODEL")}
+    try:
+        for flag in ("--llm", "--vlm"):
+            r = subprocess.run([sys.executable, "build_prebake.py", v, "--out", tmp, flag],
+                               cwd=ROOT, capture_output=True, text=True, env=env)
+            assert r.returncode != 0, flag
+            assert "OPENAI_API_KEY" in r.stderr, flag
+    finally:
+        srv.shutdown()
+
+
+def test_the_manifest_reports_which_source_each_row_came_from():
+    m, _ = run_cli(limit="12")
+    assert m["byVia"]["api"] == 12
+    assert m["byVia"]["llm"] == 0 and m["byVia"]["vlm"] == 0
+    assert m["ai"] is None, "no ai stats when neither pass ran"
+
+
+def test_every_row_carries_its_validation_verdict():
+    """The CLI used to take hit.confidence raw while /extract validated — two pipelines, one
+    of them quietly worse."""
+    m, _ = run_cli(limit="12")
+    for r in m["products"]:
+        assert "validation" in r, r["title"]
+        assert isinstance(r["validation"]["unverified"], bool)
+        assert 0.0 <= r["measure"]["confidence"] <= 1.0
+
+
 def test_a_rerun_prunes_the_previous_runs_images():
     """Product ids differ between runs, so without pruning every re-run leaves its
     predecessor's images behind — 142 files for a 100-product manifest."""

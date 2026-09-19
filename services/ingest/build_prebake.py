@@ -26,9 +26,11 @@ from urllib.parse import urlparse
 
 import httpx
 
+from app.ai_extract import OpenAIConfig, extract_with_llm, extract_with_vlm
 from app.browserbase import BrowserbaseFetch, CachedFetch, FetchError
 from app.dimensions import extract
 from app.page_extract import extract_from_page, product_url
+from app.validate import validate
 from verify_merchants import USER_AGENT, REQUEST_DELAY_S, bucket_for, DEMO_CATEGORIES
 
 
@@ -63,7 +65,21 @@ def pull_catalogue(client: httpx.Client, base: str, pages: int = 2) -> list[dict
     return products
 
 
-def _row(merchant: str, base: str, p: dict, bbox: dict, confidence: float,
+def _accept(merchant: str, base: str, p: dict, hit, image: str, via: str) -> dict | None:
+    """Steps 4 and 5 for one hit, from whichever source — the same gate the service applies.
+    Taking `hit.confidence` raw, as this script used to, meant the CLI had no validation at
+    all while /extract did: two pipelines, one of them quietly worse."""
+    bbox = hit.as_bbox() if hit else None
+    if not bbox:
+        return None
+    v = validate(bbox, category=p.get("product_type"), title=p.get("title") or "",
+                 source_field=hit.source_field)
+    if not v.ok:
+        return None
+    return _row(merchant, base, p, bbox, v, image, hit.source_field, via)
+
+
+def _row(merchant: str, base: str, p: dict, bbox: dict, verdict,
          image: str, extracted_from: str, via: str) -> dict:
     return {
         "productId": str(p.get("id")),
@@ -79,7 +95,8 @@ def _row(merchant: str, base: str, p: dict, bbox: dict, confidence: float,
         # contracts.md allows lidar|extracted|declared, and a page read is still extraction —
         # inventing a fourth value would be a schema change. Which surface it came from is
         # recorded beside it instead.
-        "measure": {"method": "extracted", "confidence": confidence},
+        "measure": {"method": "extracted", "confidence": verdict.confidence},
+        "validation": {"flags": verdict.flags, "unverified": verdict.unverified},
         "extractedFrom": extracted_from,
         # Which pass produced this row. Inferring it from extractedFrom was guesswork — the
         # field names overlap between the API pass and the page pass.
@@ -101,14 +118,47 @@ def candidates_from(merchant: str, base: str, products: list[dict]) -> tuple[lis
         if not images:
             continue  # no picture, no mesh — a page fetch cannot help
         hit = extract(p)
-        bbox = hit.as_bbox() if hit else None
-        if not bbox:
+        if hit is None or hit.as_bbox() is None:
             if p.get("handle"):
                 needs_page.append(p)
             continue
-        out.append(_row(merchant, base, p, bbox, hit.confidence, images[0],
-                        hit.source_field, via="api"))
+        row = _accept(merchant, base, p, hit, images[0], "api")
+        if row is None:
+            continue
+        out.append(row)
     return out, needs_page
+
+
+def enrich_with_llm(merchant: str, base: str, products: list[dict], cfg: OpenAIConfig,
+                    limit: int) -> tuple[list[dict], list[dict]]:
+    """Step 2. Returns (recovered, still_missing) so the caller can hand the rest to 2.5."""
+    recovered, missing = [], []
+    for p in products[:limit]:
+        image = next((i.get("src") for i in (p.get("images") or []) if i.get("src")), None)
+        row = _accept(merchant, base, p, extract_with_llm(p, cfg), image, "llm") if image else None
+        (recovered if row else missing).append(row or p)
+    return [r for r in recovered if r], missing + products[limit:]
+
+
+def enrich_with_vlm(merchant: str, base: str, products: list[dict], cfg: OpenAIConfig,
+                    limit: int, client: httpx.Client) -> list[dict]:
+    """Step 3. Only over what every cheaper source failed, and a spec diagram is rarely the
+    hero shot, so images 2 through 4 are tried rather than the first."""
+    recovered = []
+    for p in products[:limit]:
+        srcs = [i.get("src") for i in (p.get("images") or []) if i.get("src")]
+        for src in srcs[1:4]:
+            try:
+                r = client.get(src)
+                r.raise_for_status()
+            except httpx.HTTPError:
+                continue
+            hit = extract_with_vlm(r.content, r.headers.get("content-type", ""), cfg)
+            row = _accept(merchant, base, p, hit, srcs[0], "vlm")
+            if row:
+                recovered.append(row)
+                break
+    return recovered
 
 
 def enrich_from_pages(merchant: str, base: str, products: list[dict], fetcher,
@@ -130,12 +180,13 @@ def enrich_from_pages(merchant: str, base: str, products: list[dict], fetcher,
             print(f"    fetch failed: {p.get('title', '')[:34]} — {e}", file=sys.stderr)
             continue
         hit = extract_from_page(res.content)
-        bbox = hit.as_bbox() if hit else None
-        if not bbox:
+        if hit is None or hit.as_bbox() is None:
             continue
         image = next(i.get("src") for i in p["images"] if i.get("src"))
-        recovered.append(_row(merchant, base, p, bbox, hit.confidence, image,
-                              hit.source_field, via="page"))
+        row = _accept(merchant, base, p, hit, image, "page")
+        if row is None:
+            continue
+        recovered.append(row)
         stats["recovered"] += 1
     return recovered, stats
 
@@ -213,6 +264,14 @@ def main() -> int:
     ap.add_argument("--download", action="store_true",
                     help="also fetch the images into <out>/catalog/... , mirroring the R2 layout")
     ap.add_argument("--pages", type=int, default=2, help="catalogue pages per merchant")
+    ap.add_argument("--llm", action="store_true",
+                    help="step 2: read dimensions stated as prose. Needs OPENAI_API_KEY and "
+                         "OPENAI_MODEL.")
+    ap.add_argument("--vlm", action="store_true",
+                    help="step 3: read the spec-sheet diagram. The most expensive pass, so it "
+                         "runs only on what every cheaper source failed.")
+    ap.add_argument("--ai-limit", type=int, default=40,
+                    help="products per merchant for steps 2 and 3 (default 40)")
     ap.add_argument("--browserbase", action="store_true",
                     help="step 2.5: for products with an image but no dimensions in "
                          "/products.json, fetch the rendered product page and read them there. "
@@ -241,8 +300,14 @@ def main() -> int:
         except ValueError as e:
             raise SystemExit(f"{e}")  # standing rule 4: do not quietly skip step 2.5
 
+    cfg = OpenAIConfig()
+    if (args.llm or args.vlm) and not cfg.configured:
+        # standing rule 4: skipping quietly would look like the merchants having no dimensions.
+        raise SystemExit("--llm/--vlm need OPENAI_API_KEY and OPENAI_MODEL")
+
     candidates: list[dict] = []
     page_stats = {"attempted": 0, "recovered": 0, "failed": 0}
+    ai_stats = {"llm": 0, "vlm": 0}
     with httpx.Client(headers={"User-Agent": USER_AGENT}, timeout=30, follow_redirects=True) as client:
         for m in merchants:
             name, base = m.get("name") or urlparse(m["storefrontBaseUrl"]).netloc, m["storefrontBaseUrl"]
@@ -257,6 +322,12 @@ def main() -> int:
                   file=sys.stderr)
             candidates.extend(found)
 
+            if args.llm and needs_page:
+                rescued, needs_page = enrich_with_llm(name, base, needs_page, cfg, args.ai_limit)
+                ai_stats["llm"] += len(rescued)
+                candidates.extend(rescued)
+                print(f"  step 2 (llm): recovered {len(rescued)}", file=sys.stderr)
+
             if fetcher is not None and needs_page:
                 print(f"  step 2.5: {len(needs_page)} have an image but no dimensions; "
                       f"fetching up to {args.browserbase_limit} pages", file=sys.stderr)
@@ -268,6 +339,12 @@ def main() -> int:
                 print(f"  step 2.5: recovered {stats['recovered']}/{stats['attempted']} "
                       f"({rate:.0%}), {stats['failed']} fetch failures", file=sys.stderr)
                 candidates.extend(rescued)
+
+            if args.vlm and needs_page:
+                rescued = enrich_with_vlm(name, base, needs_page, cfg, args.ai_limit, client)
+                ai_stats["vlm"] += len(rescued)
+                candidates.extend(rescued)
+                print(f"  step 3 (vlm): recovered {len(rescued)}", file=sys.stderr)
 
         picked = curate(candidates, args.limit)
 
@@ -289,6 +366,9 @@ def main() -> int:
         "imagesDownloaded": downloaded,
         "fromPageFetch": sum(1 for c in picked if c.get("via") == "page"),
         "step2_5": page_stats if args.browserbase else None,
+        "ai": ai_stats if (args.llm or args.vlm) else None,
+        "byVia": {v: sum(1 for c in picked if c.get("via") == v)
+                  for v in ("api", "llm", "page", "vlm")},
         "products": picked,
     }
     path = os.path.join(args.out, "manifest.json")
@@ -303,6 +383,10 @@ def main() -> int:
         print(f"\n  step 2.5: {r}/{a} pages yielded dimensions"
               f"{f' ({r / a:.0%})' if a else ''}, {page_stats['failed']} fetch failures")
         print(f"  cache: {fetcher.hits} hit, {fetcher.misses} fetched")
+    if args.llm or args.vlm:
+        print(f"  steps 2/3: llm recovered {ai_stats['llm']}, vlm recovered {ai_stats['vlm']}")
+    print("  in the final set by source: " +
+          ", ".join(f"{v} {n}" for v, n in manifest["byVia"].items() if n))
     total_bytes = sum(r.get("bytes", 0) for r in picked)
     if total_bytes:
         print(f"\n  images: {total_bytes / 1e6:.1f} MB at width={args.image_width or 'original'}")
