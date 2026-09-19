@@ -97,8 +97,8 @@ const fitOverlay = new FitOverlay();
 scene.add(fitOverlay.group);
 
 const PALETTE_ACTIONS: PaletteItem[] = [
-  { url: '', name: 'Reset room', action: 'reset' },
-  { url: '', name: 'Clear objects', action: 'clear' },
+  { url: '', name: 'Reset room', action: 'reset', section: 'Room' },
+  { url: '', name: 'Clear objects', action: 'clear', destructive: true, section: 'Room' },
 ];
 const ghosts = new Ghosts();
 scene.add(ghosts.group);
@@ -212,8 +212,8 @@ async function start() {
 
   /** The wrist's Designer row: preset tiles, or the agent's status, or the proposal and its buttons. */
   function designerTiles(s: AgentSnapshot): PaletteItem[] {
-    const label = (name: string, severity: 'info' | 'warn' = 'info'): PaletteItem => ({ url: '', name, label: true, severity });
-    const tile = (name: string, action: string, accent = false): PaletteItem => ({ url: '', name, action, accent });
+    const label = (name: string, severity: 'info' | 'warn' = 'info'): PaletteItem => ({ url: '', name, label: true, severity, section: 'Designer' });
+    const tile = (name: string, action: string, accent = false): PaletteItem => ({ url: '', name, action, accent, section: 'Designer' });
     switch (s.state) {
       case 'working':
         return [label(s.status || 'Working…'), ...s.log.slice(-3).map((e) => label(e.message, e.severity))];
@@ -610,7 +610,7 @@ async function start() {
       return say(`${obj.name ?? obj.objectId}: ${(err as Error).message}.`);
     }
     if (catalog.some((c) => c.url === item.url)) return; // the feed can repeat an object
-    const entry: PaletteItem = { url: item.url, name: item.name, scale: 1, objectId: obj.objectId };
+    const entry: PaletteItem = { url: item.url, name: item.name, scale: 1, objectId: obj.objectId, section: 'Furniture' };
     catalog.push(entry);
     showPalette();
     renderCatalog();
@@ -743,7 +743,7 @@ async function start() {
       console.warn('objects.json could not be read:', err);
       return;
     }
-    for (const o of list) catalog.push({ url: o.url, name: o.name ?? o.url.split('/').pop()!, scale: o.scale });
+    for (const o of list) catalog.push({ url: o.url, name: o.name ?? o.url.split('/').pop()!, scale: o.scale, section: 'Furniture' });
     showPalette();
     renderCatalog();
 
