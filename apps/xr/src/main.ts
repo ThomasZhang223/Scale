@@ -188,7 +188,8 @@ async function start() {
       objects.set(obj.id, obj);
       const spot = physics.findFreeSpot(loaded.size, 0, at);
       scene.add(loaded.node);
-      physics.addObject(obj.id, loaded.node, loaded.size, loaded.hull, spot, 0);
+      // Straight onto the floor under the ray, no drop: it's being carried, not delivered.
+      physics.addObject(obj.id, loaded.node, loaded.size, loaded.hull, spot, 0, 0);
       report(obj);
       return obj.id;
     } catch (err) {

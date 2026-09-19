@@ -3,12 +3,14 @@ import type { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js
 import { XRControllerModelFactory } from 'three/examples/jsm/webxr/XRControllerModelFactory.js';
 import type { Physics } from './physics';
 import type { Palette, PaletteItem } from './palette';
+import { Halo } from './halo';
 
 /*
  * Moving scanned objects, in the headset and on the laptop.
  *
  * Quest: point at an object (the ray turns blue), hold the trigger, and it follows your
- * ray across the floor. Thumbstick left/right turns it. Let go and it stays.
+ * ray across the floor. Thumbstick left/right turns it smoothly; A/X and B/Y on either
+ * controller turn it a quarter turn at a time. Let go and it stays.
  * Laptop: drag an object with the mouse; scroll while dragging to turn it.
  *
  * Neither moves objects directly. Both hand physics a target, so walls and other
@@ -18,6 +20,9 @@ import type { Palette, PaletteItem } from './palette';
 const IDLE_RAY = 0xffffff;
 const HOVER_RAY = 0x5fb3ff;
 const TURN_SPEED = 2.2;          // rad/s at full thumbstick
+const TURN_STEP = Math.PI / 2;   // per press of A/X (clockwise) or B/Y (counter-clockwise)
+const BUTTON_AX = 4;             // xr-standard gamepad mapping
+const BUTTON_BY = 5;
 const WHEEL_STEP = Math.PI / 12; // 15° per scroll notch
 const PALETTE_RAY = 0x4cd28a;
 
@@ -33,6 +38,7 @@ interface Hand {
   source?: XRInputSource;
   grab?: Grab;
   pulling?: boolean; // trigger still held while a palette pull is loading
+  pressed: boolean[]; // face buttons last frame, to act once per press
 }
 
 export class Interaction {
@@ -42,6 +48,8 @@ export class Interaction {
   private hit = new THREE.Vector3();
   private mouse = new THREE.Vector2();
   private mouseGrab?: Grab;
+  private mouseHover: string | null = null;
+  private halo = new Halo();
 
   constructor(
     renderer: THREE.WebGLRenderer,
@@ -59,7 +67,9 @@ export class Interaction {
 
   update(dt: number) {
     let overPalette: PaletteItem | null = null;
+    let hoverId: string | null = null;
     for (const hand of this.hands) {
+      this.turnButtons(hand);
       this.raycaster.setFromXRController(hand.controller);
       if (hand.grab) {
         const stick = hand.source?.gamepad?.axes[2] ?? 0;
@@ -69,14 +79,26 @@ export class Interaction {
       }
       const item = this.palette.hitTest(this.raycaster);
       if (item) overPalette = item;
-      const hovering = !item && this.raycaster.intersectObjects(this.physics.pickables(), true).length > 0;
-      (hand.ray.material as THREE.LineBasicMaterial).color.setHex(item ? PALETTE_RAY : hovering ? HOVER_RAY : IDLE_RAY);
+      const over = item ? null : this.hitId();
+      if (over) hoverId = over;
+      (hand.ray.material as THREE.LineBasicMaterial).color.setHex(item ? PALETTE_RAY : over ? HOVER_RAY : IDLE_RAY);
     }
     this.palette.hover(overPalette);
     if (this.mouseGrab) {
       this.raycaster.setFromCamera(this.mouse, this.camera);
       this.follow(this.mouseGrab);
     }
+    // One halo: bright on the held object, dim on whatever a ray or the mouse is over.
+    const held = this.mouseGrab?.id ?? this.hands.find((h) => h.grab)?.grab?.id ?? null;
+    const node = this.physics.nodeOf(held ?? hoverId ?? this.mouseHover ?? '');
+    if (node) this.halo.show(node, held ? 0.85 : 0.35);
+    else this.halo.hide();
+  }
+
+  /** The object under whatever ray the raycaster currently holds. */
+  private hitId(): string | null {
+    const [first] = this.raycaster.intersectObjects(this.physics.pickables(), true);
+    return this.physics.idFromObject(first?.object ?? null);
   }
 
   // ---------- shared ----------
@@ -121,7 +143,7 @@ export class Interaction {
       grip.add(models.createControllerModel(grip));
       scene.add(grip);
 
-      const hand: Hand = { controller, ray };
+      const hand: Hand = { controller, ray, pressed: [] };
       controller.addEventListener('connected', (e) => {
         hand.source = e.data;
         if (e.data.handedness === 'left') this.palette.attachTo(grip);
@@ -140,6 +162,23 @@ export class Interaction {
         hand.grab = undefined;
       });
       this.hands.push(hand);
+    }
+  }
+
+  /**
+   * A/X and B/Y turn the held object a quarter turn per press. Either controller's buttons
+   * work: they act on this hand's object, or on the other hand's if this one is empty.
+   */
+  private turnButtons(hand: Hand) {
+    const buttons = hand.source?.gamepad?.buttons;
+    if (!buttons) return;
+    for (const [index, direction] of [[BUTTON_AX, -1], [BUTTON_BY, 1]] as const) {
+      const down = buttons[index]?.pressed ?? false;
+      if (down && !hand.pressed[index]) {
+        const grab = hand.grab ?? this.hands.find((h) => h !== hand && h.grab)?.grab;
+        if (grab) grab.rotY += direction * TURN_STEP;
+      }
+      hand.pressed[index] = down;
     }
   }
 
@@ -186,8 +225,8 @@ export class Interaction {
       toMouse(e);
       if (this.mouseGrab) return;
       this.raycaster.setFromCamera(this.mouse, this.camera);
-      const over = this.raycaster.intersectObjects(this.physics.pickables(), true).length > 0;
-      canvas.style.cursor = over ? 'grab' : '';
+      this.mouseHover = this.hitId();
+      canvas.style.cursor = this.mouseHover ? 'grab' : '';
     });
 
     const end = () => {
@@ -197,6 +236,7 @@ export class Interaction {
       this.controls.enabled = true;
       canvas.style.cursor = '';
     };
+    canvas.addEventListener('pointerleave', () => (this.mouseHover = null));
     canvas.addEventListener('pointerup', end);
     canvas.addEventListener('pointercancel', end);
 

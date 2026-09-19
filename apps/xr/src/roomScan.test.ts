@@ -89,6 +89,33 @@ test('the raw RoomPlan sample still builds', () => {
   near(built.size.depth, 3.6, 'depth');
 });
 
+test('Rapier: a dragged object follows the pointer directly and stops at the wall', async () => {
+  const built = buildRoomFromScan(fixture);
+  const physics = await createPhysics(new THREE.Scene());
+  physics.setRoom(built);
+  const size = new THREE.Vector3(0.4, 0.4, 0.4);
+  const node = new THREE.Group();
+  physics.addObject('box', node, size, new Float32Array(), { x: 0, z: 1.2 }, 0); // z = 1.2: a clear lane to the east wall
+  for (let i = 0; i < 60; i++) physics.step(1 / 60); // land
+
+  physics.drag('box', 0.5, 1.2, 0);
+  physics.step(1 / 60);
+  near(node.position.x, 0.5, 'reaches the target in one frame, no chase', 1e-3);
+
+  physics.drag('box', 10, 1.2, 0);
+  for (let i = 0; i < 60; i++) physics.step(1 / 60);
+  // East wall: center x = 2, 0.12 thick, so its inner face is x = 1.94.
+  const rightEdge = node.position.x + size.x / 2;
+  near(rightEdge, 1.94, 'stops at the inner wall face', 0.015);
+  near(node.position.z, 1.2, 'no sideways drift', 1e-3);
+  near(node.position.y, 0, 'still on the floor', 0.01);
+
+  physics.release('box');
+  const before = node.position.x;
+  for (let i = 0; i < 120; i++) physics.step(1 / 60);
+  near(node.position.x, before, 'stays put once released', 0.01);
+});
+
 test('Rapier: the detected chair is solid until a scanned object replaces it', async () => {
   const built = buildRoomFromScan(fixture);
   const physics = await createPhysics(new THREE.Scene());

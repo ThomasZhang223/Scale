@@ -12,22 +12,26 @@ import type { BuiltRoom } from './roomScan';
  *   Gravity drops them onto the floor and they push against each other.
  * - Objects stay upright: tipping is locked, turning around the vertical axis is not.
  *   Furniture that falls over in a demo looks broken, not realistic.
- * - Moving an object sets its velocity toward a target instead of teleporting it, so a
- *   dragged chair stops at a wall or shoves another chair instead of passing through.
+ * - A held object goes straight to the pointer every frame, like dragging a window, but
+ *   the move is swept against the room first: it stops at walls and detected furniture
+ *   and slides along them, and shoves other scanned objects out of the way.
  */
 
 const STEP = 1 / 60;
-const DRAG_GAIN = 12;       // how hard a dragged object chases the pointer
-const DRAG_MAX_SPEED = 3;   // m/s
-const TURN_GAIN = 10;
+const SKIN = 0.005; // stop this far short of a wall so the next sweep isn't already touching
+const LIFT = 0.01;  // sweep slightly above the floor so resting on it never counts as a hit
 
 interface Dynamic {
   node: THREE.Object3D;
   body: RAPIER.RigidBody;
   size: THREE.Vector3;
+  shape: RAPIER.Shape;
+  pick: THREE.Mesh; // invisible box the rays hit: easier to point at than thin geometry
   target?: { x: number; z: number; rotY: number };
   debug: THREE.Object3D;
 }
+
+const PICK_MATERIAL = new THREE.MeshBasicMaterial({ visible: false });
 
 export async function createPhysics(scene: THREE.Scene): Promise<Physics> {
   await RAPIER.init();
@@ -171,9 +175,11 @@ export class Physics {
 
     debug.visible = this.debugVisible;
     node.add(debug);
+    const pick = new THREE.Mesh(new THREE.BoxGeometry(size.x, size.y, size.z).translate(0, size.y / 2, 0), PICK_MATERIAL);
+    node.add(pick);
     node.position.set(spot.x, dropHeight, spot.z);
     node.quaternion.copy(rot);
-    this.dynamics.set(id, { node, body, size, debug });
+    this.dynamics.set(id, { node, body, size, shape: shape.shape, pick, debug });
     this.refreshQueries(); // so the next findFreeSpot sees this object
   }
 
@@ -182,6 +188,7 @@ export class Physics {
     if (!d) return;
     this.world.removeRigidBody(d.body);
     d.debug.removeFromParent();
+    d.pick.removeFromParent();
     this.dynamics.delete(id);
   }
 
@@ -213,7 +220,11 @@ export class Physics {
   // ---------- queries for interaction ----------
 
   pickables(): THREE.Object3D[] {
-    return [...this.dynamics.values()].map((d) => d.node);
+    return [...this.dynamics.values()].map((d) => d.pick);
+  }
+
+  nodeOf(id: string): THREE.Object3D | null {
+    return this.dynamics.get(id)?.node ?? null;
   }
 
   idFromObject(obj: THREE.Object3D | null): string | null {
@@ -226,9 +237,9 @@ export class Physics {
   // ---------- per frame ----------
 
   step(dt: number) {
+    this.followTargets();
     this.accumulator = Math.min(this.accumulator + dt, STEP * 5);
     while (this.accumulator >= STEP) {
-      this.applyDrag();
       this.world.step();
       this.accumulator -= STEP;
     }
@@ -249,21 +260,41 @@ export class Physics {
 
   // ---------- internals ----------
 
-  private applyDrag() {
-    for (const [id, d] of this.dynamics) {
+  /**
+   * Moves every held object straight to its target. The move is cast as a shape sweep
+   * against the room (walls, detected furniture; other scanned objects are excluded so
+   * they get pushed instead), stopping at the first hit and sliding the remainder along
+   * the surface, so dragging along a wall feels smooth rather than sticky.
+   */
+  private followTargets() {
+    for (const d of this.dynamics.values()) {
       if (!d.target) continue;
+      const rot = this.quat.setFromAxisAngle(THREE.Object3D.DEFAULT_UP, d.target.rotY);
       const t = d.body.translation();
-      const v = d.body.linvel();
-      let vx = (d.target.x - t.x) * DRAG_GAIN;
-      let vz = (d.target.z - t.z) * DRAG_GAIN;
-      const speed = Math.hypot(vx, vz);
-      if (speed > DRAG_MAX_SPEED) {
-        vx *= DRAG_MAX_SPEED / speed;
-        vz *= DRAG_MAX_SPEED / speed;
+      let dx = d.target.x - t.x;
+      let dz = d.target.z - t.z;
+      for (let pass = 0; pass < 2 && Math.hypot(dx, dz) > 1e-4; pass++) {
+        const from = d.body.collider(0).translation();
+        const hit = this.world.castShape(
+          { x: from.x, y: from.y + LIFT, z: from.z }, rot, { x: dx, y: 0, z: dz }, d.shape,
+          0, 1, false, RAPIER.QueryFilterFlags.EXCLUDE_DYNAMIC, undefined, undefined, d.body,
+        );
+        const fraction = hit ? Math.max(0, hit.time_of_impact - SKIN / Math.hypot(dx, dz)) : 1;
+        t.x += dx * fraction;
+        t.z += dz * fraction;
+        d.body.setTranslation(t, true);
+        if (!hit) break;
+        // Slide what's left along the surface we hit.
+        const rx = dx * (1 - fraction);
+        const rz = dz * (1 - fraction);
+        const along = rx * hit.normal1.x + rz * hit.normal1.z;
+        dx = rx - along * hit.normal1.x;
+        dz = rz - along * hit.normal1.z;
       }
-      d.body.setLinvel({ x: vx, y: v.y, z: vz }, true);
-      const turn = shortestAngle(this.rotationY(id), d.target.rotY);
-      d.body.setAngvel({ x: 0, y: turn * TURN_GAIN, z: 0 }, true);
+      d.body.setRotation(rot, true);
+      const v = d.body.linvel();
+      d.body.setLinvel({ x: 0, y: v.y, z: 0 }, true); // gravity only; no coasting
+      d.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
     }
   }
 
@@ -309,8 +340,4 @@ function toVectors(points: Float32Array): THREE.Vector3[] {
   const out: THREE.Vector3[] = [];
   for (let i = 0; i < points.length; i += 3) out.push(new THREE.Vector3(points[i], points[i + 1], points[i + 2]));
   return out;
-}
-
-function shortestAngle(from: number, to: number) {
-  return Math.atan2(Math.sin(to - from), Math.cos(to - from));
 }
