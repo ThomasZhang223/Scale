@@ -9,6 +9,23 @@ import sys
 PACKAGE = Path(__file__).resolve().parents[1] / "deploy" / "sf3d"
 
 
+def test_model_imports_as_local_generation_package(tmp_path):
+    result = subprocess.run(
+        [sys.executable, "-B", "-c", """
+import sys
+sys.path.insert(0, sys.argv[1])
+from deploy.sf3d.model import model, transport
+from app.generation_io import SF3DProvider
+assert model.decode_request is transport.decode_request
+assert model.artifact_response is transport.artifact_response
+assert model.Model(secrets={})._runtime is None
+assert not any(name in sys.modules for name in ('torch', 'sf3d', 'huggingface_hub'))
+""", str(PACKAGE.parents[1])],
+        cwd=tmp_path, capture_output=True, text=True, timeout=30,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
 def test_model_imports_with_truss_file_loader(tmp_path):
     # The server runs from /app, with the deployed model/ package beneath it.
     # A fresh interpreter avoids test_sf3d_config's cached model.* imports.
