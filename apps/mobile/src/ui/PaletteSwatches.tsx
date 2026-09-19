@@ -1,10 +1,12 @@
 // A row of small colour circles from Object v1's `palette` field (hex
 // strings). Used by the Objects grid tile and the object detail screen.
 //
-// Plain React Native, not @expo/ui: a coloured circle is one View with a
-// backgroundColor and a borderRadius, and @expo/ui has no simpler native
-// primitive for it than that.
-import { View, StyleSheet } from "react-native";
+// Built on @expo/ui's Circle shape, not a plain RN View: this nests inside
+// a SwiftUI HStack/VStack, and a plain RN view cannot — @expo/ui's SwiftUI
+// tree only accepts its own primitives (or RNHostView, its explicit escape
+// hatch) as children, never a bare react-native View.
+import { HStack, Circle } from "@expo/ui/swift-ui";
+import { foregroundStyle, frame } from "@expo/ui/swift-ui/modifiers";
 
 export type PaletteSwatchesProps = {
   colors: string[];
@@ -13,27 +15,10 @@ export type PaletteSwatchesProps = {
 
 export function PaletteSwatches({ colors, size = 16 }: PaletteSwatchesProps) {
   return (
-    <View style={styles.row}>
+    <HStack spacing={6}>
       {colors.map((hex, i) => (
-        <View
-          key={`${hex}-${i}`}
-          style={[
-            styles.swatch,
-            { width: size, height: size, borderRadius: size / 2, backgroundColor: hex },
-          ]}
-        />
+        <Circle key={`${hex}-${i}`} modifiers={[foregroundStyle(hex), frame({ width: size, height: size })]} />
       ))}
-    </View>
+    </HStack>
   );
 }
-
-const styles = StyleSheet.create({
-  row: {
-    flexDirection: "row",
-    gap: 6,
-  },
-  swatch: {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(0,0,0,0.1)",
-  },
-});

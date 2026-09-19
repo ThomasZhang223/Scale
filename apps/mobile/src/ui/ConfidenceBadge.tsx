@@ -3,9 +3,14 @@
 // separate 0-1 confidence float on `measure` instead (contracts.md), so the
 // object detail screen buckets that float into the same three labels
 // before handing it to this component — see toConfidenceLevel below.
-import { Text, View, StyleSheet } from "react-native";
+//
+// Built on @expo/ui's Text + modifiers, not a plain RN View + Text: this
+// nests inside a SwiftUI HStack/VStack (see PaletteSwatches.tsx for why a
+// bare RN view can't).
+import { Text } from "@expo/ui/swift-ui";
+import { background, foregroundStyle, padding, shapes } from "@expo/ui/swift-ui/modifiers";
 
-import { colors, radius, spacing } from "../theme/tokens";
+import { colors } from "../theme/tokens";
 
 export type ConfidenceLevel = "high" | "medium" | "low";
 
@@ -16,30 +21,23 @@ export function toConfidenceLevel(confidence: number): ConfidenceLevel {
 }
 
 const TONE: Record<ConfidenceLevel, { bg: string; fg: string }> = {
-  high: { bg: "rgba(52,199,89,0.16)", fg: "#248a3d" },
-  medium: { bg: "rgba(255,159,10,0.16)", fg: "#a15c00" },
-  low: { bg: "rgba(255,59,48,0.16)", fg: colors.danger },
+  high: { bg: "#d9f2df", fg: "#248a3d" },
+  medium: { bg: "#fdead0", fg: "#a15c00" },
+  low: { bg: "#fbdad8", fg: colors.danger },
 };
 
 export function ConfidenceBadge({ level }: { level: ConfidenceLevel }) {
   const tone = TONE[level];
+  const label = level.charAt(0).toUpperCase() + level.slice(1);
   return (
-    <View style={[styles.badge, { backgroundColor: tone.bg }]}>
-      <Text style={[styles.label, { color: tone.fg }]}>{level}</Text>
-    </View>
+    <Text
+      modifiers={[
+        foregroundStyle(tone.fg),
+        padding({ horizontal: 8, vertical: 2 }),
+        background(tone.bg, shapes.capsule()),
+      ]}
+    >
+      {label}
+    </Text>
   );
 }
-
-const styles = StyleSheet.create({
-  badge: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-    borderRadius: radius.sm,
-    alignSelf: "flex-start",
-  },
-  label: {
-    fontSize: 12,
-    fontWeight: "600",
-    textTransform: "capitalize",
-  },
-});
