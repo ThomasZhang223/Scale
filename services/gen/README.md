@@ -13,9 +13,9 @@ In priority order when they conflict: **dimensional accuracy**, then **fidelity*
 
 - **Accuracy** is the binding — AABB equals `bboxMeters` within 1 mm. Verified with a tape
   measure, never a viewer. See `BINDING.md`.
-- **Fidelity** is whether the mesh reads as the real object at 1:1 in a headset. Levers:
-  multi-view input over single-image, a clean matte before generation, and the UV unwrap and
-  PBR parameters Stable Fast 3D already returns.
+- **Fidelity** is whether the mesh reads as the real object at 1:1 in a headset. Levers: choosing
+  the best clean frame from the scan, a clean matte before generation, and the UV unwrap and PBR
+  parameters Stable Fast 3D already returns.
 - **Latency** is wall clock from last frame to a loadable `glbUrl`, measured on the venue
   network at peak. Keep the endpoint warm. Pre-bake the catalog; exactly one live generation
   happens on stage.
@@ -33,8 +33,9 @@ work as a background job.
 
 ### Two latency tiers, one `tier` parameter
 
-- **`live`** — Stable Fast 3D. Sub-second on an A100, ~6 GB VRAM, MIT licence, gives UV unwrap and
-  PBR parameters. Used for the single on-stage generation during the demo.
+- **`live`** — Stable Fast 3D. Receives one best clean image; sub-second on an A100, ~6 GB VRAM,
+  Stability AI Community License, gives UV unwrap and PBR parameters. Used for the single
+  on-stage generation during the demo.
 - **`quality`** — TRELLIS 2 or Hunyuan3D Pro. Slower, better mesh quality. Used for the offline
   pre-baked catalog (60–100 products) and async upgrades.
 
@@ -61,8 +62,8 @@ objects. A MacBook is a good demo object: matte, rectangular, solid. A water bot
 adversarial case. Test twenty random objects on Friday so the failure boundary is known in
 advance, not discovered on stage.
 
-Multi-view input beats single-image — a phone sweep gives four good frames for free, so use them
-when available instead of forcing single-image generation.
+A phone sweep gives multiple candidate frames. Use all useful frames for SigLIP2 retrieval, but
+select one best clean frame for Stable Fast 3D; do not send it a multi-view set.
 
 If a generation is likely to be bad (object in the known failure set, low frame count), say so in
 the response rather than silently returning a bad mesh.
@@ -93,5 +94,5 @@ services/gen/
     bgremove/         background removal, before generation
     baseten/          Baseten client, both tiers behind `tier`
     binding/          the scale binding — sole owner, see BINDING.md
-    embedding/        CLIP ViT-L/14 embeddings, caption, palette
+    embedding/        SigLIP2 embeddings, caption, palette
 ```

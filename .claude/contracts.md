@@ -232,7 +232,7 @@ jobs(id TEXT PK, object_id, kind, tier, state, progress_pct, error, created_at, 
 
 ### Vectorize index `objects-v1`
 
-768 dimensions, cosine metric, from CLIP ViT-L/14 image embeddings. Filterable metadata, integers in millimetres so numeric range filters work:
+768 dimensions, cosine metric, from `google/siglip2-base-patch16-224` embeddings. Filterable metadata, integers in millimetres so numeric range filters work:
 
 ```
 objectId, source, category, w_mm, h_mm, d_mm, dominant_hex
