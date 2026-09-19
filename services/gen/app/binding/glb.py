@@ -1,7 +1,7 @@
 """Bounded static GLB codec. Keep original visual records/binary data losslessly.
 
 This deliberately supports a strict glTF subset, not an arbitrary scene converter.
-Unsupported deformation/compression/tangent-space features fail closed.
+Unsupported deformation/compression features fail closed.
 """
 import copy
 import io
@@ -166,9 +166,7 @@ def instances(doc):
 def primitive_arrays(doc, binary, primitive):
     require(primitive.get("mode", 4) == 4, "Only triangles supported")
     attrs = primitive.get("attributes", {})
-    if "TANGENT" in attrs:
-        raise UnsupportedMesh("Tangent-space preservation is not verified; refusing TANGENT")
-    require(set(attrs) <= {"POSITION", "NORMAL", "TEXCOORD_0", "TEXCOORD_1", "COLOR_0"}, "Unsupported vertex attribute")
+    require(set(attrs) <= {"POSITION", "NORMAL", "TANGENT", "TEXCOORD_0", "TEXCOORD_1", "COLOR_0"}, "Unsupported vertex attribute")
     vertices = accessor(doc, binary, attrs.get("POSITION"))
     require(vertices.shape[1] == 3 and vertices.dtype.kind == "f", "Invalid positions")
     indices = accessor(doc, binary, primitive["indices"]) if "indices" in primitive else np.arange(len(vertices), dtype=np.uint32)[:, None]
@@ -184,6 +182,13 @@ def primitive_arrays(doc, binary, primitive):
         if key == "NORMAL":
             require(data.shape[1] == 3 and data.dtype.kind == "f"
                     and np.all(np.abs(np.linalg.norm(data, axis=1)-1) <= 1e-4), "Invalid normals")
+        if key == "TANGENT":
+            if data.shape[1] != 4 or data.dtype.kind != "f":
+                raise UnsupportedMesh("Invalid TANGENT accessor: expected float VEC4")
+            require(np.all(np.abs(np.linalg.norm(data[:, :3], axis=1)-1) <= 1e-4)
+                    and np.all(np.abs(data[:, 3]) == 1), "Invalid tangent length/handedness")
+            require("NORMAL" in attrs and "TEXCOORD_0" in attrs,
+                    "Tangent reconstruction requires normals and UV0")
         if key.startswith("TEXCOORD"):
             require(data.shape[1] == 2 and data.dtype.kind == "f", "Invalid UVs")
         if key == "COLOR_0":
@@ -231,7 +236,11 @@ def validate_features(doc, binary):
         if "sampler" in texture: record(doc.get("samplers", []), texture["sampler"])
     for material in doc.get("materials", []):
         if "normalTexture" in material:
-            raise UnsupportedMesh("Normal-map tangent basis under nonuniform scale is unverified")
+            normal = material["normalTexture"]
+            if normal.get("texCoord", 0) != 0:
+                raise UnsupportedMesh("Normal-map tangent reconstruction requires UV0")
+            scale = normal.get("scale", 1)
+            require(type(scale) in (int, float) and np.isfinite(scale), "Invalid normal-map scale")
         def textures(value):
             if isinstance(value, dict):
                 for key, child in value.items():
