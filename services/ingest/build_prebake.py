@@ -353,6 +353,10 @@ def main() -> int:
                     help="products PER MERCHANT for steps 2 and 3 (default 40). With ten "
                          "merchants this is 400 products, not 40 — step 3 spends up to three "
                          "calls on each, so it sets the runtime more than any other flag.")
+    ap.add_argument("--only", metavar="NAME",
+                    help="run just the merchants whose name contains this (comma-separated "
+                         "for several, case-insensitive). The way to test a change without "
+                         "paying for all ten: --only floyd --ai-limit 5.")
     ap.add_argument("--ai-concurrency", type=int, default=DEFAULT_AI_CONCURRENCY,
                     help=f"parallel API calls for steps 2 and 3 (default "
                          f"{DEFAULT_AI_CONCURRENCY}). 1 restores the old serial behaviour.")
@@ -374,6 +378,22 @@ def main() -> int:
     merchants = [m for m in data.get("merchants", []) if m.get("productsJsonVerified")]
     if not merchants:
         raise SystemExit(f"{args.verified} lists no verified merchants")  # standing rule 4
+
+    if args.only:
+        wanted = [s.strip().lower() for s in args.only.split(",") if s.strip()]
+        merchants = [m for m in merchants
+                     if any(w in (m.get("name") or "").lower() for w in wanted)]
+        # Standing rule 4: a filter that matches nothing is an error, never a quiet full run.
+        # Silently ignoring a typo here would run all ten merchants and the bill would arrive
+        # before the surprise did.
+        if not merchants:
+            names = [m.get("name") for m
+                     in data.get("merchants", []) if m.get("productsJsonVerified")]
+            raise SystemExit(
+                f"--only {args.only!r} matched no verified merchant.\nAvailable: "
+                + ", ".join(repr(n) for n in names))
+        print(f"--only: {len(merchants)} merchant(s): "
+              + ", ".join(m.get("name") for m in merchants), file=sys.stderr)
 
     os.makedirs(args.out, exist_ok=True)
 

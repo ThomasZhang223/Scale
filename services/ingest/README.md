@@ -263,6 +263,35 @@ Rescued rows carry `extractedFrom` (`json_ld`, `spec_block` or `page_text`) so y
 which surface paid off. `measure.method` stays `"extracted"` — a page read is still extraction,
 and inventing a fourth enum value would be a schema change.
 
+### Testing a change without paying for ten merchants
+
+`--only` runs a subset, matched case-insensitively against the merchant name:
+
+```
+python3 build_prebake.py merchants.verified.json --only floyd \
+        --ai-limit 5 --browserbase-limit 5 --limit 10 --out /tmp/probe --llm --vlm
+```
+
+That is about 20 API calls instead of 1600, and the pages are already cached from earlier
+runs, so it comes back in well under a minute. `--only floyd,bend` takes several.
+
+An `--only` that matches nothing **exits non-zero and lists the available names** rather than
+falling back to all ten — standing rule 4. A typo that quietly became a full run would deliver
+the bill before the surprise.
+
+Read the step 3 line closely, because three different situations used to print `recovered 0`:
+
+```
+step 3 (vlm): recovered 0 — 12/40 products had a 2nd image, 31 call(s) made, 31 FAILED
+      31 x http_400: {"error":{"code":"invalid_image_format"}}
+```
+
+- `0 call(s) made` — no product had a second image. Step 3 reads images 2-4 on the theory that
+  a spec diagram is rarely the hero shot, so single-image products are skipped. Not a bug.
+- `N FAILED` with a reason — the calls are being rejected. The reason comes from the API.
+- calls made, none failed, still zero — the model looked and found no dimensioned diagram.
+  For most Shopify furniture listings this is the honest answer.
+
 ### Steps 2 and 3: `--llm`, `--vlm`, and what they cost
 
 `--ai-limit` is **per merchant**, not per run. With ten verified merchants the default of 40

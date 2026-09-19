@@ -273,6 +273,46 @@ def test_a_verified_file_with_no_merchants_fails_loudly():
     assert r.returncode != 0 and "no verified merchants" in r.stderr
 
 
+def _verified_file(tmp, names):
+    v = os.path.join(tmp, "v.json")
+    with open(v, "w") as f:
+        json.dump({"merchants": [
+            {"name": n, "storefrontBaseUrl": "https://example.invalid",
+             "productsJsonVerified": True} for n in names]}, f)
+    return v
+
+
+def test_only_that_matches_nothing_fails_rather_than_running_everything():
+    """A typo must not quietly become a full ten-merchant run. That bill arrives before the
+    surprise does."""
+    tmp = tempfile.mkdtemp()
+    v = _verified_file(tmp, ["Floyd Home", "Poly & Bark"])
+    r = subprocess.run([sys.executable, "build_prebake.py", v, "--only", "flyod",
+                        "--out", tmp], cwd=ROOT, capture_output=True, text=True)
+    assert r.returncode != 0, "a no-match --only exited 0"
+    assert "matched no verified merchant" in r.stderr
+    # The message has to name what WAS available, or the fix is a guessing game.
+    assert "Floyd Home" in r.stderr and "Poly & Bark" in r.stderr
+
+
+def test_only_selects_by_case_insensitive_substring():
+    tmp = tempfile.mkdtemp()
+    v = _verified_file(tmp, ["Floyd Home", "Poly & Bark", "Bend Goods"])
+    r = subprocess.run([sys.executable, "build_prebake.py", v, "--only", "FLOYD",
+                        "--out", tmp], cwd=ROOT, capture_output=True, text=True)
+    assert "--only: 1 merchant(s): Floyd Home" in r.stderr, r.stderr[:400]
+    assert "Poly & Bark" not in r.stderr.split("--only:")[1][:120]
+
+
+def test_only_takes_several_merchants_comma_separated():
+    tmp = tempfile.mkdtemp()
+    v = _verified_file(tmp, ["Floyd Home", "Poly & Bark", "Bend Goods"])
+    r = subprocess.run([sys.executable, "build_prebake.py", v, "--only", "floyd,bend",
+                        "--out", tmp], cwd=ROOT, capture_output=True, text=True)
+    assert "--only: 2 merchant(s)" in r.stderr, r.stderr[:400]
+    assert "Floyd Home" in r.stderr and "Bend Goods" in r.stderr
+
+
 if __name__ == "__main__":
     fails = 0
     for name, fn in sorted(globals().items()):
