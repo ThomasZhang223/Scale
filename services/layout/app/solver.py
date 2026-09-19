@@ -141,6 +141,10 @@ def solve(request: dict) -> dict:
         lit = m.NewBoolVar(f"rule_{rid}")
         if must:
             assumptions.append((lit, rid))
+        elif r["type"] in ("pin", "against_wall"):
+            # Soft all-or-nothing rules: pay for breaking them, and report it.
+            objective.append(weight * FACING_PENALTY * lit.Not())
+            soft.append({"ruleId": rid, "unmet": lit.Not()})
 
         if r["type"] == "pin":
             m.Add(a.x == a.x0).OnlyEnforceIf(lit)

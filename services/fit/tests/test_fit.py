@@ -116,6 +116,18 @@ class Fit(unittest.TestCase):
         report = fit(ROOM, [p], objects={"obj-a": {"w": 0.5, "h": 0.5, "d": 0.5}})
         self.assertTrue(report["ok"])
 
+    def test_raw_roomplan_room_is_accepted(self):
+        # apps/xr/public/room-scan.json: RoomPlan's own encoding, no schemaVersion, doors/windows
+        # in their own lists, walls 0 thick. Door on the south wall centred at x = 1.5 (raw frame).
+        room = json.load(open(os.path.join(HERE, "..", "..", "..", "apps", "xr", "public", "room-scan.json")))
+        clear = fit(room, [placement("a", -0.5, 0.0, w=0.3, h=0.5, d=0.3)])
+        self.assertEqual(kinds(clear), [])
+        blocked = fit(room, [placement("a", 1.5, 2.2, w=0.3, h=0.5, d=0.3)])
+        self.assertIn("door_swing", kinds(blocked))
+        arc = next(v for v in blocked["violations"] if v["kind"] == "door_swing")["geometry"]
+        self.assertEqual(arc["type"], "arc")
+        self.assertAlmostEqual(arc["radiusM"], 0.9)
+
     def test_wrong_schema_version_fails_loud(self):
         with self.assertRaisesRegex(ValueError, "schemaVersion 2, expected 1 — ask Thomas"):
             fit({**ROOM, "schemaVersion": 2}, [])

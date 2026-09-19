@@ -105,6 +105,17 @@ class Solver(unittest.TestCase):
         self.assertEqual((chair["xCm"], chair["zCm"], chair["rotDeg"]), (140, 30, 270))
         assert_valid(self, req, res)
 
+    def test_03b_soft_pin_is_kept_when_cheap_and_reported_when_broken(self):
+        kept = solve(request([{"id": "r1", "type": "pin", "a": "obj_chair", "priority": "should", "weight": 3}]))
+        self.assertEqual(kept["violated"], [])
+        broken = solve(request([
+            {"id": "r1", "type": "near", "a": "obj_chair", "b": {"point": [-50, -175]}, "maxCm": 100, "priority": "must"},
+            {"id": "r2", "type": "pin", "a": "obj_chair", "priority": "should", "weight": 3},
+        ]))
+        self.assertIn(broken["status"], ("OPTIMAL", "FEASIBLE"))
+        self.assertEqual([v["ruleId"] for v in broken["violated"]], ["r2"])
+        self.assertIs(broken["violated"][0]["amountCm"], True)
+
     def test_04_no_rules_nothing_moves(self):
         res = solve(request([]))
         self.assertEqual(res["status"], "OPTIMAL")

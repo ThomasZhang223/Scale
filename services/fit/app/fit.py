@@ -87,50 +87,73 @@ class Opening:
     swing_deg: float
 
 
+DEFAULT_WALL_THICKNESS_M = 0.1  # RoomPlan reports 0 for walls; RoomCapture v1 measures it
+
+
+def _matrix(t) -> list:
+    """16 floats, column-major: flat, or 4 columns of 4 (Swift's encoder does both)."""
+    flat = [x for col in t for x in col] if t and isinstance(t[0], list) else list(t)
+    if len(flat) != 16:
+        raise ValueError(f"transform has {len(flat)} numbers, not 16")
+    return flat
+
+
+def _dims(d) -> list:
+    return [d["x"], d["y"], d["z"]] if isinstance(d, dict) else list(d)[:3]
+
+
 class Room:
+    """RoomCapture v1 (the contract) or raw RoomPlan CapturedRoom JSON straight from the phone."""
+
     def __init__(self, capture: dict):
-        if capture.get("schemaVersion") != EXPECTED_SCHEMA_VERSION:
-            raise ValueError(
-                f"RoomCapture schemaVersion {capture.get('schemaVersion')}, expected {EXPECTED_SCHEMA_VERSION} — ask Thomas"
-            )
+        version = capture.get("schemaVersion")
+        if version is not None and version != EXPECTED_SCHEMA_VERSION:
+            raise ValueError(f"RoomCapture schemaVersion {version}, expected {EXPECTED_SCHEMA_VERSION} — ask Thomas")
         walls_raw = capture.get("walls") or []
         if not walls_raw:
-            raise ValueError("RoomCapture has no walls; nothing to check against")
-        self.floor_y = min(w["transform"][13] - w["dimensions"][1] / 2 for w in walls_raw)
-        polygon = (capture.get("floor") or {}).get("polygon") or [[w["transform"][12], w["transform"][14]] for w in walls_raw]
+            raise ValueError("the room has no walls; nothing to check against")
+        parsed = [(_matrix(w["transform"]), _dims(w["dimensions"])) for w in walls_raw]
+        self.floor_y = min(m[13] - d[1] / 2 for m, d in parsed)
+        polygon = (capture.get("floor") or {}).get("polygon") or [[m[12], m[14]] for m, _ in parsed]
         self.centroid: Vec = (
             sum(p[0] for p in polygon) / len(polygon),
             sum(p[1] for p in polygon) / len(polygon),
         )
         self.walls: dict[str, Wall] = {}
-        for w in walls_raw:
-            m = w["transform"]
+        for i, (w, (m, d)) in enumerate(zip(walls_raw, parsed)):
+            wall_id = str(w.get("id") or w.get("identifier") or f"wall-{i}")
             center = (m[12], m[14])
             along = norm((m[0], m[2]))
             normal = norm((m[8], m[10]))
             if dot(normal, sub(self.centroid, center)) < 0:
                 normal = (-normal[0], -normal[1])
-            width, _height, thickness = w["dimensions"]
-            self.walls[w["id"]] = Wall(w["id"], center, along, normal, width, thickness)
+            thickness = d[2] if d[2] > 0 else DEFAULT_WALL_THICKNESS_M
+            self.walls[wall_id] = Wall(wall_id, center, along, normal, d[0], thickness)
 
+        raw_openings = [(o, o.get("kind", "opening")) for o in capture.get("openings") or []]
+        raw_openings += [(o, "door") for o in capture.get("doors") or []]
+        raw_openings += [(o, "window") for o in capture.get("windows") or []]
         self.openings: list[Opening] = []
-        for o in capture.get("openings") or []:
-            wall = self.walls.get(o.get("wallId"))
-            if wall is None:
+        for i, (o, kind) in enumerate(raw_openings):
+            m = _matrix(o["transform"])
+            d = _dims(o["dimensions"])
+            center = (m[12], m[14])
+            wall = self.walls.get(o.get("wallId")) if o.get("wallId") else None
+            if wall is None and o.get("wallId"):
                 raise ValueError(f"opening {o.get('id')} references unknown wallId {o.get('wallId')}")
-            m = o["transform"]
-            width, height, _ = o["dimensions"]
+            if wall is None:  # RoomPlan doesn't link openings to walls: take the nearest
+                wall = min(self.walls.values(), key=lambda w: math.hypot(*sub(w.center, center)))
             self.openings.append(
                 Opening(
-                    id=o["id"],
-                    kind=o["kind"],
+                    id=str(o.get("id") or o.get("identifier") or f"{kind}-{i}"),
+                    kind=kind,
                     wall=wall,
-                    center=(m[12], m[14]),
-                    width=width,
-                    height=height,
-                    sill=(m[13] - height / 2) - self.floor_y,
+                    center=center,
+                    width=d[0],
+                    height=d[1],
+                    sill=(m[13] - d[1] / 2) - self.floor_y,
                     hinge_side=o.get("hingeSide", "unknown"),
-                    swing_deg=float(o.get("swingDeg") or 0),
+                    swing_deg=float(o.get("swingDeg") if o.get("swingDeg") is not None else (90 if kind == "door" else 0)),
                 )
             )
 
