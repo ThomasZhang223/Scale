@@ -18,6 +18,7 @@ import offlineProposal from '../../../services/agent/fixtures/pipeline/proposal.
 import { Palette, type PaletteItem } from './palette';
 import { matchDetected } from './placement';
 import roomDemo from '../../../fixtures/room-demo.json';
+import roomLarge from '../public/room-large.json';
 
 /*
  * Stand inside a RoomPlan room scan, with scanned objects (GLBs) in it.
@@ -44,7 +45,10 @@ const params = new URLSearchParams(location.search);
 const SHOW_PANEL = params.get('panel') !== '0';
 const SCAN_URL = params.get('scan'); // null: the committed RoomCapture v1 fixture
 const OBJECTS_URL = params.get('objects') ?? '/objects.json';
-const ROOM_ID = params.get('room') ?? import.meta.env.VITE_ROOM_ID ?? roomDemo.roomId;
+// Without ?room=<id> (or VITE_ROOM_ID) the page shows the local large room, empty of furniture:
+// every object comes from the palette. With one, the room is fetched from the server.
+const SERVER_ROOM_ID: string | null = params.get('room') ?? import.meta.env.VITE_ROOM_ID ?? null;
+const ROOM_ID = SERVER_ROOM_ID ?? roomLarge.roomId;
 const OBJECT_IDS = params.get('object')?.split(',').filter(Boolean) ?? [];
 const VERSION_ID = params.get('version'); // a stored layout to apply after the room loads
 const AGENT_STUB = params.get('agentstub') === '1' || import.meta.env.VITE_AGENT_STUB === '1'; // the agent's fixture timeline
@@ -68,7 +72,7 @@ sun.position.set(3, 6, 2);
 scene.add(sun);
 
 const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.05, 100);
-const SPECTATOR_POSITION = new THREE.Vector3(4, 5, 5.5);
+const SPECTATOR_POSITION = new THREE.Vector3(5.5, 6.5, 7.5); // far enough back for the 6.4 × 4.8 m room
 camera.position.copy(SPECTATOR_POSITION);
 
 const controls = new OrbitControls(camera, renderer.domElement);
@@ -466,7 +470,7 @@ async function start() {
 
   /** Asks the server to check the current layout; under the stub, that's the door-swing fixture. */
   async function checkFit() {
-    if (SCAN_URL) return;
+    if (SCAN_URL || !SERVER_ROOM_ID) return; // the server's stub only knows its own room
     try {
       showFit(await postFit(ROOM_ID));
     } catch (err) {
@@ -642,6 +646,8 @@ async function start() {
     if (SCAN_URL || !currentRoom) return;
     clearTimeout(pushTimer);
     pushTimer = window.setTimeout(async () => {
+      void syncAgentState(); // the agent keeps its own layout history until the server's is real
+      if (!SERVER_ROOM_ID) return;
       const offset = currentRoom!.offset;
       const layout: PlacedLayout[] = [...objects.values()].map((o) => ({
         placementId: o.id,
@@ -658,7 +664,6 @@ async function start() {
         // The stub answers 501 here; once versions are real this becomes the live save.
         console.info('Layout not saved to the server:', (err as Error).message);
       }
-      void syncAgentState(); // the agent keeps its own layout history until the server's is real
     }, 800);
   }
 
@@ -681,6 +686,11 @@ async function start() {
       } catch (err) {
         say(`Couldn’t load ${SCAN_URL}: ${(err as Error).message}. Drop a scan file onto the page instead.`);
       }
+      return;
+    }
+    if (!SERVER_ROOM_ID) {
+      showScan(roomLarge, 'room-large.json');
+      setConnection('file');
       return;
     }
     try {
@@ -736,7 +746,7 @@ async function start() {
   if (VERSION_ID) {
     getVersion(VERSION_ID).then(applyVersion).catch((err) => say(`Version ${VERSION_ID}: ${(err as Error).message}`));
   }
-  if (!SCAN_URL) {
+  if (!SCAN_URL && SERVER_ROOM_ID) {
     watchRoom(ROOM_ID, {
       object: (obj) => void addServerObject(obj),
       version: (v) => void getVersion(v.versionId).then(applyVersion).catch((err) => console.warn('Version event:', err)),
