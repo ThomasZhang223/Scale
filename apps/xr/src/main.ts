@@ -17,6 +17,7 @@ import { Ghosts, type GhostTarget } from './ghosts';
 import offlineProposal from '../../../services/agent/fixtures/pipeline/proposal.json';
 import { Palette, type PaletteItem } from './palette';
 import { matchDetected } from './placement';
+import { Outdoors } from './outdoors';
 import roomDemo from '../../../fixtures/room-demo.json';
 import roomLarge from '../public/room-large.json';
 
@@ -65,18 +66,19 @@ document.body.appendChild(renderer.domElement);
 document.body.appendChild(VRButton.createButton(renderer));
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color('#1d2126');
-scene.add(new THREE.HemisphereLight(0xffffff, 0x3a3f45, 1.3));
+const outdoors = new Outdoors(); // sky, clouds and grass around the room
+scene.add(outdoors.group);
+scene.add(new THREE.HemisphereLight(0xdfefff, 0x4d7a35, 1.2)); // sky above, grass below
 const sun = new THREE.DirectionalLight(0xffffff, 1.4);
 sun.position.set(3, 6, 2);
 scene.add(sun);
 
-const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.05, 100);
-const SPECTATOR_POSITION = new THREE.Vector3(5.5, 6.5, 7.5); // far enough back for the 6.4 × 4.8 m room
+const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.05, 500);
+const SPECTATOR_POSITION = new THREE.Vector3(7.5, 3.6, 9.5); // back from the 6.4 × 4.8 m room, low enough to see the sky
 camera.position.copy(SPECTATOR_POSITION);
 
 const controls = new OrbitControls(camera, renderer.domElement);
-controls.target.set(0, 0.8, 0);
+controls.target.set(0, 1.2, 0);
 controls.enableDamping = true;
 controls.autoRotate = true;
 controls.autoRotateSpeed = 0.4;
@@ -847,6 +849,7 @@ async function start() {
   const clock = new THREE.Clock();
   renderer.setAnimationLoop(() => {
     const dt = Math.min(clock.getDelta(), 0.1);
+    outdoors.update(clock.elapsedTime);
     if (rise < 1) {
       rise = Math.min(1, rise + dt * 1.4);
       room.scale.y = Math.max(0.001, 1 - Math.pow(1 - rise, 3));

@@ -38,7 +38,7 @@
       /* The sidebar: a material sheet holding an inset grouped list. */
       #panel {
         position: absolute; top: 16px; left: 16px; max-height: calc(100% - 32px); width: 336px;
-        padding: 16px; border-radius: 20px; overflow-y: auto; display: grid; gap: 24px; align-content: start;
+        padding: 12px; border-radius: 20px; overflow-y: auto; display: grid; gap: 14px; align-content: start;
         background: rgba(28, 28, 30, 0.78); -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px);
         box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 12px 32px rgba(0, 0, 0, 0.35);
         scrollbar-width: thin; scrollbar-color: var(--fill-primary) transparent;
@@ -47,27 +47,27 @@
       @media (prefers-reduced-transparency: reduce) { #panel { background: var(--bg-cell); backdrop-filter: none; } }
 
       /* Large title + status pill */
-      .titlebar { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 4px 4px 0; }
+      .titlebar { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 2px 4px 0; }
       .titlebar h1 { margin: 0; font-size: 28px; line-height: 34px; font-weight: 700; letter-spacing: 0.36px; }
       #connection { font-size: 13px; line-height: 18px; color: var(--label-secondary); white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
       #connection::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--orange); }
       #connection[data-live="true"]::before { background: var(--green); }
 
       /* Inset grouped sections */
-      section { display: grid; gap: 8px; }
+      section { display: grid; gap: 6px; }
       section > h2 {
-        margin: 0 0 0 16px; font-size: 13px; line-height: 18px; font-weight: 400; letter-spacing: -0.08px;
+        margin: 0 0 0 12px; font-size: 13px; line-height: 18px; font-weight: 400; letter-spacing: -0.08px;
         color: var(--label-secondary);
       }
       .group { background: var(--bg-cell); border-radius: var(--radius-md); overflow: hidden; }
       .group:not(:has(> :not(:empty))) { display: none; } /* nothing in it yet (catalogue, proposal buttons) */
-      .row { display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 8px 16px; }
+      .row { display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 6px 12px; }
       .row + .row { border-top: 0.5px solid var(--separator); }
       .row.text { color: var(--label-secondary); font-size: 13px; line-height: 18px; letter-spacing: -0.08px; padding: 11px 16px; }
       .row.text:empty { display: none; }
       .row.text p { margin: 0; }
       .row .label { flex: 1; }
-      section > .footer { margin: 0 16px; font-size: 13px; line-height: 18px; color: var(--label-secondary); }
+      section > .footer { margin: 0 12px; font-size: 13px; line-height: 18px; color: var(--label-secondary); }
 
       /* Buttons (HIG §8): filled, tinted, gray. Medium 34px; sentence case. */
       button {
@@ -85,7 +85,7 @@
       button.gray { color: var(--label); font-weight: 400; }
       button.destructive { color: var(--red); }
       button.large { min-height: 44px; width: 100%; font-size: 17px; letter-spacing: -0.43px; }
-      .wrap { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 16px; }
+      .wrap { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 12px; }
       .wrap:empty { display: none; }
       .wrap button { min-height: 32px; padding: 5px 12px; font-size: 14px; }
 
@@ -110,14 +110,14 @@
       .switch input:focus-visible + span { outline: 3px solid color-mix(in srgb, var(--accent) 50%, transparent); outline-offset: 2px; }
 
       /* Designer agent */
-      #agent-ask-row { padding: 8px 8px 8px 16px; }
+      #agent-ask-row { padding: 4px 6px 4px 12px; }
       #agent input {
         flex: 1; min-width: 0; font: inherit; letter-spacing: inherit; color: var(--label);
         min-height: 36px; padding: 6px 0; border: 0; background: transparent; outline: none;
       }
       #agent input::placeholder { color: var(--label-tertiary); }
-      #agent-presets { display: grid; gap: 10px; padding: 12px 16px; }
-      #agent-presets .styles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+      #agent-presets { display: grid; gap: 6px; padding: 8px 12px; }
+      #agent-presets .styles { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
       #agent-presets .styles button { width: 100%; }
       #agent-status { color: var(--label-secondary); font-size: 13px; line-height: 18px; }
       #agent-status:empty { display: none; }
@@ -126,20 +126,20 @@
       #agent-status[data-state="failed"], #agent-status[data-state="room_changed"] { color: var(--orange); }
       #agent-buttons:empty { display: none; }
       #agent-log {
-        max-height: 160px; overflow-y: auto; margin: 0 16px 12px; padding: 8px 10px; border-radius: var(--radius-sm);
+        max-height: 160px; overflow-y: auto; margin: 0 12px 8px; padding: 6px 8px; border-radius: var(--radius-sm);
         background: var(--bg-tertiary); font: 12px/16px var(--font-mono); color: var(--label-secondary);
       }
       #agent-log:empty { display: none; }
       #agent-log .warn { color: var(--orange); }
       #agent-log .decision { color: var(--label); }
       #agent-rules summary {
-        list-style: none; cursor: pointer; display: flex; align-items: center; min-height: 44px; padding: 8px 16px; color: var(--label);
+        list-style: none; cursor: pointer; display: flex; align-items: center; min-height: 40px; padding: 6px 12px; color: var(--label);
       }
       #agent-rules summary::-webkit-details-marker { display: none; }
       #agent-rules summary::after { content: "›"; margin-left: auto; color: var(--label-tertiary); font-size: 20px; transition: transform 200ms var(--ease-standard); }
       #agent-rules[open] summary::after { transform: rotate(90deg); }
       #agent-rules table { width: 100%; border-collapse: collapse; font-size: 13px; line-height: 18px; color: var(--label-secondary); }
-      #agent-rules td { padding: 8px 16px; vertical-align: top; border-top: 0.5px solid var(--separator); }
+      #agent-rules td { padding: 6px 12px; vertical-align: top; border-top: 0.5px solid var(--separator); }
       #agent-rules td:first-child { color: var(--label); white-space: nowrap; width: 40%; }
 
       @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: 0.01ms !important; } }
@@ -153,7 +153,6 @@
       </div>
 
       <section>
-        <h2>Room and objects</h2>
         <div class="group">
           <div class="row">
             <button id="open" type="button" class="filled large">Add room or object…</button>
