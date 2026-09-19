@@ -99,8 +99,8 @@ def validate_candidate(config):
     validate_schema_fields(config, schema, schema)
     if config["runtime"]["predict_concurrency"] != 1:
         raise ValueError("Only one generation may run at a time")
-    if config["resources"]["accelerator"] != "L4":
-        raise ValueError("Native kernel build is targeted at L4")
+    if config["resources"] != {"instance_type": "L4:4x16"}:
+        raise ValueError("Exactly one L4 requires the explicit L4:4x16 SKU")
     if config["python_version"] != "py311":
         raise ValueError("Python must match the selected image")
     if config["secrets"] != {"hf_access_token": None}:
@@ -114,6 +114,7 @@ def test_candidate_schema_and_runtime_constraints():
     validate_candidate(config)
     mutations = [("runtime", "predict_concurrency", "1"), ("runtime", "predict_concurrency", 2),
                  ("runtime", "predict_concurency", 1), ("resources", "accelerator", "T4"),
+                 ("resources", "instance_type", "L4:2x24x96"),
                  ("secrets", "hf_access_token", "not-a-real-token")]
     for section, key, value in mutations:
         broken = copy.deepcopy(config)
