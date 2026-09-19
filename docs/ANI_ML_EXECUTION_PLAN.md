@@ -398,7 +398,7 @@ Backend owns durable idempotency keyed by scope/object/image/settings/bbox snaps
 
 ## 8. Sequential implementation prompts
 
-These are **copy-pastable bounded tasks**. B01 packaging is complete; B02 local preparation has begun but cloud execution is blocked on credit coverage; see §10 for evidence. B03–B09 remain unexecuted. B02 is an access gate, not a reason to block independent B03/B04. Each prompt is bounded and stops at its step. New test names/commands below are instructions to **add and run** tests, not claims those tests already exist unless recorded in §10. Run commands from repo root unless a prompt says otherwise; use the step's isolated interpreter. Logs/results must redact secrets and distinguish unit fakes, local real-model checks and live integration.
+These are **copy-pastable bounded tasks**. B01 packaging is complete; B02 local preparation has begun but cloud execution is blocked on credit coverage; see §10 for evidence. B03 is complete for local real-model embeddings; B04–B09 remain unexecuted. B02 is an access gate, not a reason to block independent B03/B04. Each prompt is bounded and stops at its step. New test names/commands below are instructions to **add and run** tests, not claims those tests already exist unless recorded in §10. Run commands from repo root unless a prompt says otherwise; use the step's isolated interpreter. Logs/results must redact secrets and distinguish unit fakes, local real-model checks and live integration.
 
 ### B01 — Prepare the SF3D feasibility package (first action)
 
@@ -860,7 +860,7 @@ Do not require captions/palettes to unlock Paul's baseline. `SiglipModel` is not
 | AUDIT-WEB | COMPLETE for cited public sources; gated card limited | Official text sources fetched; exact revisions/source inspected | SF3D raw HF README 401; no private workspace access | Ani access review before live spike |
 | B01 | COMPLETE (candidate packaging only) | 25 lightweight tests passed; runner help passed; package/config/source evidence below | Actual build, model load and generation UNVERIFIED; live B02 access outstanding | Complete B02 manual access/setup prerequisites |
 | B02 | IN_PROGRESS; cloud execution BLOCKED | Official chair decoded; isolated Truss 0.18.30 installed; real config parser, dependency check and CLI help passed; no generation | Remaining credit coverage and builder rate unconfirmed under USD 3 credits-only authorization | Confirm billing details below before any cloud build |
-| B03 | NOT_STARTED | Source/API verified upstream only | Isolated environment/download approval and one real image | Can proceed independently if B02 blocked |
+| B03 | COMPLETE (local real-model E1) | 35 preprocessing/contract tests + 2 opt-in real-model tests passed; isolated pip check passed; evidence below | None for B03; Docker and production storage integration unverified | Stop at this checkpoint; await the next authorized step |
 | B04 | NOT_STARTED | Existing mesh contract only | Binding dependencies; real mesh for orientation gate | Synthetic software tests then genuine generated mesh |
 | B05 | NOT_STARTED | Proposed records/filter reference | Paul data, Thomas scope/index bridge agreement | Establish payloads before remote mutation |
 | B06 | NOT_STARTED | Proposed lifecycle | B02/B04 + Thomas job/storage/completion seams | Integrate Ani adapter only |
@@ -946,6 +946,56 @@ The preceding pricing read returned **USD 0.01414/minute** for one L4 (24 GiB VR
 **PROPOSED budget/shutdown guard after confirmation:** reserve at least USD 0.50 of the approved USD 3 for shutdown/rounding; stop earlier if estimated total commitments approach USD 2.50, and initiate cleanup by 80 minutes to leave 10 minutes within the 90-minute ceiling. Count builder time at its confirmed rate, plus replica time at the confirmed L4 rate, including loading and idle time; account for any other reported charges. Do not rely on the hourly usage report to stop in real time. Do not submit a retry after an ambiguous timeout. Cancel this test's remaining build/workloads, deactivate its deployment and verify terminal/inactive state. If those conservative bounds cannot be established, remain blocked. These are local controls, not provider guarantees.
 
 **Shutdown status:** no test cloud workloads were created, so none require cancellation/deactivation. Real model load, native build, mesh generation, geometry/texture inspection and cold/warm measurements remain **UNVERIFIED**. B03 has not started.
+
+### B03 execution evidence — 2026-09-19
+
+**VERIFIED_LOCALLY:** real image and text embeddings now work independently of generation, mesh state, Baseten and indexing. This supersedes the historical audit's unproved-embedding status and the preceding B02 log's then-current statement that B03 had not started. Only B03 files were changed; no B02 work or cloud operation was performed.
+
+**Environment and reproducibility.** An isolated managed CPython **3.11.9** environment was created at `C:\Users\hp\AppData\Local\Temp\ani-siglip2-b03\venv` using locally isolated uv **0.6.17**. Global Python 3.13 was not modified. Actual host: Windows build 26200, AMD Ryzen 5 5500U with Radeon Graphics, 6 cores / 12 logical processors. Inference uses CPU float32, eager attention, four torch threads, eval/inference mode and one resident model. `requirements-embedding-win-py311.txt` pins transitive packages and hashes; it was installed with `uv pip sync --require-hashes`. All 41 installed packages passed `uv pip check`; the literal pip check below also returned **No broken requirements found**. The separate hashed Linux runtime lock resolved successfully, but its installation and the Docker image build remain **UNVERIFIED**.
+
+Actual critical wheels: torch **2.6.0+cpu** (`cp311-cp311-win_amd64`), tokenizers **0.21.1** (`cp39-abi3-win_amd64`), sentencepiece **0.2.0**, NumPy **1.26.4**, Pillow **11.1.0** (each `cp311-cp311-win_amd64`). Other candidate pins were retained: Transformers **4.51.3**, huggingface-hub **0.30.2**, safetensors **0.5.3**, FastAPI **0.116.1**, httpx **0.28.1**, uvicorn **0.34.0**, pytest **8.3.5**. See component lockfiles for every resolved package/hash, and `app/embedding/README.md` for installation/download/run commands.
+
+**Actual model and preprocessing.** Public weights and processor/tokenizer assets were downloaded explicitly outside Git; normal startup and tests load cache-only. Model, tokenizer and processor use revision `75de2d55ec2d0b4efc50b3e9ad70dba96a7b2fa2` of `google/siglip2-base-patch16-224`. Resolved classes: **SiglipModel**, **SiglipVisionTransformer**, **SiglipTextTransformer**, **SiglipProcessor**, slow **SiglipImageProcessor**, **GemmaTokenizerFast**. Runtime checks confirm the 224×224 bilinear resize, rescale 1/255, mean/std 0.5, 768-dimensional features and 64-position text context. Tests exercise EXIF orientation, white alpha compositing, RGB conversion, full-frame preprocessing, corrupt/animated/oversized rejection, text trim/lowercase, no BOS, EOS id 1, pad id 0, right padding and truncation to 64 tokens. This checkpoint's tokenizer returns `input_ids` only; the model receives no invented attention-mask input.
+
+Fingerprint: `fc3e942234e223f2853a3087c16ed804755419f3fe953a08be80a9441338327d`. It was identical across the two real-test process loads. It hashes revision, actual asset hashes/classes, runtime versions/platform and preprocessing policy. Image `inputHash` covers original compressed bytes; text `inputHash` covers trimmed/lowercased UTF-8. Cross-platform equivalence is not assumed: Linux may have a different fingerprint and must be validated before sharing an index.
+
+**Input provenance.** Reused `C:\Users\hp\AppData\Local\Temp\ani-sf3d-b02-j14jau_3\chair1.png`: the official upstream example at `https://raw.githubusercontent.com/Stability-AI/stable-fast-3d/ff21fc491b4dc5314bf6734c7c0dabd86b5f5bb2/demo_files/examples/chair1.png`, 512×512 RGBA, 114705 bytes. It is not Ani's phone photo. SHA-256: `2503c12a74419d91a4c6c9f1affc48fee6e2b8b9091956ca6211e91ada57b5bf`. Text input: `a wooden chair`; normalized input SHA-256: `1465ce6555694a530ec197923a53b4e8d7839faa27ed749f1a0b231efbf9bf2e`.
+
+| Real check | Image | Text |
+| --- | --- | --- |
+| Shape / dtype / finite | `(1, 768)` / float32 / yes | `(1, 768)` / float32 / yes |
+| L2 norm | 1.0 | 0.9999999404 |
+| Repeat maximum absolute difference | 0.0 | 0.0 |
+| Different-input maximum absolute difference | 0.2280638 versus synthetic solid red PNG | 0.1291768 versus `a red sports car` |
+| First call / repeat | 0.811 s / 0.527 s | 0.807 s / 0.195 s |
+| In-process authenticated `/embed` call | 0.643 s, matching vector/hash/fingerprint | 0.478 s, matching vector/hash/fingerprint |
+
+Model initialization from cached weights took **14.428 s** on the final run (37.379 s on the earlier run). These are observed local wall-clock samples, with one resident model, sequential requests and no warm-up before the first calls; filesystem cache state was not controlled. Per-call timings include local decoding/tokenization, preprocessing, feature extraction and normalization; HTTP timings include in-process ASGI serialization/handling, **not network transport**. They are neither deployment cold-start measurements nor a p50/p95 latency benchmark. Different-input checks prove nonconstant outputs, not fine-grained retrieval quality or calibrated probabilities.
+
+**Commands and results.** Run from repository root; `$embedPython` below is the isolated interpreter, not global Python:
+
+```powershell
+$embedRoot = 'C:\Users\hp\AppData\Local\Temp\ani-siglip2-b03'
+$embedPython = Join-Path $embedRoot 'venv\Scripts\python.exe'
+$env:PYTHONDONTWRITEBYTECODE = '1'
+& $embedPython -m pytest services/gen/tests/test_embedding_preprocess.py services/gen/tests/test_embedding_contract.py -q -p no:cacheprovider --basetemp (Join-Path $embedRoot ('unit-' + [guid]::NewGuid().ToString('N')))
+python -m pip --isolated --python $embedPython check
+$env:HF_HUB_OFFLINE = '1'
+$env:TRANSFORMERS_OFFLINE = '1'
+$env:ANI_EMBEDDING_REAL = '1'
+$env:EMBEDDING_CACHE_DIR = Join-Path $embedRoot 'models'
+$env:EMBEDDING_TEST_IMAGE = 'C:\Users\hp\AppData\Local\Temp\ani-sf3d-b02-j14jau_3\chair1.png'
+$env:EMBEDDING_TEST_REPORT = Join-Path $embedRoot ('real-' + [guid]::NewGuid().ToString('N') + '.json')
+& $embedPython -m pytest services/gen/tests/test_embedding_real.py -q -s -p no:cacheprovider --basetemp (Join-Path $embedRoot ('real-test-' + [guid]::NewGuid().ToString('N')))
+```
+
+- Preprocessing/contract suite: **35 passed**, 34.23 s. HTTP error/authorization/storage-seam tests use a fake encoder; numerical normalization tests use real tensors without model weights. Neither counts as real-model evidence.
+- Final explicit real-model suite: **2 passed**, 34.17 s. Actual cached weights produced image/text vectors and both passed through authenticated `/embed` using an in-process TestClient.
+- Both suites emitted one Starlette/AnyIO deprecation warning concerning `anyio.abc.BlockingPortal`; no test failure was suppressed.
+- First real attempt: image passed; the text test failed before text inference because the test incorrectly expected a returned `attention_mask`. Inspected actual tokenizer outputs, corrected the test to inspect fast-tokenizer encoding metadata, and reran both real tests successfully. No model substitution or production validation weakening was used.
+- Final complete machine-readable report, including asset hashes, runtime provenance and output-vector hashes: `C:\Users\hp\AppData\Local\Temp\ani-siglip2-b03\real-9fd76ab5cde148b1a698737fe48e5003.json`. Reports, weights and environments remain outside Git.
+
+**Boundary and remaining limits.** `/embed` accepts exactly one image (bounded base64 bytes or an authorized object-key adapter) OR text, and returns `values`, `dimension`, `fingerprint`, `inputHash`, `modality`. It rejects a mismatched expected fingerprint and invalid vectors. Interactive batch size is one; local offline methods allow 1–8. A busy encoder returns 429; no inference queue, mesh gate or index write is introduced. `/health` indicates process liveness; `/ready` indicates model availability. A separate `EMBEDDING_API_KEY` authenticates trusted internal callers. Thomas's principal-aware storage reader remains an injected seam, disabled by default: production `imageKey` integration is **UNVERIFIED**, not silently replaced with arbitrary URL fetching. Network-server deployment, Linux/Docker execution, retrieval evaluation and shared-index integration remain outside this completed B03 check. No B03 blocker remains; stop here.
 
 ## 11. Sources and compact HTN requirements appendix
 

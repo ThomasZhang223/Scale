@@ -4,7 +4,10 @@ Owner: **Ani**. See `.claude/workstreams/ani.md` for the full scope and hour-by-
 `.claude/contracts.md` for the schemas this service reads and writes — that file wins on any
 disagreement with this one.
 
-This is a skeleton only. No generation, binding, or embedding logic is implemented yet.
+B03 implements independent, real image **or** text embeddings through `/embed`.
+See [embedding setup, API and tests](app/embedding/README.md). `/health` is process
+liveness; `/ready` reports model readiness. Generation and binding remain stubs.
+The generation sections below describe planned scope, not current functionality.
 
 ## The three objectives
 
@@ -75,11 +78,13 @@ owns that file — ask him for the entry, do not add it yourself).
 
 ```
 docker build -t services-gen services/gen
-docker run --rm -p 8000:8000 services-gen
+docker run --rm -p 8002:8002 services-gen
 ```
 
-Every endpoint is unimplemented right now and returns HTTP 501 naming the job it belongs to — see
-`app/main.py`.
+The embedding service requires an approved local model cache and internal-service
+token; see its linked README for mount/environment setup. Docker build/run has
+not been validated by the local Windows checks. The remaining generation-stage
+endpoints return HTTP 501 — see `app/main.py`.
 
 ## Layout
 
@@ -90,9 +95,9 @@ services/gen/
   Dockerfile
   requirements.txt
   app/
-    main.py          FastAPI app, job-worker entry points, all 501 for now
+    main.py          FastAPI app; real /embed, remaining job-worker stages 501
     bgremove/         background removal, before generation
     baseten/          Baseten client, both tiers behind `tier`
     binding/          the scale binding — sole owner, see BINDING.md
-    embedding/        SigLIP2 embeddings, caption, palette
+    embedding/        independent SigLIP image/text embeddings (no captions/index writes)
 ```
