@@ -124,7 +124,11 @@ final class RoomCaptureController: NSObject {
     locationManager.stopUpdatingHeading()
     arSession.pause()
 
-    return RoomCaptureSerializer.serialize(capturedRoom, northBearingDeg: northBearingDeg)
+    var json = RoomCaptureSerializer.serialize(capturedRoom, northBearingDeg: northBearingDeg)
+    if let appearance = RoomAppearanceSampler.sample(room: capturedRoom, frames: frameRingBuffer) {
+      json["appearance"] = appearance
+    }
+    return json
   }
 
   private func reportProgress(_ room: CapturedRoom) {

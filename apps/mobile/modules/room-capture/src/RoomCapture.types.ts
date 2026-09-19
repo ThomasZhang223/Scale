@@ -36,6 +36,11 @@ export interface RoomCaptureObject {
   confidence: Confidence;
 }
 
+export interface RoomAppearanceSurface {
+  hex: string;
+  textureUrl: string | null;
+}
+
 export interface RoomCaptureV1 {
   schemaVersion: 1;
   roomId: string;
@@ -46,6 +51,10 @@ export interface RoomCaptureV1 {
   walls: RoomCaptureWall[];
   openings: RoomCaptureOpening[];
   objects: RoomCaptureObject[];
+  // Optional — absent renders exactly as today. Keyed by wallId, plus
+  // "floor" and (only when sampled) "ceiling" — RoomPlan has no ceiling
+  // category, so that key is often absent, not a guessed default.
+  appearance?: { surfaces: Record<string, RoomAppearanceSurface> };
 }
 
 export type RoomCaptureInstruction =

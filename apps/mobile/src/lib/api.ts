@@ -8,6 +8,8 @@
 // base URL"), but the file was never actually committed. This is a fresh
 // write against that same spec, not a port of prior code.
 
+import { File, UploadType } from "expo-file-system";
+
 export const API_BASE = process.env.EXPO_PUBLIC_API_BASE;
 
 const SCHEMA_VERSION = 1;
@@ -89,20 +91,26 @@ export function postJSON<T>(
   );
 }
 
-// `POST /uploads` returns a presigned R2 target. The bytes go straight to R2,
-// never through the Worker — this is the only call in this file that does
-// not touch `API_BASE`.
+// `POST /uploads` returns a presigned R2 target. The bytes go straight to
+// R2, never through the Worker — this is the only function in this file
+// that does not touch `API_BASE`. Takes a local file path rather than a
+// Blob: expo-file-system's File.upload() streams from disk with a plain
+// binary PUT, which is what a presigned R2 URL expects. Reading the file
+// into a Blob first (e.g. via a base64 round-trip) would work too, but
+// wastes memory and a full read-encode-decode pass that File.upload()
+// already avoids.
 export async function putUpload(
+  localFilePath: string,
   putUrl: string,
-  body: Blob | ArrayBuffer,
   contentType: string
 ): Promise<void> {
-  const res = await fetch(putUrl, {
-    method: "PUT",
+  const file = new File(localFilePath);
+  const result = await file.upload(putUrl, {
+    httpMethod: "PUT",
+    uploadType: UploadType.BINARY_CONTENT,
     headers: { "Content-Type": contentType },
-    body,
   });
-  if (!res.ok) {
-    throw new ApiError(`upload -> HTTP ${res.status}`);
+  if (result.status < 200 || result.status >= 300) {
+    throw new ApiError(`upload -> HTTP ${result.status}`);
   }
 }

@@ -69,5 +69,15 @@
       "dimensions": [0.5, 0.9, 0.5],
       "confidence": "medium"
     }
-  ]
+  ],
+  "appearance": {
+    "surfaces": {
+      "838d678c-9de2-4bba-bd25-9e84cf97efb9": { "hex": "#c9c3b8", "textureUrl": null },
+      "df58db2c-43f1-4a8d-ab6d-1d33c088b24f": { "hex": "#c9c3b8", "textureUrl": null },
+      "7016098b-eeef-4d7f-b6bf-8b48c16aa88c": { "hex": "#cfc9be", "textureUrl": null },
+      "51e06902-4fcf-402b-8a2a-b49ee2b9b0e0": { "hex": "#cfc9be", "textureUrl": null },
+      "floor": { "hex": "#8a6a44", "textureUrl": null },
+      "ceiling": { "hex": "#f2f0ec", "textureUrl": null }
+    }
+  }
 }

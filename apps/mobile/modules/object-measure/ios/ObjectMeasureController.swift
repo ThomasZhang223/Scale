@@ -23,6 +23,10 @@ struct ObjectMeasureResult {
   let heightMeters: Float
   let depthMeters: Float
   let yawDeg: Float
+  // World-space centre, in the same ARKit world frame as everything else
+  // this session produces. The native view needs this to place the
+  // wireframe box — bboxMeters alone is a size, not a placement.
+  let centerWorld: SIMD3<Float>
   // The surviving fraction, of the frame closest to the reported median —
   // contracts.md's `measure.confidence`.
   let confidence: Float
@@ -132,6 +136,7 @@ final class ObjectMeasureController: NSObject {
       heightMeters: median.heightMeters,
       depthMeters: median.depthMeters,
       yawDeg: median.yawDeg,
+      centerWorld: median.centerWorld,
       confidence: Float(median.survivingSampleCount) / Float(max(median.totalSampleCount, 1)),
       framePaths: framePaths,
       ambientIntensityLux: light.map { Float($0.ambientIntensity) },

@@ -46,6 +46,7 @@ public final class ObjectMeasureModule: Module {
           "h": result.heightMeters,
           "d": result.depthMeters,
         ],
+        "center": ["x": result.centerWorld.x, "y": result.centerWorld.y, "z": result.centerWorld.z],
         "yawDeg": result.yawDeg,
         "confidence": result.confidence,
         "framePaths": result.framePaths,

@@ -10,6 +10,10 @@ export interface NormalizedTapPoint {
 // filled in later, by the Worker or the user, not by this module.
 export interface ObjectMeasureResult {
   bboxMeters: { w: number; h: number; d: number };
+  // World-space centre, in the ARKit world frame this session ran in. Only
+  // meaningful while that same session (and its ObjectMeasureView) is still
+  // alive — it is not something to store alongside Object v1.
+  center: { x: number; y: number; z: number };
   yawDeg: number;
   // measure.confidence in contracts.md: the surviving-sample fraction.
   confidence: number;

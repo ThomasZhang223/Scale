@@ -34,6 +34,19 @@ deliberately separate `ARSession`s — one wants frames and poses, the other wan
   without it before turning it on — see plan section 12.
 - The floor polygon falls back to a convex hull of wall base points when `CapturedRoom.floors`
   is empty. That is a real derivation from the same scan, not a guess.
-- The frame ring buffer (pose, intrinsics, a downscaled image) is collected during every sweep,
-  but nothing consumes it yet. It is what the per-wall texture rectification step (plan section
-  4b, step 3) needs later, and capturing it now costs nothing.
+- The frame ring buffer (pose, intrinsics, a downscaled image) is collected during every sweep.
+  `RoomAppearanceSampler` is its first real consumer — see below — and it is also what the
+  per-wall texture rectification step (plan section 4b, step 3) needs later.
+
+## Appearance (step 1 only)
+
+`RoomAppearanceSampler` samples one dominant colour per wall, per floor, and — only when a
+buffered frame actually pitched up far enough to see it — per ceiling, into the optional
+`appearance.surfaces` field now documented in `.claude/contracts.md`. `textureUrl` is always
+`null`; per-wall rectified photos are step 3, out of scope here.
+
+This is the least-verified piece in the module, more so than the RoomPlan calls themselves: it
+projects a world point back into a buffered frame using a hand-derived inverse of
+`modules/object-measure`'s `DepthUnprojector` math, and the "did a frame look at the ceiling"
+pitch threshold (0.35) is an untuned guess. If a demo room's appearance colours look wrong, check
+this file before the RoomPlan mapping.
