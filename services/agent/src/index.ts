@@ -16,7 +16,7 @@ export interface Env {
   CF_AIG_TOKEN?: string;
   FIT_URL: string;
   SOLVER_URL: string;
-  SOLVER_KEY?: string;
+  UPSTREAM_TOKEN?: string;
 }
 
 const CORS = {

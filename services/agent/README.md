@@ -39,13 +39,16 @@ npm install
 npm run dev                     # wrangler dev, port 8789
 ```
 
-With `services/fit` on 8000 and `services/layout` on 8080 (`SOLVER_KEY=dev-solver-key`),
-`scripts/e2e.sh` runs the whole chain (E1–E6 from `09_END_TO_END_TESTS.md`).
+With the `fit` container up on 8001 (`bash infra/up.sh`, or `docker compose --profile local
+up -d --build fit`) — it serves both `/fit` and `/solve` (OR-Tools) — `scripts/e2e.sh` runs
+the whole chain (E1–E6 from `09_END_TO_END_TESTS.md`).
 
-Config lives in `wrangler.toml` (`OPENAI_MODEL`, `AI_GATEWAY_URL`, `FIT_URL`, `SOLVER_URL`);
-secrets in `.dev.vars` locally or `wrangler secret put`: `OPENAI_API_KEY`, `SOLVER_KEY`,
-optionally `CF_AIG_TOKEN`. Without an OpenAI key the presets use the built-in plans in
-`fixtures/preset-plans.json` and the log says so; typed requests need the planner.
+Config lives in `wrangler.toml` (`OPENAI_MODEL`, `AI_GATEWAY_URL`, `FIT_URL`, `SOLVER_URL` —
+both the fit container: local port 8001, or its Cloudflare quick-tunnel origin once deployed);
+secrets in `.dev.vars` locally or `wrangler secret put`: `OPENAI_API_KEY`, `UPSTREAM_TOKEN`
+(the shared value from `infra/.env`, sent as `X-Upstream-Token`; the container 401s without
+it), optionally `CF_AIG_TOKEN`. Without an OpenAI key, Rearrange and the presets use the
+built-in rules and the log says so; typed requests need the planner.
 
 ## Tests
 

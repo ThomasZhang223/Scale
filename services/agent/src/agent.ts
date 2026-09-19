@@ -313,6 +313,11 @@ export class DesignerAgent extends Agent<Env> {
 
   // ---------- tools ----------
 
+  /** The tunnel hop's shared secret (infra/README.md): fit and solve refuse calls without it. */
+  private upstreamHeaders(): Record<string, string> {
+    return this.env.UPSTREAM_TOKEN ? { 'X-Upstream-Token': this.env.UPSTREAM_TOKEN } : {};
+  }
+
   private plannerConfig(): PlannerConfig {
     return { apiKey: this.env.OPENAI_API_KEY, model: this.env.OPENAI_MODEL, gatewayUrl: this.env.AI_GATEWAY_URL || undefined, gatewayToken: this.env.CF_AIG_TOKEN };
   }
@@ -320,7 +325,7 @@ export class DesignerAgent extends Agent<Env> {
   private async callSolver(req: SolverRequest, requestId: string): Promise<SolverResponse> {
     const res = await fetch(`${this.env.SOLVER_URL.replace(/\/$/, '')}/solve`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', 'X-Solver-Key': this.env.SOLVER_KEY ?? 'dev-solver-key', 'X-Request-Id': requestId },
+      headers: { 'content-type': 'application/json', ...this.upstreamHeaders(), 'X-Request-Id': requestId },
       body: JSON.stringify(req),
       signal: AbortSignal.timeout(SOLVER_TIMEOUT_MS),
     });
@@ -331,7 +336,7 @@ export class DesignerAgent extends Agent<Env> {
   private async callFit(room: Record<string, unknown>, placements: PlacementV1[], objects: Record<string, { w: number; h: number; d: number }>): Promise<FitReport> {
     const res = await fetch(`${this.env.FIT_URL.replace(/\/$/, '')}/fit`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', ...this.upstreamHeaders() },
       body: JSON.stringify({ room, placements, objects }),
       signal: AbortSignal.timeout(SOLVER_TIMEOUT_MS),
     });
@@ -343,7 +348,7 @@ export class DesignerAgent extends Agent<Env> {
     let solver: 'online' | 'offline' = 'offline';
     let detail = '';
     try {
-      const res = await fetch(`${this.env.SOLVER_URL.replace(/\/$/, '')}/health`, { headers: { 'X-Solver-Key': this.env.SOLVER_KEY ?? 'dev-solver-key' }, signal: AbortSignal.timeout(3000) });
+      const res = await fetch(`${this.env.SOLVER_URL.replace(/\/$/, '')}/health`, { signal: AbortSignal.timeout(3000) }); // /health is ungated
       if (res.ok) {
         solver = 'online';
         detail = `OR-Tools ${((await res.json()) as { ortools?: string }).ortools ?? ''}`;

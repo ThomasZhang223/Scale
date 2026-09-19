@@ -1,7 +1,5 @@
 # Copy to .dev.vars (git-ignored) for `npm run dev`. Deployed: `wrangler secret put <NAME>`.
 OPENAI_API_KEY=sk-...
-# Shared with services/layout (SOLVER_KEY there). Default in dev: dev-solver-key
-SOLVER_KEY=dev-solver-key
 # Optional: route OpenAI calls through Cloudflare AI Gateway.
 # AI_GATEWAY_URL=https://gateway.ai.cloudflare.com/v1/<account_id>/<gateway_id>/openai
 # CF_AIG_TOKEN=...

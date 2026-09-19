@@ -20,9 +20,10 @@ OPENAI_MODEL = "gpt-4o-mini"
 # OpenAI through Cloudflare AI Gateway: https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway_id}/openai
 # Empty means "call api.openai.com directly" (still logged as offline-planner if no key).
 AI_GATEWAY_URL = ""
-# The fit validator (services/fit) and the OR-Tools solver (services/layout, behind a Cloudflare
-# Tunnel in production; a local port in dev).
-FIT_URL = "http://127.0.0.1:8000"
-SOLVER_URL = "http://127.0.0.1:8080"
+# The fit container (services/fit) serves both /fit and /solve (OR-Tools). Locally that's
+# docker compose's port 8001 (infra/README.md); deployed, the fit tunnel's *.trycloudflare.com
+# origin. Both calls carry X-Upstream-Token (the UPSTREAM_TOKEN secret, same value as infra/.env).
+FIT_URL = "http://127.0.0.1:8001"
+SOLVER_URL = "http://127.0.0.1:8001"
 
-# Secrets (wrangler secret put ..., or .dev.vars locally): OPENAI_API_KEY, SOLVER_KEY, CF_AIG_TOKEN (optional)
+# Secrets (wrangler secret put ..., or .dev.vars locally): OPENAI_API_KEY, UPSTREAM_TOKEN, CF_AIG_TOKEN (optional)

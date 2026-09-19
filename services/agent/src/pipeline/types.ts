@@ -199,6 +199,10 @@ export type RequestState = 'queued' | 'reading' | 'planning' | 'solving' | 'chec
 
 export const PRESETS: Record<string, string> = {
   tidy_room: 'Tidy up the room',
+  cozy: 'Make it cozy',
+  spacious: 'Make it spacious',
+  modern: 'Make it modern',
+  social: 'Set it up for company',
   reading_corner: 'Reading corner by the window',
   open_floor: 'Open up the floor',
   clear_door: 'Clear the door',
