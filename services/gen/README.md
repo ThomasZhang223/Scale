@@ -1,103 +1,42 @@
-# services/gen — Component C: image-to-3D, the scale binding, embeddings
+# Ani ML: current implementation
 
-Owner: **Ani**. See `.claude/workstreams/ani.md` for the full scope and hour-by-hour plan, and
-`.claude/contracts.md` for the schemas this service reads and writes — that file wins on any
-disagreement with this one.
+Real SigLIP2 image/text embeddings, search records, mesh binding and local generation
+composition are implemented. **Live SF3D is externally blocked; no real generated
+mesh has been validated.** See [the demo runbook](DEMO_RUNBOOK.md) for commands,
+measured timings, fallback behavior and exact teammate dependencies.
 
-B03 implements independent, real image **or** text embeddings through `/embed`.
-See [embedding setup, API and tests](app/embedding/README.md). `/health` is process
-liveness; `/ready` reports model readiness. Generation and binding remain stubs.
-The generation sections below describe planned scope, not current functionality.
+| Piece | Evidence / limit |
+| --- | --- |
+| B01 SF3D package | Prepared and package-tested; GPU build/load not proven |
+| B03 SigLIP2 | Real cached model, image/text and HTTP checks pass |
+| B04 binder | 66 synthetic software tests; real SF3D orientation still unproved |
+| B05 search handoff | Paul's existing index/ranker and HTTP input; strict local filters |
+| B06 generation handoff | Real B04, fake provider tests; immutable bytes and retry-safe delivery |
+| Local integration | Actual Paul and Thomas storage handlers, fake encoder/provider/R2 in tests |
+| Product retrieval quality | No legitimate image/identity corpus; no quality claim |
 
-## The three objectives
+- [Embedding setup/API](app/embedding/README.md): CPU-only pinned environment,
+  cache-only load, authenticated `/embed`, `/health` and `/ready`.
+- [Search handoff](SEARCH_HANDOFF.md): export/query commands, fingerprint checks,
+  image manifest and caller compatibility; indexing is independent of mesh state.
+- [Binding contract](BINDING.md): metres, bottom-centre, +Y up, explicit front,
+  serialized bounds within 1 mm, material preservation and distortion diagnostic.
+- [Generation handoff](GENERATION_HANDOFF.md): provider -> B04 -> validated artifact
+  -> Thomas `glbBase64`/`glbKey`; no second jobs, storage or SSE system.
+- [SF3D package](deploy/sf3d/README.md): isolated GPU candidate and bounded runner.
 
-In priority order when they conflict: **dimensional accuracy**, then **fidelity**, then
-**latency**.
+`app.main` serves embeddings on port 8002. `/generate` has an authenticated,
+injectable composition seam; it returns 503 until provider/job authority is
+configured. `/ready` reports embedding readiness only, not generation readiness.
+The unused `/bind`, `/baseten`, `/bgremove` stage stubs were removed: binding is a
+library and SF3D already has rembg. No caller in the inspected team code used them.
 
-- **Accuracy** is the binding — AABB equals `bboxMeters` within 1 mm. Verified with a tape
-  measure, never a viewer. See `BINDING.md`.
-- **Fidelity** is whether the mesh reads as the real object at 1:1 in a headset. Levers: choosing
-  the best clean frame from the scan, a clean matte before generation, and the UV unwrap and PBR
-  parameters Stable Fast 3D already returns.
-- **Latency** is wall clock from last frame to a loadable `glbUrl`, measured on the venue
-  network at peak. Keep the endpoint warm. Pre-bake the catalog; exactly one live generation
-  happens on stage.
+Thomas owns backend/Cloudflare, Paul owns search/ingest/ranking, Justin owns
+renderer/fit. The supplied size and its physical accuracy remain the data owner's
+responsibility; binding proves agreement with that size, not real-world accuracy.
 
-A correct box beats a beautiful object at the wrong size. The whole pitch is that the size is
-real.
-
-
-## Scope
-
-One HTTP service, run standalone in Docker, that turns an `Object v1` at `state:"measured"` into
-`state:"ready"` with a real `glbUrl`, a caption, and a palette. It sits behind
-`POST /objects/{id}/generate` and `GET /jobs/{id}` on Thomas's Workers layer, and does the actual
-work as a background job.
-
-### Two latency tiers, one `tier` parameter
-
-- **`live`** — Stable Fast 3D. Receives one best clean image; sub-second on an A100, ~6 GB VRAM,
-  Stability AI Community License, gives UV unwrap and PBR parameters. Used for the single
-  on-stage generation during the demo.
-- **`quality`** — TRELLIS 2 or Hunyuan3D Pro. Slower, better mesh quality. Used for the offline
-  pre-baked catalog (60–100 products) and async upgrades.
-
-Both tiers sit behind one endpoint parameter: `tier: "live" | "quality"`.
-
-### Two input paths, one convergence type
-
-Both paths produce the same `Object v1` (see `.claude/contracts.md`):
-
-1. **Phone scan** — frames (`objects/{objectId}/frames/{n}.jpg` in R2) plus a LiDAR-measured box.
-   `measure.method` is `"lidar"`, confidence is real.
-2. **Catalog product** — a product image plus dimensions Paul's scraper extracted or declared,
-   which may be low confidence. These dimensions are **extracted or declared, not measured** —
-   `measure.method` must be `"extracted"` or `"declared"`, and `measure.confidence` must be
-   correspondingly lower. Never claim LiDAR-grade confidence for a number nobody measured with a
-   sensor.
-
-Both paths hit the same generator and the same binding step (see `BINDING.md`).
-
-### Known failure set — test this before the event
-
-Single-image generation degrades badly on **transparent, reflective, thin, and very dark**
-objects. A MacBook is a good demo object: matte, rectangular, solid. A water bottle is the
-adversarial case. Test twenty random objects on Friday so the failure boundary is known in
-advance, not discovered on stage.
-
-A phone sweep gives multiple candidate frames. Use all useful frames for SigLIP2 retrieval, but
-select one best clean frame for Stable Fast 3D; do not send it a multi-view set.
-
-If a generation is likely to be bad (object in the known failure set, low frame count), say so in
-the response rather than silently returning a bad mesh.
-
-## Run
-
-Standalone service, own Docker container, registered in the root `docker-compose.yml` (Thomas
-owns that file — ask him for the entry, do not add it yourself).
-
-```
-docker build -t services-gen services/gen
-docker run --rm -p 8002:8002 services-gen
-```
-
-The embedding service requires an approved local model cache and internal-service
-token; see its linked README for mount/environment setup. Docker build/run has
-not been validated by the local Windows checks. The remaining generation-stage
-endpoints return HTTP 501 — see `app/main.py`.
-
-## Layout
-
-```
-services/gen/
-  README.md         this file
-  BINDING.md         the scale binding — read this, it's the technical thesis
-  Dockerfile
-  requirements.txt
-  app/
-    main.py          FastAPI app; real /embed, remaining job-worker stages 501
-    bgremove/         background removal, before generation
-    baseten/          Baseten client, both tiers behind `tier`
-    binding/          the scale binding — sole owner, see BINDING.md
-    embedding/        independent SigLIP image/text embeddings (no captions/index writes)
-```
+Out of hackathon scope: quality tier, alternate models, 60-100 prebakes, captions,
+palette/thumbnail helpers (no current required consumer), best-frame scoring,
+large benchmarks, fine-tuning, extra vector databases and advanced caching.
+The existing gen Docker image is embedding-only; its Linux runtime has not been
+live-tested here. Use the local checkout for the CPU composition/search helpers.

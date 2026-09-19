@@ -1,5 +1,51 @@
 # Ani ML execution plan
 
+## Current implementation override — 2026-09-19
+
+The audit and schedule below are historical. The latest user instruction authorizes
+all remaining Ani-owned demo-critical checkpoints, one normal main merge and scoped
+local commits; do not stop at a historical step boundary. No pushes are authorized.
+See [the current demo runbook](../services/gen/DEMO_RUNBOOK.md) for commands/evidence.
+
+- Synced once to origin/main `13541b7`, fast-forward, no conflicts; B01/B03/B04
+  regressions passed. Paul already owns working search/index/ranking. Thomas's
+  implemented backend is visible at `origin/thomas/cloudflare-verify` `5a3ce5f`;
+  it is not merged into current main. Justin's renderer branch is `3196bd2`.
+- B03 real cached image/text embeddings and HTTP evidence pass. B04 has 66 passing
+  synthetic software checks; this is not evidence of real SF3D mesh quality.
+- B05 `324290d`: validated record export for Paul's `/index`, direct photo/text
+  queries through his ranker, strict local constraints, no generation dependency.
+- B06 `76864ac`: selected/owned image + dimensions -> provider -> B04 exactly once
+  -> reviewed artifact -> Thomas `glbBase64`/`glbKey`; fake-provider evidence only.
+- Integration `f2b2ff8`: caller aliases/auth, authorized local photo manifest,
+  strict query command, actual Paul HTTP and Thomas upload/asset handler tests
+  with fake storage. No live jobs/SSE/renderer claim. Total lightweight gen suite:
+  **198 passed**, 3 opt-in tests skipped; those 3 real-model checks passed separately.
+- Transport hardening `922cc51`: bounded response reads, deadline/ambiguity handling
+  and suppressed private HTTP logs, including lazily created transport loggers.
+- Final inspection saw origin/main advance four commits to `0888470`, including
+  Paul's new downloaded-image manifest builder (fake-storefront tests, no real
+  corpus yet). Ani's `app.embedding.catalog_manifest` now consumes that shape,
+  requires supplied backend object IDs and checks image hashes before export.
+  No second merge, teammate-file edits, catalog crawl or invented facts occurred.
+- Real product retrieval checkpoint is blocked on Paul's image/identity/metadata
+  corpus. Existing extraction text, example.com seed merchants and renderer GLBs
+  are not a legitimate product search dataset. No success commit was manufactured.
+- B02 is **BLOCKED_EXTERNAL** after one short current preflight: no configured
+  Baseten key, deployment URL or standard Truss credentials in this session.
+  Credit applicability/custom deployment access cannot be verified. $0 spent;
+  no cloud requests, deployment or compute created. No B02 success commit.
+- Remaining live wiring depends on Thomas's selected source/image/scope and durable
+  attempt handoff, separate CPU/GPU configuration, and Object v1 finalization.
+  Exact gaps are in [GENERATION_HANDOFF.md](../services/gen/GENERATION_HANDOFF.md).
+- A small measured local runbook replaces the old broad B07/B08/B09 research gates.
+  Cut quality tier, bulk prebake, captions/palette/thumbnail, automatic frame scoring,
+  model comparisons/tuning, broad benchmarks and duplicate backend/search systems.
+
+The old “neither retrieval nor generation works” verdict, Vectorize work assignment,
+missing embedding/binding claims and step-by-step stop rules below no longer describe
+the current implementation. Preserve them only as the original audit history.
+
 Audit date: **2026-09-19** (America/Toronto). This is an audit and proposed build sequence, not an implementation report. No model weights were downloaded, models deployed, accounts changed, indexes mutated, or licenses accepted. Only this document is an intended repository change.
 
 ## Active ML workflow policy - updated 2026-09-19
