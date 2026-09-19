@@ -149,6 +149,9 @@ activemq-data/
 
 # Environments
 .env
+# ...except this one. The team shares a single UPSTREAM_TOKEN and the repo is private, so the
+# real file is committed rather than passed around a chat. See the header inside it.
+!infra/.env
 .envrc
 .venv
 env/
