@@ -16,6 +16,8 @@
 // the free plan's 100 concurrent Workflow instances.
 
 import { WorkflowEntrypoint, type WorkflowEvent, type WorkflowStep } from "cloudflare:workers";
+// NonRetryableError lives in cloudflare:workflows, not cloudflare:workers.
+import { NonRetryableError } from "cloudflare:workflows";
 import { complete, parseJsonObject } from "../lib/ai";
 import { nowIso, uuid } from "../lib/ids";
 import { insertObject } from "../lib/store";
@@ -81,10 +83,15 @@ export class IngestMerchantWorkflow extends WorkflowEntrypoint<Env, IngestMercha
           headers: { accept: "application/json", "user-agent": "full-scale-htn2026/1.0" },
         });
         if (!res.ok) {
-          throw new Error(
+          const message =
             `${base}${path} returned ${res.status}. Some merchants disable /products.json — ` +
-              `verify it in a browser before adding the storefront.`,
-          );
+            `verify it in a browser before adding the storefront.`;
+          // 429 and 5xx are worth waiting out. A 403 or a 404 is a decision the merchant made,
+          // and retrying it is both useless and impolite to somebody else's server.
+          if (res.status >= 400 && res.status < 500 && res.status !== 429) {
+            throw new NonRetryableError(message);
+          }
+          throw new Error(message);
         }
         const body = (await res.json()) as { products?: RawProduct[] };
         return (body.products ?? []).slice(0, MAX_PRODUCTS);

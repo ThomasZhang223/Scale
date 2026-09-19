@@ -12,6 +12,8 @@
 // starting a hundred instances at once — see the queue consumer in src/index.ts.
 
 import { WorkflowEntrypoint, type WorkflowEvent, type WorkflowStep } from "cloudflare:workers";
+// NonRetryableError lives in cloudflare:workflows, not cloudflare:workers.
+import { NonRetryableError } from "cloudflare:workflows";
 import { R2Keys } from "../lib/keys";
 import { nowIso } from "../lib/ids";
 import { advanceJob, markObjectFailed, markObjectReady } from "../lib/store";
@@ -52,7 +54,14 @@ export class GenerateMeshWorkflow extends WorkflowEntrypoint<Env, GenerateMeshPa
     const p = event.payload;
 
     try {
-      const meta = await step.do("load-object", async (): Promise<ObjectMeta> => {
+      const meta = await step.do(
+        "load-object",
+        // D1 can hiccup, so two tries. Everything *inside* that is deterministic throws
+        // NonRetryableError instead: a missing object and a missing frame never become
+        // present by waiting, and a step that keeps retrying leaves the job row on "running"
+        // while the phone polls it forever.
+        { retries: { limit: 2, delay: "2 seconds", backoff: "constant" }, timeout: "30 seconds" },
+        async (): Promise<ObjectMeta> => {
         await advanceJob(this.env, p.jobId, "running", 5, null, nowIso());
         const row = await this.env.DB.prepare(
           "SELECT id, name, category, bbox_w, bbox_h, bbox_d FROM objects WHERE id = ?",
@@ -66,14 +75,14 @@ export class GenerateMeshWorkflow extends WorkflowEntrypoint<Env, GenerateMeshPa
             bbox_h: number;
             bbox_d: number;
           }>();
-        if (!row) throw new Error(`Object ${p.objectId} does not exist.`);
+        if (!row) throw new NonRetryableError(`Object ${p.objectId} does not exist.`);
 
         // Frames were uploaded to objects/{objectId}/frames/{n}.jpg. List rather than assume a
         // count: the phone decides how many frames it took, and a catalog product has one.
         const listed = await this.env.BUCKET.list({ prefix: `objects/${p.objectId}/frames/` });
         const frameKeys = listed.objects.map((o) => o.key).sort();
         if (frameKeys.length === 0) {
-          throw new Error(
+          throw new NonRetryableError(
             `No frames at objects/${p.objectId}/frames/. Upload at least one before generating.`,
           );
         }
@@ -84,7 +93,8 @@ export class GenerateMeshWorkflow extends WorkflowEntrypoint<Env, GenerateMeshPa
           name: row.name ?? "",
           category: row.category ?? "",
         };
-      });
+      },
+    );
 
       // ceiling: the first frame by key order, not the clearest silhouette. Ani's workstream
       // says Stable Fast 3D takes ONE best clean image, never a multi-view set, and picking
@@ -104,7 +114,7 @@ export class GenerateMeshWorkflow extends WorkflowEntrypoint<Env, GenerateMeshPa
           if (!url) {
             // Standing rule 4. There is no second endpoint to fall back to, and guessing one
             // would fail at the demo rather than here, where the message can name the fix.
-            throw new Error(
+            throw new NonRetryableError(
               "BASETEN_URL is not set. Run: npx wrangler secret put BASETEN_URL (and BASETEN_API_KEY).",
             );
           }
@@ -154,13 +164,13 @@ export class GenerateMeshWorkflow extends WorkflowEntrypoint<Env, GenerateMeshPa
         }
 
         if (!generated.glbBase64) {
-          throw new Error("Baseten returned neither glbKey nor glbBase64.");
+          throw new NonRetryableError("Baseten returned neither glbKey nor glbBase64.");
         }
         const bytes = base64ToBytes(generated.glbBase64);
         // A glTF binary always starts with the magic 'glTF'. Catching a JSON error page here
         // is worth four lines: the alternative is Justin debugging his own loader for an hour.
         if (bytes.length < 12 || String.fromCharCode(...bytes.slice(0, 4)) !== "glTF") {
-          throw new Error("Baseten returned data that is not a binary glTF.");
+          throw new NonRetryableError("Baseten returned data that is not a binary glTF.");
         }
         await this.env.BUCKET.put(key, bytes, {
           httpMetadata: { contentType: "model/gltf-binary" },
@@ -176,7 +186,7 @@ export class GenerateMeshWorkflow extends WorkflowEntrypoint<Env, GenerateMeshPa
           return { indexed: false };
         }
         if (generated.embedding.length !== 768) {
-          throw new Error(
+          throw new NonRetryableError(
             `Embedding has ${generated.embedding.length} dimensions, expected 768 ` +
               `(google/siglip2-base-patch16-224). The index will reject it.`,
           );

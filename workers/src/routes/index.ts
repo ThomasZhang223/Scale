@@ -396,6 +396,18 @@ export async function postSearch(req: Request, env: Env, origin: string): Promis
     return json(relaxedHits, 200, { "x-ranker": "relaxed" });
   }
 
+  // The one unset upstream key that does NOT raise, and the reason is worth stating because
+  // it looks like an exception to the fail-loud rule in lib/config.ts.
+  //
+  // upstream:solver is a *capability*: with no solver there is no answer to /v1/fit at all, so
+  // an unset key must 503. upstream:search is a *re-rank stage* over candidates Vectorize has
+  // already returned, so an unset key still produces a correct, complete result set — just in
+  // similarity order rather than Paul's order. Raising there would take a working search
+  // offline to report a missing optional component.
+  //
+  // What makes that safe rather than a silent default is the X-Ranker header: every response
+  // says which of the four paths ran, so "the results are not ranked" is one curl away instead
+  // of something you notice on stage.
   const searchOrigin = await env.CONFIG.get("upstream:search");
   if (!searchOrigin) return json(hits, 200, { "x-ranker": "vectorize" });
 
