@@ -23,14 +23,16 @@ import {
   loadRoomCapture,
 } from "../lib/store";
 import type {
-  ConstraintPlanV1,
   FitReportV1,
+  LayoutPlan,
+  LayoutRule,
   ObjectV1,
   PlacementV1,
   RoomCaptureV1,
   SolveResponse,
   VersionV1,
 } from "../lib/contracts";
+import { infeasibleReason, toPlacements, toSolveRequest } from "../lib/solveframe";
 import { SCHEMA_VERSION } from "../lib/contracts";
 
 export interface RoomAgentState {
@@ -42,20 +44,30 @@ export interface RoomAgentState {
 
 const SYSTEM_PROMPT = `You arrange furniture in a real, measured room.
 
-You never output coordinates, positions, or rotations. You are not able to: the plan_layout
-tool takes an objective and a list of constraints, and a numerical solver computes the actual
-positions. Describing where something should go in prose is not placing it.
+You never output coordinates, positions, or rotations. You are not able to: plan_layout takes
+rules, and a numerical solver computes the actual positions. Describing where something should
+go in prose is not placing it.
 
 Work in this order:
 1. search_objects to find candidate pieces that fit the measured gap and the stated style.
-2. plan_layout with an objective and constraints. Every length you give is in METRES.
-3. check_fit on the result. If it reports a blocking violation, change the constraints and
-   plan again rather than arguing with the solver.
+2. plan_layout with rules. Give every rule a "why" in one clause — when a rule turns out to be
+   the one that cannot hold, that clause is what the user is shown.
+3. check_fit on the result. If it reports a blocking violation, change the rules and plan
+   again rather than arguing with the solver.
 4. commit_version once the fit is clean, then tell the user in one short paragraph what you
    placed, why, and what it cost.
 
-All lengths are metres. All money is integer cents. If you cannot determine a value, say so
-and ask. Do not guess a dimension.`;
+UNITS. search_objects and check_fit are in METRES. plan_layout is in CENTIMETRES, because the
+solver works in whole centimetres — maxCm, minCm, marginCm and walkwayCm are all centimetres.
+That is the only exception in the system; do not mix them up.
+
+Prefer "should" with a weight over "must". A plan of all hard rules is usually infeasible, and
+an infeasible plan places nothing at all. Door and walkway clearance are always enforced
+whatever you ask, so you do not need to state them.
+
+All money is integer cents. If you cannot determine a value, say so and ask. Do not guess a
+dimension.`;
+
 
 const TOOLS: ToolDef[] = [
   {
@@ -79,34 +91,47 @@ const TOOLS: ToolDef[] = [
   {
     name: "plan_layout",
     description:
-      "Run the numerical solver. You supply an objective and constraints; it returns the " +
-      "positions. This is the ONLY way to place anything.",
+      "Run the OR-Tools solver. You give rules; it computes the positions. This is the ONLY " +
+      "way to place anything. Distances are in CENTIMETRES here, which is the one exception " +
+      "in this system — everywhere else is metres.",
     parameters: {
       type: "object",
       properties: {
-        objective: {
-          type: "string",
-          enum: ["maximize_walkway", "maximize_free_floor", "minimize_wall_gap", "group_seating"],
-          description: "What the solver optimises for",
-        },
+        summary: { type: "string", description: "One line naming the arrangement, e.g. 'Reading corner by the window'" },
         objectIds: {
           type: "array",
           items: { type: "string" },
           description: "Ids of the objects to place, from search_objects",
         },
-        minClearanceMeters: {
-          type: "number",
-          description: "Walkway width to preserve, in METRES. 0.9 is the usual default.",
-        },
-        againstWallObjectIds: {
+        rules: {
           type: "array",
-          items: { type: "string" },
-          description: "Objects that must sit flat against a wall",
+          description: "The constraints. A rule has no field that can hold a position.",
+          items: {
+            type: "object",
+            properties: {
+              id: { type: "string", description: "Short unique id, e.g. 'r1'" },
+              type: {
+                type: "string",
+                enum: ["pin", "against_wall", "near", "far_from", "facing", "keep_clear"],
+              },
+              a: { type: "string", description: "The object this rule is about" },
+              b: { type: "string", description: "For near/far_from: the other object, or window:{id} / door:{id}" },
+              wall: { type: "string", description: "For against_wall: wall:{id}, or 'any'" },
+              target: { type: "string", description: "For facing: an object id, window:{id}, door:{id}, or 'center'" },
+              zone: { type: "string", description: "For keep_clear: door:{id}, window:{id}, or 'walkway'" },
+              maxCm: { type: "number", description: "For near: maximum centre distance in CENTIMETRES" },
+              minCm: { type: "number", description: "For far_from: minimum centre distance in CENTIMETRES" },
+              marginCm: { type: "number", description: "For keep_clear: depth of the zone in CENTIMETRES" },
+              priority: { type: "string", enum: ["must", "should"], description: "must is hard; should is soft and may be broken" },
+              weight: { type: "number", description: "For should: 1-10, how much breaking it costs" },
+              why: { type: "string", description: "One clause. Shown to the user when this rule is the one that cannot hold." },
+            },
+            required: ["id", "type", "priority"],
+          },
         },
-        budgetCents: { type: "number", description: "Total budget in integer cents" },
-        notes: { type: "string", description: "One sentence of reasoning, shown to the user" },
+        walkwayCm: { type: "number", description: "Walkway to preserve between pieces, in CENTIMETRES. 60 is the default." },
       },
-      required: ["objective", "objectIds"],
+      required: ["summary", "objectIds", "rules"],
     },
   },
   {
@@ -287,7 +312,7 @@ export class RoomAgent extends Agent<Env, RoomAgentState> {
       (body.budgetCents ? ` Budget ${body.budgetCents} cents.` : "") +
       history;
 
-    let lastPlan: ConstraintPlanV1 | null = null;
+    let lastPlan: LayoutPlan | null = null;
     let committed: VersionV1 | null = null;
 
     const result = await runToolLoop(this.env, {
@@ -317,14 +342,14 @@ export class RoomAgent extends Agent<Env, RoomAgentState> {
 
     // Remember this run, whatever happened. An agent that forgets a failed attempt will make
     // the same one on the next question.
-    const plan = lastPlan as ConstraintPlanV1 | null;
+    const plan = lastPlan as LayoutPlan | null;
     this.sql`INSERT INTO transcript (id, at, intent, objective, placed, outcome)
       VALUES (${uuid()}, ${nowIso()}, ${body.intent},
-              ${plan?.objective ?? null},
+              ${plan?.summary ?? null},
               ${this.proposed.length},
               ${committed ? `committed ${(committed as VersionV1).versionId}` : result.text.slice(0, 300)})`;
 
-    this.setState({ ...this.state, lastObjective: plan?.objective ?? null });
+    this.setState({ ...this.state, lastObjective: plan?.summary ?? null });
 
     return Response.json({
       answer: result.text,
@@ -370,7 +395,7 @@ export class RoomAgent extends Agent<Env, RoomAgentState> {
     room: RoomCaptureV1,
     budgetCents: number | null,
     origin: string,
-  ): Promise<{ plan: ConstraintPlanV1; summary: unknown }> {
+  ): Promise<{ plan: LayoutPlan; summary: unknown }> {
     const objectIds = (args.objectIds as string[]) ?? [];
     if (objectIds.length === 0) throw new Error("plan_layout needs at least one objectId.");
 
@@ -378,38 +403,59 @@ export class RoomAgent extends Agent<Env, RoomAgentState> {
     if (candidates.length === 0) {
       throw new Error(`None of ${objectIds.join(", ")} exist. Run search_objects first.`);
     }
+    // The budget is not a solver constraint — CP-SAT places things, it does not shop. It is
+    // enforced where it belongs, before anything is placed, so an over-budget arrangement is
+    // never computed and then rejected.
+    if (budgetCents !== null) {
+      const total = candidates.reduce((sum, o) => sum + (o.price?.cents ?? 0), 0);
+      if (total > budgetCents) {
+        return {
+          plan: { summary: String(args.summary ?? ""), rules: [] },
+          summary: {
+            rejected: `Those pieces total ${total} cents, over the ${budgetCents} cent budget.`,
+          },
+        };
+      }
+    }
 
-    const plan: ConstraintPlanV1 = {
-      schemaVersion: SCHEMA_VERSION,
-      objective: (args.objective as ConstraintPlanV1["objective"]) ?? "maximize_walkway",
-      constraints: [
-        { kind: "min_clearance", meters: Number(args.minClearanceMeters ?? 0.9) },
-        ...((args.againstWallObjectIds as string[]) ?? []).map(
-          (id) => ({ kind: "against_wall", objectId: id, wallId: null }) as const,
-        ),
-        ...(budgetCents !== null ? [{ kind: "budget" as const, cents: budgetCents }] : []),
-      ],
-      notes: String(args.notes ?? ""),
+    const plan: LayoutPlan = {
+      summary: String(args.summary ?? ""),
+      movable: objectIds,
+      rules: ((args.rules as LayoutRule[]) ?? []).map((r, i) => ({
+        ...r,
+        id: r.id || `r${i + 1}`,
+      })),
     };
 
-    const solved = await callUpstream<SolveResponse>(this.env, "solver", "/solve", {
-      schemaVersion: SCHEMA_VERSION,
+    const request = toSolveRequest({
       room,
       candidates,
-      fixed: this.proposed,
-      plan,
+      placements: this.proposed,
+      rules: plan.rules,
+      movable: plan.movable,
+      walkwayCm: args.walkwayCm as number | undefined,
     });
 
-    if (solved.infeasible) {
-      return { plan, summary: { infeasible: solved.infeasible, placements: 0 } };
-    }
-    this.proposed = solved.placements;
+    const solved = await callUpstream<SolveResponse>(this.env, "layout", "/solve", request);
+
+    const reason = infeasibleReason(solved, plan.rules);
+    if (reason) return { plan, summary: { infeasible: reason, status: solved.status } };
+
+    this.proposed = toPlacements(solved, this.proposed);
     return {
       plan,
       summary: {
-        placed: solved.placements.length,
-        objective: solved.objective,
-        objectIds: solved.placements.map((p) => p.objectId),
+        status: solved.status,
+        placed: this.proposed.length,
+        movedCm: solved.movedCm ?? null,
+        solveMs: solved.solveMs ?? null,
+        satisfied: solved.satisfied ?? [],
+        // A broken soft rule is the thing the user most needs told, so it is surfaced by its
+        // own `why` rather than by an id the model would have to look up.
+        broken: (solved.violated ?? []).map((v) => ({
+          why: plan.rules.find((r) => r.id === v.ruleId)?.why ?? v.ruleId,
+          byCm: v.amountCm,
+        })),
       },
     };
   }

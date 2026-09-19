@@ -3,13 +3,19 @@
 ## Current hackathon scope override — 2026-09-19
 
 Follow [the current runbook](../../services/gen/DEMO_RUNBOOK.md) and actual code;
-the original sprint below is historical. B01 package, real B03 embeddings, synthetic
-B04 binding, B05 search adapter and B06 local generation composition are implemented.
+the original sprint below is historical. B01/B02 real SF3D, real B03 embeddings,
+real B04 binding, B05 search adapter and B06 local generation composition are implemented.
 Paul already owns the index/ranker; Thomas owns durable jobs/storage/finalization;
 Justin owns rendering/fit. Ani connects these with small adapters only.
 
-Real SF3D and its orientation/visual binding gate remain externally blocked.
-Real product search validation needs Paul's image/identity corpus. Live generation
+Real SF3D and saved-mesh nonuniform B04 binding PASS, including normal-map tangents,
+preserved textures/UV corners and CPU visual review. Exact hashes, bbox/errors and
+local GLB/preview paths are in [the evidence](../../services/gen/evidence/real-sf3d-binding-2026-09-19.json).
+The sample chair's physical dimensions were NOT independently measured. No further
+Baseten/GPU calls: the saved shutdown receipt is INACTIVE with zero replicas.
+The full lightweight suite passes 210 tests with 3 opt-in skips on merged main.
+Paul's downloaded 100-image manifest is now in main; relevance evaluation and
+backend identity mapping remain separate from this binding proof. Live generation
 wiring needs Thomas's durable attempt and authorized selected-object handoff.
 The local provider/storage tests are explicitly fake, with actual B04 and teammate
 handler execution. Indexing no longer waits for a mesh or state:ready.
@@ -17,7 +23,8 @@ handler execution. Indexing no longer waits for a mesh or state:ready.
 Cut from this demo: quality tier, alternate models, 60–100 prebakes, generative
 captions, palette/thumbnail helpers, broad benchmarks, automatic frame scoring and
 duplicate background-removal/search/backend services. No new Vectorize work is needed.
-Scoped local commits are authorized across remaining checkpoints; pushing is not.
+Normal sync, branch push, merge into main and main push are authorized after tests.
+No rebase, reset, squash or force push. The main integration preserves both histories.
 
 This is your scope for the 36-hour build. Read `.claude/contracts.md` first if anything here
 seems underspecified — it wins on any disagreement. Skim `.claude/sprint.md` for the full

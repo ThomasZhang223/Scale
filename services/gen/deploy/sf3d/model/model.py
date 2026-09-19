@@ -8,7 +8,11 @@ import sys
 import threading
 import time
 
-from .transport import artifact_response, decode_request
+if __package__:
+    from .transport import artifact_response, decode_request
+else:
+    # Truss 0.18.30 loads this file with an empty package from /app.
+    from model.transport import artifact_response, decode_request
 
 SOURCE_REVISION = "ff21fc491b4dc5314bf6734c7c0dabd86b5f5bb2"
 MODEL_REVISION = "f0c9a8ffd62cb1bbc8a7a53c9f87a0be1b6be778"

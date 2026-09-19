@@ -88,10 +88,14 @@ def test_reloaded_export_revalidates_metadata(change):
 
 
 def test_actual_paul_index_route_accepts_measured_records(monkeypatch):
+    monkeypatch.setenv("UPSTREAM_TOKEN", "synthetic-upstream-token")
     main = paul_module("main")
+    monkeypatch.setattr(paul_module("auth"), "_TOKEN", "synthetic-upstream-token")
     monkeypatch.setattr(main, "INDEX", paul_module("index").BruteForceIndex())
     with TestClient(main.app) as client:
         payload = index_payload([record()], expected_fingerprint=FP, scope="test")
+        assert client.post("/index", json=payload).status_code == 401
+        client.headers["X-Upstream-Token"] = "synthetic-upstream-token"
         assert client.post("/index", json=payload).json() == {"indexed": 1, "total": 1}
         assert client.post("/index", json=payload).json()["total"] == 1
         row = client.post("/search", json={"fit": {"maxW": .8}}).json()[0]["object"]

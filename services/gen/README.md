@@ -1,15 +1,16 @@
 # Ani ML: current implementation
 
 Real SigLIP2 image/text embeddings, search records, mesh binding and local generation
-composition are implemented. **Live SF3D is externally blocked; no real generated
-mesh has been validated.** See [the demo runbook](DEMO_RUNBOOK.md) for commands,
+composition are implemented. **Real SF3D generation and saved-mesh B04 binding
+PASS.** The chair's physical dimensions are unverified. No further Baseten/GPU
+calls are authorized. See [the demo runbook](DEMO_RUNBOOK.md) for commands,
 measured timings, fallback behavior and exact teammate dependencies.
 
 | Piece | Evidence / limit |
 | --- | --- |
-| B01 SF3D package | Prepared and package-tested; GPU build/load not proven |
+| B01/B02 SF3D | Genuine saved GLB verified; prior deployment inactive with zero replicas |
 | B03 SigLIP2 | Real cached model, image/text and HTTP checks pass |
-| B04 binder | 66 synthetic software tests; real SF3D orientation still unproved |
+| B04 binder | 76 binding/selection/cache tests; real nonuniform binding and normal-map preview pass |
 | B05 search handoff | Paul's existing index/ranker and HTTP input; strict local filters |
 | B06 generation handoff | Real B04, fake provider tests; immutable bytes and retry-safe delivery |
 | Local integration | Actual Paul and Thomas storage handlers, fake encoder/provider/R2 in tests |

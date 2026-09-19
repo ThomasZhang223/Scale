@@ -12,7 +12,10 @@ import { HttpError } from "./http";
  * silently wrong the moment a second service exists, and would look like it worked in every
  * test until the demo.
  */
-export type Upstream = "solver" | "search" | "ingest";
+// "solver" is services/fit, which answers /fit. "layout" is services/layout, the OR-Tools
+// CP-SAT service that answers /solve. They are two services with two tunnels, because they
+// speak different request shapes and only one of them can be satisfied by a stub.
+export type Upstream = "solver" | "search" | "ingest" | "layout";
 
 const KV_PREFIX = "upstream:";
 

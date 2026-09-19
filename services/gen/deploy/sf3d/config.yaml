@@ -6,9 +6,7 @@ base_image:
   image: pytorch/pytorch@sha256:a55ff10111eb11f998884327d37361592e632899edd24fce99886b69289e33e6
   python_executable_path: /opt/conda/bin/python
 resources:
-  accelerator: L4
-  cpu: "4"
-  memory: 16Gi
+  instance_type: "L4:4x16"
 runtime:
   predict_concurrency: 1
   enable_debug_logs: false

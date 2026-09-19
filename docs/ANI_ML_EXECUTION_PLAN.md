@@ -3,16 +3,17 @@
 ## Current implementation override — 2026-09-19
 
 The audit and schedule below are historical. The latest user instruction authorizes
-all remaining Ani-owned demo-critical checkpoints, one normal main merge and scoped
-local commits; do not stop at a historical step boundary. No pushes are authorized.
+completion of Ani-owned work, scoped commits, latest-main sync, normal branch push,
+and normal merge/push to main after tests. No rebase/reset/squash/force is authorized.
+No further Baseten/GPU calls: reuse the saved genuine artifact.
 See [the current demo runbook](../services/gen/DEMO_RUNBOOK.md) for commands/evidence.
 
-- Synced once to origin/main `13541b7`, fast-forward, no conflicts; B01/B03/B04
-  regressions passed. Paul already owns working search/index/ranking. Thomas's
-  implemented backend is visible at `origin/thomas/cloudflare-verify` `5a3ce5f`;
-  it is not merged into current main. Justin's renderer branch is `3196bd2`.
-- B03 real cached image/text embeddings and HTTP evidence pass. B04 has 66 passing
-  synthetic software checks; this is not evidence of real SF3D mesh quality.
+- Latest main sync: normal merge `8156fee`, incoming main `0f25a27`, no conflicts.
+  This incorporates the teammate backend, renderer, auth and ingestion changes.
+  Earlier sync/branch-status notes below are historical snapshots.
+- B03 real cached image/text embeddings and HTTP evidence pass. B04 now passes
+  76 binding/selection/cache tests and genuine saved-SF3D nonuniform binding.
+  The full lightweight suite passes 210 tests with 3 opt-in skips.
 - B05 `324290d`: validated record export for Paul's `/index`, direct photo/text
   queries through his ranker, strict local constraints, no generation dependency.
 - B06 `76864ac`: selected/owned image + dimensions -> provider -> B04 exactly once
@@ -28,13 +29,23 @@ See [the current demo runbook](../services/gen/DEMO_RUNBOOK.md) for commands/evi
   corpus yet). Ani's `app.embedding.catalog_manifest` now consumes that shape,
   requires supplied backend object IDs and checks image hashes before export.
   No second merge, teammate-file edits, catalog crawl or invented facts occurred.
-- Real product retrieval checkpoint is blocked on Paul's image/identity/metadata
-  corpus. Existing extraction text, example.com seed merchants and renderer GLBs
-  are not a legitimate product search dataset. No success commit was manufactured.
-- B02 is **BLOCKED_EXTERNAL** after one short current preflight: no configured
-  Baseten key, deployment URL or standard Truss credentials in this session.
-  Credit applicability/custom deployment access cannot be verified. $0 spent;
-  no cloud requests, deployment or compute created. No B02 success commit.
+- Latest main now has 100 downloaded catalog images and extracted metadata in
+  `services/ingest/prebake/manifest.json`; the earlier missing-corpus status is stale.
+  Retrieval relevance and independently measured accuracy remain unproven. Backend
+  identity mapping is still an explicit importer input. The SF3D chair1 sample
+  has no independently verified physical bbox in this evidence.
+- B02 **REAL SF3D PASS**: saved raw SHA
+  `6291edefcd2e1342903b57619d9c17ebf676a2a33774d17ab629fa76ae4e4956`,
+  798,560 bytes, 12,177 vertices, 19,996 faces, one material, two embedded textures.
+  Reviewed +Y up / -Z front. Saved shutdown evidence: INACTIVE, zero replicas.
+- B04 **REAL BINDING PASS**: target derived from raw extents with factors
+  `[1.08, 1.00, 0.96]`, distortion 1.125, identity nodes/metres, bbox errors
+  `[2.622604367e-8, 0, 1.192092891e-8]` m and zero bottom-centre error.
+  Normal-map tangents are rebuilt after scaling, with five handedness seam splits;
+  material, normalTexture, base-color images and UV corners survive export/reload.
+  CPU normal-map preview reviewed. Physical dimensions of this chair are NOT proven.
+  Exact target/source AABB, hashes and local paths:
+  [real evidence](../services/gen/evidence/real-sf3d-binding-2026-09-19.json).
 - Remaining live wiring depends on Thomas's selected source/image/scope and durable
   attempt handoff, separate CPU/GPU configuration, and Object v1 finalization.
   Exact gaps are in [GENERATION_HANDOFF.md](../services/gen/GENERATION_HANDOFF.md).
@@ -444,7 +455,7 @@ Backend owns durable idempotency keyed by scope/object/image/settings/bbox snaps
 
 ## 8. Sequential implementation prompts
 
-These are **copy-pastable bounded tasks**. B01 packaging is complete; B02 local preparation has begun but cloud execution is blocked on credit coverage; see §10 for evidence. B03 is complete for local real-model embeddings; B04's synthetic software gate passes, with real SF3D orientation/visual review blocked on B02; B05–B09 remain unexecuted. B02 is an access gate, not a reason to block independent B03/B04. Each prompt is bounded and stops at its step. New test names/commands below are instructions to **add and run** tests, not claims those tests already exist unless recorded in §10. Run commands from repo root unless a prompt says otherwise; use the step's isolated interpreter. Logs/results must redact secrets and distinguish unit fakes, local real-model checks and live integration.
+These are historical task prompts, superseded by the current implementation override and user authorization. B02 generation and B04 real binding now pass; use the current runbook and evidence for status. Earlier stop/access rules below record the original plan, not new work authorization.
 
 ### B01 — Prepare the SF3D feasibility package (first action)
 
@@ -904,12 +915,12 @@ Do not require captions/palettes to unlock Paul's baseline. `SiglipModel` is not
 | AUDIT-REPO | COMPLETE (inspection only) | HEAD/status, full source/ownership inspection, no prior plan | Global git ignore read warning, disclosed | Preserve snapshot and reread on each future step |
 | AUDIT-LOCAL | COMPLETE (limited safe checks) | ASGI 501s, Worker stub probe, SQLite/JSON/hardware checks | No real model environments/assets | Do not treat as model success |
 | AUDIT-WEB | COMPLETE for cited public sources; gated card limited | Official text sources fetched; exact revisions/source inspected | SF3D raw HF README 401; no private workspace access | Ani access review before live spike |
-| B01 | COMPLETE (candidate packaging only) | 25 lightweight tests passed; runner help passed; package/config/source evidence below | Actual build, model load and generation UNVERIFIED; live B02 access outstanding | Complete B02 manual access/setup prerequisites |
-| B02 | IN_PROGRESS; cloud execution BLOCKED | Official chair decoded; isolated Truss 0.18.30 installed; real config parser, dependency check and CLI help passed; no generation | Remaining credit coverage and builder rate unconfirmed under USD 3 credits-only authorization | Confirm billing details below before any cloud build |
+| B01 | COMPLETE; real build/load now proven | Package tests and saved genuine SF3D receipt | No further live calls authorized | Use saved artifact |
+| B02 | REAL SF3D PASS | Saved 6291edef artifact; 798,560 bytes, textured real mesh | Physical sample measurements unverified | Reuse saved artifact; no further GPU/Baseten calls |
 | B03 | COMPLETE (local real-model E1) | 35 preprocessing/contract tests + 2 opt-in real-model tests passed; isolated pip check passed; evidence below | None for B03; Docker and production storage integration unverified | Stop at this checkpoint; await the next authorized step |
-| B04 | SOFTWARE PASS; real-output gates BLOCKED_ON_B02 | 66 synthetic tests passed; actual GLB export/reload, texture/normal/material and selection checks; evidence below | Genuine SF3D semantic orientation and visual distortion review | Stop; inspect a genuine raw artifact with Justin only after B02 becomes available and is authorized |
-| B05 | NOT_STARTED | Proposed records/filter reference | Paul data, Thomas scope/index bridge agreement | Establish payloads before remote mutation |
-| B06 | NOT_STARTED | Proposed lifecycle | B02/B04 + Thomas job/storage/completion seams | Integrate Ani adapter only |
+| B04 | REAL BINDING PASS | Nonuniform saved-mesh bind, tangents, preserved textures/UVs, CPU visual review; 76 binding tests | Physical sample measurements unverified | Saved evidence and offline reproduction script |
+| B05 | SOFTWARE COMPLETE | Search handoff and manifest importer; current override above | Real product corpus remains external | Await verified image/identity/measurements |
+| B06 | SOFTWARE COMPLETE | Actual B04 and fake-provider/storage integration tests | Deployed teammate workflow unproven | Current generation handoff document |
 | B07 | NOT_STARTED | Evaluation design, no results | Real labeled phone/corpus data | Run honest baseline report |
 | B08 | NOT_STARTED | No actual integrated path | Teammate services/client and real artifacts | Prove both paths without stubs |
 | B09 | NOT_STARTED | Targets only | Working integration + benchmark budget | Measure/freeze/rehearse |
@@ -917,6 +928,9 @@ Do not require captions/palettes to unlock Paul's baseline. `SiglipModel` is not
 Historical audit-delivery check (before B01): all eleven requested sections and nine bounded prompts were present; every implementation step was NOT_STARTED. `git status --porcelain=v1 --untracked-files=all` reported only `?? docs/ANI_ML_EXECUTION_PLAN.md`; tracked-file diff was empty. No implementation/manifests/contracts/PDFs had changed. Markdown checks found balanced code fences and no control characters; these were document checks, not product acceptance tests.
 
 ### B01 execution evidence — 2026-09-19
+
+Historical package/access checkpoint: its unverified build/generation statements
+are superseded by the genuine artifact and current evidence above.
 
 **Scope/status:** candidate packaging complete; B02–B09 NOT_STARTED. No weights, CUDA installation, environment installation, container build, deployment, paid request, license acceptance, account mutation, commit or push occurred. The original audit's repository snapshot remains historical rather than being rewritten as today's state.
 
@@ -1045,13 +1059,16 @@ $env:EMBEDDING_TEST_REPORT = Join-Path $embedRoot ('real-' + [guid]::NewGuid().T
 
 ### B04 execution evidence — 2026-09-19
 
+This v1 checkpoint is historical. Its real-mesh and tangent limitations are
+superseded by v2, the current override and the linked real SF3D binding evidence.
+
 Starting branch `ani/ml`, HEAD `0f18c06`, clean working tree and empty index. Only the authorized B04 paths changed. No B01/B02/B03 implementation, cloud service, credential check, model download or paid operation was performed.
 
 | Gate | Result | Evidence / limit |
 | --- | --- | --- |
 | Mesh binding software | **PASS — VERIFIED_LOCALLY** | 66 synthetic tests, real serialization and independent trimesh scene reload |
-| Real SF3D semantic orientation | **BLOCKED_ON_B02** | No genuine generated mesh available; no SF3D profile invented |
-| Real SF3D visual distortion review | **BLOCKED_ON_B02** | Synthetic geometry and texture tests cannot establish generated-object quality |
+| Real SF3D semantic orientation | **Now PASS; blocked at this v1 checkpoint** | Saved chair reviewed +Y up / -Z front; see current evidence |
+| Real SF3D visual distortion review | **Now PASS; blocked at this v1 checkpoint** | Current CPU normal-map six-view review, distortion 1.125; physical measurements unverified |
 
 **Implemented:** `app/binding/core.py` provides `bind_glb`, explicit proper-rotation profiles, immutable result bytes/report, scoped `raw_key`/`bound_key` and a selected-product image/bbox boundary. `glb.py` validates a bounded static GLB subset, traverses the complete scene hierarchy and handles shared geometry instances, nested TRS/matrix transforms, nonuniform scaling and mirrors. A small GLB writer retains original material/texture JSON and embedded bytes, appending transformed vertex/normal/index arrays; this avoids a lossy material conversion through a general mesh exporter. Every output node is identity. The original and exported scenes are independently loaded by trimesh; the exported bytes are re-parsed and checked against the numerical and visual-data contract. This is an internal component API, not a new shared HTTP contract; `/bind` remains a stub.
 
@@ -1080,7 +1097,7 @@ Both use target **[0.73, 1.29, 0.47] m**; absolute post-export dimension errors 
 
 **Important limits and decisions:** normals are inverse-transpose transformed and mirror winding corrected. Tangents and normal maps explicitly raise `UnsupportedMesh`; their preservation is not claimed. Animated/skinned/morphed/extended/compressed assets, external images, unsupported accessors and unreachable scene nodes also fail closed. `BINDING.md` records the supported subset and size limits. The complex example's distortion ratio is **3.1697**, correctly labeled `proxy_recommended` despite passing dimensions. The binder returns a validated candidate plus the diagnostic, never silently publishes or substitutes a proxy; all results require visual review. The provenance marker rejects accidental double binding, but cannot prevent external removal of every marker; callers must retain immutable raw identities. A 1 mm software check does not establish physical measurement accuracy or room fit.
 
-No further implementation step is authorized by this evidence. Next B04-specific action is review of a genuine raw generated GLB with Justin after B02 becomes available; do not resume B02 or start B05 automatically.
+That checkpoint's stop rule is historical. The current user instruction authorizes completion, push and merge; the saved real mesh now passes v2 binding and CPU visual review.
 
 ## 11. Sources and compact HTN requirements appendix
 

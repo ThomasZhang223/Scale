@@ -12,9 +12,10 @@ import trimesh
 
 from .glb import (BindingError, UnsupportedMesh, require, canonical, unpack, pack,
                   accessor, append_array, instances, primitive_arrays, validate_features, view_bytes)
+from .tangents import tangent_frames
 
-BINDER_VERSION = "ani-bind-v1"
-EXPORTER_VERSION = "ani-glb-preserve-v1"
+BINDER_VERSION = "ani-bind-v2"
+EXPORTER_VERSION = "ani-glb-preserve-v2"
 MARKER = "ani_scale_binding"
 TOLERANCE = 0.001
 
@@ -122,8 +123,8 @@ def _visual_signature(doc, binary):
 def bind_glb(raw_glb, bbox_meters, orientation_profile, *, scope):
     """Return serialized/reloaded contract evidence or raise BindingError.
 
-    Normals are inverse-transpose transformed; tangents and normal maps explicitly
-    raise UnsupportedMesh until their visual preservation can be established.
+    Normals use inverse transpose; tangent frames use final positions/normals/UV0
+    and mirror-corrected indices. Unconstructible normal-map bases fail closed.
     """
     try:
         return _bind(raw_glb, bbox_meters, orientation_profile, scope)
@@ -182,10 +183,11 @@ def _bind(raw_glb, bbox, orientation, scope):
     out["scene"] = 0
     out["asset"].setdefault("extras", {})[MARKER] = provenance
     transforms, expected, generated_normals = [], [], 0
+    tangent_primitives, seam_vertices = 0, 0
     for node_id, world, primitive, vertices, faces in primitives:
         final = transform @ world
         p = copy.deepcopy(primitive)
-        p["attributes"]["POSITION"] = append_array(out, blob, _transform(vertices, final))
+        positions = _transform(vertices, final).astype("<f4").astype(float)
         if "NORMAL" in primitive["attributes"]:
             normals = accessor(doc, binary, primitive["attributes"]["NORMAL"]).astype(float)
         else:
@@ -198,9 +200,27 @@ def _bind(raw_glb, bbox, orientation, scope):
         lengths = np.linalg.norm(normals, axis=1)
         require(np.isfinite(normals).all() and np.all(lengths > 0), "Invalid transformed normals")
         normals /= lengths[:, None]
-        p["attributes"]["NORMAL"] = append_array(out, blob, normals)
+        normals = normals.astype("<f4").astype(float)
         if np.linalg.det(final[:3, :3]) < 0:
             faces = faces[:, ::-1].copy()
+        material = doc.get("materials", [])[primitive["material"]] if "material" in primitive else {}
+        tangents, mapping = None, np.arange(len(vertices))
+        if "normalTexture" in material or "TANGENT" in primitive["attributes"]:
+            require("TEXCOORD_0" in primitive["attributes"], "Normal-map tangent reconstruction requires UV0")
+            uv = accessor(doc, binary, primitive["attributes"]["TEXCOORD_0"])
+            tangents, mapping, faces = tangent_frames(positions, normals, uv, faces)
+            tangent_primitives += 1
+            seam_vertices += len(mapping) - len(vertices)
+            total += len(mapping) - len(vertices)
+            require(total <= 2_000_000, "Instanced tangent seam vertex budget exceeded")
+            p["attributes"]["TANGENT"] = append_array(out, blob, tangents)
+            if len(mapping) != len(vertices):
+                for name, index in primitive["attributes"].items():
+                    if name not in ("POSITION", "NORMAL", "TANGENT"):
+                        p["attributes"][name] = append_array(out, blob, accessor(doc, binary, index)[mapping])
+        normals = normals[mapping]
+        p["attributes"]["POSITION"] = append_array(out, blob, positions[mapping])
+        p["attributes"]["NORMAL"] = append_array(out, blob, normals)
         p["indices"] = append_array(out, blob, faces.reshape((-1, 1)), indices=True)
         mesh_id = len(out["meshes"])
         out["meshes"].append({"primitives": [p], "name": f"bound-instance-{node_id}-{mesh_id}"})
@@ -209,14 +229,14 @@ def _bind(raw_glb, bbox, orientation, scope):
                              "extras": {MARKER: {"bound_key": key}}})
         out["scenes"][0]["nodes"].append(mesh_id)
         transforms.append({"source_node": node_id, "matrix_rows": final.tolist()})
-        expected.append((primitive, normals, faces))
+        expected.append((primitive, normals, faces, tangents, mapping))
     result = pack(out, blob)
     reloaded, reloaded_binary = unpack(result)
     validate_features(reloaded, reloaded_binary)
     points = []
     reloaded_instances = instances(reloaded)
     require(len(reloaded_instances) == len(primitives), "Lost geometry instances")
-    for (_, matrix, mesh), (source, normals, faces) in zip(reloaded_instances, expected):
+    for (_, matrix, mesh), (source, normals, faces, tangents, mapping) in zip(reloaded_instances, expected):
         require(np.array_equal(matrix, np.eye(4)), "Export contains nonidentity node transform")
         p = mesh["primitives"][0]
         vertices, actual_faces = primitive_arrays(reloaded, reloaded_binary, p)
@@ -224,9 +244,14 @@ def _bind(raw_glb, bbox, orientation, scope):
         require(np.array_equal(actual_faces, faces), "Topology changed during export")
         require(np.allclose(accessor(reloaded, reloaded_binary, p["attributes"]["NORMAL"]), normals, atol=1e-6, rtol=0), "Normals changed")
         require(p.get("material") == source.get("material"), "Material assignment changed")
+        if tangents is not None:
+            actual = accessor(reloaded, reloaded_binary, p["attributes"]["TANGENT"])
+            require(np.allclose(actual, tangents, atol=1e-6, rtol=0), "Tangents changed during export")
+            require(np.all(np.abs(np.sum(actual[:, :3] * normals, axis=1)) <= 1e-6),
+                    "Serialized tangents are not orthogonal to normals")
         for name, index in source["attributes"].items():
-            if name not in ("POSITION", "NORMAL"):
-                require(np.array_equal(accessor(doc, binary, index), accessor(reloaded, reloaded_binary, p["attributes"][name])), "Visual attribute changed")
+            if name not in ("POSITION", "NORMAL", "TANGENT"):
+                require(np.array_equal(accessor(doc, binary, index)[mapping], accessor(reloaded, reloaded_binary, p["attributes"][name])), "Visual attribute changed")
     measured = _bounds(points)
     _scene(result, measured)
     measured_extents = measured[1] - measured[0]
@@ -243,7 +268,9 @@ def _bind(raw_glb, bbox, orientation, scope):
               "validation": "PASS", "export_reloaded": True, "primitive_instances": len(primitives),
               "materials": len(doc.get("materials", [])), "textures": len(doc.get("textures", [])),
               "embedded_image_hashes": visual["image_hashes"], "generated_normal_primitives": generated_normals,
-              "tangent_normal_map_support": "unsupported_rejected", "physical_measurement_accuracy": "not_established",
+              "tangent_normal_map_support": "recomputed_final_geometry_angle_weighted",
+              "tangent_primitives": tangent_primitives, "tangent_seam_vertices": seam_vertices,
+              "physical_measurement_accuracy": "not_established",
               "numpy": np.__version__, "trimesh": trimesh.__version__}
     return BoundArtifact(result, canonical(report).decode())
 

@@ -82,18 +82,18 @@ Replace `--text` with `--image C:/data/query.jpg` for a photo. Output gives rank
 and local embedding/search times; scores are not probabilities. This local command
 requires the sibling services/search checkout (the gen-only Docker image omits it).
 
-Current real merchant samples contain dimension text but omit images, product IDs
-and prices. Paul must supply 5–10 real image files with object/variant identity,
-measurement provenance/confidence, and price/currency only where known. Until
-then the committed tests are adapter evidence, not catalog relevance evidence.
+Latest main includes 100 real downloaded images and extracted metadata in
+`services/ingest/prebake/manifest.json`. This supersedes the earlier missing-image
+status; extraction metadata is not independently measured physical accuracy.
+The committed tests prove adapters, not catalog relevance.
 
-## New Paul image manifest (0888470)
+## Current Paul image manifest
 
-`origin/main` advanced during this work, after the one authorized merge. Read-only
-inspection found Paul's new `services/ingest/build_prebake.py`; it builds
-`{products:[{productId,merchant,title,r2Key,bboxMeters,measure,...}]}` and can download
-images. Its commit contains fake-storefront tests, not real downloaded data.
-No second merge or catalog crawl was performed.
+The normal main sync includes `services/ingest/build_prebake.py` and downloaded
+`{products:[{productId,merchant,title,r2Key,bboxMeters,measure,...}]}` data.
+No additional crawl/download was performed in this binding completion run.
+Paul's HTTP `/index` and `/search` now require `X-Upstream-Token`; configure
+`UPSTREAM_TOKEN` securely at service startup and send the matching header.
 
 Ani's `catalog_manifest` importer consumes its **downloaded** output. Thomas must
 supply a JSON mapping from each `catalog/merchant/productId/source.jpg` key to the
