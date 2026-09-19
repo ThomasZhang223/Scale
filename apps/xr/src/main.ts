@@ -5,7 +5,7 @@ import { buildRoomFromScan, type BuiltRoom, type ScannedObject } from './roomSca
 import { ObjectLoader, type LoadedObject } from './objects';
 import { createPhysics } from './physics';
 import { Interaction } from './interaction';
-import { watchRoomScan, uploadRoomScan, supabase } from './sync';
+import { getRoom, getObject, objectToItem, boundsMismatch, watchRoom, STUB, type ObjectV1 } from './api';
 import { Palette, type PaletteItem } from './palette';
 import { matchDetected } from './placement';
 import roomDemo from '../../../fixtures/room-demo.json';
@@ -13,9 +13,13 @@ import roomDemo from '../../../fixtures/room-demo.json';
 /*
  * Stand inside a RoomPlan room scan, with scanned objects (GLBs) in it.
  *
- * Room: loaded from ?scan=<url>, else the committed fixtures/room-demo.json (RoomCapture v1,
- *   the team contract). Raw RoomPlan CapturedRoom JSON works too. Built at true size, floor at y = 0.
- * Objects: loaded from /objects.json, or dropped onto the page as .glb files.
+ * Room: GET /v1/rooms/{id} from the team's server (RoomCapture v1; ?room=<id> picks one),
+ *   falling back to the committed fixtures/room-demo.json when the server is unreachable.
+ *   ?scan=<url> loads a file instead; raw RoomPlan CapturedRoom JSON works too.
+ *   Built at true size, floor at y = 0.
+ * Objects: from the server (?object=<id>, and every `object` event on the room's live
+ *   feed, GET /v1/sync/{id}) loaded by glbUrl at scale 1 — never rescaled; from
+ *   /objects.json; or dropped onto the page as .glb files.
  *   - Kept at their real-world size (Object Capture exports in meters).
  *   - If its name contains a category RoomPlan detected ("chair.glb", "my-sofa.glb"),
  *     the object takes that piece's place and rotation at start, replacing its grey box.
@@ -24,13 +28,15 @@ import roomDemo from '../../../fixtures/room-demo.json';
  *   - Physics: they land on the floor, can't pass through walls or furniture, stay upright.
  *
  * Works in the Quest Browser (Enter VR) and on a laptop (orbiting view, mouse drag).
- * ?panel=0 hides the panel. Optional Supabase in .env makes new room scans appear live.
+ * ?panel=0 hides the panel.
  */
 
 const params = new URLSearchParams(location.search);
 const SHOW_PANEL = params.get('panel') !== '0';
 const SCAN_URL = params.get('scan'); // null: the committed RoomCapture v1 fixture
 const OBJECTS_URL = params.get('objects') ?? '/objects.json';
+const ROOM_ID = params.get('room') ?? import.meta.env.VITE_ROOM_ID ?? roomDemo.roomId;
+const OBJECT_IDS = params.get('object')?.split(',').filter(Boolean) ?? [];
 
 // ---------- renderer, scene, camera ----------
 
@@ -224,16 +230,72 @@ async function start() {
     say(text + '.');
   }
 
+  // ---------- the server ----------
+
+  /** An Object v1 from the server: loaded by its glbUrl at scale 1, placed, and added to the palette. */
+  async function addServerObject(obj: ObjectV1) {
+    let item;
+    try {
+      item = objectToItem(obj);
+    } catch (err) {
+      return say(`${obj.name ?? obj.objectId}: ${(err as Error).message}.`);
+    }
+    if (catalog.some((c) => c.url === item.url)) return; // the feed can repeat an object
+    const entry: PaletteItem = { url: item.url, name: item.name, scale: 1 };
+    catalog.push(entry);
+    palette.setItems(catalog);
+    renderCatalog();
+    try {
+      const loaded = await loader.load(item.url, 1);
+      entry.size = loaded.size;
+      palette.setItems(catalog);
+      renderCatalog();
+      const placed: PlacedObject = { id: crypto.randomUUID(), name: item.name, loaded };
+      objects.set(placed.id, placed);
+      if (currentRoom && rise >= 1) place(placed); // otherwise placed when the walls are up
+      const mismatch = boundsMismatch(loaded.size, item.expected);
+      if (mismatch) {
+        console.warn(`${item.name}: ${mismatch}`);
+        say(`${item.name}: ${mismatch}.`);
+      }
+    } catch (err) {
+      console.error(`Loading ${item.name} from ${item.url} failed:`, err);
+      say(`Couldn’t load ${item.name} from the server: ${(err as Error).message}`);
+    }
+  }
+
+  async function loadServerObjects() {
+    for (const id of OBJECT_IDS) {
+      try {
+        await addServerObject(await getObject(id));
+      } catch (err) {
+        say(`Object ${id}: ${(err as Error).message}`);
+      }
+    }
+  }
+
   // ---------- loading ----------
 
-  async function loadScanFile() {
-    if (!SCAN_URL) return showScan(roomDemo, 'room-demo.json');
+  async function loadRoom() {
+    if (SCAN_URL) {
+      try {
+        const res = await fetch(SCAN_URL);
+        if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+        showScan(await res.json(), SCAN_URL.split('/').pop() ?? 'Room scan');
+        setConnection('file');
+      } catch (err) {
+        say(`Couldn’t load ${SCAN_URL}: ${(err as Error).message}. Drop a scan file onto the page instead.`);
+      }
+      return;
+    }
     try {
-      const res = await fetch(SCAN_URL);
-      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-      showScan(await res.json(), SCAN_URL.split('/').pop() ?? 'Room scan');
+      const scan = await getRoom(ROOM_ID);
+      showScan(scan, `Room ${ROOM_ID.slice(0, 8)}… from the server`);
+      setConnection(STUB ? 'stub' : 'server');
     } catch (err) {
-      say(`Couldn’t load ${SCAN_URL}: ${(err as Error).message}. Drop a scan file onto the page instead.`);
+      console.warn('The server did not answer; showing the committed fixture instead.', err);
+      showScan(roomDemo, 'room-demo.json (fixture)');
+      setConnection('offline');
     }
   }
 
@@ -272,9 +334,17 @@ async function start() {
     renderCatalog();
   }
 
-  await loadScanFile();
+  await loadRoom();
   void loadManifest();
-  watchRoomScan((scan) => showScan(scan, 'Live scan'), setConnection);
+  void loadServerObjects();
+  if (!SCAN_URL) {
+    watchRoom(ROOM_ID, {
+      object: (obj) => void addServerObject(obj),
+      version: (v) => console.info('A new version was pushed:', v.versionId), // placements: not rendered yet
+      fit: (report) => console.info('Fit report:', report), // drawing it in red is the next step
+      status: setConnection,
+    });
+  }
 
   // ---------- panel actions ----------
 
@@ -305,9 +375,7 @@ async function start() {
       return say(`${file.name} isn’t valid JSON. Export the CapturedRoom with JSONEncoder and try again.`);
     }
     showScan(scan, file.name);
-    if (supabase) {
-      uploadRoomScan(scan).catch((err) => say(`Showing ${file.name} here; sending it to headsets failed: ${err.message}`));
-    }
+    setConnection('file');
   }
 
   document.getElementById('reset')!.addEventListener('click', () => {
@@ -337,16 +405,17 @@ async function start() {
   });
 }
 
-function setConnection(status: string) {
-  const labels: Record<string, string> = {
-    SUBSCRIBED: 'Live: new room scans appear automatically',
-    NOT_CONFIGURED: 'Local files only (Supabase not set up)',
-    CLOSED: 'Offline',
-    CHANNEL_ERROR: 'Connection error: check Realtime is on for rooms',
-    TIMED_OUT: 'Connection timed out',
+function setConnection(status: 'stub' | 'server' | 'live' | 'nosync' | 'offline' | 'file') {
+  const labels = {
+    stub: 'Server: stub data (X-Stub: 1)',
+    server: 'Server: connected',
+    live: 'Live: new objects appear as the phone pushes them',
+    nosync: 'Server answered; the live feed isn’t available yet (retrying)',
+    offline: 'Server unreachable: showing the committed fixture',
+    file: 'Local file',
   };
-  connection.textContent = labels[status] ?? 'Connecting…';
-  connection.dataset.live = String(status === 'SUBSCRIBED');
+  connection.textContent = labels[status];
+  connection.dataset.live = String(status === 'live');
 }
 
 function describe(o: PlacedObject) {

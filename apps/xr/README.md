@@ -96,7 +96,9 @@ until you pull it out.
 | `src/objects.ts` | GLB → real-size object with a bottom-center origin and hull points; fixes cm/mm files |
 | `src/physics.ts` | Rapier world: solid room, upright objects, free-spot search, collision-aware dragging |
 | `src/interaction.ts` | Quest controllers and laptop mouse, both moving objects through physics |
-| `src/sync.ts` | Optional Supabase live room updates |
+| `src/api.ts` | The team's `/v1` API: room, objects by `glbUrl`, the SSE live feed, schema and bbox checks |
+| `src/palette.ts` | The wrist palette in VR |
+| `src/halo.ts` | Blue halo on the pointed-at / held object |
 | `public/room-scan.json` | Sample room (off-center like a real ARKit scan) |
 | `public/objects.json` | Objects loaded at start |
 | `public/objects/` | Sample chair and sofa (CC BY 4.0, see `ATTRIBUTION.md`) |
@@ -125,8 +127,22 @@ the controller ray, and textures (the Node test couldn't decode them). If frame 
 drops, optimize the GLBs first:
 `npx @gltf-transform/cli optimize in.glb out.glb --compress draco --texture-compress webp`.
 
-## Optional: live room scans
+## The server
 
-Create a Supabase project, run `supabase/schema.sql`, copy `.env.example` to `.env` with
-the URL and anon key. Room scans written to the `rooms` row (id `demo`) appear live in
-every open headset. Objects are local to each page for now.
+The page talks to the team's Worker (Thomas's, `workers/`) exactly as `.claude/contracts.md`
+lays out, and every request carries `X-Stub: 1` by default, so his committed fixtures come
+back until the real backend exists:
+
+- `GET /v1/rooms/{id}` — the room at start (`?room=<id>`; default `VITE_ROOM_ID`, else the
+  fixture's id). If the server doesn't answer, the committed fixture is shown and the panel
+  says so.
+- `GET /v1/objects/{id}` — `?object=<id>[,<id>]` loads objects by their `glbUrl` at scale 1.
+  A GLB is never rescaled here; if its box differs from `bboxMeters` by more than 1 mm, the
+  panel says the normalisation contract broke upstream.
+- `GET /v1/sync/{roomId}` — the room's live feed. Every `object` event with `state: "ready"`
+  is loaded and placed. `version` and `fit` events are logged for now.
+
+In dev, Vite proxies `/v1` to `VITE_API_PROXY` (default `http://127.0.0.1:8787`, i.e.
+`wrangler dev` in `workers/`), so there's no CORS to configure and the Quest reaches it over
+the same USB port-forward. Copy `.env.example` to `.env` to change any of this;
+`VITE_API_STUB=0` drops the stub header.
