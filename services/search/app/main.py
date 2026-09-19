@@ -15,9 +15,10 @@ from __future__ import annotations
 import logging
 import os
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
 
+from .auth import require_upstream_token
 from .index import BruteForceIndex, candidate_from_object_v1
 from .ranking import fit_bounds_mm, rank
 
@@ -62,7 +63,7 @@ async def _embed(text: str | None, image_key: str | None) -> tuple[list[float] |
         return None, "embedder-unavailable"
 
 
-@app.post("/search")
+@app.post("/search", dependencies=[Depends(require_upstream_token)])
 async def search(request: Request):
     body = await request.json()
 
@@ -114,7 +115,7 @@ async def search(request: Request):
     return JSONResponse(content=payload, headers=headers)
 
 
-@app.post("/index")
+@app.post("/index", dependencies=[Depends(require_upstream_token)])
 async def index_objects(request: Request):
     """Load `Object v1` rows for ranking. Ani's pipeline calls this on state:"ready"."""
     body = await request.json()

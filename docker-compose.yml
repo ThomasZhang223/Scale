@@ -5,27 +5,61 @@
 # that nobody has to add an entry later and collide with someone else's edit. An empty
 # placeholder costs nothing; a merge conflict at hour 20 costs the demo.
 
+# Local-edge note (thomas/local-edge panel): the four port lines below were
+# <host>:<host> before this pass, mapping to a container port nothing listens on — every
+# container binds uvicorn on 8000 (fit, gen) or 8080 (ingest, search), never on its host
+# port. Fixed to <host>:<container>. Same panel added the profiles, restart, env_file, and
+# healthcheck lines below; see infra/README.md for why.
+
 services:
   fit:
     # Owner: Justin. Solver service — reads RoomCapture v1 and bboxMeters, answers /solve.
     build: ./services/fit
     ports:
-      - "8001:8001"
+      - "8001:8000"
+    profiles: ["local"]
+    restart: unless-stopped
+    env_file: infra/.env
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   gen:
     # Owner: Ani. Baseten image-to-3D, the scale binding, embeddings.
+    # Profile "unused": generation runs on Baseten, not on this laptop. A bare
+    # `docker compose up` with no --profile starts nothing, which is loud, rather than
+    # starting the wrong three services quietly. Left otherwise untouched — Ani's file.
     build: ./services/gen
     ports:
-      - "8002:8002"
+      - "8002:8000"
+    profiles: ["unused"]
 
   ingest:
     # Owner: Paul. Catalog scraper and extractor.
     build: ./services/ingest
     ports:
-      - "8003:8003"
+      - "8003:8080"
+    profiles: ["local"]
+    restart: unless-stopped
+    env_file: infra/.env
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   search:
     # Owner: Paul. Ranking service, answers /search.
     build: ./services/search
     ports:
-      - "8004:8004"
+      - "8004:8080"
+    profiles: ["local"]
+    restart: unless-stopped
+    env_file: infra/.env
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 5

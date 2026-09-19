@@ -1,0 +1,31 @@
+# NOT USED TODAY. Fully commented out.
+#
+# This project runs on the free Cloudflare tier with no domain, so infra/up.sh starts three
+# independent quick tunnels — `cloudflared tunnel --url http://localhost:PORT`, one per
+# service — each getting its own random *.trycloudflare.com hostname on every run. A quick
+# tunnel takes exactly one origin; it cannot do the hostname routing this file describes.
+#
+# This file is the upgrade path for the day a domain sits on Cloudflare DNS: one named tunnel,
+# one long-lived `cloudflared` process, routing every service by hostname instead of three
+# separate quick-tunnel processes with URLs that change on every restart. Nothing below runs
+# until that day.
+#
+# Setup this file assumes, once a domain exists:
+#   cloudflared tunnel login
+#   cloudflared tunnel create full-scale-local
+#   # then fill in the tunnel id and credentials path below, add a CNAME per hostname, and
+#   # run: cloudflared tunnel run full-scale-local
+#
+# tunnel: <tunnel-id, printed by `cloudflared tunnel create`>
+# credentials-file: ~/.cloudflared/<tunnel-id>.json
+#
+# ingress:
+#   - hostname: fit.<your-domain>
+#     service: http://localhost:8001
+#   - hostname: search.<your-domain>
+#     service: http://localhost:8004
+#   - hostname: ingest.<your-domain>
+#     service: http://localhost:8003
+#   - hostname: xr-dev.<your-domain>
+#     service: http://localhost:5173
+#   - service: http_status:404

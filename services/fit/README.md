@@ -21,12 +21,29 @@ ottoman, or go 20 cm narrower on the couch."
 
 ## How this runs
 
-This is a **standalone HTTP service in Docker**. Thomas's Cloudflare Worker proxies `/v1/fit`
-and `/v1/solve` to it verbatim. The service is stateless: it receives everything it needs in
-the request body and never fetches a room itself.
+This is a **standalone HTTP service in Docker**, reached from Cloudflare through a quick
+tunnel — see `infra/README.md` for the laptop side of that hop. The service is stateless: it
+receives everything it needs in the request body and never fetches a room itself.
 
-This means the internal contract here is identical to the public one in
-`.claude/contracts.md` — there is only one shape to agree on, not two.
+The tunnel hop means there are **two shapes, not one.** The public surface in
+`.claude/contracts.md` is what the phone and headset call:
+
+```
+POST /v1/fit    { roomId, versionId }
+POST /v1/solve  { roomId, intent, budgetCents?, fixed[] }
+```
+
+The `RoomAgent` Durable Object hydrates that into what this service actually receives over the
+tunnel, headers `X-Upstream-Token`:
+
+```
+POST /fit    { schemaVersion, room: <RoomCapture v1>, placements: [<Placement v1>] }
+POST /solve  { schemaVersion, room: <RoomCapture v1>, candidates: [<Object v1>],
+               fixed: [<Placement v1>], plan: <ConstraintPlan v1> }
+```
+
+`candidates` carries `bboxMeters` and nothing else — that field is all this service reads. See
+`infra/README.md` for the full hop and the `ConstraintPlan v1` shape.
 
 ## Run
 
