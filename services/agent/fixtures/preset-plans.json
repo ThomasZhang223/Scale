@@ -1,0 +1,40 @@
+{
+  "note": "Hand-written constraint plans, one per preset. Used when the planner (OpenAI) is unavailable, and as the deterministic planner in tests. Targets use the room-facts ids for the sample room: door d1 (south), window win1 (north).",
+  "reading_corner": {
+    "text": "Reading corner by the window",
+    "summary": "Reading corner by the window",
+    "rules": [
+      { "id": "r1", "type": "near", "a": "obj_chair", "b": "window:win1", "maxCm": 100, "priority": "must", "why": "Reading needs daylight" },
+      { "id": "r2", "type": "facing", "a": "obj_chair", "target": "center", "priority": "should", "weight": 5, "why": "Faces into the room, not the wall" }
+    ],
+    "remember": []
+  },
+  "open_floor": {
+    "text": "Open up the floor",
+    "summary": "Open up the floor",
+    "rules": [
+      { "id": "r1", "type": "against_wall", "a": "obj_sofa", "wall": "any", "priority": "must", "why": "Big pieces go to the walls" },
+      { "id": "r2", "type": "against_wall", "a": "obj_chair", "wall": "any", "priority": "should", "weight": 6, "why": "Clears the middle of the room" },
+      { "id": "r3", "type": "keep_clear", "zone": "walkway", "marginCm": 90, "priority": "must", "why": "Wide walkways" }
+    ],
+    "remember": []
+  },
+  "clear_door": {
+    "text": "Clear the door",
+    "summary": "Clear the door",
+    "rules": [
+      { "id": "r1", "type": "far_from", "a": "obj_sofa", "b": "door:d1", "minCm": 180, "priority": "must", "why": "Nothing near the door" },
+      { "id": "r2", "type": "far_from", "a": "obj_chair", "b": "door:d1", "minCm": 120, "priority": "should", "weight": 4, "why": "Keep the approach open" }
+    ],
+    "remember": []
+  },
+  "face_window": {
+    "text": "Face the window",
+    "summary": "Face the window",
+    "rules": [
+      { "id": "r1", "type": "facing", "a": "obj_sofa", "target": "window:win1", "priority": "must", "why": "Asked for the view" },
+      { "id": "r2", "type": "facing", "a": "obj_chair", "target": "window:win1", "priority": "should", "weight": 5, "why": "Same view for the chair" }
+    ],
+    "remember": []
+  }
+}

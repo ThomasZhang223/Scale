@@ -1,52 +1,53 @@
-"""services/fit — HTTP surface stubs.
+"""services/fit — HTTP surface.
 
-Two routes, not implemented yet:
-  POST /fit   — VALIDATOR. See app/README.md for the four checks it owes.
-  POST /solve — OPTIMISER. Grid discretisation + OR-Tools/scipy.optimize.
+  POST /fit   — VALIDATOR (app/fit.py). Body: { room: RoomCapture v1, placements: Placement v1[],
+                objects?: { [objectId]: bboxMeters } }. This service is stateless and never
+                fetches a room, so the Worker inlines the room and each object's bboxMeters
+                when it proxies the public { roomId, placements } shape here.
+  POST /solve — OPTIMISER. Grid discretisation + OR-Tools/scipy.optimize. Not implemented yet.
 
-Neither route implements any geometry or solving here. Both return HTTP 501
-naming the route, per the scaffold-only scope of this pass.
+local-edge patch: token gate for the tunnel hop (app/auth.py), applied per-route like
+services/search/app/main.py — a quick-tunnel URL is unguessable but fully public, and this
+header is the only thing between the open internet and the solver on Thomas's laptop. /health
+stays ungated: the Docker healthcheck calls it with no token, and workers/src/routes/index.ts's
+getUpstreamHealth calls `${origin}/health`. See infra/README.md.
 """
 
-from fastapi import APIRouter, Depends, FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from .auth import require_upstream_token
+from .fit import fit as run_fit
 
 app = FastAPI(title="fit")
 
-# local-edge patch: token gate for the tunnel hop (app/auth.py), plus /health for the
-# container healthcheck. The gate is a router dependency, not a FastAPI(dependencies=...)
-# global one — a global app-level dependency covers every included router too, including
-# /health, and the container healthcheck carries no token. Path is /health, not /healthz —
-# workers/src/routes/index.ts's getUpstreamHealth calls `${origin}/health`. See
-# infra/README.md.
-health_router = APIRouter()
 
-
-@health_router.get("/health")
+@app.get("/health")
 async def health():
     return {"status": "ok"}
 
 
-api_router = APIRouter(dependencies=[Depends(require_upstream_token)])
-
-
-@api_router.post("/fit")
+@app.post("/fit", dependencies=[Depends(require_upstream_token)])
 async def fit(request: Request):
-    return JSONResponse(
-        status_code=501,
-        content={"error": "not implemented", "route": "POST /fit"},
-    )
+    body = await request.json()
+    room = body.get("room")
+    if not isinstance(room, dict):
+        return JSONResponse(
+            status_code=422,
+            content={
+                "error": "room required",
+                "message": "POST /fit is stateless: inline the RoomCapture v1 as `room` and each placed object's bboxMeters as `objects`",
+            },
+        )
+    try:
+        return run_fit(room, body.get("placements") or [], body.get("objects"))
+    except (ValueError, KeyError, TypeError) as err:
+        return JSONResponse(status_code=422, content={"error": "unfit input", "message": str(err)})
 
 
-@api_router.post("/solve")
+@app.post("/solve", dependencies=[Depends(require_upstream_token)])
 async def solve(request: Request):
     return JSONResponse(
         status_code=501,
         content={"error": "not implemented", "route": "POST /solve"},
     )
-
-
-app.include_router(health_router)
-app.include_router(api_router)

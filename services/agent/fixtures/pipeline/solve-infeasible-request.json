@@ -1,0 +1,21 @@
+{
+  "room": {
+    "boundsCm": { "minX": -205, "maxX": 205, "minZ": -175, "maxZ": 175 },
+    "doors": [{ "id": "d1", "keepOut": { "minX": 35, "maxX": 125, "minZ": 85, "maxZ": 175 } }],
+    "windows": [{ "id": "win1", "xCm": -50, "zCm": -175, "widthCm": 120, "side": "north" }],
+    "walls": [
+      { "id": "n1", "side": "north" }, { "id": "s1", "side": "south" },
+      { "id": "e1", "side": "east" }, { "id": "w1", "side": "west" }
+    ]
+  },
+  "objects": [
+    { "id": "obj_sofa", "widthCm": 219, "depthCm": 102, "xCm": 0, "zCm": -124, "rotDeg": 0, "movable": true },
+    { "id": "obj_chair", "widthCm": 83, "depthCm": 57, "xCm": 140, "zCm": 30, "rotDeg": 270, "movable": true },
+    { "id": "obj_table", "widthCm": 100, "depthCm": 60, "xCm": 0, "zCm": 28, "rotDeg": 0, "movable": false },
+    { "id": "obj_storage", "widthCm": 80, "depthCm": 40, "xCm": -185, "zCm": 80, "rotDeg": 90, "movable": false }
+  ],
+  "rules": [
+    { "id": "r1", "type": "near", "a": "obj_chair", "b": { "point": [80, 175] }, "maxCm": 30, "priority": "must" }
+  ],
+  "settings": { "walkwayCm": 60, "timeLimitMs": 2000 }
+}
