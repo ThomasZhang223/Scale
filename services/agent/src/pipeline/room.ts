@@ -228,8 +228,10 @@ export function solverRoom(geo: RoomGeometry, doorKeepOutGrowCm = 0): SolverRequ
   const doors = geo.doors.map((d) => {
     const side = wallSide(geo, d.wallId);
     const cx = Math.round(d.center[0] * 100), cz = Math.round(d.center[1] * 100);
-    const half = Math.round(d.width * 50);
-    const depth = Math.round(d.width * 100) + doorKeepOutGrowCm;
+    // Slightly wider and deeper than the door itself: the fit engine measures in exact metres,
+    // the solver in whole centimetres, and a 1 cm shortfall would read as a blocked walkway.
+    const half = Math.round(d.width * 50) + 2;
+    const depth = Math.round(d.width * 100) + 5 + doorKeepOutGrowCm;
     const b = geo.bounds;
     const keepOut =
       side === 'south' ? { minX: cx - half, maxX: cx + half, minZ: b.maxZ - depth, maxZ: b.maxZ }

@@ -54,7 +54,7 @@ export const PLAN_SCHEMA = {
   },
 };
 
-export function validatePlan(plan: Plan, facts: RoomFacts): string[] {
+export function validatePlan(plan: Plan, facts: RoomFacts, options: { trusted?: boolean } = {}): string[] {
   const errors: string[] = [];
   const objectIds = facts.objects.map((o) => o.id);
   const list = objectIds.join(', ');
@@ -68,9 +68,12 @@ export function validatePlan(plan: Plan, facts: RoomFacts): string[] {
   const pinned = new Set(facts.pinned);
 
   if (!Array.isArray(plan.rules)) return ['rules must be a list'];
-  if (plan.rules.length > MAX_RULES) errors.push(`too many rules (${plan.rules.length}); keep the ${MAX_RULES} most important`);
-  const musts = plan.rules.filter((r) => r.priority === 'must').length;
-  if (musts > MAX_MUST) errors.push(`too many must rules (${musts}); keep the ${MAX_MUST} most important`);
+  // Generated preset plans have one rule per object and are trusted; the model's plans are capped.
+  if (!options.trusted) {
+    if (plan.rules.length > MAX_RULES) errors.push(`too many rules (${plan.rules.length}); keep the ${MAX_RULES} most important`);
+    const musts = plan.rules.filter((r) => r.priority === 'must').length;
+    if (musts > MAX_MUST) errors.push(`too many must rules (${musts}); keep the ${MAX_MUST} most important`);
+  }
 
   for (const r of plan.rules) {
     const id = r.id || '?';
@@ -190,7 +193,9 @@ export function buildSolverRequest(
   geo: RoomGeometry,
   objects: SolverRequest['objects'],
   rules: SolverRule[],
-  settings: { walkwayCm: number; timeLimitMs: number; doorKeepOutGrowCm?: number },
+  settings: { walkwayCm: number; timeLimitMs: number; doorKeepOutGrowCm?: number; closePairs?: [string, string, number][] },
 ): SolverRequest {
-  return { room: solverRoom(geo, settings.doorKeepOutGrowCm ?? 0), objects, rules, settings: { walkwayCm: settings.walkwayCm, timeLimitMs: settings.timeLimitMs } };
+  const out: SolverRequest = { room: solverRoom(geo, settings.doorKeepOutGrowCm ?? 0), objects, rules, settings: { walkwayCm: settings.walkwayCm, timeLimitMs: settings.timeLimitMs } };
+  if (settings.closePairs?.length) out.settings.closePairs = settings.closePairs;
+  return out;
 }

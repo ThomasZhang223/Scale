@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 
 EXPECTED_SCHEMA_VERSION = 1
 CLEARANCE_M = 0.9  # walkway width, also the depth of the corridor kept clear at a door
-WALL_GAP_MIN_M = 0.01  # closer than this counts as touching the wall
+WALL_GAP_MIN_M = 0.015  # closer than this counts as touching the wall (the solver works in whole cm)
 WALL_GAP_MAX_M = 0.04  # further than this is deliberate, not "floating"
 WINDOW_PATCH_DEPTH_M = 0.6  # floor in front of a window that direct light reaches
 EDGE_SAMPLE_M = 0.02
@@ -200,8 +200,8 @@ def polygons_overlap(a: list[Vec], b: list[Vec]) -> bool:
             axis = (-(q[1] - p[1]), q[0] - p[0])
             pa = [dot(v, axis) for v in a]
             pb = [dot(v, axis) for v in b]
-            if max(pa) < min(pb) or max(pb) < min(pa):
-                return False
+            if max(pa) <= min(pb) + 1e-6 or max(pb) <= min(pa) + 1e-6:
+                return False  # touching along an edge is not overlapping
     return True
 
 
@@ -264,6 +264,8 @@ def clearance(room: Room, placed: list[Placed]) -> list[dict]:
         for p in placed:
             if polygons_overlap(p.corners(), corridor):
                 depth = overlap_depth(p.corners(), corridor, door.wall.normal_in)
+                if depth < 0.005:
+                    continue  # a solver's whole-centimetre position grazing the corridor edge
                 out.append(
                     violation(
                         "clearance", "block", p.placement_id, depth,

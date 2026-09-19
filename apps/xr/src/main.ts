@@ -97,8 +97,8 @@ const fitOverlay = new FitOverlay();
 scene.add(fitOverlay.group);
 
 const PALETTE_ACTIONS: PaletteItem[] = [
-  { url: '', name: 'Reset room', action: 'reset' },
-  { url: '', name: 'Clear objects', action: 'clear' },
+  { url: '', name: 'Reset room', action: 'reset', section: 'Room' },
+  { url: '', name: 'Clear objects', action: 'clear', destructive: true, section: 'Room' },
 ];
 const ghosts = new Ghosts();
 scene.add(ghosts.group);
@@ -137,6 +137,20 @@ let currentVersionId: string | null = null; // parent for the next version we pu
 let lastFitReport: FitReport | null = null;
 let undoAvailable = false;
 let lastTouchedId: string | null = null; // what the turn buttons act on when nothing is held
+let showRules = false; // the Rearrange guidelines, expanded on the wrist
+
+/** What Rearrange does with each kind of object (mirrors services/agent generatedPlan). */
+const REARRANGE_RULES: [string, string][] = [
+  ['sofa', 'wall, facing in; faces the TV'],
+  ['TV / storage / shelf', 'against a wall'],
+  ['bed', 'wall, away from the door'],
+  ['desk', 'wall, near a window'],
+  ['dining table', 'middle of the room'],
+  ['chairs', 'at the table, facing it; else with the sofa'],
+  ['coffee table', 'in front of the sofa'],
+  ['lamps / other', 'a wall, out of the way'],
+  ['always', '90 cm walkways; doors and windows clear'],
+];
 const objects = new Map<string, PlacedObject>();
 const catalog: PaletteItem[] = []; // everything in objects.json, placed or not
 let rise = 1; // 0..1 while the walls rise; objects are placed once it reaches 1
@@ -155,7 +169,8 @@ async function start() {
     onChange: onAgentChange,
   });
   const interaction = new Interaction(renderer, scene, camera, controls, physics, palette, spawn, onAction, layoutChanged, onGrab);
-  const showPalette = () => palette.setItems([...catalog, ...PALETTE_ACTIONS, ...designerTiles(agent.snapshot)]);
+  // Designer tiles first (closest to the hand), then the catalogue, then Reset / Clear.
+  const showPalette = () => palette.setItems([...designerTiles(agent.snapshot), ...catalog, ...PALETTE_ACTIONS]);
   showPalette();
   renderAgentPanel(agent.snapshot);
 
@@ -165,6 +180,10 @@ async function start() {
     if (action.startsWith('preset:')) void askAgent({ preset: action.slice(7) });
     if (action === 'turn:left') turnLast(Math.PI / 2);
     if (action === 'turn:right') turnLast(-Math.PI / 2);
+    if (action === 'rules') {
+      showRules = !showRules;
+      showPalette();
+    }
     if (action === 'accept') void acceptProposal();
     if (action === 'reject') void rejectProposal();
     if (action === 'ask_again') void agent.askAgain();
@@ -193,8 +212,8 @@ async function start() {
 
   /** The wrist's Designer row: preset tiles, or the agent's status, or the proposal and its buttons. */
   function designerTiles(s: AgentSnapshot): PaletteItem[] {
-    const label = (name: string, severity: 'info' | 'warn' = 'info'): PaletteItem => ({ url: '', name, label: true, severity });
-    const tile = (name: string, action: string, accent = false): PaletteItem => ({ url: '', name, action, accent });
+    const label = (name: string, severity: 'info' | 'warn' = 'info'): PaletteItem => ({ url: '', name, label: true, severity, section: 'Designer' });
+    const tile = (name: string, action: string, accent = false): PaletteItem => ({ url: '', name, action, accent, section: 'Designer' });
     switch (s.state) {
       case 'working':
         return [label(s.status || 'Working…'), ...s.log.slice(-3).map((e) => label(e.message, e.severity))];
@@ -216,10 +235,13 @@ async function start() {
         return [label('The room changed.', 'warn'), tile('Ask again', 'ask_again'), tile('Dismiss', 'try_again')];
       default:
         return [
-          label(`Designer${s.solver === 'offline' ? ' (solver offline)' : ''}`),
+          ...(s.solver === 'offline' ? [label('Solver offline', 'warn')] : []),
           tile('Turn 90° left', 'turn:left'),
           tile('Turn 90° right', 'turn:right'),
+          ...(objects.size ? [tile('Rearrange', 'preset:tidy_room', true)] : []), // nothing to rearrange until something is down
           ...(undoAvailable ? [tile('Undo', 'undo')] : []),
+          tile(showRules ? 'Hide rules' : 'Rules', 'rules'),
+          ...(showRules ? REARRANGE_RULES.map(([kind, rule]) => label(`${kind}: ${rule}`)) : []),
         ];
     }
   }
@@ -399,10 +421,10 @@ async function start() {
   }
 
   agentPresets.replaceChildren(
-    ...[['Turn 90° left', 'turn:left'], ['Turn 90° right', 'turn:right']].map(([text, action]) => {
+    ...[['Turn 90° left', 'turn:left'], ['Turn 90° right', 'turn:right'], ['Rearrange', 'preset:tidy_room']].map(([text, action]) => {
       const b = document.createElement('button');
       b.type = 'button';
-      b.className = 'quiet';
+      b.className = action.startsWith('preset:') ? '' : 'quiet';
       b.textContent = text;
       b.addEventListener('click', () => onAction(action));
       return b;
@@ -426,6 +448,7 @@ async function start() {
     objects.clear();
     fitOverlay.clear();
     say('All objects removed.');
+    showPalette();
   }
 
   // ---------- room ----------
@@ -510,6 +533,7 @@ async function start() {
     for (const obj of objects.values()) obj.replaces = undefined;
     for (const obj of objects.values()) place(obj);
     console.table([...objects.values()].map(describe));
+    showPalette();
   }
 
   async function addObject(url: string, name: string, scale?: number) {
@@ -517,7 +541,11 @@ async function start() {
       const loaded = await loader.load(url, scale);
       const obj: PlacedObject = { id: crypto.randomUUID(), objectId: localId(name), name, loaded };
       objects.set(obj.id, obj);
-      if (currentRoom && rise >= 1) place(obj); // otherwise placed when the room is ready
+      lastTouchedId = obj.id;
+      if (currentRoom && rise >= 1) {
+        place(obj); // otherwise placed when the room is ready
+        showPalette();
+      }
     } catch (err) {
       console.error(`Loading ${name} failed:`, err);
       say(`Couldn’t load ${name}: ${(err as Error).message}`);
@@ -537,6 +565,7 @@ async function start() {
       // Straight onto the floor under the ray, no drop: it's being carried, not delivered.
       physics.addObject(obj.id, loaded.node, loaded.size, loaded.hull, spot, 0, 0);
       report(obj);
+      showPalette(); // Rearrange appears with the first object
       return obj.id;
     } catch (err) {
       console.error(`Loading ${item.name} failed:`, err);
@@ -581,7 +610,7 @@ async function start() {
       return say(`${obj.name ?? obj.objectId}: ${(err as Error).message}.`);
     }
     if (catalog.some((c) => c.url === item.url)) return; // the feed can repeat an object
-    const entry: PaletteItem = { url: item.url, name: item.name, scale: 1, objectId: obj.objectId };
+    const entry: PaletteItem = { url: item.url, name: item.name, scale: 1, objectId: obj.objectId, section: 'Furniture' };
     catalog.push(entry);
     showPalette();
     renderCatalog();
@@ -669,7 +698,7 @@ async function start() {
 
   /** A category the agent and the detected boxes will recognise, from a file or manifest name. */
   function categoryOf(name: string): string {
-    const known = ['sofa', 'couch', 'chair', 'table', 'desk', 'bed', 'storage', 'shelf', 'lamp', 'television', 'tv', 'plant'];
+    const known = ['coffee table', 'side table', 'sofa', 'couch', 'armchair', 'chair', 'stool', 'bench', 'dining', 'table', 'desk', 'bed', 'storage', 'shelf', 'bookcase', 'cabinet', 'dresser', 'wardrobe', 'lamp', 'television', 'tv', 'plant', 'rug'];
     const lower = name.toLowerCase();
     return known.find((k) => lower.includes(k)) ?? name.replace(/\.(glb|gltf)$/i, '');
   }
@@ -714,7 +743,7 @@ async function start() {
       console.warn('objects.json could not be read:', err);
       return;
     }
-    for (const o of list) catalog.push({ url: o.url, name: o.name ?? o.url.split('/').pop()!, scale: o.scale });
+    for (const o of list) catalog.push({ url: o.url, name: o.name ?? o.url.split('/').pop()!, scale: o.scale, section: 'Furniture' });
     showPalette();
     renderCatalog();
 

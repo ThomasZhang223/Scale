@@ -51,6 +51,10 @@
       #agent-log:empty { display: none; }
       #agent-log .warn { color: #ffd27a; }
       #agent-log .decision { color: #e8edf2; }
+      #agent-rules summary { cursor: pointer; color: #a9b2bc; font-size: 13px; }
+      #agent-rules table { margin-top: 6px; border-collapse: collapse; font-size: 12px; color: #c3cbd3; }
+      #agent-rules td { padding: 3px 6px 3px 0; vertical-align: top; border-top: 1px solid rgba(255, 255, 255, 0.06); }
+      #agent-rules td:first-child { color: #e8edf2; white-space: nowrap; }
     </style>
   </head>
   <body>
@@ -75,6 +79,20 @@
         <div id="agent-status"></div>
         <div id="agent-buttons"></div>
         <div id="agent-log" aria-live="polite"></div>
+        <details id="agent-rules">
+          <summary>What Rearrange does</summary>
+          <table>
+            <tr><td>sofa</td><td>back against a wall, facing into the room; faces the TV if there is one</td></tr>
+            <tr><td>TV / storage / shelf / cabinet</td><td>against a wall</td></tr>
+            <tr><td>bed</td><td>against a wall, away from the door</td></tr>
+            <tr><td>desk</td><td>against a wall, near a window for daylight</td></tr>
+            <tr><td>dining table</td><td>toward the middle of the room</td></tr>
+            <tr><td>chairs</td><td>if there's a table: pulled up to it, facing it; else grouped with the sofa around the coffee table</td></tr>
+            <tr><td>coffee table</td><td>in front of the sofa</td></tr>
+            <tr><td>lamps, plants, unknown</td><td>against a wall, out of the way</td></tr>
+            <tr><td>always</td><td>90 cm walkways between groups; doors and the 50 cm in front of windows kept clear</td></tr>
+          </table>
+        </details>
       </section>
     </div>
     <script type="module" src="/src/main.ts"></script>

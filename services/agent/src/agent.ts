@@ -23,7 +23,7 @@ import presetPlans from '../fixtures/preset-plans.json';
 
 const ACTIVE: RequestState[] = ['queued', 'reading', 'planning', 'solving', 'checking'];
 const RECENT_USER_MS = 60_000;
-const SOLVER_TIMEOUT_MS = 5000;
+const SOLVER_TIMEOUT_MS = 9000; // the solver's own limit is up to 6 s for full rooms
 
 interface RequestRow {
   id: string;

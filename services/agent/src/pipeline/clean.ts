@@ -25,11 +25,14 @@ function label(name: string) {
   return name.charAt(0).toUpperCase() + name.slice(1);
 }
 
-export function cleanState(state: RoomState, geo: RoomGeometry, pins: string[], requestText: string): CleanResult {
+export function cleanState(state: RoomState, geo: RoomGeometry, pins: string[], requestText: string, wholeRoom = false): CleanResult {
   const log: LogEntry[] = [];
   const objects: CleanResult['objects'] = {};
   const excluded: string[] = [];
   const mentioned = requestText.toLowerCase();
+  // A whole-room request (rearrange / tidy) is about every object, named or not.
+  const names = (o: { category: string; name?: string }) =>
+    wholeRoom || mentioned.includes(o.category.toLowerCase()) || (!!o.name && mentioned.includes(o.name.toLowerCase()));
   const b = geo.bounds;
 
   // Duplicate ids: keep the newer (later) placement.
@@ -66,7 +69,7 @@ export function cleanState(state: RoomState, geo: RoomGeometry, pins: string[], 
       }
     }
     if (o.source === 'box') {
-      const named = mentioned.includes(o.category.toLowerCase()) || mentioned.includes((o.name || '').toLowerCase());
+      const named = names(o);
       if (o.confidence === 'low') {
         movable = false;
         note = 'low-confidence detection';
@@ -92,8 +95,7 @@ export function cleanState(state: RoomState, geo: RoomGeometry, pins: string[], 
       note = undefined;
       log.push(entry('data', `${name} was ${Math.round(overlapCm)} cm inside the wall: freeing it to move.`, 'warn'));
     } else if (Math.abs(pose.exactDeg - pose.rotDeg) > 2 && movable && !pins.includes(objectId)) {
-      const named = mentioned.includes(o.category.toLowerCase());
-      if (named) {
+      if (names(o)) {
         log.push(entry('data', `${name} sits at ${Math.round(pose.exactDeg)}°: snapping it to ${pose.rotDeg}° for this solve.`));
       } else {
         movable = false;

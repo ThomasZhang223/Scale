@@ -247,6 +247,7 @@ Pods/
 
 # macOS
 .DS_Store
+.gstack/
 
 # Expo local env (per-machine API base, never committed)
 .env.local
