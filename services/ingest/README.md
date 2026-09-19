@@ -80,9 +80,22 @@ reachable: 3/6   usable (>=25% fully dimensioned): 1
 `usable` means all three axes parsed, so the product yields a real `bboxMeters`. It exits
 non-zero below 15 usable merchants, so it works as a gate in a script.
 
-Statuses worth knowing: `not_shopify` is the common way a store "disables" the endpoint — it
-returns the HTML shop page with a 200, which a naive check reads as success. `thin` means the
-catalogue is too small to carry its own integration cost.
+### Statuses
+
+| Status | Means |
+| --- | --- |
+| `ok` | Endpoint served a real catalogue. Check the `usable` column before trusting it. |
+| `not_shopify` | The common way a store "disables" the endpoint: it returns the HTML shop page with a **200**, which a naive check reads as success. Also covers JSON with no `products` key. |
+| `blocked` | HTTP 4xx/5xx on `/products.json`, or an egress policy in the way. |
+| `robots_disallow` | `robots.txt` forbids it. Not negotiable — pick another merchant. |
+| `dns_error` | The domain does not resolve. Almost always a typo in `candidates.json`. |
+| `timeout` | Slow host, or it is throttling us. Worth one retry before writing it off. |
+| `tls_error` | Expired or mismatched certificate. |
+| `refused` | Nothing listening on 443. |
+| `thin` | Catalogue too small to carry its own integration cost. |
+
+`dns_error` vs `blocked` is the distinction that saves time on a hand-typed list: one is your
+spelling, the other is the merchant.
 
 It is polite by construction: `robots.txt` is fetched and honoured for `/products.json`, one
 request at a time per host with a delay, a descriptive User-Agent, and public catalogue

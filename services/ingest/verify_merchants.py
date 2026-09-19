@@ -47,6 +47,34 @@ MIN_PRODUCTS = 20
 MIN_DIMENSION_RATE = 0.25
 
 
+def classify_error(e: BaseException) -> tuple[str, str]:
+    """Turn a transport exception into (status, a sentence worth reading).
+
+    With 25 hand-typed candidates, "that domain does not exist" and "that store is refusing
+    us" need different reactions — one is a typo, the other is a dead merchant.
+    """
+    chain = []
+    cur: BaseException | None = e
+    while cur is not None and len(chain) < 6:
+        chain.append(f"{type(cur).__name__}: {cur}")
+        cur = cur.__cause__ or cur.__context__
+    blob = " | ".join(chain).lower()
+
+    if isinstance(e, (httpx.ConnectTimeout, httpx.ReadTimeout, httpx.PoolTimeout)):
+        return "timeout", "timed out — slow host, or it is throttling us"
+    if "nodename nor servname" in blob or "name or service not known" in blob \
+            or "gaierror" in blob or "no address associated" in blob \
+            or "temporary failure in name resolution" in blob:
+        return "dns_error", "domain does not resolve — check the spelling, or the store is gone"
+    if "certificate" in blob or "ssl" in blob or "tls" in blob:
+        return "tls_error", "TLS failed — expired or mismatched certificate"
+    if "refused" in blob:
+        return "refused", "connection refused — nothing listening on 443"
+    if "proxy" in blob or "403 to connect" in blob:
+        return "blocked", "egress policy blocked this host (not the merchant's fault)"
+    return "error", f"{type(e).__name__}: {e}"
+
+
 @dataclass
 class MerchantReport:
     name: str
@@ -131,8 +159,7 @@ def check(client: httpx.Client, name: str, base: str, sample: int) -> MerchantRe
         rep.note = str(e)
         return rep
     except httpx.HTTPError as e:
-        rep.status = "error"
-        rep.note = f"{type(e).__name__}: {e}"
+        rep.status, rep.note = classify_error(e)
         return rep
 
     rep.http_status = 200

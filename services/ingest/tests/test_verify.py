@@ -130,6 +130,44 @@ def test_report_renders():
     assert "usable" in out and "reachable: 2/3" in out
 
 
+def _connect_error(cause: BaseException) -> httpx.ConnectError:
+    """A ConnectError with a realistic __cause__, as httpx raises in the wild."""
+    err = httpx.ConnectError("connection failed")
+    err.__cause__ = cause
+    return err
+
+
+def test_dns_failure_is_named_as_such():
+    import socket
+    # macOS wording; Linux says "Name or service not known". Both must classify the same.
+    for msg in ("[Errno 8] nodename nor servname provided, or not known",
+                "[Errno -2] Name or service not known"):
+        status, note = vm.classify_error(_connect_error(socket.gaierror(msg)))
+        assert status == "dns_error", f"{msg!r} -> {status}"
+        assert "resolve" in note
+
+
+def test_timeout_is_not_a_dns_error():
+    status, note = vm.classify_error(httpx.ConnectTimeout("timed out"))
+    assert status == "timeout" and "timed out" in note
+
+
+def test_refused_connection():
+    status, note = vm.classify_error(_connect_error(ConnectionRefusedError("[Errno 61] Connection refused")))
+    assert status == "refused"
+
+
+def test_tls_failure():
+    import ssl
+    status, note = vm.classify_error(_connect_error(ssl.SSLCertVerificationError("certificate has expired")))
+    assert status == "tls_error" and "certificate" in note
+
+
+def test_unknown_error_still_reports_its_type():
+    status, note = vm.classify_error(httpx.HTTPError("something odd"))
+    assert status == "error" and "HTTPError" in note
+
+
 def test_output_keys_are_camel_case_like_the_example_file():
     """merchants.verified.json must match merchants.example.json's shape — the crawler reads it."""
     import json as _json
