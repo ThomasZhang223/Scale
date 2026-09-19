@@ -1,4 +1,4 @@
-"""Synthetic software checks only. Real SF3D orientation remains BLOCKED_ON_B02."""
+"""Synthetic software checks; real SF3D evidence is recorded separately."""
 import copy
 import io
 from pathlib import Path
@@ -100,7 +100,7 @@ def test_invalid_scene_rejected(edit):
 @pytest.mark.parametrize("edit", [
     lambda d: d.update(animations=[{}]),
     lambda d: d["meshes"][0]["primitives"][0].update(targets=[{}]),
-    lambda d: d["materials"][0].update(normalTexture={"index": 0}),
+    lambda d: d["materials"][0].update(normalTexture={"index": 0, "texCoord": 1}),
     lambda d: d["meshes"][0]["primitives"][0]["attributes"].update(TANGENT=0),
     lambda d: d.update(extensionsUsed=["KHR_draco_mesh_compression"]),
 ])

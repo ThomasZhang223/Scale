@@ -1,0 +1,243 @@
+{
+  "axis_scale": [
+    1.08,
+    1.0,
+    0.96
+  ],
+  "binder": "ani-bind-v2",
+  "bottom_centre_error_meters": [
+    0.0,
+    0.0,
+    0.0
+  ],
+  "bound_key": "61fd4ff9481e26e749e496cfcc037fbba72ed074db941c0be36908fefdb6d092",
+  "bound_sha256": "992d2937335305313b0e5b608a4deacd4766b4930be81166a286992911e95aa3",
+  "dimension_error_meters": [
+    2.622604367008563e-08,
+    0.0,
+    1.1920928910669204e-08
+  ],
+  "distortion_diagnostic": "eligible_for_visual_review",
+  "distortion_ratio": 1.1250000000000002,
+  "embedded_image_hashes": [
+    "cd7354e2f7682bcd2bceb8c1c801d74cbae5690b37bef9e408a0bfa315aa0320",
+    "3559d7dacf962d50566a218008777e071747f839e3b8a12d0a40e385304b7e14"
+  ],
+  "export_reloaded": true,
+  "exporter": "ani-glb-preserve-v2",
+  "generated_normal_primitives": 0,
+  "instance_transforms": [
+    {
+      "matrix_rows": [
+        [
+          1.08,
+          0.0,
+          0.0,
+          0.0013582062721252443
+        ],
+        [
+          0.0,
+          1.0,
+          0.0,
+          0.44422751665115356
+        ],
+        [
+          0.0,
+          0.0,
+          0.96,
+          0.01831732749938965
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "source_node": 1
+    }
+  ],
+  "materials": 1,
+  "measured_meters": [
+    0.5374427437782288,
+    0.9512068629264832,
+    0.5020748972892761
+  ],
+  "numpy": "1.26.4",
+  "orientation": {
+    "evidence": "manual_review",
+    "matrix": [
+      [
+        1.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        1.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "name": "sf3d-chair-6291edef-manual-review",
+    "version": "1"
+  },
+  "orientation_then_binding_matrix_rows": [
+    [
+      1.08,
+      0.0,
+      0.0,
+      0.0013582062721252443
+    ],
+    [
+      0.0,
+      1.0,
+      0.0,
+      0.44422751665115356
+    ],
+    [
+      0.0,
+      0.0,
+      0.96,
+      0.01831732749938965
+    ],
+    [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+    ]
+  ],
+  "physical_measurement_accuracy": "not_established",
+  "primitive_instances": 1,
+  "publication_requires_visual_review": true,
+  "raw_sha256": "6291edefcd2e1342903b57619d9c17ebf676a2a33774d17ab629fa76ae4e4956",
+  "source_oriented_extents": [
+    0.49763214588165283,
+    0.9512068629264832,
+    0.5229946970939636
+  ],
+  "tangent_normal_map_support": "recomputed_final_geometry_angle_weighted",
+  "tangent_primitives": 1,
+  "tangent_seam_vertices": 5,
+  "target_meters": [
+    0.5374427175521851,
+    0.9512068629264832,
+    0.502074909210205
+  ],
+  "textures": 2,
+  "trimesh": "4.4.1",
+  "units": "metres",
+  "validation": "PASS",
+  "raw_bytes": 798560,
+  "bound_bytes": 1625392,
+  "raw_vertices": 12177,
+  "raw_faces": 19996,
+  "bound_vertices": 12182,
+  "bound_faces": 19996,
+  "source_aabb": [
+    [
+      -0.2500736713409424,
+      -0.44422751665115356,
+      -0.2805778980255127
+    ],
+    [
+      0.24755847454071045,
+      0.5069793462753296,
+      0.24241679906845093
+    ]
+  ],
+  "software_target_factors": [
+    1.08,
+    1.0,
+    0.96
+  ],
+  "target_provenance": "Derived raw AABB software target; NOT independently measured chair dimensions",
+  "uv_corners_preserved": true,
+  "double_binding_rejected": true,
+  "max_tangent_length_error": 5.960464477539063e-08,
+  "max_tangent_normal_dot": 6.05359673500061e-08,
+  "visual_review": {
+    "result": "PASS",
+    "reviewer": "Codex",
+    "date": "2026-09-19",
+    "method": "Inspected bound six views and raw/bound comparison, Blender 5.2.2 Cycles CPU, embedded base-color and normal textures, shader uses exported TANGENT/NORMAL plus cross(N,T)*w explicitly. Raw comparison basis reconstructed without binding; display placement only.",
+    "upright": true,
+    "front_correct": true,
+    "wood_upholstery_visible": true,
+    "obvious_new_normal_map_damage": false,
+    "unexpected_geometry_damage": false,
+    "floor_contact": "minY=0; individual foot unevenness inherited from raw SF3D, not corrected or hidden",
+    "limits": "Software visual check, not physical measurement accuracy, exact MikkTSpace equivalence or downstream client rendering proof"
+  },
+  "real_sf3d": "PASS",
+  "real_b04": "PASS",
+  "physical_measurement_claim": "NOT PROVEN: no independently verified dimensions for this sample chair",
+  "orientation_axes": {
+    "up": "+Y",
+    "front": "-Z"
+  },
+  "base_color_texture_preserved": true,
+  "normal_texture_preserved": true,
+  "materials_preserved": true,
+  "node_transforms": "identity (scale 1)",
+  "new_baseten_calls": 0,
+  "new_gpu_calls": 0,
+  "prior_shutdown_evidence": {
+    "path": "C:\\Users\\hp\\AppData\\Local\\Temp\\ani-sf3d-team26-7a0c56f9\\final-status.json",
+    "status": "INACTIVE",
+    "active_replica_count": 0,
+    "verification": "Saved prior shutdown receipt inspected locally; no new provider request"
+  },
+  "generation_receipt": {
+    "kind": "raw_sf3d_unscaled",
+    "input_sha256": "2503c12a74419d91a4c6c9f1affc48fee6e2b8b9091956ca6211e91ada57b5bf",
+    "revisions": {
+      "sf3d_source": "ff21fc491b4dc5314bf6734c7c0dabd86b5f5bb2",
+      "sf3d_weights": "f0c9a8ffd62cb1bbc8a7a53c9f87a0be1b6be778",
+      "dinov2": "47b73eefe95e8d44ec3623f8890bd894b6ea2d6c",
+      "open_clip": "1a25a446712ba5ee05982a381eed697ef9b435cf",
+      "rembg": "2.0.57",
+      "u2net_md5": "60024c5c889badc19c04ad937298a77b"
+    },
+    "settings": {
+      "foreground_ratio": 0.85,
+      "texture_resolution": 1024,
+      "remesh": "none",
+      "vertex_count": -1,
+      "dtype": "cuda-bfloat16-autocast"
+    },
+    "timings": {
+      "decode_ms": 60.16862799970113,
+      "preprocess_ms": 9.567447999870637,
+      "generate_bake_ms": 58200.01698200031,
+      "export_ms": 68.46581999980117,
+      "peak_cuda_bytes": 6470981632
+    },
+    "client_elapsed_s": 59.53055809997022,
+    "validation": "structural GLB only; visual review and normalization NOT performed"
+  },
+  "local_paths": {
+    "raw": "C:\\Users\\hp\\AppData\\Local\\Temp\\ani-sf3d-team26-7a0c56f9\\raw\\mesh.glb",
+    "bound": "C:\\Users\\hp\\AppData\\Local\\Temp\\ani-sf3d-team26-7a0c56f9\\bound\\chair-bound.glb",
+    "report": "C:\\Users\\hp\\AppData\\Local\\Temp\\ani-sf3d-team26-7a0c56f9\\bound\\binding-report.json",
+    "bound_preview": "C:\\Users\\hp\\AppData\\Local\\Temp\\ani-sf3d-team26-7a0c56f9\\bound\\bound-six-views.png",
+    "comparison_preview": "C:\\Users\\hp\\AppData\\Local\\Temp\\ani-sf3d-team26-7a0c56f9\\bound\\raw-vs-bound.png",
+    "render_script": "C:\\Users\\hp\\AppData\\Local\\Temp\\ani-sf3d-team26-7a0c56f9\\render_bound.py"
+  },
+  "preview_sha256": {
+    "bound-six-views.png": "abcab9a4b4b9d0b2d5f5dd5283dd640c8160c11beaee785891ca0aa576782672",
+    "raw-vs-bound.png": "d4e217ec31aaf9c4dcc464453dcd2a9cba78de6025251fc4b7d8141016231ef3"
+  },
+  "tests": {
+    "command": "python -m pytest services/gen/tests -q -p no:cacheprovider",
+    "passed": 210,
+    "skipped": 3,
+    "warning": "Existing Starlette anyio BlockingPortal deprecation",
+    "paid_live_tests_run": false
+  }
+}

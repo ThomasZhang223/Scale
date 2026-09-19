@@ -1,8 +1,9 @@
 # Ani ML demo runbook — 2026-09-19
 
 **Works locally:** real cached embeddings, Paul's search handoff, B04 and B06
-software composition. **Not live:** SF3D, product relevance evaluation, deployed
-generation workflow/SSE. Keep those claims separate.
+software composition. **Real SF3D generation and saved-mesh B04: PASS.**
+Product relevance evaluation and deployed generation workflow/SSE remain unproven.
+No further Baseten/GPU calls are authorized; use the saved artifact below.
 
 ## Start the CPU service
 
@@ -57,16 +58,18 @@ the commands below start his existing service using the CPU environment:
 ```powershell
 $null = Remove-Item Env:PYTHONPATH -ErrorAction SilentlyContinue
 Set-Location services/search
+# UPSTREAM_TOKEN must already be supplied securely for Paul's current auth gate.
 $env:EMBED_URL = 'http://127.0.0.1:8002/embed/search'
 & "$env:TEMP\ani-siglip2-b03\venv\Scripts\python.exe" -m uvicorn app.main:app --host 127.0.0.1 --port 8004 --workers 1
 ```
 
 GET `http://127.0.0.1:8004/health`, then POST the validated exported JSON to
-`/index`. POST `/search` with `{"text":"chair","limit":5}` or a manifest-listed
+`/index` with `X-Upstream-Token` from the configured environment. Use that header
+for `/search` too. POST `/search` with `{"text":"chair","limit":5}` or a manifest-listed
 `imageKey`. Require no `X-Search-Degraded`. His HTTP route can relax fit and ignores
 budget; **use the strict local handoff when those constraints matter**. Restarting
-his service clears its index. Current search Docker listens on 8080 while root
-compose maps 8004:8004: Thomas/Paul must align that before using compose.
+his service clears its index. Latest main includes the team's compose port fixes;
+use `infra/README.md` for current deployment wiring.
 
 Lightweight suite (repository root; set `$aniPython` as above):
 
@@ -101,48 +104,74 @@ observations, **not p95**, not network/deployed latencies:
 | B04, synthetic textured GLB | 0.023 |
 | Real text -> selection -> fake provider -> B04 -> inline completion | 0.249 |
 
-No real generation/build/load/cold/warm GPU times exist. The fast fake-provider
-path does not estimate SF3D latency. Corpus has **zero verified products**, zero
+The saved SF3D generation receipt is separate evidence, not a cold/warm benchmark.
+The fast fake-provider path does not estimate SF3D latency. Corpus has **zero verified products**, zero
 held-out photos; Recall@K is not meaningful. Five synthetic hard-filter checks
 had zero violations. Unit fixtures also prove ranking changes with query vectors.
 
 ## Remaining dependencies and honest fallback
 
-- **Paul:** supply 5–10 real images with verified object/product/variant identity,
-  names/source, metre dimensions and measurement provenance/confidence, and actual
-  cents/currency where used. Current 11 merchant sample files contain title/text
-  only. The newly visible `0888470` commit adds `build_prebake.py` and image URL
-  capture, but no real downloaded corpus. Ask Paul for its downloaded manifest
-  with 5–10 items; Ani's [manifest importer](SEARCH_HANDOFF.md#new-paul-image-manifest-0888470)
-  accepts that current shape, with Thomas's supplied backend object IDs.
-  Thomas's seed catalog uses `example.com` merchants; Justin's GLBs are renderer
-  assets, not verified product/photo pairs. None count as retrieval evidence.
-- **Thomas:** connect CPU embed origin/token and the flat Paul search payload;
+- **Paul / Thomas:** latest main now includes 100 downloaded catalog images and
+  `services/ingest/prebake/manifest.json` with extracted metadata. This supersedes
+  the earlier missing-image status. Ani's importer accepts that manifest shape;
+  Thomas must supply real backend object IDs. This completion run does not claim
+  retrieval relevance evaluation or independent physical measurement verification.
+  Nothing in that catalog verifies the official SF3D chair1 sample's dimensions.
+- **Thomas:** connect CPU embed origin/token and the flat Paul search payload (now forwarded directly by the Worker);
   hydrate source/authorized image/scope and durable attempt identity for generation;
   stop blind timeout resubmission; retain artifact validation and emit Object v1
   at finalization. Exact paths/gaps: [GENERATION_HANDOFF.md](GENERATION_HANDOFF.md).
   Actual upload/PUT/asset handlers pass with local R2/KV doubles; no deployed
   backend, durable workflow or SSE success is claimed. Justin's Object v1 adapter
   requires `state:ready`, `glbUrl`, `schemaVersion:1`, metre box and scale 1.
-- **Account owner / Baseten:** one preflight found no session/user environment
-  Baseten API key, deployment URL or standard Truss credentials. Custom deployment
-  entitlement and usable credits could not be verified. **BLOCKED_EXTERNAL**.
-  No account/deploy/inference requests were made, $0 spent, no compute created.
-  Restore credentials securely and verify applicable credit/build coverage for
-  the authorized <=US$3 run before the existing B02 runner is used. Do not add a
-  payment method or make a speculative deployment. A real GLB then needs Ani's
-  orientation/material/distortion review and binding check.
+- **Saved SF3D / B04:** real generation succeeded. The existing deployment's saved
+  shutdown receipt says `INACTIVE`, zero replicas. This completion run makes no
+  Baseten, inference, model-download or GPU calls. There is no deployed workflow claim.
 
-If Baseten is unavailable, keep the existing measured box in the product demo.
-There is currently no verified cached SF3D artifact to claim as a fallback. Fake
-providers are tests only; the default HTTP service never substitutes them.
+## Saved real mesh software proof
+
+[Sanitized evidence](evidence/real-sf3d-binding-2026-09-19.json) records raw and bound
+hashes, source AABB, exact target and validation. Source extents are
+`[0.49763214588165283, 0.9512068629264832, 0.5229946970939636]`.
+Multipliers `[1.08, 1.00, 0.96]` yield target W/H/D
+`[0.5374427175521851, 0.9512068629264832, 0.502074909210205]` metres;
+distortion is **1.125**. This is a moderate nonuniform software test target.
+The real chair's physical dimensions were **not independently measured**.
+
+Local root: `C:\Users\hp\AppData\Local\Temp\ani-sf3d-team26-7a0c56f9`.
+Open `bound\chair-bound.glb` in Blender. Previews are
+`bound\bound-six-views.png` and `bound\raw-vs-bound.png`.
+The preview uses Blender Cycles **CPU**, embedded base color and normal map, and
+explicit exported tangent/bitangent/normal attributes. No GPU render is used.
+Raw preview placement is centred on the floor for comparison; raw bytes are unchanged.
+The chair remains upright, with -Z front, visible wood/upholstery and no obvious
+new tangent shading or shape damage. Uneven individual feet are inherited from
+SF3D; bottom-centre/minY is exactly zero. This is not a physical accuracy review.
+
+Reproduce numeric evidence using only the saved raw artifact (new output directory):
+
+```powershell
+& $aniPython services/gen/tests/run_saved_sf3d_binding.py --raw "$env:TEMP\ani-sf3d-team26-7a0c56f9\raw\mesh.glb" --output "$env:TEMP\ani-sf3d-binding-recheck"
+```
+
+The script requires the reviewed raw SHA; it refuses other artifacts or an
+output directory inside Git. It never regenerates SF3D. Normal maps use final
+geometry tangents, with five duplicated seam vertices and unchanged UV corners,
+material records and embedded image hashes. Dimensions reload with errors
+`[2.622604367e-8, 0, 1.192092891e-8]` metres and zero origin error.
+Current full lightweight tests: **210 passed, 3 skipped** (opt-in real-model checks).
 
 Cut: quality tier, bulk prebake, model comparisons, captions, palette/thumbnail,
 best-frame scoring, new search/vector DB/backend, broad benchmarks and tuning.
 The SF3D rembg path is sufficient; a second background-removal service is cut.
 
-Sync note: the one authorized merge used `origin/main` at `13541b7`. During work,
-the remote-tracking ref advanced four commits to `0888470`. Those new files were
-inspected read-only and the importer adapted, without a second merge or edits to
-Paul's files. A future sync needs authorization; this checkout retains both the
-original team sync and Ani's local commits.
+Integration authorization now includes normal merges of latest `origin/main`
+into `ani/ml`, branch push, then a normal merge into main and push after tests.
+No rebase, squash, reset or force push. The Git history records the completed sync.
+
+Sync checkpoint: `8156fee` merged `origin/main` at `0f25a27` without conflicts.
+Ani's integration clients now exercise the required search auth header with a
+synthetic token and verify 401 without it. Worker handler tests use the actual
+checkout HEAD, with local R2/KV doubles. No shared auth behavior was changed.
+The incoming main already tracks `infra/.env` (commit `502ebab`); its token was
+not printed, used or introduced by Ani. Ani's staged secret/artifact scans passed.

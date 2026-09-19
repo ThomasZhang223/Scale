@@ -1,14 +1,16 @@
 # B01: SF3D feasibility package
 
-Owner: Ani. **Candidate packaging only. Actual image build, model load and real
-generation have NOT been tested.** No deployment is created by importing these
+Owner: Ani. **Real build/load/generation succeeded for the saved chair artifact.**
+See [evidence](../../evidence/real-sf3d-binding-2026-09-19.json). The prior deployment
+is recorded INACTIVE with zero replicas; no further Baseten/GPU calls are authorized.
+No deployment is created by importing these
 files, running the packaging tests, or asking the runner for `--help`.
 
 This isolated Truss generates **one raw, unscaled textured GLB** from one image.
 It is not Object v1-ready: no metre binding, semantic orientation guarantee, R2,
 jobs, callbacks, embeddings, retrieval or alternative model. Production artifact
 transport/binding is implemented in [B06](../../GENERATION_HANDOFF.md), with
-fake-provider evidence until B02 succeeds. Do not call this wrapper with `/async_predict`: its inline
+fake-provider integration tests and separate genuine saved-mesh evidence. Do not call this wrapper with `/async_predict`: its inline
 base64 transfer is designed only for this synchronous B02 spike.
 
 ## Prepared files and limits

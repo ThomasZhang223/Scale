@@ -1,6 +1,8 @@
 # B06: generation -> B04 -> Thomas artifact result
 
-Software integration is implemented. **No real SF3D generation is proven.**
+Software integration is implemented. **Real SF3D generation and offline B04
+binding are proven**; see [saved evidence](evidence/real-sf3d-binding-2026-09-19.json).
+This does not establish deployed job/storage/SSE integration.
 Tests use a labelled fake provider and actual B04 serialization/reload validation.
 Nothing deploys or makes paid calls on import. CPU dependencies stay separate from
 `deploy/sf3d/requirements.txt`; install `requirements-adapters.txt` into B03's environment.
@@ -25,7 +27,9 @@ result = deliver(artifact, WorkerArtifactSink(trusted_worker_origin), review)
 Provider injection is explicit. `SF3DProvider` implements the prepared B01 synchronous
 Baseten transport and requires `allow_paid=True` plus a configured token/endpoint.
 That flag is not budget authorization: the operator must first verify the permitted
-credit budget. Default is disabled. No real orientation profile is shipped yet.
+credit budget. Default is disabled. The current instruction prohibits further
+Baseten/GPU calls. The saved chair has an artifact-specific reviewed profile in
+`tests/run_saved_sf3d_binding.py`; other artifacts require their own review.
 
 `prepare()` returns the same artifact on repeat calls to the same attempt. It never
 automatically retries generation, including ambiguous request failures/timeouts.
