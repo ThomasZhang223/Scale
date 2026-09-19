@@ -4,19 +4,13 @@ import { buttonStyle } from "@expo/ui/swift-ui/modifiers";
 
 import { getJSON } from "../../src/lib/api";
 import { colors } from "../../src/theme/tokens";
+import { DEMO_ROOM_ID } from "../../src/ui/demoIds";
 import { EmptyState } from "../../src/ui/EmptyState";
 import { ErrorView } from "../../src/ui/ErrorView";
 import { LoadingView } from "../../src/ui/LoadingView";
 import { Metric } from "../../src/ui/Metric";
 import type { RoomCaptureV1, VersionSummary } from "../../src/ui/types";
 import { useFetchState } from "../../src/ui/useFetchState";
-
-// ceiling: .claude/contracts.md has no GET /rooms (list) endpoint, only
-// GET /rooms/{id} — there is exactly one demo room and no discovery
-// endpoint yet. Hardcoded to fixtures/room-demo.json's own roomId, which
-// X-Stub: 1 returns regardless of the id in the path. Upgrade path: add a
-// real list endpoint once more than one room exists.
-const DEMO_ROOM_ID = "8b371353-29a8-4872-8dce-45b7d50576a7";
 
 type RoomsPayload = {
   room: RoomCaptureV1;

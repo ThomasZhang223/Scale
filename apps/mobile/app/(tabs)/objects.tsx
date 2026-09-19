@@ -15,6 +15,7 @@ import { buttonStyle, pickerStyle, tag } from "@expo/ui/swift-ui/modifiers";
 import { getJSON } from "../../src/lib/api";
 import { spacing } from "../../src/theme/tokens";
 import { ConfidenceBadge, toConfidenceLevel } from "../../src/ui/ConfidenceBadge";
+import { DEMO_OBJECT_ID } from "../../src/ui/demoIds";
 import { EmptyState } from "../../src/ui/EmptyState";
 import { ErrorView } from "../../src/ui/ErrorView";
 import { LoadingView } from "../../src/ui/LoadingView";
@@ -22,12 +23,6 @@ import { PaletteSwatches } from "../../src/ui/PaletteSwatches";
 import type { ObjectV1 } from "../../src/ui/types";
 import { useFetchState } from "../../src/ui/useFetchState";
 import { formatDimensionsCm } from "../../src/lib/units";
-
-// ceiling: .claude/contracts.md has no GET /objects (list) endpoint, only
-// GET /objects/{id} — same gap as the Rooms tab. Hardcoded to
-// fixtures/object-macbook.json's own objectId until a real list/search
-// endpoint backs this grid.
-const DEMO_OBJECT_ID = "42d37a2f-9975-418b-9a41-d427b252023b";
 
 type Filter = "all" | "scanned" | "catalog";
 
