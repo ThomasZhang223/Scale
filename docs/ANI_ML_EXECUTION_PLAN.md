@@ -398,7 +398,7 @@ Backend owns durable idempotency keyed by scope/object/image/settings/bbox snaps
 
 ## 8. Sequential implementation prompts
 
-These are **copy-pastable bounded tasks**. B01 packaging is now complete; see §10 for evidence. B02–B09 remain unexecuted. B02 is an access gate, not a reason to block independent B03/B04. Each prompt is bounded and stops at its step. New test names/commands below are instructions to **add and run** tests, not claims those tests already exist unless recorded in §10. Run commands from repo root unless a prompt says otherwise; use the step's isolated interpreter. Logs/results must redact secrets and distinguish unit fakes, local real-model checks and live integration.
+These are **copy-pastable bounded tasks**. B01 packaging is complete; B02 local preparation has begun but cloud execution is blocked on credit coverage; see §10 for evidence. B03–B09 remain unexecuted. B02 is an access gate, not a reason to block independent B03/B04. Each prompt is bounded and stops at its step. New test names/commands below are instructions to **add and run** tests, not claims those tests already exist unless recorded in §10. Run commands from repo root unless a prompt says otherwise; use the step's isolated interpreter. Logs/results must redact secrets and distinguish unit fakes, local real-model checks and live integration.
 
 ### B01 — Prepare the SF3D feasibility package (first action)
 
@@ -859,7 +859,7 @@ Do not require captions/palettes to unlock Paul's baseline. `SiglipModel` is not
 | AUDIT-LOCAL | COMPLETE (limited safe checks) | ASGI 501s, Worker stub probe, SQLite/JSON/hardware checks | No real model environments/assets | Do not treat as model success |
 | AUDIT-WEB | COMPLETE for cited public sources; gated card limited | Official text sources fetched; exact revisions/source inspected | SF3D raw HF README 401; no private workspace access | Ani access review before live spike |
 | B01 | COMPLETE (candidate packaging only) | 25 lightweight tests passed; runner help passed; package/config/source evidence below | Actual build, model load and generation UNVERIFIED; live B02 access outstanding | Complete B02 manual access/setup prerequisites |
-| B02 | NOT_STARTED | No GPU/weights/deployment tested | HF acceptance/access + Baseten custom capacity + cost approval | Run only after B01/manual prerequisites |
+| B02 | IN_PROGRESS; cloud execution BLOCKED | Official chair decoded; isolated Truss 0.18.30 installed; real config parser, dependency check and CLI help passed; no generation | Remaining credit coverage and builder rate unconfirmed under USD 3 credits-only authorization | Confirm billing details below before any cloud build |
 | B03 | NOT_STARTED | Source/API verified upstream only | Isolated environment/download approval and one real image | Can proceed independently if B02 blocked |
 | B04 | NOT_STARTED | Existing mesh contract only | Binding dependencies; real mesh for orientation gate | Synthetic software tests then genuine generated mesh |
 | B05 | NOT_STARTED | Proposed records/filter reference | Paul data, Thomas scope/index bridge agreement | Establish payloads before remote mutation |
@@ -914,6 +914,39 @@ python services/gen/deploy/sf3d/b02_smoke.py --help
 
 Observed: **25 passed in 0.50s**, runner help exit 0. Tests still use fake inference/synthetic GLB data. Remote build, model loading and live generation remain **UNVERIFIED**. This checkpoint includes the B01 package and the newly authorized local-commit policy, not live feasibility evidence.
 
+### B02 preparation and credits-only gate - 2026-09-19
+
+Continue from local checkpoint `ba41ae6` on `ani/ml`; starting worktree clean. B01 remains complete and was not rebuilt. Current-process model/secret reads in the preceding preflight succeeded (HTTP 200; zero models; `hf_access_token` metadata present). Earlier 403s are historical. HF access is user-confirmed; do not request setup again without a specific failure. Those reads do not establish deployment permission or capacity.
+
+**Authorization:** local isolated Truss setup and required downloads approved. Cloud work is conditional on **applicable credits only**, **USD 3 total**, including builder and running-replica costs; no out-of-pocket billing or payment-method changes. One L4 replica, at most two sequential generation requests, at most 90 minutes elapsed, with a shutdown margin and earlier budget stop. This is not a provider-enforced cap. No cloud build, model download, deployment or inference has been started during this preparation.
+
+**VERIFIED_LOCALLY - official input:** downloaded [chair1.png at pinned SF3D source](https://raw.githubusercontent.com/Stability-AI/stable-fast-3d/ff21fc491b4dc5314bf6734c7c0dabd86b5f5bb2/demo_files/examples/chair1.png) using TLS verification, bounded bytes and no redirects; decoded it with the existing `model.transport.decode_image` before any paid work. **114,705 bytes; 512 x 512; RGBA; SHA-256 `2503c12a74419d91a4c6c9f1affc48fee6e2b8b9091956ca6211e91ada57b5bf`.** This is an upstream example, not Ani's phone photo or held-out evaluation data. No pre-generated mesh was downloaded.
+
+- Input: `C:\Users\hp\AppData\Local\Temp\ani-sf3d-b02-j14jau_3\chair1.png`.
+- Input-only provenance: `C:\Users\hp\AppData\Local\Temp\ani-sf3d-b02-j14jau_3\input-provenance.json`.
+- No `mesh.glb` or generation `report.json` exists yet. Any future output is **raw/unscaled**, with no real-world accuracy claim. Image-viewer access to this temporary file was denied; validation here is the actual decoder/size/hash check, not a visual review.
+
+**VERIFIED_LOCALLY - CLI preparation:** Truss **0.18.30** installed in `C:\Users\hp\AppData\Local\Temp\ani-sf3d-deploy-cli` using existing Python **3.13.5**, separate from the model's candidate Linux Python 3.11 runtime. Initial `python -m venv` failed during `ensurepip`; directly inspecting `ensurepip` showed its bundled-wheel copy failed with `FileNotFoundError`. Completed the isolated installation using existing global pip **26.0.1** with `--python` targeting the new environment; no global packages or security settings were changed. No Truss login/credential persistence was performed. Exact recovery and checks:
+
+```powershell
+$aniCliPython = Join-Path $env:TEMP 'ani-sf3d-deploy-cli\Scripts\python.exe'
+python -m pip --isolated --python $aniCliPython install --index-url https://pypi.org/simple truss==0.18.30
+$env:PYTHONDONTWRITEBYTECODE='1'
+& $aniCliPython -c "from pathlib import Path; from truss.base.truss_config import TrussConfig; TrussConfig.from_yaml(Path('services/gen/deploy/sf3d/config.yaml')); print('Truss configuration parsed; no build performed')"
+python -m pip --isolated --python $aniCliPython check
+& (Join-Path $env:TEMP 'ani-sf3d-deploy-cli\Scripts\truss.exe') --help
+```
+
+Observed: installation succeeded; **Truss configuration parsed; no build performed**; **No broken requirements found**; CLI help exit 0. This is actual CLI/config validation, not a container build, native extension import or model test. The real-generation test remains unexecuted; no live pass is claimed. Dependency/image downloads here comprise CLI packages and the sample PNG, not model weights.
+
+**DOCUMENTED_UPSTREAM - spending gate:** [Baseten billing documentation](https://docs.baseten.co/organization/billing.md) and [usage-summary schema](https://docs.baseten.co/reference/management-api/billing/gets-billing-usage-summary-for-a-date-range.md), accessed 2026-09-19, explicitly state that image-builder workload time, cold start/model loading and running replicas are billable. Deployment usage updates hourly. The documented summary API exposes past usage and credits used, not remaining credit balance; the billing dashboard is the documented place to check remaining credits. Budget enforcement applies to Model APIs, not dedicated deployments. Do not infer a hard spending cap or free builds.
+
+The preceding pricing read returned **USD 0.01414/minute** for one L4 (24 GiB VRAM, 4 CPU, 16 GiB RAM). Ninety replica-minutes alone are USD 1.2726; that excludes builders and cannot establish the complete test budget. Builder SKU/rate and applicable remaining credits are unverified. Ani has been asked for the billing-page/sponsor confirmation of remaining balance, expiry, coverage of both custom L4 inference and image builds, and builder rate. No billable work may start until that condition is satisfied.
+
+**PROPOSED budget/shutdown guard after confirmation:** reserve at least USD 0.50 of the approved USD 3 for shutdown/rounding; stop earlier if estimated total commitments approach USD 2.50, and initiate cleanup by 80 minutes to leave 10 minutes within the 90-minute ceiling. Count builder time at its confirmed rate, plus replica time at the confirmed L4 rate, including loading and idle time; account for any other reported charges. Do not rely on the hourly usage report to stop in real time. Do not submit a retry after an ambiguous timeout. Cancel this test's remaining build/workloads, deactivate its deployment and verify terminal/inactive state. If those conservative bounds cannot be established, remain blocked. These are local controls, not provider guarantees.
+
+**Shutdown status:** no test cloud workloads were created, so none require cancellation/deactivation. Real model load, native build, mesh generation, geometry/texture inspection and cold/warm measurements remain **UNVERIFIED**. B03 has not started.
+
 ## 11. Sources and compact HTN requirements appendix
 
 All URLs below accessed **2026-09-19**. Public requests succeeded after initial sandbox network restriction was resolved by read-only escalation, except the explicitly listed gated HF card. Sources establish upstream behavior/rules, not account enablement or measured end-to-end performance. Repository citations above are inspection evidence, not independent validation of their promises.
@@ -955,4 +988,4 @@ Initial Devpost submission, final team members/badge IDs and **all intended spon
 
 ## First action to take now
 
-**Complete the B02 manual access gate: obtain Ani/account-owner confirmation of gated HF access and authorized Baseten custom inference capacity, downloads, spend/time ceiling and shutdown responsibility.** B01 packaging is complete; do not run B02 until that gate is satisfied.
+**Confirm remaining applicable credits and the image-builder rate on Baseten's billing page or with the sponsor, so B02 can stay within USD 3 using credits only.** HF access/secret presence and the official input are already established; do not repeat those setup steps. No cloud build may start before the billing condition is satisfied.
