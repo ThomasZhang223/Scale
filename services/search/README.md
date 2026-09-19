@@ -45,10 +45,16 @@ uvicorn app.main:app --reload --port 8082
 
 ```
 pip install -r requirements.txt
-python3 tests/test_ranking.py     # 22 tests, the rule and the maths
-python3 tests/test_api.py         # 15 tests, the wire contract
-uvicorn app.main:app --reload --port 8082
+python3 tests/test_ranking.py     # the rule and the maths — no env needed
+UPSTREAM_TOKEN=dev python3 tests/test_api.py   # the wire contract
+UPSTREAM_TOKEN=dev uvicorn app.main:app --reload --port 8082
 ```
+
+`/search` and `/index` sit behind `X-Upstream-Token` (Thomas, `app/auth.py`), because the
+service is reachable through a public quick-tunnel URL. `app.auth` refuses to import when
+`UPSTREAM_TOKEN` is unset — an auth check that silently passes when unconfigured is worse than
+none — so the variable has to be set before the app is imported, including in tests. `/health`
+stays open so liveness answers before anyone has configured a secret.
 
 ### How the two halves compose
 
