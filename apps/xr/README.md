@@ -97,6 +97,11 @@ until you pull it out.
 | `src/physics.ts` | Rapier world: solid room, upright objects, free-spot search, collision-aware dragging |
 | `src/interaction.ts` | Quest controllers and laptop mouse, both moving objects through physics |
 | `src/api.ts` | The team's `/v1` API: room, objects by `glbUrl`, the SSE live feed, schema and bbox checks |
+| `src/agent.ts` | The designer agent client: request, poll + SSE, accept / reject / undo, offline fallback |
+| `src/apply.ts` | Applies a proposal through physics drag targets (2 cm / 2° arrival, 4 s give-up) |
+| `src/ghosts.ts` | Ghost outlines and movement lines for a proposal |
+| `src/fit.ts` | Red / amber fit ribbons on the floor |
+| `src/placements.ts` | Version v1 placements ↔ scene coordinates |
 | `src/palette.ts` | The wrist palette in VR |
 | `src/halo.ts` | Blue halo on the pointed-at / held object |
 | `public/room-scan.json` | Sample room (off-center like a real ARKit scan) |
@@ -126,6 +131,23 @@ stripped, since decoding them needs a browser):
 the controller ray, and textures (the Node test couldn't decode them). If frame rate
 drops, optimize the GLBs first:
 `npx @gltf-transform/cli optimize in.glb out.glb --compress draco --texture-compress webp`.
+
+## The designer agent
+
+Pull a **Designer** tile on the wrist (*Reading corner*, *Open up the floor*, *Clear the
+door*, *Face the window*) or type a request on the laptop. The wrist shows the agent
+working ("Reading room…", the last three decisions), then ghost outlines where things will
+go with a line from where they are, the explanation and any trade-off, and **Accept** /
+**Reject** / **Ask again**. Accept glides the furniture into place through physics (it still
+stops at walls; movers ignore each other so swaps don't jam); **Undo** puts it back.
+Whatever you're holding is pinned. The laptop panel keeps the full decision log — that's
+the evidence of how the agent handled messy data.
+
+The agent itself is `services/agent` (a Cloudflare Worker, one Durable Object per room);
+the page reaches it at `/v1/agent`, proxied by Vite to `VITE_AGENT_PROXY` (default
+`http://127.0.0.1:8789`). With the agent down, the built-in sample proposal plays and the
+wrist says "Offline". `?agentstub=1` uses the agent's fixture timeline. See
+`docs/agent/` for the whole design.
 
 ## The server
 
