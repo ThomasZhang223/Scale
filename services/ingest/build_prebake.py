@@ -283,12 +283,20 @@ def curate(candidates: list[dict], limit: int) -> list[dict]:
     for rows in buckets.values():
         rows.sort(key=lambda c: -c["measure"]["confidence"])
 
+    # The named categories first, round-robin so no one of them runs away with the set.
     picked: list[dict] = []
-    order = [k for k in DEMO_CATEGORIES] + ["other"]
-    while len(picked) < limit and any(buckets[k] for k in order):
-        for k in order:
+    named = [k for k in DEMO_CATEGORIES]
+    while len(picked) < limit and any(buckets[k] for k in named):
+        for k in named:
             if buckets[k] and len(picked) < limit:
                 picked.append(buckets[k].pop(0))
+
+    # "other" is what is left over, not a category. It used to sit in the round-robin as a
+    # peer, which handed it a guaranteed fifth of the set — a real run spent 20 of 100 slots
+    # on beds and mattresses that matched no bucket, four colourways of one model among them.
+    # Anything worth demoing on purpose belongs in DEMO_CATEGORIES; everything else fills gaps.
+    if len(picked) < limit:
+        picked.extend(buckets["other"][:limit - len(picked)])
     return picked
 
 
@@ -376,6 +384,17 @@ def main() -> int:
 
     data = json.load(open(args.verified))
     merchants = [m for m in data.get("merchants", []) if m.get("productsJsonVerified")]
+
+    # `productsJsonVerified` means the endpoint answers, not that it is useful — the two came
+    # apart early and this is the other half of that. A merchant is excluded only on evidence
+    # from a real run, never on a pre-Browserbase statistic: Bend Goods, Lulu and Branch all
+    # report 0 usable products in /products.json and are rescued by step 2.5, which is the
+    # whole reason that step exists. Excluding on usableProducts would delete them.
+    excluded = [m for m in merchants if m.get("excluded")]
+    for m in excluded:
+        print(f"skipping {m.get('name')}: {m['excluded']}", file=sys.stderr)
+    merchants = [m for m in merchants if not m.get("excluded")]
+
     if not merchants:
         raise SystemExit(f"{args.verified} lists no verified merchants")  # standing rule 4
 

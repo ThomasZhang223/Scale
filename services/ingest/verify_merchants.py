@@ -62,7 +62,25 @@ DEMO_CATEGORIES = {
     "storage": ("shelf", "shelv", "bookcase", "bookshelf", "cabinet", "storage", "dresser",
                 "credenza", "wardrobe", "chest", "drawer"),
     "lighting": ("lamp", "light", "sconce", "pendant", "lantern", "chandelier", "flush mount"),
+    # Beds arrived as 20% of a real handoff through the `other` bucket, uncategorised, four
+    # colourways of one model among them. They are legitimate demo objects — a bed placed at
+    # true 1:1 in a headset is a striking thing to see — so they get a named category and a
+    # deliberate share, rather than arriving by accident because nothing else matched.
+    "sleeping": ("bed", "mattress", "headboard", "bunk", "daybed", "futon"),
 }
+
+
+# Soft goods and decor. They are not objects you place at true scale against a room scan, and
+# several of them collide with a real category by substring — "bedding" contains "bed",
+# "table runner" contains "table". Checked before any bucket matches, so a category keyword
+# can never drag one of these in.
+NOT_PLACEABLE = (
+    "bedding", "duvet", "sheet set", "pillowcase", "pillow case", "sham", "blanket", "throw",
+    "quilt", "comforter", "cushion cover", "slipcover", "cover set", "linen set",
+    "rug", "runner", "curtain", "drape", "art print", "wall art", "poster", "mirror",
+    "candle", "vase", "planter", "tray", "coaster", "knob", "pull", "hardware", "sample",
+    "swatch", "gift card", "care kit", "cleaner", "touch-up", "replacement part",
+)
 
 
 def bucket_for(ptype: str, title: str = "") -> str | None:
@@ -78,6 +96,9 @@ def bucket_for(ptype: str, title: str = "") -> str | None:
     # discarding the product from coverage entirely.
     text = (ptype or "").lower() or (title or "").lower()
     if not text:
+        return None
+    # Before anything else: a duvet is not a bed, a table runner is not a table.
+    if any(w in text for w in NOT_PLACEABLE):
         return None
     if any(w in text for w in DEMO_CATEGORIES["lighting"]):
         return "lighting"

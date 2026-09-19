@@ -94,7 +94,8 @@
       "dimensionHitRate": 0.056,
       "fullyDimensionedRate": 0.0,
       "usableProducts": 0,
-      "sampleSize": 250
+      "sampleSize": 250,
+      "excluded": "0 usable products from every step on the 2026-09-19 run: 0 from /products.json, 0 from the LLM, 0 of 60 rendered pages. Not a reachability problem \u2014 the endpoint answers 200 with 250 products \u2014 the listings simply carry no dimensions anywhere. Costs 60 Browserbase fetches a run for nothing. Delete this field to re-try."
     },
     {
       "name": "InStyle Home (CA)",

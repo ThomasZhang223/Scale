@@ -313,6 +313,50 @@ def test_only_takes_several_merchants_comma_separated():
     assert "Floyd Home" in r.stderr and "Bend Goods" in r.stderr
 
 
+
+def test_other_only_fills_what_the_named_categories_leave():
+    """`other` used to sit in the round-robin as a peer and took a guaranteed fifth of the
+    set — 20 of 100 slots went to beds nothing had categorised."""
+    def row(bucket, conf):
+        return {"bucket": bucket, "measure": {"confidence": conf}}
+    # Plenty of real rows, plus a pile of uncategorised ones.
+    cands = ([row("seating", 0.9) for _ in range(10)]
+             + [row("surface", 0.9) for _ in range(10)]
+             + [row(None, 0.99) for _ in range(50)])   # higher confidence, still a remainder
+    picked = bp.curate(cands, 20)
+    assert len(picked) == 20
+    assert all(p["bucket"] for p in picked), "an uncategorised row took a named slot"
+
+
+def test_other_still_fills_the_gap_when_named_categories_run_dry():
+    """A remainder, not a ban. If the real categories cannot fill the set, use what is left
+    rather than shipping a short manifest."""
+    def row(bucket, conf):
+        return {"bucket": bucket, "measure": {"confidence": conf}}
+    cands = [row("seating", 0.9)] * 3 + [row(None, 0.4)] * 10
+    picked = bp.curate(cands, 8)
+    assert len(picked) == 8
+    assert sum(1 for p in picked if p["bucket"] is None) == 5
+
+
+def test_an_excluded_merchant_is_skipped_and_says_why():
+    """Excluding on evidence from a run, not on a pre-Browserbase statistic — the merchants
+    step 2.5 exists to rescue all report 0 usable products in /products.json."""
+    tmp = tempfile.mkdtemp()
+    v = os.path.join(tmp, "v.json")
+    with open(v, "w") as f:
+        json.dump({"merchants": [
+            {"name": "Dead Store", "storefrontBaseUrl": "https://dead.invalid",
+             "productsJsonVerified": True, "excluded": "nothing from any step on 2026-09-19"},
+        ]}, f)
+    r = subprocess.run([sys.executable, "build_prebake.py", v, "--out", tmp],
+                       cwd=ROOT, capture_output=True, text=True)
+    assert "skipping Dead Store" in r.stderr, r.stderr[:300]
+    assert "nothing from any step" in r.stderr, "skipped without saying why"
+    # Every merchant excluded means no merchants, which is still an error.
+    assert r.returncode != 0 and "no verified merchants" in r.stderr
+
+
 if __name__ == "__main__":
     fails = 0
     for name, fn in sorted(globals().items()):
