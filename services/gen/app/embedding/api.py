@@ -143,6 +143,30 @@ def create_app(*, encoder=None, authenticator=None, image_reader: ImageReader | 
     async def embed(request: Request):
         principal = app.state.auth.authenticate(request.headers.get("authorization"))
         payload = await bounded_request(request)
+        return await encode(payload, principal)
+
+    @app.post("/embed/search")
+    async def search_compat(request: Request):
+        """Paul's no-header caller, opt-in and localhost only; never expose by tunnel.
+
+        Normal /embed stays authenticated. No credential in an EMBED_URL query string.
+        Uses the same real encoder/validation and returns Paul's `vector` alias.
+        """
+        if (os.environ.get("EMBEDDING_LOCAL_SEARCH") != "1" or request.client is None
+                or request.client.host not in ("127.0.0.1", "::1")
+                or any(h in request.headers for h in ("forwarded", "x-forwarded-for", "x-forwarded-host"))):
+            raise HTTPException(403, detail="local_search_only")
+        payload = await bounded_request(request)
+        expected = os.environ.get("EMBEDDING_SEARCH_FINGERPRINT")
+        if not expected:
+            raise HTTPException(503, detail="search_fingerprint_unconfigured")
+        if payload.expectedFingerprint is not None and payload.expectedFingerprint != expected:
+            raise HTTPException(409, detail="embedding_fingerprint_mismatch")
+        payload.expectedFingerprint = expected
+        result = await encode(payload, Principal("trusted-local-search"))
+        return {**result.model_dump(), "vector": result.values}
+
+    async def encode(payload, principal):
         current = app.state.encoder
         if current is None:
             raise HTTPException(503, detail="embedding_model_unavailable")
