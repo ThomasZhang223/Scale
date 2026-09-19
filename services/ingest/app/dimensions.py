@@ -29,12 +29,25 @@ _UNIT_ALT = "|".join(
 )
 _NUM = r"\d+(?:[.,]\d+)?"
 
-# "W 60\" x D 30\" x H 29\"", "Width: 152 cm", "Depth - 76cm"
+# Label first: "W 60\" x D 30\" x H 29\"", "Width: 152 cm", "Depth - 76cm"
 _LABELLED = re.compile(
     rf"\b(?P<label>W|D|H|L|width|depth|height|length)\b\s*[:\-–]?\s*"
     rf"(?P<value>{_NUM})\s*(?P<unit>{_UNIT_ALT})?",
     re.IGNORECASE,
 )
+
+# Label last: '15.5" H x 19.75" L x 18.5" W', '50"W x 70"L', '60 in. wide'.
+# Found in real catalogues (Sabai, Kohara) and missed entirely by the label-first pattern,
+# which is why those stores read as 0% on the first live run.
+_LABELLED_SUFFIX = re.compile(
+    rf"(?P<value>{_NUM})\s*(?P<unit>{_UNIT_ALT})?\s*"
+    rf"(?P<label>W|D|H|L|wide|deep|high|tall|long)\b\.?",
+    re.IGNORECASE,
+)
+
+# "13-24\"L x 4-7\"W" — a range across a product family, not one product's size. Parsing it
+# would invent a dimension, so the field is refused outright (standing rule 4).
+_RANGE = re.compile(rf"{_NUM}\s*[-–]\s*{_NUM}\s*(?:{_UNIT_ALT})?\s*(?:W|D|H|L)\b", re.IGNORECASE)
 
 # "152 x 76 x 74 cm", "60\" x 30\"", "60in x 30in x 29in"
 _SEQUENCE = re.compile(
@@ -97,9 +110,15 @@ def _to_metres(value: str, unit: str | None, fallback_unit: str | None) -> float
 
 
 def _labelled(text: str, field: str) -> DimensionHit | None:
+    if _RANGE.search(text):
+        return None  # a range is not a measurement
+
     found: dict[str, float] = {}
     raw_bits: list[str] = []
-    matches = list(_LABELLED.finditer(text))
+    # Prefer whichever convention this merchant uses; a catalogue mixes them only rarely.
+    prefix = list(_LABELLED.finditer(text))
+    suffix = list(_LABELLED_SUFFIX.finditer(text))
+    matches = prefix if len(prefix) >= len(suffix) else suffix
     if not matches:
         return None
 
@@ -128,6 +147,8 @@ def _labelled(text: str, field: str) -> DimensionHit | None:
 
 
 def _sequence(text: str, field: str) -> DimensionHit | None:
+    if _RANGE.search(text):
+        return None
     m = _SEQUENCE.search(text)
     if not m:
         return None
