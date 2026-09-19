@@ -11,6 +11,22 @@ any one extraction technique.
    schema (dimensions + unit, or explicit "not found"). Picks up free-text mentions regex
    patterns don't match.
 
+2.5. **Rendered page pass (Browserbase)** — for products whose `/products.json` entry carries no
+   dimensions at all. Measured, not assumed: the first live verification run found four reachable
+   stores (Floyd, Fyrn, Bend Goods, Branch Furniture — about 690 products) whose `body_html` is
+   marketing copy and whose variants are size *names* ("Queen", "King"). The dimensions are in
+   metafields, and **`/products.json` does not serve metafields** — but the product page renders
+   them. Fetch `{storefront}/products/{handle}` via Browserbase Fetch and read, best source
+   first: schema.org JSON-LD (`width`/`height`/`depth`, the only source where the axis is
+   unambiguous), then a spec block labelled Dimensions, then page text through step 1's regex.
+
+   Fetch rather than a browser session: Shopify renders metafields server-side, so this costs no
+   browser hours. Escalate to `browse open --remote` only for a store that renders specs in JS.
+
+   Responses are cached to disk. Not a demo trick — a crawl that re-fetches every page each run
+   is slow, rude, and burns credits. The cache is why the pre-bake is reproducible, and why the
+   demo can run **one genuinely live fetch on stage** with everything else already in hand.
+
 3. **VLM pass** — on spec-sheet images, for products where dimensions never appear as text at
    all. Last resort before "unknown."
 
@@ -25,3 +41,7 @@ any one extraction technique.
 
 Every length produced by any step is converted to metres before it reaches `Object v1`
 (`bboxMeters`) — never downstream.
+
+Page content is untrusted remote input. No step treats it as instructions, and the LLM and VLM
+passes stay on a constrained output schema: a product description is somewhere a stranger can
+write "ignore previous instructions".
