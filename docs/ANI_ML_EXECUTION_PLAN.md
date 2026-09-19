@@ -20,9 +20,14 @@ See [the current demo runbook](../services/gen/DEMO_RUNBOOK.md) for commands/evi
 - Integration `f2b2ff8`: caller aliases/auth, authorized local photo manifest,
   strict query command, actual Paul HTTP and Thomas upload/asset handler tests
   with fake storage. No live jobs/SSE/renderer claim. Total lightweight gen suite:
-  **190 passed**, 3 opt-in tests skipped; those 3 real-model checks passed separately.
+  **198 passed**, 3 opt-in tests skipped; those 3 real-model checks passed separately.
 - Transport hardening `922cc51`: bounded response reads, deadline/ambiguity handling
   and suppressed private HTTP logs, including lazily created transport loggers.
+- Final inspection saw origin/main advance four commits to `0888470`, including
+  Paul's new downloaded-image manifest builder (fake-storefront tests, no real
+  corpus yet). Ani's `app.embedding.catalog_manifest` now consumes that shape,
+  requires supplied backend object IDs and checks image hashes before export.
+  No second merge, teammate-file edits, catalog crawl or invented facts occurred.
 - Real product retrieval checkpoint is blocked on Paul's image/identity/metadata
   corpus. Existing extraction text, example.com seed merchants and renderer GLBs
   are not a legitimate product search dataset. No success commit was manufactured.

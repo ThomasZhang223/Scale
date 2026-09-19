@@ -111,7 +111,10 @@ had zero violations. Unit fixtures also prove ranking changes with query vectors
 - **Paul:** supply 5–10 real images with verified object/product/variant identity,
   names/source, metre dimensions and measurement provenance/confidence, and actual
   cents/currency where used. Current 11 merchant sample files contain title/text
-  only; newer ingest branch adds extraction fixes, no image/identity dataset.
+  only. The newly visible `0888470` commit adds `build_prebake.py` and image URL
+  capture, but no real downloaded corpus. Ask Paul for its downloaded manifest
+  with 5–10 items; Ani's [manifest importer](SEARCH_HANDOFF.md#new-paul-image-manifest-0888470)
+  accepts that current shape, with Thomas's supplied backend object IDs.
   Thomas's seed catalog uses `example.com` merchants; Justin's GLBs are renderer
   assets, not verified product/photo pairs. None count as retrieval evidence.
 - **Thomas:** connect CPU embed origin/token and the flat Paul search payload;
@@ -137,3 +140,9 @@ providers are tests only; the default HTTP service never substitutes them.
 Cut: quality tier, bulk prebake, model comparisons, captions, palette/thumbnail,
 best-frame scoring, new search/vector DB/backend, broad benchmarks and tuning.
 The SF3D rembg path is sufficient; a second background-removal service is cut.
+
+Sync note: the one authorized merge used `origin/main` at `13541b7`. During work,
+the remote-tracking ref advanced four commits to `0888470`. Those new files were
+inspected read-only and the importer adapted, without a second merge or edits to
+Paul's files. A future sync needs authorization; this checkout retains both the
+original team sync and Ani's local commits.

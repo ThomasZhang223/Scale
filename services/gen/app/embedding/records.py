@@ -162,6 +162,8 @@ def main():
         path = (args.manifest.parent / item["imagePath"]).resolve()
         with path.open("rb") as handle:
             raw = handle.read(MAX_IMAGE_BYTES + 1)
+        if "imageSha256" in item:
+            require(digest(item["imageSha256"]) == hashlib.sha256(raw).hexdigest(), "Manifest image hash changed")
         records.append(make_record(item["object"], encoder.response(image=raw),
                                   expected_fingerprint=args.fingerprint, scope=args.scope,
                                   image_ref=item["imageRef"], image_bytes=raw))

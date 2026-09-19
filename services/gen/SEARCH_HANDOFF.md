@@ -86,3 +86,25 @@ Current real merchant samples contain dimension text but omit images, product ID
 and prices. Paul must supply 5–10 real image files with object/variant identity,
 measurement provenance/confidence, and price/currency only where known. Until
 then the committed tests are adapter evidence, not catalog relevance evidence.
+
+## New Paul image manifest (0888470)
+
+`origin/main` advanced during this work, after the one authorized merge. Read-only
+inspection found Paul's new `services/ingest/build_prebake.py`; it builds
+`{products:[{productId,merchant,title,r2Key,bboxMeters,measure,...}]}` and can download
+images. Its commit contains fake-storefront tests, not real downloaded data.
+No second merge or catalog crawl was performed.
+
+Ani's `catalog_manifest` importer consumes its **downloaded** output. Thomas must
+supply a JSON mapping from each `catalog/merchant/productId/source.jpg` key to the
+real backend `objectId`. Product IDs are merchant-scoped; the importer never
+invents global IDs, variant IDs or prices. It validates local images, hashes them,
+maps title to name, and preserves extraction dimensions/confidence/provenance.
+
+```text
+python -m app.embedding.catalog_manifest --prebake C:/data/prebake/manifest.json --identities C:/data/object-ids.json --output C:/data/b05-input.json
+```
+
+Use that output with `app.embedding.records --manifest ...` above. Export refuses
+changed image hashes. CDN query-bearing URLs are not retained in records; the
+actual supplied R2 key is the image reference. Import never downloads or generates.
