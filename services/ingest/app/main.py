@@ -10,16 +10,18 @@ from .auth import require_upstream_token
 
 app = FastAPI(title="ingest")
 
-# local-edge patch: token gate for the tunnel hop (app/auth.py), plus /healthz for the
+# local-edge patch: token gate for the tunnel hop (app/auth.py), plus /health for the
 # container healthcheck. The gate is a router dependency, not a FastAPI(dependencies=...)
 # global one — a global app-level dependency covers every included router too, including
-# /healthz, and the container healthcheck carries no token. See infra/README.md. Crawl/extract
+# /health, and the container healthcheck carries no token. Path is /health, not /healthz —
+# matches services/fit and services/search, and the convention the Worker's
+# getUpstreamHealth already uses for the solver origin. See infra/README.md. Crawl/extract
 # logic below is untouched.
 health_router = APIRouter()
 
 
-@health_router.get("/healthz")
-def healthz():
+@health_router.get("/health")
+def health():
     return {"status": "ok"}
 
 
