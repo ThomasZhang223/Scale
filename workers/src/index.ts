@@ -234,6 +234,8 @@ async function dispatch(
   if ((hit = m("GET", /^\/v1\/objects\/([^/]+)$/))) return real.getObjectById(env, hit[1], origin);
   if ((hit = m("POST", /^\/v1\/objects\/([^/]+)\/mesh$/)))
     return real.postObjectMesh(req, env, hit[1], origin, ctx);
+  if ((hit = m("POST", /^\/v1\/objects\/([^/]+)\/thumbnail$/)))
+    return real.postObjectThumbnail(req, env, hit[1], origin, ctx);
   if ((hit = m("POST", /^\/v1\/objects\/([^/]+)\/index$/)))
     return real.postObjectIndex(req, env, hit[1], origin);
   if ((hit = m("POST", /^\/v1\/objects\/([^/]+)\/generate$/)))

@@ -196,6 +196,9 @@ export async function postUpload(req: Request, env: Env, origin: string): Promis
     case "scanMesh":
       key = R2Keys.scanMesh(required(body.objectId, "objectId"));
       break;
+    case "scanThumb":
+      key = R2Keys.scanThumb(required(body.objectId, "objectId"));
+      break;
     case "catalogSource":
       key = R2Keys.catalogSource(
         required(body.merchant, "merchant"),
@@ -208,7 +211,7 @@ export async function postUpload(req: Request, env: Env, origin: string): Promis
       throw new HttpError(
         400,
         "unknown_upload_kind",
-        `kind "${kind}" is not one of roomCapture, objectFrame, objectMesh, objectThumb, scanMesh, catalogSource.`,
+        `kind "${kind}" is not one of roomCapture, objectFrame, objectMesh, objectThumb, scanMesh, scanThumb, catalogSource.`,
       );
   }
 
@@ -494,6 +497,66 @@ export async function postObjectMesh(
  * Same X-Upstream-Token gate as POST /v1/catalog/ingest — this writes to a shared index and is
  * not a public route. Not in contracts.md yet; see workers/DEPLOY.md "Schema proposals".
  */
+/**
+ * POST /v1/objects/{id}/thumbnail — raw JPEG bytes, no wrapper.
+ *
+ * A phone scan arrives with no picture of itself: the Object Capture path uploads a mesh and
+ * nothing else. That is why every scan embeds to the SAME vector — they are indexed from their
+ * text, and every row's text is "Captured object" / "unknown" — so a text query cannot rank
+ * them at all. Measured before this existed: chair, lamp and sofa each returned all three
+ * indexed scans with one identical score to four decimals.
+ *
+ * So the headset renders the scan's own mesh and posts that render here. It is stored beside
+ * the mesh (`scans/{id}/thumb.jpg`, the upgrade the ceiling comment in keys.ts anticipated) and
+ * IMAGE-embedded through the same indexObject path the catalogue uses for its product photos.
+ * SigLIP 2's text tower shares that space, so "chair" can finally find the chair.
+ *
+ * Idempotent: a second post for an object that already has one is a no-op unless ?force=1. The
+ * client fires this from a render loop and never retries, so the cheap answer matters.
+ */
+export async function postObjectThumbnail(
+  req: Request,
+  env: Env,
+  objectId: string,
+  origin: string,
+  ctx: ExecutionContext,
+): Promise<Response> {
+  const object = await getObject(env, objectId, origin); // 404s before anything is written
+  // Only a scan. A catalogue row has its own product photo and a primitive is already indexed
+  // from a real name; overwriting either with a render would make their vectors worse.
+  if (object.source !== "scan") {
+    throw new HttpError(422, "not_a_scan", `${objectId} is source "${object.source}"; only a scan takes a rendered thumbnail.`);
+  }
+
+  const bytes = new Uint8Array(await req.arrayBuffer());
+  if (bytes.byteLength > 4_000_000) throw new HttpError(413, "thumb_too_large", "A thumbnail must be under 4 MB.");
+  // The bytes decide the type, not the header: see sniffImageType.
+  const contentType = sniffImageType(bytes);
+  if (!contentType) throw new HttpError(415, "not_an_image", "The body is neither PNG nor JPEG.");
+
+  const key = R2Keys.scanThumb(objectId);
+  const force = new URL(req.url).searchParams.get("force") === "1";
+  if (!force && (await env.BUCKET.head(key))) {
+    return json({ objectId, key, stored: false, reason: "already has a thumbnail; pass ?force=1 to replace" });
+  }
+
+  await env.BUCKET.put(key, bytes, { httpMetadata: { contentType } });
+  // Indexing is a network call to the encoder; the client is inside a frame loop, so it must not
+  // wait. ceiling: the outcome cannot be reported in this response, and the vector takes 20-30 s
+  // to become visible. The retry path is POST /v1/objects/{id}/index { imageKey }.
+  ctx.waitUntil(
+    indexObject(env, {
+      objectId,
+      source: object.source,
+      category: object.category,
+      bboxMeters: object.bboxMeters,
+      dominantHex: object.palette?.[0] ?? null,
+      imageKey: key,
+    }).catch((err: unknown) => console.error(`scan_thumb_index_failed ${objectId}: ${String(err).slice(0, 300)}`)),
+  );
+  return json({ objectId, key, stored: true, indexed: "pending" }, 202);
+}
+
 export async function postObjectIndex(
   req: Request,
   env: Env,
