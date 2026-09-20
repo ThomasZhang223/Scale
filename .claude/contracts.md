@@ -183,7 +183,7 @@ B ships this surface as stubs in hours 0–2. Real logic lands behind it afterwa
 | `GET /jobs/{id}` | — | `{ state, progressPct, objectId, error }` | A |
 | `POST /search` | `{ text?, imageKey?, fit?, source?, limit }` | `[{ objectId, score, object }]` | F |
 | `POST /fit` | `{ roomId, versionId }`, `{ roomId, placements }`, or `{ roomId }` alone (the newest version's placements) | `FitReport v1` | A, D |
-| `POST /solve` | `{ roomId, intent, budgetCents?, fixed[] }` | `{ placements, objective, infeasible? }` | F |
+| `POST /solve` | `{ roomId, intent, budgetCents?, fixed[] }` | `{ answer, plan, placements, version, toolCalls }` — `answer` the agent's prose; `plan` the rules it gave the solver, `{ summary, movable?, rules }`, or `null`; `placements` `[Placement v1]` (empty when nothing was placed); `version` the committed `Version v1` or `null`; `toolCalls` `[{ name, arguments }]`. There is no `objective` or `infeasible` field: an infeasible plan is reported inside `answer`. A body `objectIds` is accepted and ignored | F |
 | `POST /push/{roomId}` | `{ versionId }` | `204` | A, F |
 | `GET /sync/{roomId}` | — | SSE stream | D |
 | `POST /ingest` | `{ merchant, storefront, collection?, browserbase?, llm?, vlm? }`, `X-Upstream-Token` | `202 { workflowId, merchant, storefront }` | operator, P3 |
