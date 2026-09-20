@@ -112,3 +112,70 @@ test('a remembered page that no longer exists falls back to the first, never to 
   palette.setItems(paged.filter((it) => it.page === 'Designer'));
   assert.equal(palette.activePage, 'Designer');
 });
+
+// ---------- a page too long to show at once ----------
+
+/** A catalogue the size the built-in library is heading for. */
+const many: PaletteItem[] = Array.from({ length: 30 }, (_, i) => ({
+  url: `/objects/piece-${i}.glb`,
+  name: `Piece ${i}`,
+  page: 'Furniture',
+}));
+
+test('a long page is sliced, and only one slice is on screen', () => {
+  const palette = new Palette();
+  palette.setItems(many);
+  const shown = hittableNames(palette);
+  const steps = shown.filter((n) => n === '‹' || n === '›');
+  assert.deepEqual(steps, ['›'], 'the first slice offers forward only: there is no back from the top');
+  const pieces = shown.filter((n) => n.startsWith('Piece '));
+  assert.ok(pieces.length < 30 && pieces.length >= 4, `one slice holds ${pieces.length} of 30`);
+  assert.equal(pieces[0], 'Piece 0');
+});
+
+test('stepping forward and back walks the same page without losing a tile', () => {
+  const palette = new Palette();
+  palette.setItems(many);
+  const slice = () => hittableNames(palette).filter((n) => n.startsWith('Piece '));
+  const seen: string[] = [...slice()];
+  let guard = 0;
+  while (hittableNames(palette).includes('›') && guard++ < 10) {
+    palette.scrollBy(1);
+    seen.push(...slice());
+  }
+  assert.deepEqual(seen, many.map((it) => it.name), 'every tile appears exactly once, in order');
+  assert.deepEqual(hittableNames(palette).filter((n) => n === '‹' || n === '›'), ['‹'], 'the last slice offers back only');
+  palette.scrollBy(-1);
+  assert.ok(hittableNames(palette).includes('›'), 'and forward comes back');
+});
+
+test('a widget row is never cut in half by a slice', () => {
+  const palette = new Palette();
+  palette.setItems(many);
+  // Four cells across, so a slice must hold whole rows: its tile count is a multiple of four.
+  // The final slice is exempt, because 30 tiles end in a row of two however they are sliced.
+  const counts: number[] = [];
+  let guard = 0;
+  for (;;) {
+    counts.push(hittableNames(palette).filter((n) => n.startsWith('Piece ')).length);
+    if (!hittableNames(palette).includes('›') || guard++ > 10) break;
+    palette.scrollBy(1);
+  }
+  assert.ok(counts.length > 1, 'it did slice');
+  for (const n of counts.slice(0, -1)) assert.equal(n % 4, 0, `a middle slice holds ${n} tiles`);
+  assert.equal(counts.reduce((a, b) => a + b, 0), many.length, 'and nothing is dropped or repeated');
+});
+
+test('a short page has no pager at all, and changing tab returns to the top', () => {
+  const palette = new Palette();
+  palette.setItems(paged);
+  assert.deepEqual(hittableNames(palette).filter((n) => n === '‹' || n === '›'), []);
+
+  const mixed = new Palette();
+  mixed.setItems([...many, { url: '', name: 'Clear objects', action: 'clear', page: 'Room' }]);
+  mixed.scrollBy(1);
+  assert.ok(hittableNames(mixed).includes('‹'), 'moved down the catalogue');
+  mixed.showPage('Room');
+  mixed.showPage('Furniture');
+  assert.deepEqual(hittableNames(mixed).filter((n) => n === '‹' || n === '›'), ['›'], 'back at the top');
+});

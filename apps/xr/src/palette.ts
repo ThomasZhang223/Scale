@@ -73,9 +73,16 @@ const TAB_GAP = 0.004;
 const PAGE_TAB_H = 0.034;
 const PAGE_TAB_GAP = 0.004;
 // A one-tile page would otherwise draw a window a few centimetres tall, which reads as broken
-// rather than as empty. ceiling: a page taller than the eye box is not split into sub-pages
-// yet; the upgrade is to slice `slots` at this height and add a "‹ 1 of 3 ›" footer row.
+// rather than as empty.
 const MIN_CONTENT_H = 0.10;
+// And a page taller than this is split, rather than growing a window you cannot see the top
+// of. Three rows of object cells, which is twelve of them; the catalogue is heading for about
+// thirty. ceiling: a split that lands inside a group leaves that chunk without the group's
+// header. No page that overflows has more than one section today — the Furniture page is one
+// section whose header is already suppressed for repeating its tab — so nothing is lost yet.
+// The upgrade is to carry the open section's name onto the next chunk.
+const MAX_CONTENT_H = 0.32;
+const PAGER_H = 0.030;
 const PAGE_KEY = 'fullscale.tablet.page'; // the page this session was last left on
 const ROW_W = COLS * COL_W + (COLS - 1) * GAP_X;
 const SCREEN_W = ROW_W + 2 * MARGIN;
@@ -119,6 +126,7 @@ export class Palette {
   private hovered: THREE.Mesh | null = null;
   private items: PaletteItem[] = [];
   private page: string | null = null;
+  private sub = 0; // which slice of a page too long to show at once
   /**
    * Where an object cell's picture comes from. The palette pulls, rather than being handed a
    * picture per item, so only the cells on the page you are looking at ever ask for one —
@@ -158,10 +166,17 @@ export class Palette {
     return this.page;
   }
 
+  /** A step through a page too long to show at once, from the `scroll:` tiles under it. */
+  scrollBy(delta: number) {
+    this.sub += delta;
+    this.render();
+  }
+
   /** Switches tab. Called for a `page:<name>` action, which is what a tab tile carries. */
   showPage(name: string) {
     if (this.page === name) return;
     this.page = name;
+    this.sub = 0; // a fresh page starts at its top
     try {
       sessionStorage.setItem(PAGE_KEY, name);
     } catch {
@@ -194,10 +209,13 @@ export class Palette {
     }
     if (!this.page || !pages.includes(this.page)) this.page = remembered(pages) ?? pages[0];
 
-    const slots = layout(items.filter((it) => pageOf(it) === this.page), this.page);
+    const chunks = paginate(layout(items.filter((it) => pageOf(it) === this.page), this.page));
+    if (this.sub >= chunks.length) this.sub = 0;
+    const slots = chunks[this.sub] ?? [];
     const contentH = slots.length ? slots.at(-1)!.y + slots.at(-1)!.h / 2 : 0;
     const stripH = pages.length > 1 ? PAGE_TAB_H + PAGE_TAB_GAP : 0;
-    const screenH = Math.max(contentH, MIN_CONTENT_H) + MARGIN + TAB_H + TAB_GAP + stripH;
+    const pagerH = chunks.length > 1 ? PAGER_H + GAP_X : 0;
+    const screenH = Math.max(contentH, MIN_CONTENT_H) + pagerH + MARGIN + TAB_H + TAB_GAP + stripH;
     const frameW = SCREEN_W + 2 * BEZEL;
     const frameH = screenH + 2 * BEZEL;
 
@@ -241,6 +259,28 @@ export class Palette {
       else this.tiles.push(tile);
       this.group.add(tile);
     }
+
+    if (pagerH) {
+      // Under the rows: back, where you are, forward. The step you cannot take is left out
+      // rather than greyed — there is no hover on a controller ray to explain a dead tile.
+      const y = top - Math.max(contentH, MIN_CONTENT_H) - GAP_X - PAGER_H / 2;
+      const edge = (ROW_W - COL_W) / 2;
+      if (this.sub > 0) this.group.add(this.pagerTile('‹', 'scroll:back', -edge, y));
+      const count = text(`${this.sub + 1} of ${chunks.length}`, ROW_W - 2 * (COL_W + GAP_X), PAGER_H, { font: 'footnote', color: C.secondary, background: null, padding: 0, centre: true });
+      count.position.set(0, y, 0);
+      count.raycast = () => {};
+      this.group.add(count);
+      if (this.sub < chunks.length - 1) this.group.add(this.pagerTile('›', 'scroll:next', edge, y));
+    }
+  }
+
+  /** One step tile of the pager, hit like any other tile so it goes through the one dispatcher. */
+  private pagerTile(glyph: string, action: string, x: number, y: number): THREE.Mesh {
+    const tile = pageTab(glyph, false, COL_W, PAGER_H);
+    tile.position.set(x, y, 0);
+    tile.userData.item = { url: '', name: glyph, action } satisfies PaletteItem;
+    this.tiles.push(tile);
+    return tile;
   }
 
   /** The item under the ray, if any. */
@@ -258,6 +298,30 @@ export class Palette {
     if (tile) (tile.material as THREE.MeshBasicMaterial).color.setHex(0xb8b8b8);
     this.hovered = tile;
   }
+}
+
+/**
+ * Cuts a page too long to show into slices, each starting at y = 0.
+ *
+ * It cuts between slots, never inside a row: the cells of one widget row share a y, so the
+ * first cell that would overflow opens the new slice and its neighbours land there with it.
+ */
+function paginate(slots: Slot[]): Slot[][] {
+  const last = slots.at(-1);
+  if (!last || last.y + last.h / 2 <= MAX_CONTENT_H) return [slots];
+  const out: Slot[][] = [];
+  let current: Slot[] = [];
+  let top = 0;
+  for (const s of slots) {
+    if (current.length && s.y + s.h / 2 - top > MAX_CONTENT_H) {
+      out.push(current);
+      current = [];
+      top = s.y - s.h / 2;
+    }
+    current.push({ ...s, y: s.y - top });
+  }
+  if (current.length) out.push(current);
+  return out;
 }
 
 // ---------- pages ----------
@@ -406,7 +470,7 @@ function texture(canvas: HTMLCanvasElement): THREE.Texture {
 }
 
 /** A plain text plate (section headers). */
-function text(str: string, w: number, h: number, o: { font: Font; color: string; background: string | null; padding: number }): THREE.Mesh {
+function text(str: string, w: number, h: number, o: { font: Font; color: string; background: string | null; padding: number; centre?: boolean }): THREE.Mesh {
   const c = canvasFor(w, h);
   const material = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, transparent: true });
   if (c) {
@@ -415,7 +479,8 @@ function text(str: string, w: number, h: number, o: { font: Font; color: string;
     ctx.font = FONT[o.font];
     ctx.fillStyle = o.color;
     ctx.textBaseline = 'middle';
-    ctx.fillText(fitText(ctx, str, canvas.width - 2 * o.padding), o.padding, canvas.height / 2 + 4);
+    const line = fitText(ctx, str, canvas.width - 2 * o.padding);
+    ctx.fillText(line, o.centre ? (canvas.width - ctx.measureText(line).width) / 2 : o.padding, canvas.height / 2 + 4);
     material.map = texture(canvas);
   }
   return new THREE.Mesh(new THREE.PlaneGeometry(w, h), material);

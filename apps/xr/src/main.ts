@@ -280,6 +280,8 @@ async function start() {
 
   function onAction(action: string) {
     if (action.startsWith('page:')) return palette.showPage(action.slice(5));
+    if (action === 'scroll:back') return palette.scrollBy(-1);
+    if (action === 'scroll:next') return palette.scrollBy(1);
     if (action === 'listings:show') findPanel.reopen();
     if (action === 'find:close') findPanel.dismiss();
     if (action.startsWith('find:pick:')) void pickListing(action.slice(10));

@@ -23,6 +23,13 @@ import type { Recommendation, StageInfo, FindStage } from './listings.ts';
  *           the mesh itself and is the only thing that tells two rows apart.
  */
 
+/**
+ * Which library a set of rows came from. It decides the title, the picture and the line under
+ * each name — never the layout, the anchoring or the drag, which belong to the panel itself,
+ * so a fourth kind is a case in three switches and nothing else.
+ */
+export type FindKind = 'shop' | 'scans' | 'library';
+
 export type PanelHit = { kind: 'card'; objectId: string } | { kind: 'close' } | null;
 
 const PX = 2400;
@@ -90,7 +97,7 @@ export class FindPanel {
   private presenting = false;
   private dismissed = false;
   private mode: 'hidden' | 'searching' | 'results' = 'hidden';
-  private kind: 'shop' | 'scans' = 'shop';
+  private kind: FindKind = 'shop';
   private query = '';
   /**
    * A render of a row's own mesh, for a row that has no product photo — which is every scan.
@@ -279,7 +286,7 @@ export class FindPanel {
    * the title, the picture and what the second line of a card says. `query` is what was asked
    * — a scans search has no searching phase to have set it already.
    */
-  showResults(recs: Recommendation[], note: string | null, kind: 'shop' | 'scans' = 'shop', query = this.query) {
+  showResults(recs: Recommendation[], note: string | null, kind: FindKind = 'shop', query = this.query) {
     this.mode = 'results';
     this.kind = kind;
     this.query = query;
@@ -317,7 +324,7 @@ export class FindPanel {
    */
   private loadThumbs() {
     for (const { listing } of this.recs) {
-      if (listing.imageUrl && this.kind !== 'scans') this.loadThumb(listing.objectId, listing.imageUrl);
+      if (listing.imageUrl && this.kind === 'shop') this.loadThumb(listing.objectId, listing.imageUrl);
       else this.thumbFor?.(listing.objectId, listing.glbUrl ?? null);
     }
   }
@@ -404,7 +411,9 @@ export class FindPanel {
         ? `Searching Shopify via Browserbase — “${this.query}”`
         : this.kind === 'scans'
           ? `${count} of your scans for “${this.query}”`
-          : `${count} listings for “${this.query}”`;
+          : this.kind === 'library'
+            ? `${count} from the library for “${this.query}”`
+            : `${count} listings for “${this.query}”`;
     ctx.fillText(ellipsis(ctx, title, (WIDTH - 2 * PAD - 0.06) * PX), (PAD + 0.05) * PX, (PAD + TITLE_H / 2) * PX);
 
     if (this.mode === 'searching') {
@@ -470,7 +479,12 @@ export class FindPanel {
       if (!this.recs.length) {
         ctx.fillStyle = SECONDARY;
         ctx.font = FONT(0.018);
-        const empty = this.kind === 'scans' ? 'No finished scans. Capture something on the phone first.' : 'Nothing fits that. Try a wider gap or another kind.';
+        const empty =
+          this.kind === 'scans'
+            ? 'No finished scans. Capture something on the phone first.'
+            : this.kind === 'library'
+              ? 'Nothing in the library matches that.'
+              : 'Nothing fits that. Try a wider gap or another kind.';
         ctx.fillText(empty, PAD * PX, (PAD + TITLE_H + CARD_H / 2) * PX);
       }
       cardRects(this.recs.length).forEach((r, i) => {
@@ -488,7 +502,7 @@ export class FindPanel {
         ctx.fillStyle = 'rgba(120,120,128,0.35)';
         ctx.fillRect(tx, ty, ts, ts);
         const img = this.thumbs.get(l.objectId);
-        const mesh = this.kind === 'scans' || !img ? this.thumbFor?.(l.objectId, l.glbUrl ?? null) ?? null : null;
+        const mesh = this.kind !== 'shop' || !img ? this.thumbFor?.(l.objectId, l.glbUrl ?? null) ?? null : null;
         if (mesh) {
           // "Contain": a mesh is framed to its own bounding box, and cropping it would make a
           // tall piece and a wide one look alike.
@@ -516,7 +530,10 @@ export class FindPanel {
         ctx.font = FONT(0.016);
         // A scan has no merchant and no price, so it says where it came from instead of
         // printing "catalogue" over something the user captured themselves.
-        const meta = this.kind === 'scans' ? `Scanned on your phone · ${size}` : `${l.merchant ?? 'catalogue'} · ${size}${price}`;
+        const meta =
+          this.kind === 'scans' ? `Scanned on your phone · ${size}`
+          : this.kind === 'library' ? `From the library · ${size}`
+          : `${l.merchant ?? 'catalogue'} · ${size}${price}`;
         ctx.fillText(ellipsis(ctx, meta, cw), cx, y0 + 0.05 * PX);
         const conf = l.measure?.confidence ?? 0.5;
         const badge = conf < 0.7 ? { text: 'size unverified', color: SECONDARY } : { text: 'fits', color: STAGE_COLOR.done };
@@ -524,7 +541,7 @@ export class FindPanel {
         // A scan is already measured and already has its mesh, so it has no third line to
         // write: "fits" is a merchant's claim about a size it declared, and the reason a scan
         // came back is already the line above it. Only real progress gets written.
-        const line = status ?? (this.kind === 'scans' ? null : `${badge.text} · ${reasons[0] ?? ''}`);
+        const line = status ?? (this.kind === 'shop' ? `${badge.text} · ${reasons[0] ?? ''}` : null);
         if (line) {
           ctx.fillStyle = status ? ACCENT : badge.color;
           ctx.font = FONT(0.016, 500);
