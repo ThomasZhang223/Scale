@@ -37,13 +37,25 @@ The `RoomAgent` Durable Object hydrates that into what this service actually rec
 tunnel, headers `X-Upstream-Token`:
 
 ```
-POST /fit    { schemaVersion, room: <RoomCapture v1>, placements: [<Placement v1>] }
+POST /fit    { schemaVersion, room: <RoomCapture v1>, placements: [<Placement v1>],
+               objects: { <objectId>: { w, h, d } } }
 POST /solve  { schemaVersion, room: <RoomCapture v1>, candidates: [<Object v1>],
                fixed: [<Placement v1>], plan: <ConstraintPlan v1> }
 ```
 
 `candidates` carries `bboxMeters` and nothing else — that field is all this service reads. See
 `infra/README.md` for the full hop and the `ConstraintPlan v1` shape.
+
+`POST /solve` accepts **two bodies** and picks by shape (`app/main.py`):
+
+| Body | Detected by | Sent by |
+| --- | --- | --- |
+| Solver frame: `{ room, objects: [...], rules, settings }` | `objects` is a list and `rules` is present | the designer agent (`services/agent`), which builds the frame itself |
+| Hydrated: `{ schemaVersion, room, candidates, fixed, plan }` (above) | `room` is an object and `plan` is present | the `RoomAgent` Worker |
+
+Anything else is a 422 `unrecognised body`; a body that matches but is unsolvable is a 422
+`unsolvable input`. The solver frame is checked first, so a body carrying both `rules` and `plan`
+is treated as a solver frame.
 
 ## Run
 

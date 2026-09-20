@@ -43,8 +43,10 @@ With the `fit` container up on 8001 (`bash infra/up.sh`, or `docker compose --pr
 up -d --build fit`) — it serves both `/fit` and `/solve` (OR-Tools) — `scripts/e2e.sh` runs
 the whole chain (E1–E6 from `09_END_TO_END_TESTS.md`).
 
-Config lives in `wrangler.toml` (`OPENAI_MODEL`, `AI_GATEWAY_URL`, `FIT_URL`, `SOLVER_URL` —
-both the fit container: local port 8001, or its Cloudflare quick-tunnel origin once deployed);
+Config lives in `wrangler.toml` (`OPENAI_MODEL`, `AI_GATEWAY_URL`). The fit container's origin
+(one service, `/fit` and `/solve`) is the KV key `upstream:solver` in the same `CONFIG` namespace
+as the front door, written by `infra/up.sh`; an unset key is an error, never a localhost fallback.
+Local dev: `npx wrangler kv key put --binding CONFIG "upstream:solver" "http://127.0.0.1:8001" --local`;
 secrets in `.dev.vars` locally or `wrangler secret put`: `OPENAI_API_KEY`, `UPSTREAM_TOKEN`
 (the shared value from `infra/.env`, sent as `X-Upstream-Token`; the container 401s without
 it), optionally `CF_AIG_TOKEN`. Without an OpenAI key, Rearrange and the presets use the

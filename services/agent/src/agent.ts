@@ -322,8 +322,17 @@ export class DesignerAgent extends Agent<Env> {
     return { apiKey: this.env.OPENAI_API_KEY, model: this.env.OPENAI_MODEL, gatewayUrl: this.env.AI_GATEWAY_URL || undefined, gatewayToken: this.env.CF_AIG_TOKEN };
   }
 
+  /** The fit container's origin, from the shared CONFIG KV. Fail loud: no fallback, no localhost. */
+  private async solverOrigin(): Promise<string> {
+    const origin = await this.env.CONFIG.get('upstream:solver');
+    if (!origin) throw new Error(
+      'upstream:solver is unset. Run infra/up.sh, or: npx wrangler kv key put --binding CONFIG ' +
+      '"upstream:solver" "https://<your>.trycloudflare.com" --remote');
+    return origin.replace(/\/+$/, '');
+  }
+
   private async callSolver(req: SolverRequest, requestId: string): Promise<SolverResponse> {
-    const res = await fetch(`${this.env.SOLVER_URL.replace(/\/$/, '')}/solve`, {
+    const res = await fetch(`${await this.solverOrigin()}/solve`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', ...this.upstreamHeaders(), 'X-Request-Id': requestId },
       body: JSON.stringify(req),
@@ -334,7 +343,7 @@ export class DesignerAgent extends Agent<Env> {
   }
 
   private async callFit(room: Record<string, unknown>, placements: PlacementV1[], objects: Record<string, { w: number; h: number; d: number }>): Promise<FitReport> {
-    const res = await fetch(`${this.env.FIT_URL.replace(/\/$/, '')}/fit`, {
+    const res = await fetch(`${await this.solverOrigin()}/fit`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', ...this.upstreamHeaders() },
       body: JSON.stringify({ room, placements, objects }),
@@ -348,7 +357,7 @@ export class DesignerAgent extends Agent<Env> {
     let solver: 'online' | 'offline' = 'offline';
     let detail = '';
     try {
-      const res = await fetch(`${this.env.SOLVER_URL.replace(/\/$/, '')}/health`, { signal: AbortSignal.timeout(3000) }); // /health is ungated
+      const res = await fetch(`${await this.solverOrigin()}/health`, { signal: AbortSignal.timeout(3000) }); // /health is ungated
       if (res.ok) {
         solver = 'online';
         detail = `OR-Tools ${((await res.json()) as { ortools?: string }).ortools ?? ''}`;
