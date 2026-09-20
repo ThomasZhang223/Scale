@@ -1,16 +1,19 @@
 import { useCallback } from "react";
 import { useFocusEffect, useRouter } from "expo-router";
-import { List, Button, VStack, HStack, Text, Image, Spacer } from "@expo/ui/swift-ui";
-import { buttonStyle } from "@expo/ui/swift-ui/modifiers";
+import { Image, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { SymbolView } from "expo-symbols";
+import { withTabFade } from "../../src/ui/TabFade";
 
 import { getJSON } from "../../src/lib/api";
-import { colors } from "../../src/theme/tokens";
-import { GlassHost, GlassSection, glassList } from "../../src/ui/glass";
+import { Card } from "../../src/ui/Card";
+import { colors, radius, spacing } from "../../src/theme/tokens";
 import { DEMO_ROOM_ID } from "../../src/ui/demoIds";
 import { EmptyState } from "../../src/ui/EmptyState";
 import { ErrorView } from "../../src/ui/ErrorView";
+import { FloorPlan } from "../../src/ui/FloorPlan";
+import { GlassHost } from "../../src/ui/glass";
 import { LoadingView } from "../../src/ui/LoadingView";
-import { Metric } from "../../src/ui/Metric";
+import { roomPhotoUri } from "../../src/ui/roomPhotos";
 import type { RoomCaptureV1, VersionSummary } from "../../src/ui/types";
 import { useFetchState } from "../../src/ui/useFetchState";
 
@@ -42,9 +45,26 @@ async function fetchRoomsPayload(): Promise<RoomsPayload> {
   return { room, versionCount };
 }
 
-export default function RoomsScreen() {
+function timeAgo(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.round(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins} min ago`;
+  const hrs = Math.round(mins / 60);
+  if (hrs < 24) return `${hrs} hr${hrs === 1 ? "" : "s"} ago`;
+  const days = Math.round(hrs / 24);
+  return `${days} day${days === 1 ? "" : "s"} ago`;
+}
+
+// Plain React Native on purpose: the card's header is a photo (RN Image)
+// or the FloorPlan drawing, neither of which can live inside a SwiftUI
+// Host. The glass comes from expo-glass-effect instead — same material as
+// the capture overlays.
+function RoomsScreen() {
   const router = useRouter();
+  const { width } = useWindowDimensions();
   const [state, retry] = useFetchState(fetchRoomsPayload, []);
+
   // A scan made on another tab lands here on the next visit, not on the next app launch.
   useFocusEffect(
     useCallback(() => {
@@ -71,35 +91,79 @@ export default function RoomsScreen() {
     );
   }
 
+  const cardWidth = width - spacing.md * 2;
+
   return (
-    <GlassHost>
-      <List modifiers={glassList}>
-        <GlassSection title="Rooms">
-          {rooms.map((r) => (
-            <Button
-              key={r.roomId}
-              modifiers={[buttonStyle("plain")]}
-              onPress={() => router.push({ pathname: "/room/[id]", params: { id: r.roomId } })}
-            >
-              <VStack alignment="leading" spacing={8}>
-                <HStack alignment="center">
-                  <VStack alignment="leading">
-                    <Text>{`${r.floor.areaM2.toFixed(1)} m² room`}</Text>
-                    <Text date={new Date(r.capturedAt)} dateStyle="relative" />
-                  </VStack>
-                  <Spacer />
-                  <Image systemName="chevron.right" color={colors.textMuted} size={14} />
-                </HStack>
-                <HStack spacing={24}>
+    <ScrollView style={styles.screen} contentContainerStyle={styles.content} contentInsetAdjustmentBehavior="automatic">
+      <Text style={styles.heading}>Rooms</Text>
+      {rooms.map((r) => {
+        const photo = roomPhotoUri(r.roomId);
+        return (
+          <Pressable
+            key={r.roomId}
+            onPress={() => router.push({ pathname: "/room/[id]", params: { id: r.roomId } })}
+            style={({ pressed }) => [pressed && styles.pressed]}
+          >
+            <Card style={styles.card}>
+              <View style={styles.header}>
+                {photo ? (
+                  <Image source={{ uri: photo }} style={styles.photo} resizeMode="cover" />
+                ) : (
+                  <View style={styles.planWrap}>
+                    <FloorPlan room={r} width={cardWidth - spacing.lg * 2} />
+                  </View>
+                )}
+              </View>
+              <View style={styles.body}>
+                <View style={styles.titleRow}>
+                  <View style={styles.titleCol}>
+                    <Text style={styles.title}>{`${r.floor.areaM2.toFixed(1)} m² room`}</Text>
+                    <Text style={styles.subtitle}>{timeAgo(r.capturedAt)}</Text>
+                  </View>
+                  <SymbolView name="chevron.right" size={14} tintColor="rgba(60,60,67,0.3)" />
+                </View>
+                <View style={styles.metrics}>
                   <Metric label="Area" value={`${r.floor.areaM2.toFixed(1)} m²`} />
                   <Metric label="Walls" value={`${r.walls.length}`} />
+                  <Metric label="Openings" value={`${r.openings.length}`} />
                   <Metric label="Versions" value={versionCount === null ? "—" : `${versionCount}`} />
-                </HStack>
-              </VStack>
-            </Button>
-          ))}
-        </GlassSection>
-      </List>
-    </GlassHost>
+                </View>
+              </View>
+            </Card>
+          </Pressable>
+        );
+      })}
+    </ScrollView>
   );
 }
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.metric}>
+      <Text style={styles.metricValue}>{value}</Text>
+      <Text style={styles.metricLabel}>{label}</Text>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: "#e8edf4" },
+  content: { padding: spacing.md, gap: spacing.md, paddingBottom: spacing.xl * 2 },
+  heading: { fontSize: 34, fontWeight: "700", color: "#1c1c1e", letterSpacing: 0.2, paddingHorizontal: 4, paddingTop: spacing.sm },
+  card: {},
+  header: { backgroundColor: "rgba(255,255,255,0.35)" },
+  photo: { width: "100%", aspectRatio: 4 / 3 },
+  planWrap: { alignItems: "center", justifyContent: "center", paddingVertical: spacing.lg },
+  body: { padding: spacing.md, gap: spacing.md },
+  titleRow: { flexDirection: "row", alignItems: "center" },
+  titleCol: { flex: 1, gap: 2 },
+  title: { fontSize: 20, fontWeight: "600", color: "#1c1c1e" },
+  subtitle: { fontSize: 14, color: colors.textMuted },
+  metrics: { flexDirection: "row", justifyContent: "space-between" },
+  metric: { alignItems: "flex-start", minWidth: 64 },
+  metricValue: { fontSize: 17, fontWeight: "600", color: "#1c1c1e", fontVariant: ["tabular-nums"] },
+  metricLabel: { fontSize: 12, color: colors.textMuted, marginTop: 1 },
+  pressed: { opacity: 0.85 },
+});
+
+export default withTabFade(RoomsScreen);

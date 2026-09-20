@@ -96,14 +96,15 @@ def prime_page_cache(cache_dir, base, handles):
             f.write(PRODUCT_PAGE)
 
 
-def run_cli(extra=(), limit="12", prime=()):
+def run_cli(extra=(), limit="12", prime=(), merchant_fields=None):
     srv, base = serve()
     tmp = tempfile.mkdtemp()
     verified = os.path.join(tmp, "v.json")
     cache = os.path.join(tmp, "pages")
+    entry = {"name": "Fake Co", "storefrontBaseUrl": base, "productsJsonVerified": True}
+    entry.update(merchant_fields or {})
     with open(verified, "w") as f:
-        json.dump({"merchants": [{"name": "Fake Co", "storefrontBaseUrl": base,
-                                  "productsJsonVerified": True}]}, f)
+        json.dump({"merchants": [entry]}, f)
     if prime:
         prime_page_cache(cache, base, prime)
     env = {**os.environ, "BROWSERBASE_API_KEY": "test-key-not-used-when-cached"}
@@ -115,7 +116,9 @@ def run_cli(extra=(), limit="12", prime=()):
         )
         assert r.returncode == 0, f"exited {r.returncode}:\n{r.stderr}"
         with open(os.path.join(tmp, "prebake", "manifest.json")) as f:
-            return json.load(f), tmp
+            manifest = json.load(f)
+        manifest["_stderr"] = r.stderr      # tests assert on what the run announced
+        return manifest, tmp
     finally:
         srv.shutdown()
 
@@ -356,6 +359,43 @@ def test_an_excluded_merchant_is_skipped_and_says_why():
     # Every merchant excluded means no merchants, which is still an error.
     assert r.returncode != 0 and "no verified merchants" in r.stderr
 
+
+
+# --- skipPageFetch: a merchant whose pages carry nothing either ------------
+
+def test_a_merchant_flagged_skip_page_fetch_makes_no_page_requests():
+    """Kohara and Color Cord both returned 0/60 from step 2.5 on two consecutive runs. Their
+    rendered pages carry no dimensions either, so 60 browser renders each is the most
+    expensive no-op in the pipeline — 120 a run between them."""
+    m, _ = run_cli(extra=["--browserbase"], prime=[f"page-only-{i}" for i in range(6)],
+                   merchant_fields={"skipPageFetch": "0/60 on two runs"})
+    assert "step 2.5: skipped — 0/60 on two runs" in m["_stderr"], m["_stderr"]
+    assert m["step2_5"]["attempted"] == 0, m["step2_5"]
+    assert m["byVia"].get("page", 0) == 0
+
+
+def test_a_skipped_merchant_is_still_crawled_and_still_contributes():
+    """Narrower than `excluded`: these merchants stay in the run. Kohara supplies 81 products
+    through /products.json and Color Cord 19 — dropping them would cost far more than the
+    fetches save."""
+    m, _ = run_cli(extra=["--browserbase"], prime=[f"page-only-{i}" for i in range(6)],
+                   merchant_fields={"skipPageFetch": "0/60 on two runs"})
+    assert m["count"] > 0, "a skipped merchant contributed nothing at all"
+    assert m["byVia"]["api"] == m["count"]
+
+
+def test_the_skip_is_announced_rather_than_silent():
+    """A quietly smaller result looks exactly like a merchant having no dimensions, which is
+    the wrong conclusion to hand anyone — the same reason a missing key is a 503."""
+    m, _ = run_cli(extra=["--browserbase"], prime=[f"page-only-{i}" for i in range(6)],
+                   merchant_fields={"skipPageFetch": "measured 0/60, twice"})
+    assert "measured 0/60, twice" in m["_stderr"]
+
+
+def test_an_unflagged_merchant_still_fetches_pages():
+    """The guard must not have turned step 2.5 off for everyone."""
+    m, _ = run_cli(extra=["--browserbase"], prime=[f"page-only-{i}" for i in range(6)])
+    assert m["step2_5"]["attempted"] > 0, m["step2_5"]
 
 if __name__ == "__main__":
     fails = 0

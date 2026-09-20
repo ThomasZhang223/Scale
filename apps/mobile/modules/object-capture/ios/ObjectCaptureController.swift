@@ -1,6 +1,7 @@
 import Foundation
 import RealityKit
 import SwiftUI
+import UIKit
 import simd
 
 enum ObjectCaptureError: Error, LocalizedError {
@@ -30,6 +31,9 @@ struct ReconstructionResult {
   let glbPath: String
   let bboxMeters: SIMD3<Float>
   let imageCount: Int
+  // One of the capture's own photos, mid-orbit, downscaled to a JPEG: the
+  // library row's thumbnail. Nil only if the folder was somehow empty.
+  let photoPath: String?
 }
 
 // One ObjectCaptureSession at a time, owned here so the SwiftUI view, the
@@ -205,6 +209,29 @@ final class ObjectCaptureController {
     }
   }
 
+  // Object Capture writes HEIC at full camera resolution. The row wants a
+  // small JPEG; ~1024 px on the long edge is plenty for a 64 pt thumbnail
+  // and a detail header, and keeps the documents folder small.
+  private static func writeThumbnail(from source: URL?, into dir: URL) -> String? {
+    guard let source, let image = UIImage(contentsOfFile: source.path) else { return nil }
+    let longEdge = max(image.size.width, image.size.height)
+    let scale = min(1, 1024 / max(longEdge, 1))
+    let size = CGSize(width: image.size.width * scale, height: image.size.height * scale)
+    let format = UIGraphicsImageRendererFormat.default()
+    format.scale = 1
+    let small = UIGraphicsImageRenderer(size: size, format: format).image { _ in
+      image.draw(in: CGRect(origin: .zero, size: size))
+    }
+    guard let data = small.jpegData(compressionQuality: 0.85) else { return nil }
+    let url = dir.appendingPathComponent("photo.jpg")
+    do {
+      try data.write(to: url)
+      return url.path
+    } catch {
+      return nil
+    }
+  }
+
   // MARK: - Reconstruction
 
   // On-device photogrammetry over the captured folder. `detail` is one of
@@ -288,12 +315,19 @@ final class ObjectCaptureController {
     let bbox = try GLBExporter.export(usdz: modelURL, to: glbURL)
     NSLog("[ObjectCapture] GLB written in %.1fs, bbox=%@", Date().timeIntervalSince(started), String(describing: bbox))
 
-    let imageCount = (try? FileManager.default.contentsOfDirectory(atPath: imagesDir.path).count) ?? 0
+    let imageNames = ((try? FileManager.default.contentsOfDirectory(atPath: imagesDir.path)) ?? [])
+      .filter { $0.lowercased().hasSuffix(".heic") || $0.lowercased().hasSuffix(".jpg") || $0.lowercased().hasSuffix(".jpeg") }
+      .sorted()
+    let photoPath = Self.writeThumbnail(
+      from: imageNames.isEmpty ? nil : imagesDir.appendingPathComponent(imageNames[imageNames.count / 2]),
+      into: rootDir
+    )
     return ReconstructionResult(
       usdzPath: modelURL.path,
       glbPath: glbURL.path,
       bboxMeters: bbox,
-      imageCount: imageCount
+      imageCount: imageNames.count,
+      photoPath: photoPath
     )
   }
 }

@@ -4,36 +4,38 @@
 // at 1:1.
 import { useCallback, useMemo, useState } from "react";
 import { useFocusEffect, useRouter } from "expo-router";
-import { List, Picker, Text, TextField } from "@expo/ui/swift-ui";
-import { font, foregroundStyle, pickerStyle, refreshable, tag } from "@expo/ui/swift-ui/modifiers";
+import { RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { SymbolView } from "expo-symbols";
+import { withTabFade } from "../../src/ui/TabFade";
 
-import { GlassHost, GlassSection, glassList } from "../../src/ui/glass";
-
-import { EmptyState } from "../../src/ui/EmptyState";
+import { Glass } from "../../src/theme/Glass";
+import { Card } from "../../src/ui/Card";
+import { colors, radius, spacing } from "../../src/theme/tokens";
 import { ErrorView } from "../../src/ui/ErrorView";
 import { LoadingView } from "../../src/ui/LoadingView";
-import { ObjectRow } from "../../src/ui/ObjectRow";
+import { ObjectCard } from "../../src/ui/ObjectCard";
 import { formatPrice, listObjects, merchantsOf, UNLABELLED_MERCHANT } from "../../src/ui/objectsApi";
 import type { ObjectV1 } from "../../src/ui/types";
 import { useFetchState } from "../../src/ui/useFetchState";
 
-const ALL = "__all__";
-
-function matches(o: ObjectV1, merchant: string, query: string): boolean {
-  if (merchant !== ALL && (o.merchant ?? UNLABELLED_MERCHANT) !== merchant) return false;
+function matches(o: ObjectV1, query: string): boolean {
   if (!query) return true;
   const q = query.toLowerCase();
-  return o.name.toLowerCase().includes(q) || o.category.toLowerCase().includes(q) || (o.caption ?? "").toLowerCase().includes(q);
+  return (
+    o.name.toLowerCase().includes(q) ||
+    o.category.toLowerCase().includes(q) ||
+    (o.merchant ?? UNLABELLED_MERCHANT).toLowerCase().includes(q) ||
+    (o.caption ?? "").toLowerCase().includes(q)
+  );
 }
 
-export default function FurnitureScreen() {
+function FurnitureScreen() {
   const router = useRouter();
-  const [merchant, setMerchant] = useState<string>(ALL);
   const [query, setQuery] = useState("");
   // One fetch of the whole catalog; merchant and text narrow it locally. A few hundred rows is
   // nothing, and it keeps the merchant menu stable while you switch between merchants.
   const [state, retry] = useFetchState(() => listObjects("catalog"), []);
-  // A scan made on another tab lands here on the next visit, not on the next app launch.
+
   useFocusEffect(
     useCallback(() => {
       retry();
@@ -43,66 +45,98 @@ export default function FurnitureScreen() {
 
   const objects = state.status === "ready" ? state.data : [];
   const merchants = useMemo(() => merchantsOf(objects), [objects]);
-  const shown = useMemo(() => objects.filter((o) => matches(o, merchant, query)), [objects, merchant, query]);
+  const shown = useMemo(() => objects.filter((o) => matches(o, query)), [objects, query]);
 
   if (state.status === "loading") return <LoadingView />;
   if (state.status === "error") return <ErrorView message={state.message} onRetry={retry} />;
 
-  const secondary = foregroundStyle({ type: "hierarchical", style: "secondary" });
-
   return (
-    <GlassHost>
-      <List modifiers={[...glassList, refreshable(async () => retry())]}>
-        <GlassSection>
-          <TextField placeholder="Search furniture" onTextChange={setQuery} />
-          <Picker
-            label="Merchant"
-            selection={merchant}
-            onSelectionChange={(v) => setMerchant(v)}
-            modifiers={[pickerStyle("menu")]}
-          >
-            <Text modifiers={[tag(ALL)]}>All merchants</Text>
-            {merchants.map((m) => (
-              <Text key={m} modifiers={[tag(m)]}>
-                {m}
-              </Text>
-            ))}
-          </Picker>
-        </GlassSection>
+    <ScrollView
+      style={styles.screen}
+      contentContainerStyle={styles.content}
+      contentInsetAdjustmentBehavior="automatic"
+      keyboardDismissMode="on-drag"
+      stickyHeaderIndices={[1]}
+      refreshControl={<RefreshControl refreshing={false} onRefresh={retry} />}
+    >
+      <Text style={styles.heading}>Furniture</Text>
 
-        {shown.length === 0 ? (
-          <GlassSection divided={false}>
-            <EmptyState
-              title={objects.length === 0 ? "No listings yet" : "No matches"}
-              systemImage="sofa"
-              description={
-                objects.length === 0
-                  ? "Run the merchant ingest and listings appear here with measured dimensions."
-                  : "Try another merchant or a shorter search."
-              }
-            />
-          </GlassSection>
-        ) : (
-          <GlassSection
-            title={merchant === ALL ? "All merchants" : merchant}
-            footer={
-              <Text modifiers={[font({ textStyle: "footnote" }), secondary]}>
-                {`${shown.length} listing${shown.length === 1 ? "" : "s"} · ${merchants.length} merchant${merchants.length === 1 ? "" : "s"}`}
-              </Text>
-            }
-          >
-            {shown.map((object) => (
-              <ObjectRow
-                key={object.objectId}
+      {/* Glass works here because the list scrolls under it. Merchant filtering
+          is by text now: type a merchant's name and its rows match. */}
+      {/* Sticky, so the listings slide underneath it — that motion is what
+          makes Liquid Glass read as glass. A faint white tint and a bright
+          hairline give it an edge even before anything scrolls. */}
+      <View style={styles.searchWrap}>
+        <Glass style={styles.searchPill} glassEffectStyle="clear" tintColor="rgba(255,255,255,0.18)" isInteractive>
+          <SymbolView name="magnifyingglass" size={17} tintColor="rgba(60,60,67,0.55)" weight="semibold" />
+          <TextInput
+            placeholder="Search furniture"
+            placeholderTextColor="rgba(60,60,67,0.45)"
+            value={query}
+            onChangeText={setQuery}
+            style={styles.search}
+            clearButtonMode="while-editing"
+            autoCorrect={false}
+          />
+        </Glass>
+      </View>
+
+      {shown.length === 0 ? (
+        <View style={styles.empty}>
+          <Text style={styles.emptyTitle}>{objects.length === 0 ? "No listings yet" : "No matches"}</Text>
+          <Text style={styles.emptyText}>
+            {objects.length === 0
+              ? "Run the merchant ingest and listings appear here with measured dimensions."
+              : "Try a shorter search."}
+          </Text>
+        </View>
+      ) : (
+        <Card style={styles.card}>
+          {shown.map((object, i) => (
+            <View key={object.objectId} style={i > 0 && styles.divider}>
+              <ObjectCard
                 object={object}
                 subtitle={`${object.merchant ?? UNLABELLED_MERCHANT} · ${object.category}`}
                 trailing={formatPrice(object.price)}
                 onPress={() => router.push({ pathname: "/object/[id]", params: { id: object.objectId } })}
               />
-            ))}
-          </GlassSection>
-        )}
-      </List>
-    </GlassHost>
+            </View>
+          ))}
+        </Card>
+      )}
+      <Text style={styles.footer}>
+        {`${shown.length} listing${shown.length === 1 ? "" : "s"} · ${merchants.length} merchant${merchants.length === 1 ? "" : "s"}`}
+      </Text>
+    </ScrollView>
   );
 }
+
+const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: "#e8edf4" },
+  content: { padding: spacing.md, gap: spacing.sm, paddingBottom: spacing.xl * 2 },
+  heading: { fontSize: 34, fontWeight: "700", color: "#1c1c1e", letterSpacing: 0.2, paddingHorizontal: 4, paddingTop: spacing.sm, marginBottom: 4 },
+  card: {},
+  searchWrap: { paddingVertical: 6, backgroundColor: "transparent", overflow: "visible" },
+  searchPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderRadius: 999,
+    overflow: "hidden",
+    paddingHorizontal: 20,
+    borderWidth: 1.5,
+    borderColor: "rgba(255,255,255,0.95)",
+    shadowColor: "#1c1c1e",
+    shadowOpacity: 0.14,
+    shadowRadius: 22,
+    shadowOffset: { width: 0, height: 10 },
+  },
+  search: { flex: 1, fontSize: 17, color: "#1c1c1e", paddingVertical: 16 },
+  divider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: "rgba(60,60,67,0.18)" },
+  footer: { fontSize: 13, color: colors.textMuted, paddingHorizontal: 10, paddingTop: 4 },
+  empty: { alignItems: "center", padding: spacing.xl, gap: 6 },
+  emptyTitle: { fontSize: 18, fontWeight: "600", color: "#1c1c1e" },
+  emptyText: { fontSize: 14, color: colors.textMuted, textAlign: "center", lineHeight: 20 },
+});
+
+export default withTabFade(FurnitureScreen);

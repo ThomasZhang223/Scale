@@ -1,4 +1,6 @@
 import ARKit
+import CoreImage
+import UIKit
 import CoreLocation
 import RoomPlan
 import simd
@@ -131,8 +133,40 @@ final class RoomCaptureController: NSObject {
     if let appearance = RoomAppearanceSampler.sample(room: capturedRoom, frames: frameRingBuffer) {
       json["appearance"] = appearance
     }
+    // Not part of RoomCapture v1 (contracts.md): a local path the phone keeps
+    // for its own library card, stripped before POST /rooms. The frame is
+    // real — one the sweep already buffered — never a stock picture.
+    json["photoPath"] = writeRepresentativePhoto()?.path as Any
     return json
   }
+
+  // The most level frame of the sweep: the camera's forward vector closest
+  // to horizontal, so the photo reads as "the room" rather than the floor or
+  // the ceiling. Ties are irrelevant; any level frame will do.
+  private func writeRepresentativePhoto() -> URL? {
+    let candidates = frameRingBuffer.filter { $0.image != nil }
+    guard !candidates.isEmpty else { return nil }
+    let best = candidates.min { a, b in
+      abs(-a.transform.columns.2.y) < abs(-b.transform.columns.2.y)
+    }
+    guard let cg = best?.image else { return nil }
+    // The buffer is landscape-right; the phone was held upright. Rotate once
+    // so the card shows it the way the presenter saw it.
+    let upright = CIImage(cgImage: cg).oriented(.right)
+    guard let rotated = Self.photoContext.createCGImage(upright, from: upright.extent),
+          let data = UIImage(cgImage: rotated).jpegData(compressionQuality: 0.85) else { return nil }
+    let url = FileManager.default.temporaryDirectory
+      .appendingPathComponent("room-photo-\(UUID().uuidString)")
+      .appendingPathExtension("jpg")
+    do {
+      try data.write(to: url)
+      return url
+    } catch {
+      return nil
+    }
+  }
+
+  private static let photoContext = CIContext()
 
   private func reportProgress(_ room: CapturedRoom) {
     let progress = Progress(

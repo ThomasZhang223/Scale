@@ -3,7 +3,7 @@ import { NativeModule, requireNativeModule } from "expo";
 import type {
   RoomCaptureInstructionEvent,
   RoomCaptureProgressEvent,
-  RoomCaptureV1,
+  RoomCaptureResult,
 } from "./RoomCapture.types";
 
 type RoomCaptureModuleEvents = {
@@ -16,7 +16,7 @@ declare class RoomCaptureModule extends NativeModule<RoomCaptureModuleEvents> {
   startSession(): Promise<void>;
   // Ends the sweep and returns RoomCapture v1. Rejects rather than resolving
   // a partial room — the caller sees a real error, never a guessed capture.
-  stopSession(): Promise<RoomCaptureV1>;
+  stopSession(): Promise<RoomCaptureResult>;
 }
 
 export default requireNativeModule<RoomCaptureModule>("RoomCapture");

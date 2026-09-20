@@ -54,9 +54,17 @@ public final class ObjectCaptureModule: Module {
         "glbPath": r.glbPath,
         "bboxMeters": ["w": r.bboxMeters.x, "h": r.bboxMeters.y, "d": r.bboxMeters.z],
         "imageCount": r.imageCount,
+        "photoPath": r.photoPath as Any,
       ]
     }
 
     View(ObjectCaptureNativeView.self) {}
+
+    View(ModelPreviewView.self) {
+      Prop("url") { (view: ModelPreviewView, url: String?) in
+        guard let url, !url.isEmpty else { view.load(url: nil); return }
+        view.load(url: url.hasPrefix("file://") ? URL(string: url) : URL(fileURLWithPath: url))
+      }
+    }
   }
 }

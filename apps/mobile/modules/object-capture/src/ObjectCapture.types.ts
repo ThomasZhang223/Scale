@@ -29,6 +29,8 @@ export interface ReconstructionResult {
   glbPath: string;
   bboxMeters: { w: number; h: number; d: number };
   imageCount: number;
+  // A downscaled JPEG from the capture itself, for the library row.
+  photoPath: string | null;
 }
 
 export interface ObjectCaptureViewProps extends ViewProps {}

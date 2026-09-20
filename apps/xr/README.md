@@ -83,6 +83,10 @@ open it with `?scan=/room-scan.json`).
 | Where | Add | Move | Turn |
 |---|---|---|---|
 | Quest | Point the right ray at the palette on your left hand (ray turns green), pull the trigger on a tile, and carry the copy out | Point (ray turns blue), hold the trigger, sweep across the floor | Thumbstick left/right while holding |
+
+Getting around on the Quest: **left thumbstick** glides you in the direction you look; flick the
+**right thumbstick** left or right to snap-turn 45°. Both only act from a hand that is not holding
+an object. Walking physically still works on top of it.
 | Laptop | **Add …** buttons in the panel | Drag with the mouse | Scroll while dragging (15° steps) |
 
 Letting go leaves the object where it is. Every pull from the palette is a fresh copy.

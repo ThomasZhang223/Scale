@@ -201,7 +201,8 @@
         },
         "from": "body_html",
         "raw": "9x7x7 inch"
-      }
+      },
+      "skipPageFetch": "0 of 60 rendered pages yielded dimensions on the 2026-09-20 run, the second run in a row. Its pages carry no dimensions either, so step 2.5 costs 60 browser renders to learn nothing. Still crawled and still useful through /products.json (81 products there). Delete this field to re-test after a site redesign."
     },
     {
       "name": "Branch Furniture (office)",
@@ -283,7 +284,8 @@
         "from": "body_html",
         "raw": "length: 6 feet width: 27 height: 14 inches"
       },
-      "note": "Lighting, and the second merchant in that category \u2014 Kohara supplied 14 of 20 lighting slots in the 2026-09-19 pre-bake, which was single-merchant risk on a whole demo category. Watch the axes: its copy reads 'length: 6 feet width: 27 height: 14 inches' for a chandelier, where the length is the hanging drop and lands in depth. validate.py flags those (axis_suspect, confidence 0.39), so they surface as unverified rather than as a 1.8 m deep light fixture."
+      "note": "Lighting, and the second merchant in that category \u2014 Kohara supplied 14 of 20 lighting slots in the 2026-09-19 pre-bake, which was single-merchant risk on a whole demo category. Watch the axes: its copy reads 'length: 6 feet width: 27 height: 14 inches' for a chandelier, where the length is the hanging drop and lands in depth. validate.py flags those (axis_suspect, confidence 0.39), so they surface as unverified rather than as a 1.8 m deep light fixture.",
+      "skipPageFetch": "0 of 60 rendered pages yielded dimensions on the 2026-09-20 run, the second run in a row. Its pages carry no dimensions either, so step 2.5 costs 60 browser renders to learn nothing. Still crawled and still useful through /products.json (19 products there). Delete this field to re-test after a site redesign."
     }
   ]
 }

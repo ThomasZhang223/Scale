@@ -81,7 +81,8 @@ export function GlassButton({ label, onPress, prominent, tint, icon, disabled, s
 
 // The round "x" in the top corner of both capture screens. Before this the
 // only way out of a scan was the status-bar back link.
-export function GlassCloseButton({ onPress, style }: { onPress: () => void; style?: StyleProp<ViewStyle> }) {
+// `dark` = the icon is dark, for the light build/result screens.
+export function GlassCloseButton({ onPress, style, dark }: { onPress: () => void; style?: StyleProp<ViewStyle>; dark?: boolean }) {
   return (
     <Pressable
       onPress={onPress}
@@ -89,9 +90,15 @@ export function GlassCloseButton({ onPress, style }: { onPress: () => void; styl
       hitSlop={12}
       style={({ pressed }) => [pressed && styles.pressed, style]}
     >
-      <CameraGlass isInteractive style={styles.closeButton}>
-        <SymbolView name="xmark" tintColor="white" size={15} weight="bold" />
-      </CameraGlass>
+      {dark ? (
+        <Glass isInteractive style={[styles.cameraGlass, styles.closeButton]}>
+          <SymbolView name="xmark" tintColor="#1c1c1e" size={15} weight="bold" />
+        </Glass>
+      ) : (
+        <CameraGlass isInteractive style={styles.closeButton}>
+          <SymbolView name="xmark" tintColor="white" size={15} weight="bold" />
+        </CameraGlass>
+      )}
     </Pressable>
   );
 }

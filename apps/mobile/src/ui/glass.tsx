@@ -8,7 +8,7 @@
 // material from expo-glass-effect (src/theme/Glass.tsx) because they float
 // over RN-hosted camera views instead.
 import { Children, Fragment, type ReactNode } from "react";
-import { Divider, Host, Section, Text, VStack, ZStack } from "@expo/ui/swift-ui";
+import { Divider, Host, Section, Spacer, Text, VStack, ZStack } from "@expo/ui/swift-ui";
 import type { HostProps } from "@expo/ui/swift-ui";
 import {
   background,
@@ -48,7 +48,15 @@ const rowInsets = listRowInsets({ top: 4, bottom: 4, leading: 16, trailing: 16 }
 export function GlassHost({ children, ...rest }: HostProps) {
   return (
     <Host style={{ flex: 1 }} useViewportSizeMeasurement {...rest}>
-      <ZStack modifiers={[backdrop, ignoreSafeArea()]}>{children}</ZStack>
+      <ZStack>
+        {/* The gradient alone runs under the status bar and tab bar; the
+            content keeps its safe-area insets, so titles never sit under
+            the clock. */}
+        <VStack modifiers={[frame({ maxWidth: 10000, maxHeight: 10000 }), backdrop, ignoreSafeArea()]}>
+          <Spacer />
+        </VStack>
+        {children}
+      </ZStack>
     </Host>
   );
 }

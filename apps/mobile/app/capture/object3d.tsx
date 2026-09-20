@@ -9,6 +9,8 @@ import type { ObjectCaptureState, ReconstructionResult } from "../../modules/obj
 import { ApiError, postJSON, putUpload } from "../../src/lib/api";
 import { CameraGlass, GlassButton, GlassCloseButton } from "../../src/theme/Glass";
 import { colors, spacing } from "../../src/theme/tokens";
+import { BuildProgress } from "../../src/ui/BuildProgress";
+import { saveObjectPhoto, saveObjectUsdz } from "../../src/ui/objectFiles";
 import { Readout, ReadoutHint } from "../../src/ui/Readout";
 
 type Phase = ObjectCaptureState | "reconstructing" | "done" | "saving";
@@ -125,6 +127,13 @@ export default function CaptureObject3DScreen() {
         bboxMeters: result.bboxMeters,
         measure: { method: "lidar", confidence: 1 },
       });
+      // The phone keeps the USDZ for its own preview and AR; the server gets the GLB.
+      try {
+        saveObjectUsdz(object.objectId, result.usdzPath);
+        if (result.photoPath) saveObjectPhoto(object.objectId, result.photoPath);
+      } catch {
+        // Preview and AR fall back to the measured box for this object.
+      }
       const { key, putUrl } = await postJSON<{ key: string; putUrl: string }>("/uploads", {
         kind: "objectMesh",
         objectId: object.objectId,
@@ -151,14 +160,28 @@ export default function CaptureObject3DScreen() {
   }, [result]);
 
   const hint = hintFor(phase, feedback);
+  // Once the camera session is finished it renders black; from here on the
+  // screen is ours: a light build/progress state, then the result.
+  const cameraDone = phase === "reconstructing" || phase === "done" || phase === "saving";
+  const light = cameraDone;
 
   return (
-    <View style={styles.screen}>
-      <ObjectCaptureView style={StyleSheet.absoluteFill} />
+    <View style={[styles.screen, light && styles.screenLight]}>
+      {cameraDone ? null : <ObjectCaptureView style={StyleSheet.absoluteFill} />}
+      {phase === "reconstructing" ? (
+        <BuildProgress
+          fraction={progress}
+          title="Building the model"
+          detail="Photogrammetry is running on this phone. A minute or two, depending on how many photos you took."
+        />
+      ) : null}
+      {phase === "saving" ? (
+        <BuildProgress fraction={1} title="Saving to your library" detail="Uploading the model to the room server." />
+      ) : null}
 
       <SafeAreaView style={styles.chrome} pointerEvents="box-none">
         <View style={styles.top} pointerEvents="box-none">
-          <GlassCloseButton onPress={() => router.back()} />
+          <GlassCloseButton dark={light} onPress={() => router.back()} />
           {phase === "capturing" && shots.max > 0 ? (
             <CameraGlass style={styles.shotsPill}>
               <Text style={styles.shotsText}>
@@ -170,15 +193,7 @@ export default function CaptureObject3DScreen() {
         </View>
 
         <View style={styles.footer} pointerEvents="box-none">
-          {phase === "reconstructing" ? (
-            <CameraGlass style={styles.progressPanel}>
-              <Text style={styles.progressValue}>{Math.round(progress * 100)}%</Text>
-              <Text style={styles.progressLabel}>Building the model on this phone. This takes a few minutes.</Text>
-              <View style={styles.track}>
-                <View style={[styles.fill, { width: `${Math.max(2, progress * 100)}%` }]} />
-              </View>
-            </CameraGlass>
-          ) : result && (phase === "done" || phase === "saving") ? (
+          {phase === "reconstructing" || phase === "saving" ? null : result && phase === "done" ? (
             <Readout bboxMeters={result.bboxMeters} confidence={1} />
           ) : hint ? (
             <ReadoutHint text={hint} />
@@ -202,7 +217,6 @@ export default function CaptureObject3DScreen() {
                 <GlassButton label="Save to library" icon="square.and.arrow.down" prominent onPress={onSave} />
               </>
             )}
-            {phase === "saving" && <ReadoutHint text="Uploading the model…" />}
           </View>
         </View>
       </SafeAreaView>
@@ -249,6 +263,7 @@ const FEEDBACK_TEXT: Record<string, string> = {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "black" },
+  screenLight: { backgroundColor: "#f6f8fb" },
   chrome: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, justifyContent: "space-between" },
   top: {
     flexDirection: "row",
@@ -267,9 +282,4 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   actions: { flexDirection: "row", gap: spacing.sm, justifyContent: "center", flexWrap: "wrap" },
-  progressPanel: { paddingHorizontal: spacing.lg, paddingVertical: spacing.md, alignItems: "center", gap: 6, alignSelf: "stretch" },
-  progressValue: { color: "white", fontSize: 34, fontWeight: "600", fontVariant: ["tabular-nums"], lineHeight: 38 },
-  progressLabel: { color: "rgba(255,255,255,0.7)", fontSize: 13, textAlign: "center" },
-  track: { alignSelf: "stretch", height: 4, borderRadius: 2, backgroundColor: "rgba(255,255,255,0.18)", marginTop: 6, overflow: "hidden" },
-  fill: { height: 4, borderRadius: 2, backgroundColor: colors.lidar },
 });

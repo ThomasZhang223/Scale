@@ -11,6 +11,9 @@ import { Halo } from './halo';
  * Quest: point at an object (the ray turns blue), hold the trigger, and it follows your
  * ray across the floor. Thumbstick left/right turns it smoothly; A/X and B/Y on either
  * controller turn it a quarter turn at a time. Let go and it stays.
+ *
+ * Moving yourself: left thumbstick glides where you look; right thumbstick flick snap-turns
+ * 45°. Walking physically still works on top of it.
  * Laptop: drag an object with the mouse; scroll while dragging to turn it.
  *
  * Neither moves objects directly. Both hand physics a target, so walls and other
@@ -20,6 +23,9 @@ import { Halo } from './halo';
 const IDLE_RAY = 0xffffff;
 const HOVER_RAY = 0x5fb3ff;
 const TURN_SPEED = 2.2;          // rad/s at full thumbstick
+const MOVE_SPEED = 1.6;          // m/s at full left thumbstick — a brisk indoor walk
+const SNAP_TURN = Math.PI / 4;   // right thumbstick flick: 45° per snap
+const STICK_DEAD = 0.15;
 const TURN_STEP = Math.PI / 2;   // per press of A/X (clockwise) or B/Y (counter-clockwise)
 const BUTTON_AX = 4;             // xr-standard gamepad mapping
 const BUTTON_BY = 5;
@@ -43,7 +49,14 @@ interface Hand {
 }
 
 export class Interaction {
+  /**
+   * The player rig: camera and both controllers live inside it, so moving or turning it
+   * moves the whole person. Locomotion never touches the reference space; three keeps
+   * the head pose relative to this group.
+   */
+  readonly rig = new THREE.Group();
   private hands: Hand[] = [];
+  private snapLatched = false;
   private raycaster = new THREE.Raycaster();
   private floor = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
   private hit = new THREE.Vector3();
@@ -68,7 +81,9 @@ export class Interaction {
     /** An object was grabbed (the designer agent treats it as pinned). */
     private onGrab: (id: string) => void = () => {},
   ) {
-    this.setUpControllers(renderer, scene);
+    scene.add(this.rig);
+    this.rig.add(camera);
+    this.setUpControllers(renderer);
     this.setUpMouse(renderer.domElement);
   }
 
@@ -84,6 +99,7 @@ export class Interaction {
         this.follow(hand.grab);
         continue;
       }
+      this.locomotion(hand, dt);
       const item = this.palette.hitTest(this.raycaster);
       if (item) overPalette = item;
       const over = item ? null : this.hitId();
@@ -153,9 +169,62 @@ export class Interaction {
     return this.mouseGrab?.id === id || this.hands.some((h) => h.grab?.id === id);
   }
 
+  // ---------- locomotion ----------
+
+  /**
+   * Left thumbstick glides you across the floor in the direction you are looking (head yaw
+   * only — pushing forward never sinks you into the floor). Right thumbstick flicked left or
+   * right snap-turns 45° about your own head, so the room pivots around you rather than you
+   * swinging around the room. Only a hand that is not holding an object steers: a held
+   * object's own thumbstick turn keeps priority, see update().
+   */
+  private locomotion(hand: Hand, dt: number) {
+    const pad = hand.source?.gamepad;
+    if (!pad) return;
+    const x = pad.axes[2] ?? 0;
+    const y = pad.axes[3] ?? 0;
+    if (hand.source?.handedness === 'left') {
+      if (Math.abs(x) < STICK_DEAD && Math.abs(y) < STICK_DEAD) return;
+      const yaw = this.headYaw();
+      // Stick forward is -y on the xr-standard mapping; forward in three is -Z.
+      const fx = -Math.sin(yaw), fz = -Math.cos(yaw);
+      const rx = Math.cos(yaw), rz = -Math.sin(yaw);
+      const step = MOVE_SPEED * dt;
+      this.rig.position.x += (fx * -y + rx * x) * step;
+      this.rig.position.z += (fz * -y + rz * x) * step;
+      return;
+    }
+    if (hand.source?.handedness === 'right') {
+      if (Math.abs(x) < 0.3) {
+        this.snapLatched = false;
+        return;
+      }
+      if (this.snapLatched || Math.abs(x) < 0.7) return;
+      this.snapLatched = true;
+      this.snapTurn(x > 0 ? -SNAP_TURN : SNAP_TURN);
+      pad.hapticActuators?.[0]?.pulse?.(0.3, 30);
+    }
+  }
+
+  private headYaw(): number {
+    const q = this.camera.getWorldQuaternion(new THREE.Quaternion());
+    const f = new THREE.Vector3(0, 0, -1).applyQuaternion(q);
+    return Math.atan2(-f.x, -f.z);
+  }
+
+  /** Rotate the rig about the head's floor position so the view pivots in place. */
+  private snapTurn(angle: number) {
+    const head = this.camera.getWorldPosition(new THREE.Vector3());
+    this.rig.rotation.y += angle;
+    this.rig.updateMatrixWorld(true);
+    const after = this.camera.getWorldPosition(new THREE.Vector3());
+    this.rig.position.x += head.x - after.x;
+    this.rig.position.z += head.z - after.z;
+  }
+
   // ---------- Quest controllers ----------
 
-  private setUpControllers(renderer: THREE.WebGLRenderer, scene: THREE.Scene) {
+  private setUpControllers(renderer: THREE.WebGLRenderer) {
     const models = new XRControllerModelFactory();
     for (let i = 0; i < 2; i++) {
       const controller = renderer.xr.getController(i);
@@ -165,11 +234,11 @@ export class Interaction {
       );
       ray.scale.z = 5;
       controller.add(ray);
-      scene.add(controller);
+      this.rig.add(controller);
 
       const grip = renderer.xr.getControllerGrip(i);
       grip.add(models.createControllerModel(grip));
-      scene.add(grip);
+      this.rig.add(grip);
 
       const hand: Hand = { controller, ray, pressed: [] };
       controller.addEventListener('connected', (e) => {

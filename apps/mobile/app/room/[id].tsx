@@ -1,5 +1,5 @@
 import { useLocalSearchParams } from "expo-router";
-import { ScrollView, View, StyleSheet, useWindowDimensions } from "react-native";
+import { Image, ScrollView, View, StyleSheet, useWindowDimensions } from "react-native";
 import { Host, List, LabeledContent } from "@expo/ui/swift-ui";
 
 import { GlassSection, glassList } from "../../src/ui/glass";
@@ -11,6 +11,7 @@ import { ErrorView } from "../../src/ui/ErrorView";
 import { FloorPlan } from "../../src/ui/FloorPlan";
 import { LoadingView } from "../../src/ui/LoadingView";
 import { Metric } from "../../src/ui/Metric";
+import { roomPhotoUri } from "../../src/ui/roomPhotos";
 import type { RoomCaptureV1 } from "../../src/ui/types";
 import { useFetchState } from "../../src/ui/useFetchState";
 
@@ -40,9 +41,11 @@ export default function RoomDetailScreen() {
   const doors = room.openings.filter((o) => o.kind === "door");
   const windows = room.openings.filter((o) => o.kind === "window");
   const planWidth = width - spacing.md * 2;
+  const photo = roomPhotoUri(room.roomId);
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.screen} contentContainerStyle={styles.content} contentInsetAdjustmentBehavior="automatic">
+      {photo ? <Image source={{ uri: photo }} style={styles.photo} resizeMode="cover" /> : null}
       {/* Plain RN: FloorPlan draws with absolute-positioned, rotated Views,
           which is not SwiftUI content and can't nest inside a Host's tree
           (see FloorPlan.tsx / PaletteSwatches.tsx for the same rule from
@@ -92,6 +95,7 @@ const styles = StyleSheet.create({
   planWrap: {
     alignItems: "center",
   },
+  photo: { width: "100%", aspectRatio: 4 / 3, borderRadius: spacing.lg, overflow: "hidden" },
   hostAuto: {
     width: "100%",
   },
