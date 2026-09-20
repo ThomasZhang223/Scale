@@ -27,6 +27,7 @@ export interface ObjectV1 {
   name: string;
   category: string;
   glbUrl: string | null;
+  createdAt?: string;
   bboxMeters: BBoxMeters;
 }
 
@@ -45,6 +46,47 @@ export async function getObject(objectId: string): Promise<ObjectV1> {
   const obj = await get<ObjectV1>(`/objects/${objectId}`);
   checkSchema(obj, 'Object');
   return obj;
+}
+
+/**
+ * The phone's own captures that have a mesh: source "scan", state "ready", a glbUrl. Always the
+ * live table, never the stub — a fixture cannot hold something you scanned a minute ago. Two
+ * routes merged by id: GET /v1/objects (list route) and POST /v1/search with no text (contract
+ * route); on 2026-09-19 the deployed Worker answered one of them empty for scans.
+ */
+export async function listScans(): Promise<ObjectV1[]> {
+  const byId = new Map<string, ObjectV1>();
+  const add = (list: ObjectV1[]) => {
+    for (const o of list) if (o && o.objectId && !byId.has(o.objectId)) byId.set(o.objectId, o);
+  };
+  const results = await Promise.allSettled([
+    fetch(`${API_BASE}/objects?source=scan&limit=50`).then(async (r) => (r.ok ? ((await r.json()) as ObjectV1[]) : [])),
+    fetch(`${API_BASE}/search`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ source: 'scan', limit: 50 }),
+    }).then(async (r) => (r.ok ? ((await r.json()) as { object: ObjectV1 }[]).map((h) => h.object) : [])),
+  ]);
+  for (const r of results) if (r.status === 'fulfilled' && Array.isArray(r.value)) add(r.value);
+  if (results.every((r) => r.status === 'rejected')) throw new Error('scans: both list routes failed');
+  return [...byId.values()]
+    .filter((o) => o.source === 'scan' && o.state === 'ready' && !!o.glbUrl)
+    .sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''));
+}
+
+/**
+ * An asset URL the page can actually fetch. The Worker sends no CORS headers, so a GLB at the
+ * Worker's absolute origin is unreachable from this page's origin; its /v1/... path, through the
+ * same proxy the API already uses (Vite in dev, worker/index.ts deployed), is reachable.
+ */
+export function sameOrigin(url: string): string {
+  try {
+    const u = new URL(url, location.href);
+    if (u.origin !== location.origin && u.pathname.startsWith('/v1/')) return u.pathname + u.search;
+    return url;
+  } catch {
+    return url;
+  }
 }
 
 /** The fail-loud rule from the contract: a mismatch is a person problem, not a fallback. */

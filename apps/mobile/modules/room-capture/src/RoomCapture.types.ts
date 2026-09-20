@@ -57,6 +57,10 @@ export interface RoomCaptureV1 {
   appearance?: { surfaces: Record<string, RoomAppearanceSurface> };
 }
 
+// What stopSession() actually resolves: the contract document plus one
+// phone-local extra. Strip `photoPath` before POST /rooms.
+export type RoomCaptureResult = RoomCaptureV1 & { photoPath: string | null };
+
 export type RoomCaptureInstruction =
   | "normal"
   | "moveCloseToWall"

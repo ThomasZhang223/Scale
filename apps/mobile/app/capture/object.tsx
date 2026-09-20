@@ -15,6 +15,7 @@ import type { ObjectMeasureResult } from "../../modules/object-measure";
 import { postJSON, putUpload } from "../../src/lib/api";
 import { GlassButton, GlassCloseButton } from "../../src/theme/Glass";
 import { spacing } from "../../src/theme/tokens";
+import { saveObjectPhoto } from "../../src/ui/objectFiles";
 import { Readout, ReadoutHint } from "../../src/ui/Readout";
 
 type Phase = "idle" | "measuring" | "measured" | "uploading";
@@ -92,6 +93,14 @@ export default function CaptureObjectScreen() {
         bboxMeters: result.bboxMeters,
         measure: { method: "lidar", confidence: result.confidence },
       });
+      // Sharpest frame first: that one is the row's photo on this phone.
+      if (result.framePaths[0]) {
+        try {
+          saveObjectPhoto(object.objectId, result.framePaths[0]);
+        } catch {
+          // Row falls back to the category icon.
+        }
+      }
       for (const [n, framePath] of result.framePaths.entries()) {
         const { putUrl } = await postJSON<{ key: string; putUrl: string }>("/uploads", {
           kind: "objectFrame",

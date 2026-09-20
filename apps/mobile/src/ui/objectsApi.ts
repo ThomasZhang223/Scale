@@ -16,24 +16,36 @@ export type JobState = {
 export async function listObjects(source: ObjectV1["source"], merchant?: string | null): Promise<ObjectV1[]> {
   const params = new URLSearchParams({ source, limit: "200" });
   if (merchant) params.set("merchant", merchant);
-  let objects: ObjectV1[];
-  try {
-    objects = await getJSON<ObjectV1[]>(`/v1/objects?${params.toString()}`, { stub: STUB });
-  } catch (err) {
-    // ceiling: the list route ships in workers/ alongside this screen but the deployed Worker
-    // may predate it. Until it is deployed, POST /v1/search with no text is the same D1 listing
-    // (routes/index.ts d1Search: source filter, newest first) capped at 50 rows. Only a 404
-    // takes this path — every other failure is still raised as-is.
-    if (!(err instanceof ApiError) || !/HTTP 404/.test(err.message)) throw err;
-    const hits = await postJSON<{ object: ObjectV1 }[]>("/v1/search", { source, limit: 50 }, { stub: STUB });
-    objects = hits.map((h) => h.object).filter((o) => !merchant || o.merchant === merchant);
+  // Both routes, merged by objectId. GET /v1/objects is the list route (workers/DEPLOY.md
+  // "Schema proposals"); POST /v1/search with no text is the contract route that lists the same
+  // D1 table. On 2026-09-19 the deployed Worker answered the GET with [] for source=scan while
+  // search returned the phone's own capture — different deploy generations. Asking both and
+  // merging costs one extra request and never hides a row that one of them knows about.
+  const byId = new Map<string, ObjectV1>();
+  const errors: string[] = [];
+  const [listed, searched] = await Promise.all([
+    getJSON<ObjectV1[]>(`/v1/objects?${params.toString()}`, { stub: STUB }).catch((err: unknown) => {
+      errors.push(err instanceof Error ? err.message : String(err));
+      return [] as ObjectV1[];
+    }),
+    postJSON<{ object: ObjectV1 }[]>("/v1/search", { source, limit: 50 }, { stub: STUB })
+      .then((hits) => hits.map((h) => h.object))
+      .catch((err: unknown) => {
+        errors.push(err instanceof Error ? err.message : String(err));
+        return [] as ObjectV1[];
+      }),
+  ]);
+  if (errors.length === 2) throw new ApiError(errors.join("; "));
+  for (const o of [...(Array.isArray(listed) ? listed : []), ...searched]) {
+    if (o && typeof o.objectId === "string" && !byId.has(o.objectId)) byId.set(o.objectId, o);
   }
-  if (!Array.isArray(objects)) throw new Error("GET /v1/objects did not return a list — ask Thomas");
+  let objects = [...byId.values()];
   // contracts.md, "The one line of code that makes this loud": checked per row, not per call.
   for (const o of objects) assertSchema(o, "Object v1");
   // The stub answers the same fixture for every source; filter so the Furniture tab is not
   // showing a LiDAR-scanned laptop as a Shopify listing.
-  return objects.filter((o) => o.source === source);
+  objects = objects.filter((o) => o.source === source && (!merchant || o.merchant === merchant));
+  return objects.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }
 
 export function getObject(objectId: string): Promise<ObjectV1> {

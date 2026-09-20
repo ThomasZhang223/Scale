@@ -7,7 +7,7 @@ import { ObjectLoader, type LoadedObject } from './objects';
 import { createPhysics } from './physics';
 import { Interaction } from './interaction';
 import {
-  getRoom, getObject, getVersion, postVersion, objectToItem, boundsMismatch, watchRoom, postFit, STUB,
+  getRoom, getObject, getVersion, postVersion, objectToItem, boundsMismatch, watchRoom, postFit, STUB, listScans, sameOrigin,
   type ObjectV1, type VersionV1, type PlacementV1,
 } from './api';
 import { FitOverlay, type FitReport } from './fit';
@@ -1185,8 +1185,51 @@ async function start() {
     renderCatalog();
   }
 
+  /**
+   * "My scans": what the phone captured and reconstructed, as pullable palette tiles next to
+   * the bundled furniture. Scale 1 always — a captured mesh is already true size (standing
+   * rule 2: nothing downstream rescales). Loaded after the manifest so the palette order is
+   * stable: designer, scanned pieces, listings, my scans, furniture.
+   */
+  async function loadMyScans() {
+    let scans;
+    try {
+      scans = await listScans();
+    } catch (err) {
+      console.warn('My scans unavailable:', err);
+      return;
+    }
+    if (!scans.length) return;
+    const items: PaletteItem[] = scans.map((o) => ({
+      url: sameOrigin(o.glbUrl!),
+      name: o.name || 'Captured object',
+      scale: 1,
+      objectId: o.objectId,
+      section: 'My scans',
+    }));
+    catalog.unshift(...items);
+    showPalette();
+    renderCatalog();
+    await Promise.all(
+      items.map(async (item) => {
+        try {
+          const loaded = await loader.load(item.url, 1);
+          item.size = loaded.size;
+          const expected = scans.find((o) => o.objectId === item.objectId)?.bboxMeters;
+          const mismatch = expected ? boundsMismatch(loaded.size, expected) : null;
+          if (mismatch) console.warn(`${item.name}: ${mismatch}`);
+        } catch (err) {
+          console.error(`Loading scan ${item.name} failed:`, err);
+          say(`Couldn’t load your scan ${item.name}: ${(err as Error).message}`);
+        }
+      }),
+    );
+    showPalette();
+    renderCatalog();
+  }
+
   await loadRoom();
-  void loadManifest();
+  void loadManifest().then(loadMyScans);
   await loadServerObjects();
   void checkFit();
   if (VERSION_ID) {

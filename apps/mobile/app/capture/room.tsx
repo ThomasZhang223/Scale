@@ -4,10 +4,11 @@ import { Alert, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { RoomCaptureModule, RoomCaptureView } from "../../modules/room-capture";
-import type { RoomCaptureProgressEvent, RoomCaptureV1 } from "../../modules/room-capture";
+import type { RoomCaptureProgressEvent, RoomCaptureResult } from "../../modules/room-capture";
 import { postJSON } from "../../src/lib/api";
 import { CameraGlass, GlassButton, GlassCloseButton } from "../../src/theme/Glass";
 import { spacing } from "../../src/theme/tokens";
+import { saveRoomPhoto } from "../../src/ui/roomPhotos";
 
 // Full-screen RoomPlan sweep. The camera feed and the instruction text are
 // drawn by the native view itself (see modules/room-capture) — this screen
@@ -56,9 +57,9 @@ export default function CaptureRoomScreen() {
 
   const finish = useCallback(async () => {
     setIsFinishing(true);
-    let room: RoomCaptureV1;
+    let result: RoomCaptureResult;
     try {
-      room = await RoomCaptureModule.stopSession();
+      result = await RoomCaptureModule.stopSession();
     } catch (error) {
       Alert.alert("Scan failed", error instanceof Error ? error.message : String(error));
       setIsFinishing(false);
@@ -66,8 +67,16 @@ export default function CaptureRoomScreen() {
     }
     setIsScanning(false);
 
+    const { photoPath, ...room } = result;
     try {
       const { roomId } = await postJSON<{ roomId: string }>("/rooms", room);
+      if (photoPath) {
+        try {
+          saveRoomPhoto(roomId, photoPath);
+        } catch {
+          // The card falls back to the floor plan; the scan itself is saved.
+        }
+      }
       router.replace(`/room/${roomId}`);
     } catch (error) {
       // The scan itself succeeded — do not throw it away because the upload

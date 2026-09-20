@@ -22,6 +22,8 @@ import { formatLengthCm } from "../../src/lib/units";
 // mesh-macbook.glb to load yet either). Swap the import below once someone
 // with a real device confirms GlbPreview actually renders.
 import { StaticThumbnail } from "../../src/three/StaticThumbnail";
+import { ModelPreviewView } from "../../modules/object-capture";
+import { objectUsdzUri } from "../../src/ui/objectFiles";
 
 // ceiling: Object v1 has no live progressPct — that lives on GET
 // /jobs/{id}, keyed by a jobId that POST /objects/{id}/generate mints per
@@ -77,6 +79,8 @@ export default function ObjectDetailScreen() {
   if (state.status === "error") return <ErrorView message={state.message} onRetry={retry} />;
 
   const object = state.data;
+  // The captured model itself when this phone built it; the measured box otherwise.
+  const usdz = objectUsdzUri(object.objectId);
   const progress = job ? Math.max(0.05, job.progressPct / 100) : progressForState(object.state);
   const canGenerate = !job && (object.state === "measured" || object.state === "failed");
   const price = formatPrice(object.price);
@@ -99,7 +103,11 @@ export default function ObjectDetailScreen() {
     // two scroll views, unlike room detail's non-scrolling metrics List).
     <View style={styles.screen}>
       <View style={styles.previewWrap}>
-        <StaticThumbnail bboxMeters={object.bboxMeters} />
+        {usdz ? (
+          <ModelPreviewView url={usdz} style={styles.model} />
+        ) : (
+          <StaticThumbnail bboxMeters={object.bboxMeters} />
+        )}
       </View>
 
       <Host style={styles.host} useViewportSizeMeasurement>
@@ -178,6 +186,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: spacing.md,
   },
+  model: { width: "100%", aspectRatio: 1.15 },
   host: {
     flex: 1,
   },

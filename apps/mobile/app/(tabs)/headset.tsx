@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import * as Haptics from "expo-haptics";
 import { List, Button, Text, Image, HStack, Spacer } from "@expo/ui/swift-ui";
+import { withTabFade } from "../../src/ui/TabFade";
 
 import { GlassHost, GlassSection, glassList } from "../../src/ui/glass";
 
@@ -27,7 +28,7 @@ function healthLabel(health: HealthState): string {
   return `stub layer OK — ${health.wallCount} walls`;
 }
 
-export default function HeadsetScreen() {
+function HeadsetScreen() {
   const [health, setHealth] = useState<HealthState>({ status: "checking" });
   const [sse, setSse] = useState<SseState>("connecting");
   const [push, setPush] = useState<PushState>("idle");
@@ -106,3 +107,5 @@ export default function HeadsetScreen() {
     </GlassHost>
   );
 }
+
+export default withTabFade(HeadsetScreen);
