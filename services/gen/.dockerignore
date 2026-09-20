@@ -2,5 +2,8 @@
 !app/
 !app/**
 !requirements-embedding-linux-py311.txt
+!requirements-adapter-service.txt
+!deploy/
+!deploy/**
 **/__pycache__/
 **/*.pyc

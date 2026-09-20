@@ -207,7 +207,15 @@ def worker_request(payload, image_bytes, *, scope, image_sha256, image_ref):
     source is absent from his payload: it must be supplied by his hydrated object,
     not guessed from a URL. upload_url is never stored or echoed in a receipt.
     """
-    check(isinstance(payload, dict) and payload.get("tier") == "live", "only_live_tier_supported")
+    # .claude/contracts.md is the authority on the wire: POST /objects/{id}/generate takes
+    # tier "live" OR "quality", and Thomas's workflow forwards whichever the caller sent.
+    # Rejecting "quality" here failed a contract-legal request at the adapter instead of at
+    # the edge, which on the demo path is a dead job, not a graceful degradation.
+    # ceiling: one SF3D configuration serves both tiers — app/baseten/README.md, "no `quality`
+    # model is implemented". The tier selects nothing downstream today. The upgrade path is a
+    # second provider configuration keyed by tier, chosen here, once one exists to choose.
+    check(isinstance(payload, dict) and payload.get("tier") in ("live", "quality"),
+          "unsupported_generation_tier")
     check(set(payload) <= {"tier", "image_url", "bbox_meters", "object_id", "upload_url", "want_embedding", "source"},
           "unsupported_generation_field")
     return GenerationInput.from_object({"objectId": payload.get("object_id"), "source": payload.get("source"),

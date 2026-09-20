@@ -25,6 +25,8 @@ else
 fi
 
 echo "== stopping containers =="
-( cd "$REPO_ROOT" && docker compose --profile local down )
+# --profile gen as well as local: the B06 generation adapter sits in its own profile
+# (see docker-compose.yml), and `down` only stops services in the profiles it is given.
+( cd "$REPO_ROOT" && docker compose --profile local --profile gen down )
 
 echo "done"
