@@ -110,8 +110,12 @@ scene.add(fitOverlay.group);
 // every frame in the loop below, from the head through the phone).
 const hud = new Hud();
 hud.attachTo(scene);
-renderer.xr.addEventListener('sessionstart', () => hud.setPresenting(true));
-renderer.xr.addEventListener('sessionend', () => hud.setPresenting(false));
+// Merchant listings get their own card, to the right of the design card, so a redesign's
+// reasons and a shop's "mesh job queued" never share a page.
+const listingsHud = new Hud({ side: 0.8, drop: 0.42 });
+listingsHud.attachTo(scene);
+renderer.xr.addEventListener('sessionstart', () => { hud.setPresenting(true); listingsHud.setPresenting(true); });
+renderer.xr.addEventListener('sessionend', () => { hud.setPresenting(false); listingsHud.setPresenting(false); });
 
 // The find panel: head-locked ahead and to the right, showing per-store Browserbase progress
 // and then the listing cards. Its own module (findpanel.ts), like hud.ts.
@@ -153,11 +157,14 @@ const say = (text: string) => (note.textContent = text);
 // the phone (hud.ts). The phone keeps the buttons; the reasons live on the panel.
 const TRANSCRIPT_KEEP = 8;
 const transcript: HudLine[] = [];
-function tell(text: string, tone: Tone = 'info') {
+const listingsTranscript: HudLine[] = [];
+type Channel = 'design' | 'listings';
+function tell(text: string, tone: Tone = 'info', channel: Channel = 'design') {
   say(text);
-  transcript.push({ text, tone });
-  if (transcript.length > TRANSCRIPT_KEEP) transcript.splice(0, transcript.length - TRANSCRIPT_KEEP);
-  hud.set(transcript);
+  const lines = channel === 'listings' ? listingsTranscript : transcript;
+  lines.push({ text, tone });
+  if (lines.length > TRANSCRIPT_KEEP) lines.splice(0, lines.length - TRANSCRIPT_KEEP);
+  (channel === 'listings' ? listingsHud : hud).set(lines);
 }
 
 /** Spoken output is one sentence: the card carries the rest. */
@@ -246,6 +253,7 @@ async function start() {
   });
   const interaction = new Interaction(renderer, scene, camera, controls, physics, palette, spawn, onAction, layoutChanged, onGrab, (r) => {
     if (hud.hitTest(r)) return 'hud:close';
+    if (listingsHud.hitTest(r)) return 'hud:close:listings';
     const hit = findPanel.hitTest(r);
     if (!hit) return null;
     return hit.kind === 'close' ? 'find:close' : `find:pick:${hit.objectId}`;
@@ -257,6 +265,11 @@ async function start() {
 
   function onAction(action: string) {
     if (action === 'hud:close') hud.dismiss();
+    if (action === 'hud:close:listings') listingsHud.dismiss();
+    if (action === 'listings:show') {
+      listingsHud.reopen();
+      findPanel.reopen();
+    }
     if (action === 'find:close') findPanel.dismiss();
     if (action.startsWith('find:pick:')) void pickListing(action.slice(10));
     if (action === 'reset' && lastScan) showScan(lastScan, 'Room reset');
@@ -318,6 +331,8 @@ async function start() {
     const items: PaletteItem[] = [];
     if (listingsBusy) return [{ url: '', name: 'Searching listings…', label: true, section: 'Listings' }];
     if (!listings) return items;
+    // The listings card can be closed; the search itself is not over. This brings it back.
+    items.push({ url: '', name: 'Show listings', action: 'listings:show', section: 'Listings' });
     if (listings.note) items.push({ url: '', name: listings.note, label: true, severity: 'warn', section: 'Listings' });
     if (!listings.recommendations.length) items.push({ url: '', name: 'Nothing fits that. Try a wider gap or another kind.', label: true, section: 'Listings' });
     for (const r of listings.recommendations.slice(0, 6)) {
@@ -368,11 +383,20 @@ async function start() {
     renderListings();
     const top = listings.recommendations[0];
     const what = need.replaces ? `for the ${need.replaces.category}` : need.text ? `for "${need.text}"` : '';
-    const spoken = top
-      ? `${listings.recommendations.length} listings ${what}. Top pick: ${top.listing.name} from ${top.listing.merchant ?? 'the catalogue'}, ${top.reasons.join(', ')}.`
-      : `Nothing for sale fits ${what}.`;
-    tell(spoken, top ? 'info' : 'warn');
-    if (need.text && lastHeard === need.text) speak(concise(spoken)); // only answer aloud when it was asked aloud
+    // The card: one short line per listing, nothing else. The voice reads each one out.
+    const shown = listings.recommendations.slice(0, 6);
+    if (!top) {
+      tell(`Nothing for sale fits ${what}.`, 'warn', 'listings');
+    } else {
+      tell(`${listings.recommendations.length} listings ${what}`, 'info', 'listings');
+      shown.forEach((r, i) => tell(`${i + 1}. ${r.listing.name} — ${r.listing.merchant ?? 'catalogue'}`, 'info', 'listings'));
+    }
+    if (need.text && lastHeard === need.text) {
+      const readout = top
+        ? `${listings.recommendations.length} listings. ${shown.map((r) => `${r.listing.name} from ${r.listing.merchant ?? 'the catalogue'}`).join('. ')}.`
+        : `Nothing for sale fits ${what}.`;
+      speak(readout); // only answer aloud when it was asked aloud
+    }
     return listings;
   }
 
@@ -422,7 +446,7 @@ async function start() {
     const l = rec.listing;
     const placedId = await addListing(objectId); // the measured box, placed where it belongs
     const placed = placedId ? objects.get(placedId) : undefined;
-    if (!placed) return tell(`${l.name}: couldn't be placed, so no mesh was queued.`, 'warn');
+    if (!placed) return tell(`${l.name}: no room to place it.`, 'warn', 'listings');
     // Already has a real mesh — addListing loaded it, there's nothing left to generate.
     if (l.state === 'ready' && l.glbUrl) {
       findPanel.setProgress(objectId, 'Mesh placed at true scale');
@@ -434,11 +458,11 @@ async function start() {
       job = await postListingsGenerate(l, SERVER_ROOM_ID);
     } catch (err) {
       findPanel.setProgress(objectId, `Couldn’t queue the mesh: ${(err as Error).message}`);
-      return tell(`${l.name}: couldn’t queue the mesh — ${(err as Error).message}`, 'error');
+      return tell(`${l.name}: 3D request failed — ${concise((err as Error).message, 80)}`, 'error', 'listings');
     }
     // The server mints a stable id; the placed box keeps tracking it so SSE dedupe works.
     placed.objectId = job.objectId;
-    tell(`${l.name}: mesh job queued. It’s in the room as a box until Baseten answers.`, 'info');
+    tell(`${l.name}: in the room as a box, 3D on the way.`, 'info', 'listings');
     const started = Date.now();
     // ceiling: 3 s polling for up to 10 min. The SSE `object` event usually lands first; when it
     // does, addServerObject's own dedupe guard (matching objects by objectId) skips placing a
@@ -459,20 +483,20 @@ async function start() {
           if (objects.has(placed.id)) {
             swapLoaded(placed, loaded);
             findPanel.setProgress(objectId, 'Mesh placed at true scale');
-            tell(`${l.name}: mesh ready and placed.`, 'info');
+            tell(`${l.name}: 3D ready.`, 'info', 'listings');
           } else {
             findPanel.setProgress(objectId, 'Mesh ready, but the box was removed');
-            tell(`${l.name}: mesh is ready but the box was removed; add it again from the wrist.`, 'warn');
+            tell(`${l.name}: 3D ready; add it again from the tablet.`, 'warn', 'listings');
           }
         } catch (err) {
           findPanel.setProgress(objectId, `Mesh failed to load: ${(err as Error).message}`);
-          tell(`${l.name}: ${(err as Error).message}`, 'error');
+          tell(`${l.name}: ${(err as Error).message}`, 'error', 'listings');
         }
         return;
       }
       if (j.state === 'failed') {
         findPanel.setProgress(objectId, `Generation failed: ${j.error ?? 'unknown'}`);
-        return tell(`${l.name}: generation failed — ${j.error ?? 'unknown error'}. The box stays.`, 'error');
+        return tell(`${l.name}: 3D failed, the box stays.`, 'error', 'listings');
       }
       const waiting = j.state === 'queued' && elapsed > 20_000;
       findPanel.setProgress(objectId, waiting ? 'Waiting on Baseten — box placed at true size' : `Generating mesh ${j.progressPct}%`);
@@ -1506,6 +1530,7 @@ async function start() {
     applier.update(dt);
     physics.step(dt);
     hud.place(renderer.xr.isPresenting ? renderer.xr.getCamera() : camera, dt);
+    listingsHud.place(renderer.xr.isPresenting ? renderer.xr.getCamera() : camera, dt);
     findPanel.place(renderer.xr.isPresenting ? renderer.xr.getCamera() : camera);
     if (!renderer.xr.isPresenting) controls.update();
     renderer.render(scene, camera);

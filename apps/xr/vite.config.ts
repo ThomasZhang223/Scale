@@ -40,6 +40,23 @@ export default defineConfig(({ mode }) => {
   const activeRoom: Plugin = {
     name: 'full-scale-active-room',
     configureServer(server) {
+      // Same-origin relay for product photos whose CDN sends no CORS headers: a canvas that
+      // draws a cross-origin image taints, and a tainted canvas cannot become a WebGL texture.
+      // Images only, dev only.
+      server.middlewares.use((req, res, next) => {
+        if (!req.url?.startsWith('/local/image?')) return next();
+        const target = new URL(req.url, 'http://x').searchParams.get('url') ?? '';
+        if (!/^https?:\/\//.test(target)) { res.statusCode = 400; return res.end('url must be http(s)'); }
+        fetch(target, { headers: { accept: 'image/*' } })
+          .then(async (r) => {
+            const type = r.headers.get('content-type') ?? '';
+            if (!r.ok || !type.startsWith('image/')) { res.statusCode = 502; return res.end(`upstream ${r.status} ${type}`); }
+            res.setHeader('content-type', type);
+            res.setHeader('cache-control', 'public, max-age=3600');
+            res.end(Buffer.from(await r.arrayBuffer()));
+          })
+          .catch((err) => { res.statusCode = 502; res.end(String(err)); });
+      });
       server.middlewares.use((req, res, next) => {
         if (!req.url?.startsWith('/local/active-room')) return next();
         res.setHeader('access-control-allow-origin', '*');

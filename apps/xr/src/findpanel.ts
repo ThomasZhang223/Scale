@@ -16,7 +16,14 @@ const PX = 2400;
 const WIDTH = 0.6;
 const PAD = 0.024;
 const TITLE_H = 0.05;
-const ROW_H = 0.036;       // a stage row
+const ROW_H = 0.036;       // a note row
+// While searching, each store is a small browser window: a tab bar with its address, a
+// status line, and the product photos its page yielded, as they arrive.
+const WIN_TAB_H = 0.03;
+const WIN_STATUS_H = 0.03;
+const WIN_STRIP = 0.075;   // photo strip height
+const WIN_GAP = 0.008;
+const WIN_PAD = 0.01;
 const CARD_H = 0.11;       // a listing card
 const CARD_GAP = 0.008;
 const THUMB = 0.09;
@@ -36,7 +43,12 @@ const ACCENT = '#0A84FF';
 const STAGE_COLOR: Record<FindStage, string> = { searching: '#FF9F0A', measuring: '#FFD60A', done: '#30D158', failed: '#FF453A' };
 const FONT = (size: number, weight = 400) => `${weight} ${size * PX}px -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", system-ui, sans-serif`;
 
-interface StageRow { merchant: string; stage: FindStage | 'queued'; detail: string }
+interface StageRow { merchant: string; stage: FindStage | 'queued'; detail: string; url?: string | null; photos?: string[] }
+
+/** A store window's height: tab + status, plus the photo strip once its page has answered. */
+function windowHeight(row: StageRow): number {
+  return WIN_TAB_H + WIN_STATUS_H + (row.photos?.length ? WIN_STRIP + WIN_PAD : 0) + WIN_PAD;
+}
 
 /** Card i occupies [y, y+h) metres below the panel's top edge. Pure, so hit tests are testable. */
 export function cardRects(count: number): { y: number; h: number }[] {
@@ -78,6 +90,11 @@ export class FindPanel {
     this.group.visible = on && this.mode !== 'hidden' && !this.dismissed;
   }
 
+  /** Brought back on purpose: the listings are still there after the card was closed. */
+  reopen() {
+    this.dismissed = false;
+  }
+
   dismiss() {
     this.dismissed = true;
     this.group.visible = false;
@@ -110,8 +127,13 @@ export class FindPanel {
 
   setStage(info: StageInfo) {
     const row = this.rows.find((r) => r.merchant === info.merchant);
-    if (row) { row.stage = info.stage; row.detail = info.detail; }
-    else this.rows.push({ ...info });
+    if (row) {
+      row.stage = info.stage;
+      row.detail = info.detail;
+      if (info.url !== undefined) row.url = info.url;
+      if (info.photos) row.photos = info.photos;
+    } else this.rows.push({ ...info });
+    for (const u of info.photos ?? []) this.loadThumb(u, u);
     if (this.mode === 'searching') this.redraw();
   }
 
@@ -138,20 +160,32 @@ export class FindPanel {
   }
 
   private loadThumbs() {
-    if (typeof Image === 'undefined') return;
-    for (const { listing } of this.recs) {
-      if (!listing.imageUrl || this.thumbs.has(listing.objectId)) continue;
-      const img = new Image();
-      img.crossOrigin = 'anonymous'; // Shopify's CDN sends CORS headers; without this the canvas taints
-      img.onload = () => this.redraw();
-      img.onerror = () => { this.thumbs.delete(listing.objectId); };
-      img.src = listing.imageUrl;
-      this.thumbs.set(listing.objectId, img);
-    }
+    for (const { listing } of this.recs) if (listing.imageUrl) this.loadThumb(listing.objectId, listing.imageUrl);
+  }
+
+  /**
+   * One image into the cache, redrawing when it lands. Loaded with CORS so the canvas stays
+   * clean for WebGL; a CDN that refuses is retried once through the dev server's image
+   * relay (vite.config.ts /local/image), which makes it same-origin.
+   * ceiling: the relay is dev-only; the deployed page has none, so such images stay blank.
+   */
+  private loadThumb(key: string, url: string) {
+    if (typeof Image === 'undefined' || this.thumbs.has(key)) return;
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    let relayed = false;
+    img.onload = () => this.redraw();
+    img.onerror = () => {
+      if (relayed) { this.thumbs.delete(key); return; }
+      relayed = true;
+      img.src = `/local/image?url=${encodeURIComponent(url)}`;
+    };
+    img.src = url;
+    this.thumbs.set(key, img);
   }
 
   private height(): number {
-    if (this.mode === 'searching') return PAD + TITLE_H + this.rows.length * ROW_H + PAD;
+    if (this.mode === 'searching') return PAD + TITLE_H + this.rows.reduce((a, r) => a + windowHeight(r) + WIN_GAP, 0) - WIN_GAP + PAD;
     const n = Math.max(1, this.recs.length);
     return PAD + TITLE_H + n * (CARD_H + CARD_GAP) - CARD_GAP + (this.note ? ROW_H : 0) + PAD;
   }
@@ -200,19 +234,64 @@ export class FindPanel {
     ctx.fillText(ellipsis(ctx, title, (WIDTH - 2 * PAD - 0.06) * PX), (PAD + 0.05) * PX, (PAD + TITLE_H / 2) * PX);
 
     if (this.mode === 'searching') {
-      this.rows.forEach((row, i) => {
-        const cy = (PAD + TITLE_H + i * ROW_H + ROW_H / 2) * PX;
+      let y = PAD + TITLE_H;
+      const x0 = PAD * PX, w = (WIDTH - 2 * PAD) * PX;
+      for (const row of this.rows) {
+        const h = windowHeight(row);
+        // The window: a card with a lighter tab bar along its top.
+        ctx.fillStyle = CARD_BG;
+        ctx.beginPath();
+        ctx.roundRect(x0, y * PX, w, h * PX, 0.01 * PX);
+        ctx.fill();
+        ctx.fillStyle = 'rgba(58,58,60,0.95)';
+        ctx.beginPath();
+        ctx.roundRect(x0, y * PX, w, WIN_TAB_H * PX, [0.01 * PX, 0.01 * PX, 0, 0]);
+        ctx.fill();
+        // Tab: status dot, store, address.
+        const ty = (y + WIN_TAB_H / 2) * PX;
         ctx.fillStyle = row.stage === 'queued' ? SECONDARY : STAGE_COLOR[row.stage];
         ctx.beginPath();
-        ctx.arc((PAD + 0.012) * PX, cy, 0.008 * PX, 0, Math.PI * 2);
+        ctx.arc(x0 + 0.014 * PX, ty, 0.006 * PX, 0, Math.PI * 2);
         ctx.fill();
         ctx.fillStyle = TEXT;
-        ctx.font = FONT(0.019, 500);
-        ctx.fillText(row.merchant, (PAD + 0.032) * PX, cy);
+        ctx.font = FONT(0.016, 600);
+        ctx.fillText(row.merchant, x0 + 0.028 * PX, ty);
+        const nameW = ctx.measureText(row.merchant).width;
         ctx.fillStyle = SECONDARY;
-        ctx.font = FONT(0.017);
-        ctx.fillText(ellipsis(ctx, row.detail, (WIDTH - PAD - 0.24 - PAD) * PX), (PAD + 0.24) * PX, cy);
-      });
+        ctx.font = FONT(0.014);
+        const addr = (row.url ?? '').replace(/^https?:\/\//, '');
+        if (addr) ctx.fillText(ellipsis(ctx, addr, w - 0.05 * PX - nameW - 0.02 * PX), x0 + 0.028 * PX + nameW + 0.014 * PX, ty);
+        // Status line.
+        const sy = (y + WIN_TAB_H + WIN_STATUS_H / 2) * PX;
+        ctx.fillStyle = row.stage === 'failed' ? STAGE_COLOR.failed : SECONDARY;
+        ctx.font = FONT(0.016);
+        ctx.fillText(ellipsis(ctx, row.detail, w - 0.028 * PX), x0 + 0.014 * PX, sy);
+        // The page's product photos, left to right, as they load; a grey tile while loading.
+        if (row.photos?.length) {
+          const ts = WIN_STRIP * PX;
+          let tx = x0 + 0.014 * PX;
+          const yy = (y + WIN_TAB_H + WIN_STATUS_H) * PX;
+          for (const u of row.photos) {
+            if (tx + ts > x0 + w - 0.014 * PX) break;
+            ctx.fillStyle = 'rgba(255,255,255,0.08)';
+            ctx.beginPath();
+            ctx.roundRect(tx, yy, ts, ts, 0.006 * PX);
+            ctx.fill();
+            const img = this.thumbs.get(u);
+            if (img && img.complete && img.naturalWidth) {
+              const s = Math.min(ts / img.naturalWidth, ts / img.naturalHeight);
+              ctx.save();
+              ctx.beginPath();
+              ctx.roundRect(tx, yy, ts, ts, 0.006 * PX);
+              ctx.clip();
+              ctx.drawImage(img, tx + (ts - img.naturalWidth * s) / 2, yy + (ts - img.naturalHeight * s) / 2, img.naturalWidth * s, img.naturalHeight * s);
+              ctx.restore();
+            }
+            tx += ts + 0.008 * PX;
+          }
+        }
+        y += h + WIN_GAP;
+      }
     } else {
       if (!this.recs.length) {
         ctx.fillStyle = SECONDARY;

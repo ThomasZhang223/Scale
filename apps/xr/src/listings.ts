@@ -137,7 +137,15 @@ export function productQuery(text: string): string {
 }
 
 export type FindStage = 'searching' | 'measuring' | 'done' | 'failed';
-export interface StageInfo { merchant: string; stage: FindStage; detail: string }
+export interface StageInfo {
+  merchant: string;
+  stage: FindStage;
+  detail: string;
+  /** The storefront page being read — shown as the address bar of that store's window. */
+  url?: string | null;
+  /** Product photos that page yielded, as soon as the store answers: the "browsing" the headset can show. */
+  photos?: string[];
+}
 export type OnStage = (info: StageInfo) => void;
 
 interface FindResponse {
@@ -164,8 +172,10 @@ export async function findLive(need: Need, limit: number, onStage: OnStage = () 
   if (need.maxD != null) fit.maxD = need.maxD;
 
   const one = async ({ merchant, storefront }: { merchant: string; storefront: string }): Promise<Listing[]> => {
-    onStage({ merchant, stage: 'searching', detail: 'rendering the search page…' });
-    const timer = setTimeout(() => onStage({ merchant, stage: 'measuring', detail: 'measuring products…' }), MEASURING_AFTER_MS);
+    // The page Browserbase is about to render; the server reports the real one when it answers.
+    const url = `${storefront.replace(/\/+$/, '')}/search?q=${encodeURIComponent(query)}`;
+    onStage({ merchant, stage: 'searching', detail: 'rendering the search page…', url });
+    const timer = setTimeout(() => onStage({ merchant, stage: 'measuring', detail: 'measuring products…', url }), MEASURING_AFTER_MS);
     try {
       const res = await fetchFn(`${API_BASE}/find`, {
         method: 'POST',
@@ -180,10 +190,15 @@ export async function findLive(need: Need, limit: number, onStage: OnStage = () 
       const out = (await res.json()) as FindResponse;
       const rows = out.listings.map((l) => ({ ...l, merchant: l.merchant ?? merchant, imageUrl: l.imageUrl ?? l.extraction?.imageUrl ?? null }));
       const fits = out.listings.filter((l) => l.extraction?.fits !== false).length;
-      onStage({ merchant, stage: 'done', detail: out.fallbackSuspected ? `${out.measured} measured, none match — ${out.warning ?? 'store fallback'}` : `${out.handles} found, ${out.measured} measured, ${fits} fit` });
+      onStage({
+        merchant, stage: 'done',
+        detail: out.fallbackSuspected ? `${out.measured} measured, none match — ${out.warning ?? 'store fallback'}` : `${out.handles} found, ${out.measured} measured, ${fits} fit`,
+        url: out.searchUrl ?? url,
+        photos: rows.map((l) => l.imageUrl).filter((u): u is string => !!u).slice(0, 6),
+      });
       return rows;
     } catch (err) {
-      onStage({ merchant, stage: 'failed', detail: (err as Error).message });
+      onStage({ merchant, stage: 'failed', detail: (err as Error).message, url });
       throw err;
     } finally {
       clearTimeout(timer);

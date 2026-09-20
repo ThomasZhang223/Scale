@@ -43,17 +43,21 @@ const C = {
 
 // Metres on the wrist; canvas pixels map 1 m → 4000 px, so a 44 pt row is 0.034 m.
 const PX = 4000;
-const COL_W = 0.165;             // wider screen: names and sizes fit on one line
+const COLS = 4;                  // a tablet, not a phone: four cells across, a short list
+const COL_W = 0.115;
 const GAP_X = 0.006;
 const ROW_H = 0.037;
 const HEADER_H = 0.022;
 const GROUP_GAP = 0.012;
 const MARGIN = 0.012;
 const BEZEL = 0.007;
-const ISLAND = { w: 0.05, h: 0.012, top: 0.006 };
-const SCREEN_W = 2 * COL_W + GAP_X + 2 * MARGIN;
+// The tab bar along the top, like a browser tab: a title, no notch.
+const TAB_H = 0.02;
+const TAB_GAP = 0.004;
+const ROW_W = COLS * COL_W + (COLS - 1) * GAP_X;
+const SCREEN_W = ROW_W + 2 * MARGIN;
 const RADIUS_CELL = 0.004; // ~12 pt, grouped list corners
-const RADIUS_SCREEN = 0.018;
+const RADIUS_SCREEN = 0.014;
 const RADIUS_FRAME = RADIUS_SCREEN + BEZEL;
 const LABEL_LINE_H = 0.0145; // one wrapped footnote line; a label row grows by this per extra line
 const LABEL_PAD = 64; // canvas px, the leading text inset of a row
@@ -86,7 +90,8 @@ export class Palette {
   constructor() {
     this.group.name = 'palette';
     this.group.visible = false;
-    // Sits just above the back of the hand, tilted toward the eyes when you look at your wrist.
+    // Rests above the back of the hand like a tablet held flat, tilted toward the eyes when
+    // you look at your wrist. Wider than the hand on purpose: it is a screen, not a phone.
     this.group.position.set(0, 0.075, -0.02);
     this.group.rotation.x = -Math.PI / 3;
   }
@@ -103,21 +108,22 @@ export class Palette {
     if (!items.length) return;
 
     const slots = layout(items);
-    const screenH = (slots.at(-1)!.y + slots.at(-1)!.h / 2) + MARGIN + ISLAND.top + ISLAND.h;
+    const screenH = (slots.at(-1)!.y + slots.at(-1)!.h / 2) + MARGIN + TAB_H + TAB_GAP;
     const frameW = SCREEN_W + 2 * BEZEL;
     const frameH = screenH + 2 * BEZEL;
 
-    // The phone: body, screen, Dynamic Island.
+    // The tablet: a thin bezel, the screen, and a tab bar with the app's name along the top.
     this.group.add(plate(frameW, frameH, RADIUS_FRAME, C.frame, -0.0025));
     this.group.add(plate(SCREEN_W, screenH, RADIUS_SCREEN, C.screen, -0.0015));
-    const island = plate(ISLAND.w, ISLAND.h, ISLAND.h / 2, C.island, -0.0005);
-    island.position.y = screenH / 2 - ISLAND.top - ISLAND.h / 2;
-    this.group.add(island);
+    const tab = text('Full Scale', ROW_W, TAB_H, { font: 'footnote', color: C.secondary, background: C.island, padding: 20 });
+    tab.position.set(0, screenH / 2 - TAB_H / 2 - 0.002, -0.0005);
+    tab.raycast = () => {};
+    this.group.add(tab);
 
-    const top = screenH / 2 - ISLAND.top - ISLAND.h; // y of the screen's usable top edge
+    const top = screenH / 2 - TAB_H - TAB_GAP; // y of the screen's usable top edge
     for (const s of slots) {
       if (s.header) {
-        const h = text(s.header, 2 * COL_W + GAP_X, HEADER_H, { font: 'footnote', color: C.secondary, background: null, padding: 16 });
+        const h = text(s.header, ROW_W, HEADER_H, { font: 'footnote', color: C.secondary, background: null, padding: 16 });
         h.position.set(0, top - (s.y - s.h / 2 - HEADER_H / 2), 0);
         h.raycast = () => {};
         this.group.add(h);
@@ -172,27 +178,22 @@ function layout(items: PaletteItem[]): Slot[] {
     const header = newGroup && section ? section : undefined;
     const groupEnd = (k: number) => k >= items.length || (items[k].section ?? '') !== section;
     if (isObject(item)) {
-      // A row of two widget cells.
-      const pair = [item, !groupEnd(i + 1) && isObject(items[i + 1]) ? items[i + 1] : null];
-      const firstRow = newGroup || !isObject(items[i - 1]);
-      const lastRow = groupEnd(i + (pair[1] ? 2 : 1)) || !isObject(items[i + (pair[1] ? 2 : 1)]);
-      pair.forEach((p, col) => {
-        if (!p) return;
+      // A row of up to COLS widget cells, left to right.
+      const row: PaletteItem[] = [];
+      for (let k = i; k < i + COLS && !groupEnd(k) && isObject(items[k]); k++) row.push(items[k]);
+      row.forEach((p, col) => {
         slots.push({
-          item: p, x: (col === 0 ? -1 : 1) * (COL_W + GAP_X) / 2, y: y + ROW_H / 2, w: COL_W, h: ROW_H,
-          corners: [firstRow && col === 0, firstRow && col === 1, lastRow && col === 1, lastRow && col === 0],
-          separator: !lastRow, header: col === 0 ? header : undefined,
+          item: p, x: (col - (COLS - 1) / 2) * (COL_W + GAP_X), y: y + ROW_H / 2, w: COL_W, h: ROW_H,
+          corners: [true, true, true, true], separator: false, header: col === 0 ? header : undefined,
         });
       });
-      // Widget cells stand alone: a little air between rows, full corners each.
-      for (const s of slots.slice(-(pair[1] ? 2 : 1))) { s.corners = [true, true, true, true]; s.separator = false; s.h = ROW_H; }
       y += ROW_H + GAP_X;
-      i += pair[1] ? 2 : 1;
+      i += row.length;
       continue;
     }
     const first = newGroup || isObject(items[i - 1]);
     const last = groupEnd(i + 1) || isObject(items[i + 1]);
-    const w = 2 * COL_W + GAP_X;
+    const w = ROW_W;
     // A label (an error, a log line) shows every word: it wraps, and the row grows to fit.
     // Buttons and furniture cells stay one line.
     let lines: string[] | undefined;

@@ -42,8 +42,17 @@ const CLOSE_R = 0.036;           // the × button's radius (top-right corner): a
 const CLOSE_INSET = 0.046;
 const FONT = `${0.02 * PX}px -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", system-ui, sans-serif`;
 
+export interface HudOptions {
+  /** Metres to the right of the centre line (negative = left). A second card beside the first. */
+  side?: number;
+  /** Metres below eye level. Default DROP; larger keeps a card out of the way. */
+  drop?: number;
+}
+
 export class Hud {
   readonly group = new THREE.Group();
+  private readonly side: number;
+  private readonly drop: number;
   private mesh: THREE.Mesh | null = null;
   private lines: HudLine[] = [];
   private presenting = false;
@@ -59,8 +68,10 @@ export class Hud {
   private readonly toCard = new THREE.Vector3();
   private readonly quat = new THREE.Quaternion();
 
-  constructor() {
-    this.group.name = 'hud';
+  constructor(options: HudOptions = {}) {
+    this.side = options.side ?? 0;
+    this.drop = options.drop ?? DROP;
+    this.group.name = this.side ? 'hud-side' : 'hud';
     this.group.visible = false;
     this.close = closeButton();
     this.group.add(this.close);
@@ -76,6 +87,15 @@ export class Hud {
     this.dismissed = true;
     this.hideAt = 0;
     this.group.visible = false;
+  }
+
+  /** Brought back on purpose (a "Show listings" tile): stays until closed by hand. */
+  reopen() {
+    if (!this.lines.length) return;
+    this.dismissed = false;
+    this.hideAt = 0;
+    this.anchored = false;
+    this.redraw();
   }
 
   /** The spoken reply has finished: the card has done its job, let it go shortly. */
@@ -104,17 +124,21 @@ export class Hud {
     if (this.forward.lengthSq() < 1e-6) this.forward.set(0, 0, -1);
     this.forward.normalize();
     this.target.copy(this.eye).addScaledVector(this.forward, DISTANCE);
-    this.target.y = this.eye.y - DROP;
+    if (this.side) {
+      // Right of the forward line on the floor plane: (-fz, 0, fx) is forward turned 90° right.
+      this.target.x += -this.forward.z * this.side;
+      this.target.z += this.forward.x * this.side;
+    }
+    this.target.y = this.eye.y - this.drop;
 
     if (!this.anchored) {
       this.group.position.copy(this.target);
       this.anchored = true;
     } else {
-      this.toCard.subVectors(this.group.position, this.eye);
-      this.toCard.y = 0;
-      const dist = this.toCard.length();
-      const angle = dist > 1e-6 ? Math.acos(Math.max(-1, Math.min(1, this.toCard.dot(this.forward) / dist))) : 0;
-      if (angle > REANCHOR_ANGLE || Math.abs(dist - DISTANCE) > REANCHOR_DIST || Math.abs(this.group.position.y - this.target.y) > REANCHOR_DIST) {
+      // Measured against where this card should be, so a side card follows on the same rule.
+      this.toCard.subVectors(this.group.position, this.target);
+      const off = this.toCard.length();
+      if (off > REANCHOR_DIST || off / DISTANCE > REANCHOR_ANGLE) {
         this.group.position.lerp(this.target, Math.min(1, FOLLOW * dt));
       }
     }
