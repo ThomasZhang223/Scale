@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { needFromText, needFromDetected, rank, findListings, isShoppingRequest, classifyUtterance, commandOf, normalizeTranscript, SHOP_VERBS, SHOP_LEAD_INS, parseLengthMetres, productQuery, findLive, STOREFRONTS, type Listing } from './listings.ts';
+import { needFromText, needFromDetected, rank, findListings, isShoppingRequest, classifyUtterance, clearScanWinner, commandOf, normalizeTranscript, SHOP_VERBS, SHOP_LEAD_INS, parseLengthMetres, productQuery, findLive, STOREFRONTS, type Listing } from './listings.ts';
 
 const catalog: Listing[] = JSON.parse(readFileSync(new URL('../public/catalog.json', import.meta.url), 'utf-8'));
 
@@ -381,4 +381,15 @@ test('the one STT homophone is repaired, and nothing else is touched', () => {
   // library, falls through to the shops and finds nothing there either. Nothing is placed.
   assert.equal(normalizeTranscript('At an angle'), 'add an angle');
   assert.equal(classifyUtterance(normalizeTranscript('at the window, put the sofa by it')).kind, 'design');
+});
+
+test('a scan is placed unasked only when it clearly beats the next one', () => {
+  const hit = (id: string, score: number) => ({ score, object: { objectId: id } as never });
+  // Real numbers from the deployed index, 2026-09-20, after the scans got image vectors.
+  assert.equal(clearScanWinner([hit('bag', 0.0912), hit('b', 0.0702)])?.objectId, 'bag');   // 1.30x
+  assert.equal(clearScanWinner([hit('bust', 0.0928), hit('b', 0.0694)])?.objectId, 'bust'); // 1.34x
+  // Two of the four scans ARE people, so this one must stay ambiguous rather than guess.
+  assert.equal(clearScanWinner([hit('person', 0.1132), hit('bust', 0.1120)]), null);        // 1.01x
+  assert.equal(clearScanWinner([hit('only', 0.01)])?.objectId, 'only');
+  assert.equal(clearScanWinner([]), null);
 });

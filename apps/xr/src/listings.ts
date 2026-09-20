@@ -629,3 +629,27 @@ export function matchLibraryByWord(rows: Listing[], query: string | null | undef
     .sort((a, b) => b.hits - a.hits);
   return scored.filter((s) => s.hits === scored[0].hits).map((s) => s.row);
 }
+
+
+/**
+ * How much the best scan must beat the next one before it is placed without asking.
+ *
+ * A RATIO, not a difference, because image-to-text similarity in SigLIP's shared space is small
+ * in absolute terms: measured on the four live scans, "bag" gives 0.0912 then 0.0702 and "bust"
+ * 0.0928 then 0.0694, while "person" gives 0.1132 then 0.1120 — and that last one SHOULD be
+ * ambiguous, because two of the four scans are people. 1.25x separates those three cases
+ * correctly (1.30, 1.34, and 1.01).
+ *
+ * ceiling: calibrated on four scans of very different things. A library of near-duplicates —
+ * five captures of the same chair — would rarely clear it, which is the safe way to be wrong:
+ * it lists them instead of guessing.
+ */
+export const SCAN_CLEAR_LEAD = 1.25;
+
+/** The one scan to place, or null when the result is too close to call. */
+export function clearScanWinner(hits: { score: number; object: ObjectV1 }[]): ObjectV1 | null {
+  if (!hits.length) return null;
+  if (hits.length === 1) return hits[0].object;
+  const [top, second] = hits;
+  return top.score >= second.score * SCAN_CLEAR_LEAD ? top.object : null;
+}

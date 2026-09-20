@@ -20,7 +20,7 @@ import { Thumbnails } from './thumbs';
 import { matchDetected } from './placement';
 import { measuredBox } from './objects';
 import { Voice, type VoiceState } from './voice';
-import { findListings, matchLibraryByWord, needFromDetected, needFromText, classifyUtterance, normalizeTranscript, productQuery, SIMILAR_ENOUGH, STOREFRONTS, type Command, type Listing, type ListingsResult, type Need, type Recommendation, type StageInfo } from './listings';
+import { findListings, matchLibraryByWord, needFromDetected, needFromText, classifyUtterance, clearScanWinner, normalizeTranscript, productQuery, SIMILAR_ENOUGH, STOREFRONTS, type Command, type Listing, type ListingsResult, type Need, type Recommendation, type StageInfo } from './listings';
 import { FindPanel, type FindKind } from './findpanel';
 import { Outdoors } from './outdoors';
 import roomH from '../../../fixtures/room-h.json';
@@ -1197,12 +1197,20 @@ async function start() {
     // "unknown" for every row today, so this finds nothing and the count rules below decide
     // instead. It starts working by itself the day the phone names a capture — the real fix is
     // upstream, on the phone's Save screen, or a caption written at index time.
-    // The parser's own product words first, then the category words the sentence implies.
-    const words = query ? [query.toLowerCase()] : needFromText(text).categoryWords ?? [];
-    const named = words.length
-      ? scans.filter((o) => words.some((w) => `${o.name ?? ''} ${o.category ?? ''}`.toLowerCase().includes(w)))
-      : [];
-    const shown = named.length ? named : scans;
+    // Ranked by what the scan LOOKS like. Every scan row is called "Captured object" with no
+    // category, so a word match has nothing to read; what it does have is a render of its own
+    // mesh, image-embedded into the same space the query text is embedded into. Measured live:
+    // "person" puts the person and the bust on top, "bag" puts the bag on top, and a query for
+    // furniture scores all four near zero because none of them is furniture.
+    let ranked: { score: number; object: ObjectV1 }[] = [];
+    if (query) {
+      try {
+        ranked = await searchObjects({ text: query, source: 'scan', limit: 10 });
+      } catch (err) {
+        console.info('scan search unavailable, listing instead:', (err as Error).message);
+      }
+    }
+    const shown = ranked.length ? ranked.map((h) => h.object) : scans;
 
     presentResults({
       mode: 'scans',
@@ -1211,12 +1219,14 @@ async function start() {
       note: null,
     });
 
-    const one = named.length === 1 ? named[0]
+    // Placed without asking only when the answer is not in doubt: a clear winner on the ranking,
+    // a sentence that names the newest, or a library of exactly one.
+    const one = ranked.length ? clearScanWinner(ranked)
       : intent.newest ? shown[0]
       : shown.length === 1 ? shown[0]
       : null;
     if (intent.listOnly || !one) {
-      const what = named.length ? `${named.length} that match` : `${scans.length} scan${scans.length === 1 ? '' : 's'}`;
+      const what = ranked.length ? `${ranked.length} scans, none of them a clear match` : `${scans.length} scan${scans.length === 1 ? '' : 's'}`;
       return sayAloud(`You have ${what}. Pick one to place it.`);
     }
     if ([...objects.values()].some((o) => o.objectId === one.objectId)) {
