@@ -118,6 +118,7 @@ export class FindPanel {
   showResults(recs: Recommendation[], note: string | null) {
     this.mode = 'results';
     this.dismissed = false;
+    // ceiling: six cards, no paging; the upgrade is a scroll or a "+N more" row.
     this.recs = recs.slice(0, MAX_CARDS);
     this.note = note;
     this.loadThumbs();
@@ -159,10 +160,11 @@ export class FindPanel {
     if (this.mesh) {
       this.mesh.geometry.dispose();
       ((this.mesh.material as THREE.MeshBasicMaterial).map as THREE.Texture | null)?.dispose();
+      (this.mesh.material as THREE.MeshBasicMaterial).dispose();
       this.mesh.removeFromParent();
       this.mesh = null;
     }
-    for (const m of this.cardMeshes) { m.geometry.dispose(); m.removeFromParent(); }
+    for (const m of this.cardMeshes) { m.geometry.dispose(); (m.material as THREE.MeshBasicMaterial).dispose(); m.removeFromParent(); }
     this.cardMeshes = [];
     if (this.mode === 'hidden') { this.group.visible = false; return; }
 
