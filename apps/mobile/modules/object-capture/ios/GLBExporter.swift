@@ -108,7 +108,6 @@ enum GLBExporter {
           uvs.append(.zero)
         }
       }
-      globalMin = simd_min(globalMin, minP); globalMax = simd_max(globalMax, maxP)
 
       pad4(&bin)
       let positionsOffset = bin.count
@@ -190,6 +189,9 @@ enum GLBExporter {
           indicesOffset: indicesOffset, indicesCount: indexCount,
           minP: minP, maxP: maxP, material: materials.count - 1))
       }
+      // Widen the reported bbox only once this mesh is known to contribute geometry: a mesh
+      // skipped at the submesh guard above must not enlarge bboxMeters past what the GLB holds.
+      globalMin = simd_min(globalMin, minP); globalMax = simd_max(globalMax, maxP)
     }
     pad4(&bin)
     guard !primitives.isEmpty else { throw ExportError.noMeshes }
@@ -278,7 +280,16 @@ enum GLBExporter {
     glb.append(bin)
     try glb.write(to: output, options: .atomic)
 
-    return globalMax - globalMin
+    let size = globalMax - globalMin
+    // Fail loud, never rescale. ModelIO gives no access to the stage's metersPerUnit, so a
+    // centimetre-authored USDZ would come out 100x too big and nothing downstream would notice:
+    // bboxMeters is derived from these same bytes. A hand-held scanned object is 1 cm to 5 m.
+    let maxDim = max(size.x, size.y, size.z)
+    guard maxDim > 0.01, maxDim < 5.0 else {
+      throw ExportError.unsupportedGeometry(
+        "model measures \(size.x)x\(size.y)x\(size.z) m — not a metre-scale scan; check metersPerUnit")
+    }
+    return size
   }
 
   private static func worldTransform(of object: MDLObject) -> simd_float4x4 {
