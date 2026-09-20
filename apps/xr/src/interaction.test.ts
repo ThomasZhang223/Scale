@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { objectButtonsActive, stickUse } from './controls.ts';
+import { DELETE_ARM_MS, armDelete, objectButtonsActive, stickUse } from './controls.ts';
 
 // The thumbstick has three jobs and they must never overlap. This is the whole rule; the
 // update loop branches on it rather than repeating it, so these cases are the real behaviour.
@@ -51,4 +51,49 @@ test('A and B do nothing while the ray is on the interface', () => {
 test('A and B are the right controller only', () => {
   assert.equal(objectButtonsActive({ draggingWindow: false, handedness: 'left' }), false);
   assert.equal(objectButtonsActive({ draggingWindow: false, handedness: undefined }), false);
+});
+
+// Delete takes two presses on the same object. Four invisible-delete bugs in one night all had
+// the same shape; guarding each hole is a list, marking the object first is the rule.
+
+const press = (armed: Parameters<typeof armDelete>[0], id: string | null, now = 1000) =>
+  armDelete(armed, { id, now });
+
+test('two presses on the same object delete it', () => {
+  const first = press(null, 'lamp', 1000);
+  assert.equal(first.deleteId, null, 'the first press only arms');
+  assert.equal(first.armed?.id, 'lamp');
+  const second = press(first.armed, 'lamp', 1500);
+  assert.equal(second.deleteId, 'lamp');
+  assert.equal(second.armed, null, 'and it is not left armed afterwards');
+});
+
+test('a second press on a DIFFERENT object arms that one and deletes nothing', () => {
+  const first = press(null, 'lamp', 1000);
+  const second = press(first.armed, 'table', 1200);
+  assert.equal(second.deleteId, null, 'nothing is deleted');
+  assert.equal(second.armed?.id, 'table', 'the new object is armed, it does not inherit');
+  // And the lamp is no longer one press from gone.
+  assert.equal(press(second.armed, 'lamp', 1300).deleteId, null);
+});
+
+test('arming lapses, and the press after it arms again rather than deleting', () => {
+  const first = press(null, 'lamp', 1000);
+  const late = press(first.armed, 'lamp', 1000 + DELETE_ARM_MS + 1);
+  assert.equal(late.deleteId, null, 'too late to be a confirmation');
+  assert.equal(late.armed?.id, 'lamp', 'it is a fresh first press');
+  assert.equal(press(late.armed, 'lamp', 1000 + DELETE_ARM_MS + 2).deleteId, 'lamp');
+});
+
+test('a press on the interface, or on nothing, disarms and deletes nothing', () => {
+  const first = press(null, 'lamp', 1000);
+  const onUi = press(first.armed, null, 1100);
+  assert.equal(onUi.deleteId, null);
+  assert.equal(onUi.armed, null, 'and the lamp is disarmed, not left waiting');
+  assert.equal(press(null, null, 1200).deleteId, null, 'a press on nothing from cold does nothing');
+});
+
+test('the edge of the window counts as in time', () => {
+  const first = press(null, 'lamp', 1000);
+  assert.equal(press(first.armed, 'lamp', 1000 + DELETE_ARM_MS).deleteId, 'lamp');
 });

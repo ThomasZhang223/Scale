@@ -7,6 +7,9 @@ import * as THREE from 'three';
  */
 
 const COLOR = 0x5fb3ff;
+/** Armed for deletion. It pulses as well as changes colour: the demo room has a deep red wall,
+ *  and a still red outline against it is exactly the case a colour alone would lose. */
+export const ARMED_COLOR = 0xff4a3d;
 const GROW = 1.04;
 
 export class Halo {
@@ -20,8 +23,10 @@ export class Halo {
     depthWrite: false,
   });
 
-  show(root: THREE.Object3D, opacity: number) {
+  /** `color` marks what the halo means: the default blue is "this one", red is "about to go". */
+  show(root: THREE.Object3D, opacity: number, color = COLOR) {
     this.material.opacity = opacity;
+    this.material.color.setHex(color); // one shared material, and only ever one haloed object
     if (root === this.owner) return;
     this.hide();
     this.owner = root;

@@ -3,8 +3,8 @@ import type { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js
 import { XRControllerModelFactory } from 'three/examples/jsm/webxr/XRControllerModelFactory.js';
 import type { Physics } from './physics';
 import type { Palette, PaletteItem } from './palette';
-import { Halo, LandingPad } from './halo';
-import { BUTTON_A, BUTTON_B, LIFT_HEIGHT, STICK_X, STICK_Y, objectButtonsActive, stickUse } from './controls';
+import { ARMED_COLOR, Halo, LandingPad } from './halo';
+import { BUTTON_A, BUTTON_B, DELETE_ARM_MS, LIFT_HEIGHT, STICK_X, STICK_Y, armDelete, objectButtonsActive, stickUse, type Armed } from './controls';
 
 /*
  * Moving scanned objects, in the headset and on the laptop.
@@ -101,6 +101,8 @@ export class Interaction {
   /** Every window a controller can take hold of, in the order they were added. */
   private windows: DraggableWindow[] = [];
   private landing = new LandingPad();
+  /** The object A has armed. A second A press on the same one deletes it. */
+  private armed: Armed | null = null;
 
   constructor(
     renderer: THREE.WebGLRenderer,
@@ -225,10 +227,18 @@ export class Interaction {
       this.raycaster.setFromCamera(this.mouse, this.camera);
       this.follow(this.mouseGrab);
     }
-    // One halo: bright on the held object, dim on whatever a ray or the mouse is over.
+    // One halo: bright on the held object, dim on whatever a ray or the mouse is over, and
+    // red and pulsing on the one A has armed.
     const held = this.mouseGrab?.id ?? this.hands.find((h) => h.grab)?.grab?.id ?? null;
-    const node = this.physics.nodeOf(held ?? hoverId ?? this.mouseHover ?? '');
-    if (node) this.halo.show(node, held ? 0.85 : 0.35);
+    const looking = held ?? hoverId ?? this.mouseHover ?? null;
+    // Arming lapses the moment it stops being what you are looking at, or the moment it ages
+    // out. An armed object you have turned away from must never still be one press from gone.
+    if (this.armed && (this.armed.id !== looking || performance.now() - this.armed.at > DELETE_ARM_MS)) {
+      this.armed = null;
+    }
+    const node = this.physics.nodeOf(looking ?? '');
+    if (node && this.armed) this.halo.show(node, 0.55 + 0.35 * Math.sin(performance.now() * 0.012), ARMED_COLOR);
+    else if (node) this.halo.show(node, held ? 0.85 : 0.35);
     else this.halo.hide();
     // And the surface it would land on: the floor, or the top of whatever is under it. While
     // an object is in the air nothing else says whether it will land ON the table or beside it.
@@ -481,11 +491,17 @@ export class Interaction {
    * exist. hitId() only ever hits the pick boxes of placed objects, so the room itself is safe.
    */
   private deleteTargeted(hand: Hand) {
-    const id = hand.grab?.id ?? this.hitId();
-    if (!id) return;
-    if (hand.grab?.id === id) hand.grab = undefined; // it is about to stop existing
-    hand.source?.gamepad?.hapticActuators?.[0]?.pulse?.(0.6, 60);
-    this.onDelete(id);
+    const target = hand.grab?.id ?? this.hitId();
+    const { armed, deleteId } = armDelete(this.armed, { id: target, now: performance.now() });
+    this.armed = armed;
+    if (deleteId) {
+      if (hand.grab?.id === deleteId) hand.grab = undefined; // it is about to stop existing
+      hand.source?.gamepad?.hapticActuators?.[0]?.pulse?.(0.6, 60);
+      this.onDelete(deleteId);
+      return;
+    }
+    // Armed, not deleted. A short tap says the press registered; the red pulse says on what.
+    if (armed) hand.source?.gamepad?.hapticActuators?.[0]?.pulse?.(0.25, 25);
   }
 
   /**
@@ -496,6 +512,7 @@ export class Interaction {
    * The trigger keeps its own grab, because the trigger is also how tiles and windows are pressed.
    */
   private toggleLift(hand: Hand) {
+    this.armed = null; // picking a thing up is not confirming that it should go
     if (hand.grab?.lifted) {
       this.physics.release(hand.grab.id);
       this.onRelease(hand.grab.id);

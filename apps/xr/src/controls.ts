@@ -27,6 +27,39 @@ export const BUTTON_B = 5;
 /** Metres above the floor a B press raises an object to. */
 export const LIFT_HEIGHT = 1.0;
 
+/** How long an armed object stays armed. Long enough to look at it, short enough to forget. */
+export const DELETE_ARM_MS = 2000;
+
+/** The object A has armed, and when. */
+export interface Armed {
+  id: string;
+  at: number;
+}
+
+/**
+ * A press of A: what it arms, and what it deletes.
+ *
+ * Delete takes two presses on the same object, because four separate bugs in one night all had
+ * the same shape — A acting on something the person could not see. Guarding each way that could
+ * happen is a list of the holes found so far. Requiring the object to be marked, and the mark to
+ * be looked at, closes the class: nothing goes without being shown first.
+ *
+ * `id` is the object this press is on, or null when the press is on the interface, on the room,
+ * or on nothing. A null press only ever disarms.
+ */
+export function armDelete(
+  armed: Armed | null,
+  press: { id: string | null; now: number },
+): { armed: Armed | null; deleteId: string | null } {
+  if (press.id === null) return { armed: null, deleteId: null };
+  const sameObject = armed?.id === press.id;
+  const inTime = armed !== null && press.now - armed.at <= DELETE_ARM_MS;
+  // A second press on the same object, in time, is the only thing that deletes. A press on a
+  // different object arms THAT one — it never inherits the armed state of the last.
+  if (sameObject && inTime) return { armed: null, deleteId: press.id };
+  return { armed: { id: press.id, at: press.now }, deleteId: null };
+}
+
 export interface StickHand {
   draggingWindow: boolean;
   handedness?: string;
