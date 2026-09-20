@@ -337,6 +337,7 @@ async function start() {
     if (action === 'reset' && lastScan) showScan(lastScan, 'Room reset');
     if (action === 'clear') clearObjects();
     if (action === 'rearrange') {
+      if (routing) return; // the tile is hidden meanwhile; this catches a press already in flight
       // No presets anywhere now: a style arrives inside the sentence ("make it cozy") and
       // reaches the agent as free text. Tablet and laptop both come through this one line.
       //
@@ -791,8 +792,10 @@ async function start() {
     const label = (name: string, severity: 'info' | 'warn' = 'info'): PaletteItem => ({ url: '', name, label: true, severity, section: 'Designer' });
     const tile = (name: string, action: string, accent = false): PaletteItem => ({ url: '', name, action, accent, section: 'Designer' });
     switch (s.state) {
-      case 'working':
-        return [label(s.status || 'Working…'), ...s.log.slice(-3).map((e) => label(e.message, e.severity))];
+      case 'working': {
+        const seconds = workingSince ? Math.round((Date.now() - workingSince) / 1000) : 0;
+        return [label(`${s.status || 'Working…'}${seconds ? `  ${seconds}s` : ''}`), ...s.log.slice(-3).map((e) => label(e.message, e.severity))];
+      }
       case 'proposed': {
         const p = s.proposal!;
         // There is no transcript card any more, so what the user must know before pressing
@@ -813,14 +816,19 @@ async function start() {
       default:
         return [
           ...(s.solver === 'offline' ? [label('Solver offline', 'warn')] : []),
-          ...voiceTiles(label, tile),
+          // While a sentence is on its way to a handler the talk tile is not offered: pressing
+          // it again would start a second request over the top of the first.
+          ...(routing ? [label('Working…')] : voiceTiles(label, tile)),
           tile('Turn 90° left', 'turn:left'),
           tile('Turn 90° right', 'turn:right'),
           ...(objects.size ? [tile('Remove', 'remove')] : []),
           // No style presets on the tablet and no gate in front of Rearrange: a style now
           // arrives inside the spoken sentence ("make it cozy"), which reaches the agent as
           // free text. The laptop panel keeps its preset buttons for a keyboard demo.
-          ...(objects.size ? [tile('Rearrange', 'rearrange', true)] : []),
+          // Not while a sentence is being routed: the request it is about to make would be
+          // refused by the agent's own "one at a time" guard, and the spoken request would
+          // vanish without a word. The tile comes back a second later.
+          ...(objects.size && !routing ? [tile('Rearrange', 'rearrange', true)] : []),
           ...(undoAvailable ? [tile('Undo', 'undo')] : []),
         ];
     }
@@ -828,6 +836,16 @@ async function start() {
 
   let spokenFor: string | null = null; // the last proposal (or failure) read aloud, so a redraw never repeats it
   function onAgentChange(s: AgentSnapshot) {
+    // One redraw a second while the agent works, so the seconds on the status line move even
+    // when the agent has nothing new to say. Cleared the moment it answers.
+    if (s.state === 'working' && !workingTimer) {
+      workingSince = Date.now();
+      workingTimer = setInterval(showPalette, 1000);
+    } else if (s.state !== 'working' && workingTimer) {
+      clearInterval(workingTimer);
+      workingTimer = undefined;
+      workingSince = 0;
+    }
     showPalette();
     renderAgentPanel(s);
     if (s.state === 'proposed' && s.proposal) {
@@ -982,6 +1000,24 @@ async function start() {
    */
   let designContext: { request: string; missing: string[]; rows: Recommendation[]; settled: boolean } | null = null;
   let lastResultKind: FindKind = 'shop';
+  /**
+   * A sentence is being routed: transcription is over, the handler has not taken over yet.
+   * Measured on the deployed system, that hole is ~800 ms long (speech-to-text answers at 491 ms,
+   * the agent's own 'working' state begins at 1299 ms once the room has been uploaded), and the
+   * Designer page spent it showing "Hold to talk" again — which reads as "it did not hear you".
+   */
+  let routing = false;
+  /**
+   * The agent's own working stretch, so the tablet can count the seconds off.
+   *
+   * Measured on the deployed system: the request is accepted at 1.6 s and the status line then
+   * changes at 2.0 s (planning), 4.5 s (solving), 4.8 s (checking) and 6.1 s (proposed) — so the
+   * longest stretch with NOTHING changing in front of the person is 2.5 s of the word
+   * "Planning…", which is the planner's own call and not something the headset can shorten. A
+   * second counter is the honest thing to put in it: it is real information, and it moves.
+   */
+  let workingSince = 0;
+  let workingTimer: ReturnType<typeof setInterval> | undefined;
   let previewBefore: { placed: PlacedMove[]; boxes: BoxPose[] } | null = null;
 
   /** A detected box has no body: it simply moves, and its solid collider with it. */
@@ -1152,6 +1188,20 @@ async function start() {
     // button press must not wait on a model.
     const rules = classifyUtterance(text);
     if (rules.kind === 'command') return runCommand(rules.command!);
+    // Transcription has finished and no handler has anything on screen yet. Measured on the
+    // deployed system, that is 491 ms to 1299 ms from the trigger release — 800 ms in which the
+    // Designer page went back to reading "Hold to talk".
+    routing = true;
+    showPalette();
+    try {
+      return await routeParsed(text, rules);
+    } finally {
+      routing = false;
+      showPalette();
+    }
+  }
+
+  async function routeParsed(text: string, rules: ReturnType<typeof classifyUtterance>) {
 
     // Everything else asks the Worker's intent parser what the sentence MEANS. Thomas names the
     // SOURCE he wants searched ("find me some objects for shopify", "search my scanned
@@ -1210,9 +1260,15 @@ async function start() {
   async function askDesign(text: string, needs: string[] | null) {
     const missing = missingCategories(needs, roomCategories());
     designContext = { request: text, missing, rows: [], settled: false };
-    // Nothing opens for a request that needs nothing new, or for a room that already has it all:
-    // a design request in a furnished room behaves exactly as it did before this existed.
-    if (missing.length) void showRecommendations('missing', missing);
+    // The page that is about to have something to say. Everything this request will draw — the
+    // status while it works, the summary, the fit counts, Keep / Put back / Ask again — is on
+    // the Designer page, and a tablet left on Furniture would show none of it for six seconds.
+    palette.showPage('Designer');
+    // A popout left over from an earlier search is not about this request. It goes before the
+    // room is even read, so it cannot sit over the proposal; the recommendations panel below
+    // opens in its place when there is something to recommend.
+    if (!missing.length) findPanel.dismiss();
+    else void showRecommendations('missing', missing);
     await askAgent({ text });
   }
 
