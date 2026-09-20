@@ -68,7 +68,16 @@ async function request<T>(
     },
   });
   if (!res.ok) {
-    throw new ApiError(`${path} -> HTTP ${res.status}`);
+    // The Worker answers every error as { error, message } (workers/src/lib/http.ts). Show it:
+    // "HTTP 400" alone sends someone to the logs; "bad_bbox: object.bboxMeters.h is 0" does not.
+    let detail = "";
+    try {
+      const err = (await res.json()) as { error?: string; message?: string };
+      detail = [err.error, err.message].filter(Boolean).join(": ");
+    } catch {
+      // Not JSON (a gateway page): the status alone will have to do.
+    }
+    throw new ApiError(`${path} -> HTTP ${res.status}${detail ? ` (${detail})` : ""}`);
   }
   // 204 No Content: POST /v1/push answers this (noContent() in workers/src/routes/index.ts),
   // and res.json() on an empty body throws SyntaxError — which the Headset tab was reporting
