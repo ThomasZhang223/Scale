@@ -1032,8 +1032,31 @@ async function start() {
     // This row is built ONCE, here: renderAgentPanel never writes agentPresets. So nothing in
     // it may depend on state that changes — the style buttons did, which is why they could be
     // clicked and never became selected, and why Rearrange stayed disabled for good.
+    // The laptop's stand-in for the room picker window, the way the catalogue buttons stand in
+    // for the wrist palette. A select rather than tiles: it is the one control that must still
+    // work with no headset, and it is how the switch is exercised without XR controllers.
+    const rooms = document.createElement('select');
+    rooms.id = 'room-pick';
+    rooms.className = 'gray';
+    if (!ROOMS.length) {
+      rooms.disabled = true;
+      rooms.append(new Option('No rooms configured', ''));
+    } else {
+      for (const room of ROOMS) rooms.append(new Option(room.label, room.id, false, room.id === currentRoomId()));
+      rooms.addEventListener('change', () => {
+        void switchRoom(rooms.value).catch(() => {
+          rooms.value = currentRoomId(); // the switch failed: the select must not claim otherwise
+        });
+      });
+    }
+    onSwitchState((state) => {
+      rooms.disabled = state === 'switching' || !ROOMS.length;
+      if (state === 'idle') rooms.value = currentRoomId();
+    });
+
     agentPresets.replaceChildren(
       group('segmented', button('Turn 90° left', 'turn:left', ''), button('Turn 90° right', 'turn:right', ''), button('Remove', 'remove', '')),
+      rooms,
       button('Rearrange', 'rearrange', 'filled'),
     );
   }
