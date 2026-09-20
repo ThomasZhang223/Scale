@@ -4,8 +4,13 @@ import type { Recommendation, StageInfo, FindStage } from './listings.ts';
 
 /*
  * The find panel: the popout window a search opens, in front of you and to the right, so
- * results never become rows inside the tablet. A canvas texture on a plane, head-locked, with
- * a × to close it. Only the cards and the × are hittable; everything else ignores the ray.
+ * results never become rows inside the tablet. A canvas texture on a plane, with a × to close
+ * it. The cards, the × and the title band are hittable; everything else ignores the ray.
+ *
+ * It stands in the room, it does not follow your head. A search puts it in front of you once
+ * and then leaves it there, and you move it by grabbing the band across its title — the same
+ * grab, on the same trigger, that moves the tablet (interaction.ts). Reading a list that
+ * slides away every time you look down at the thing you are choosing for is what that fixes.
  *
  * It answers two searches, and the difference is `kind`:
  *
@@ -37,11 +42,23 @@ const CARD_GAP = 0.008;
 const THUMB = 0.09;
 const RADIUS = 0.024;
 const MAX_CARDS = 6;
-const AHEAD = 0.9;         // metres in front of the eyes
-const RIGHT = 0.28;        // metres to the right of the gaze line
-const DOWN = 0.05;
 const CLOSE_R = 0.022;
 const CLOSE_INSET = 0.034;
+// Where a search puts the panel the first time: ahead of where you are looking, a little below
+// eye line, and far enough to the right to clear the tablet, which spawns dead ahead at 1.4 m
+// and is 0.74 m wide. Half the tablet plus half this panel is 0.67 m, so 0.75 m leaves a gap.
+const SPAWN_AHEAD = 1.35;
+const SPAWN_SIDE = 0.75;
+const SPAWN_DROP = 0.15;
+// It stays where you left it. These two are the only reasons to move it back in front of you:
+// you walked away from it, or you turned your back on it, and either way it is lost.
+const RESPAWN_DIST = 3;
+// The drag handle: a band across the title, stopping clear of the × so a press meant to close
+// the panel never starts a drag instead.
+const GRAB_H = TITLE_H + PAD * 0.6;
+const GRAB_LEFT = 2 * CLOSE_INSET + CLOSE_R;
+const POSE_KEY = 'fullscale.findpanel.pose'; // where this session last left it
+const POSE_SAVE_MS = 1000;
 
 const BACKGROUND = 'rgba(28,28,30,0.90)';
 const CARD_BG = 'rgba(44,44,46,0.95)';
@@ -88,13 +105,49 @@ export class FindPanel {
 
   private readonly eye = new THREE.Vector3();
   private readonly forward = new THREE.Vector3();
-  private readonly right = new THREE.Vector3();
+  private readonly toPanel = new THREE.Vector3();
+  /** Where the panel stands. It is put there once and then left alone; you move it by hand. */
+  private posed = false;
+  private checkPose = true;
+  private savedAt = 0;
+  /** The band across the title that a controller grabs to move the window. */
+  private readonly grab: THREE.Mesh;
 
   constructor() {
     this.group.name = 'find-panel';
     this.group.visible = false;
     this.close = closeDisc();
     this.group.add(this.close);
+    // opacity 0, not visible:false — three.js skips raycasting a mesh whose material is
+    // invisible, and this one exists only to be hit. What you see is the lighter band the
+    // canvas draws behind the title.
+    this.grab = new THREE.Mesh(
+      new THREE.PlaneGeometry(WIDTH - GRAB_LEFT - PAD, GRAB_H),
+      new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false }),
+    );
+    this.grab.name = 'find-grab';
+    this.group.add(this.grab);
+  }
+
+  /**
+   * The title band under the ray: the handle for dragging the window. Same shape as the
+   * tablet's, so interaction.ts moves both with one implementation and one gesture.
+   */
+  hitGrab(raycaster: THREE.Raycaster): THREE.Intersection | null {
+    if (!this.group.visible) return null;
+    const [hit] = raycaster.intersectObject(this.grab, false);
+    return hit ?? null;
+  }
+
+  /** Puts the panel ahead of the eyes, off to the right of the tablet, facing them. */
+  placeInFront(eye: THREE.Vector3, forward: THREE.Vector3) {
+    this.group.position.copy(eye).addScaledVector(forward, SPAWN_AHEAD);
+    // (-fz, 0, fx) is the floor-plane forward turned a quarter turn to the right.
+    this.group.position.x += -forward.z * SPAWN_SIDE;
+    this.group.position.z += forward.x * SPAWN_SIDE;
+    this.group.position.y = eye.y - SPAWN_DROP;
+    this.group.lookAt(eye);
+    this.posed = true;
   }
 
   attachTo(scene: THREE.Object3D) { scene.add(this.group); }
@@ -104,17 +157,29 @@ export class FindPanel {
     this.group.visible = on && this.mode !== 'hidden' && !this.dismissed;
   }
 
-  /** Brought back on purpose: the listings are still there after the card was closed. */
+  /** Brought back on purpose: the listings are still there after the panel was closed. */
   reopen() {
     this.dismissed = false;
+    this.checkPose = true;
   }
 
+  /** Closed by hand. Closing is a decision about where it was, so the next search re-places it. */
   dismiss() {
     this.dismissed = true;
+    this.posed = false;
     this.group.visible = false;
   }
 
-  /** Once a frame: ahead of the eyes, offset right, facing them. Head-locked, so it never gets lost. */
+  /**
+   * Once a frame, and it does NOT move the panel. The panel stands in the room where it was
+   * put, like a thing on a table: reading a list while it slides with your head is what this
+   * replaces. All this does is note where the head is, decide a pose on the frames where one
+   * is owed, and keep the visibility right.
+   *
+   * A pose is owed when a search has just opened the panel. Even then it is only re-placed if
+   * the panel has no pose yet, or has been left behind — see strayed(). A second search while
+   * it is open changes the rows and leaves the panel alone.
+   */
   place(head: THREE.Object3D) {
     if (this.mode === 'hidden' || this.dismissed) { this.group.visible = false; return; }
     head.getWorldPosition(this.eye);
@@ -122,17 +187,74 @@ export class FindPanel {
     this.forward.y = 0;
     if (this.forward.lengthSq() < 1e-6) this.forward.set(0, 0, -1);
     this.forward.normalize();
-    this.right.crossVectors(this.forward, new THREE.Vector3(0, 1, 0)).normalize();
-    this.group.position.copy(this.eye).addScaledVector(this.forward, AHEAD).addScaledVector(this.right, RIGHT);
-    this.group.position.y -= DOWN;
-    this.group.lookAt(this.eye);
+    if (this.checkPose) {
+      this.checkPose = false;
+      if (!this.posed && this.restorePose(this.eye)) {
+        // Put back where this session last left it.
+      } else if (!this.posed || this.strayed()) {
+        this.placeInFront(this.eye, this.forward);
+      }
+    }
+    this.savePose();
     this.group.visible = this.presenting && this.mesh !== null;
+  }
+
+  /** Too far to read, or behind you: either way you cannot see it, so a search brings it back. */
+  private strayed(): boolean {
+    if (this.group.position.distanceTo(this.eye) > RESPAWN_DIST) return true;
+    this.toPanel.subVectors(this.group.position, this.eye);
+    this.toPanel.y = 0;
+    return this.toPanel.dot(this.forward) <= 0;
+  }
+
+  /**
+   * Keeps the pose across a reload, which in a headset is one stray gesture away. Throttled,
+   * because this writes to sessionStorage and a drag would otherwise write every frame.
+   */
+  private savePose() {
+    if (!this.posed) return;
+    const at = now();
+    if (at - this.savedAt < POSE_SAVE_MS) return;
+    this.savedAt = at;
+    try {
+      const { x, y, z } = this.group.position;
+      const q = this.group.quaternion;
+      sessionStorage.setItem(POSE_KEY, JSON.stringify({ p: [x, y, z], q: [q.x, q.y, q.z, q.w] }));
+    } catch {
+      // Private mode has no sessionStorage. The panel still works; only the memory is lost.
+    }
+  }
+
+  /** True when a stored pose was used. A stored pose you cannot see is ignored, not trusted. */
+  private restorePose(eye: THREE.Vector3): boolean {
+    let raw: string | null = null;
+    try {
+      raw = typeof sessionStorage === 'undefined' ? null : sessionStorage.getItem(POSE_KEY);
+    } catch {
+      return false;
+    }
+    if (!raw) return false;
+    try {
+      const { p, q } = JSON.parse(raw) as { p: number[]; q: number[] };
+      if (p?.length !== 3 || q?.length !== 4 || [...p, ...q].some((n) => !Number.isFinite(n))) return false;
+      this.group.position.set(p[0], p[1], p[2]);
+      this.group.quaternion.set(q[0], q[1], q[2], q[3]);
+      this.posed = true;
+      // The room may have changed under it, so the same test a search uses applies here.
+      if (this.strayed()) {
+        this.placeInFront(eye, this.forward);
+      }
+      return true;
+    } catch {
+      return false; // unreadable: spawn fresh rather than guess a pose
+    }
   }
 
   showSearching(query: string, merchants: readonly string[]) {
     this.mode = 'searching';
     this.kind = 'shop'; // only the merchants have a search worth watching happen
     this.dismissed = false;
+    this.checkPose = true;
     this.query = query;
     this.rows = merchants.map((merchant) => ({ merchant, stage: 'queued', detail: 'waiting…' }));
     this.recs = [];
@@ -162,6 +284,7 @@ export class FindPanel {
     this.kind = kind;
     this.query = query;
     this.dismissed = false;
+    this.checkPose = true;
     // ceiling: six cards, no paging; the upgrade is a scroll or a "+N more" row.
     this.recs = recs.slice(0, MAX_CARDS);
     this.note = note;
@@ -251,6 +374,8 @@ export class FindPanel {
       });
     }
     this.close.position.set(-WIDTH / 2 + CLOSE_INSET, -CLOSE_INSET, 0.002);
+    // The drag band spans the title, starting clear of the × on its left.
+    this.grab.position.set((GRAB_LEFT - PAD) / 2, -(PAD + TITLE_H) / 2, 0.001);
 
     if (typeof document === 'undefined') { this.group.visible = this.presenting && !this.dismissed; return; }
     const canvas = document.createElement('canvas');
@@ -262,6 +387,13 @@ export class FindPanel {
     ctx.roundRect(0, 0, canvas.width, canvas.height, RADIUS * PX);
     ctx.fill();
     ctx.textBaseline = 'middle';
+
+    // The title sits on a lighter band, which is also the handle you grab to move the window —
+    // the same cue the store windows' tab bars use, so it reads as something to take hold of.
+    ctx.fillStyle = 'rgba(58,58,60,0.95)';
+    ctx.beginPath();
+    ctx.roundRect(0, 0, canvas.width, (PAD + TITLE_H) * PX, [RADIUS * PX, RADIUS * PX, 0, 0]);
+    ctx.fill();
 
     // Title
     ctx.fillStyle = TEXT;
@@ -420,6 +552,11 @@ export class FindPanel {
     this.group.add(this.mesh);
     this.group.visible = this.presenting && !this.dismissed;
   }
+}
+
+/** performance.now() where there is one; Date.now() in a test runner. */
+function now(): number {
+  return typeof performance !== 'undefined' ? performance.now() : Date.now();
 }
 
 function ellipsis(ctx: CanvasRenderingContext2D, text: string, maxPx: number): string {

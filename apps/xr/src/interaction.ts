@@ -47,8 +47,18 @@ interface Lift {
   lift0: number; // the object's lift at that moment
 }
 
-/** A hand dragging the window: it stays at this distance along the ray, offset as grabbed. */
+/**
+ * A floating window a controller can take hold of and move: the tablet, and the search popout.
+ * Structural, so neither module has to import anything from here to qualify.
+ */
+export interface DraggableWindow {
+  readonly group: THREE.Group;
+  hitGrab(raycaster: THREE.Raycaster): THREE.Intersection | null;
+}
+
+/** A hand dragging a window: which one, at what distance along the ray, offset as grabbed. */
 interface WindowDrag {
+  group: THREE.Object3D;
   distance: number;
   offset: THREE.Vector3;
 }
@@ -87,6 +97,8 @@ export class Interaction {
   private mouseGrab?: Grab;
   private mouseHover: string | null = null;
   private halo = new Halo();
+  /** Every window a controller can take hold of, in the order they were added. */
+  private windows: DraggableWindow[] = [];
 
   constructor(
     renderer: THREE.WebGLRenderer,
@@ -111,8 +123,27 @@ export class Interaction {
     this.rig.add(camera);
     // The window lives in the room, not on a hand; it is placed in front of you on entry.
     this.palette.attachTo(scene);
+    this.windows.push(palette);
     this.setUpControllers(renderer);
     this.setUpMouse(renderer.domElement);
+  }
+
+  /**
+   * Another window the same grab can move. The tablet is added by the constructor; the search
+   * popout adds itself, so both are dragged by one implementation and one gesture.
+   */
+  addWindow(window: DraggableWindow) {
+    if (!this.windows.includes(window)) this.windows.push(window);
+  }
+
+  /** The nearest window handle under the ray, so a window in front of another takes the grab. */
+  private hitWindow(): { window: DraggableWindow; hit: THREE.Intersection } | null {
+    let best: { window: DraggableWindow; hit: THREE.Intersection } | null = null;
+    for (const window of this.windows) {
+      const hit = window.hitGrab(this.raycaster);
+      if (hit && (!best || hit.distance < best.hit.distance)) best = { window, hit };
+    }
+    return best;
   }
 
   /** Eye position and floor-plane forward, from the (XR) camera. */
@@ -151,9 +182,10 @@ export class Interaction {
         const pad = hand.source?.gamepad;
         const push = pad?.axes[3] ?? 0; // stick forward = further away, back = closer
         if (Math.abs(push) > STICK_DEAD) hand.windowDrag.distance = Math.min(3.5, Math.max(0.45, hand.windowDrag.distance - push * 1.2 * dt));
-        this.palette.group.position.copy(this.raycaster.ray.origin).addScaledVector(this.raycaster.ray.direction, hand.windowDrag.distance).add(hand.windowDrag.offset);
+        const dragged = hand.windowDrag.group;
+        dragged.position.copy(this.raycaster.ray.origin).addScaledVector(this.raycaster.ray.direction, hand.windowDrag.distance).add(hand.windowDrag.offset);
         this.headPose();
-        this.palette.group.lookAt(this.eye);
+        dragged.lookAt(this.eye);
         continue;
       }
       if (this.lift?.hand === hand) continue; // its trigger is busy lifting
@@ -314,10 +346,11 @@ export class Interaction {
         this.raycaster.setFromXRController(controller);
         const panelAction = this.panelHit(this.raycaster);
         if (panelAction) return this.onAction(panelAction);
-        // The window's bar or frame: start dragging it.
-        const windowHit = this.palette.hitGrab(this.raycaster);
+        // A window's handle: start dragging it. Nearest first, so a window in front of another
+        // takes the grab. The panels' own buttons were already answered by panelHit above.
+        const windowHit = this.hitWindow();
         if (windowHit) {
-          hand.windowDrag = { distance: windowHit.distance, offset: this.palette.group.position.clone().sub(windowHit.point) };
+          hand.windowDrag = { group: windowHit.window.group, distance: windowHit.hit.distance, offset: windowHit.window.group.position.clone().sub(windowHit.hit.point) };
           hand.source?.gamepad?.hapticActuators?.[0]?.pulse?.(0.3, 30);
           return;
         }

@@ -262,6 +262,9 @@ async function start() {
     if (!hit) return null;
     return hit.kind === 'close' ? 'find:close' : `find:pick:${hit.objectId}`;
   });
+  // The popout stands in the room like the tablet does, and is moved by the same grab on the
+  // same trigger. It is already in the scene (attachTo above); this only makes it grabbable.
+  interaction.addWindow(findPanel);
   // Designer tiles first (closest to the hand), then the catalogue, then Reset / Clear. Each
   // item's section decides which tab it lands under; a section named here shares a page with
   // its neighbours, and one that is not named is its own page.
