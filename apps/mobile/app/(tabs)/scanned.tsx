@@ -1,7 +1,8 @@
+import { useCallback } from "react";
 // Scanned — every object this phone measured with LiDAR, newest first. Source "scan" only.
 // The row's state capsule is the whole generation story: Measured (box only) → Generating →
 // 3D ready (a GLB the Quest can load).
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { List, Button, Text } from "@expo/ui/swift-ui";
 import { font, foregroundStyle, refreshable } from "@expo/ui/swift-ui/modifiers";
 
@@ -22,6 +23,13 @@ function subtitleFor(method: string, confidence: number): string {
 export default function ScannedScreen() {
   const router = useRouter();
   const [state, retry] = useFetchState(() => listObjects("scan"), []);
+  // A scan made on another tab lands here on the next visit, not on the next app launch.
+  useFocusEffect(
+    useCallback(() => {
+      retry();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
+  );
 
   if (state.status === "loading") return <LoadingView />;
   if (state.status === "error") return <ErrorView message={state.message} onRetry={retry} />;

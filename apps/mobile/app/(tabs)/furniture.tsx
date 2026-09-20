@@ -2,8 +2,8 @@
 // page pass for stores whose products.json carries no dimensions), each already an Object v1
 // with measured metres. Filter by merchant, search by name, tap through to generate 3D and view
 // at 1:1.
-import { useMemo, useState } from "react";
-import { useRouter } from "expo-router";
+import { useCallback, useMemo, useState } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
 import { List, Picker, Text, TextField } from "@expo/ui/swift-ui";
 import { font, foregroundStyle, pickerStyle, refreshable, tag } from "@expo/ui/swift-ui/modifiers";
 
@@ -33,6 +33,13 @@ export default function FurnitureScreen() {
   // One fetch of the whole catalog; merchant and text narrow it locally. A few hundred rows is
   // nothing, and it keeps the merchant menu stable while you switch between merchants.
   const [state, retry] = useFetchState(() => listObjects("catalog"), []);
+  // A scan made on another tab lands here on the next visit, not on the next app launch.
+  useFocusEffect(
+    useCallback(() => {
+      retry();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
+  );
 
   const objects = state.status === "ready" ? state.data : [];
   const merchants = useMemo(() => merchantsOf(objects), [objects]);

@@ -237,16 +237,32 @@ final class ObjectCaptureController {
 
     var modelURL: URL?
     do {
-      for try await output in ps.outputs {
+      // Break out explicitly on completion. The outputs sequence is tied to
+      // the session's lifetime, not to the request list, so waiting for it to
+      // end on its own left the screen at "100%" forever on first device test.
+      outputs: for try await output in ps.outputs {
         switch output {
         case .requestProgress(_, let fraction):
           progressListeners.forEach { $0(fraction, "reconstructing") }
         case .requestComplete(_, let result):
-          if case .modelFile(let url) = result { modelURL = url }
+          if case .modelFile(let url) = result {
+            NSLog("[ObjectCapture] model file written: %@", url.path)
+            modelURL = url
+          }
         case .requestError(_, let error):
           throw ObjectCaptureError.reconstructionFailed(error.localizedDescription)
+        case .processingComplete:
+          // The documented terminal event. A plain `break` here only leaves
+          // the switch and the loop then waits on a stream that never ends —
+          // that was the "stuck at 100%" on first device test.
+          NSLog("[ObjectCapture] photogrammetry processingComplete")
+          break outputs
         case .processingCancelled:
           throw ObjectCaptureError.cancelled
+        case .inputComplete:
+          NSLog("[ObjectCapture] photogrammetry inputComplete")
+        case .invalidSample(let id, let reason):
+          NSLog("[ObjectCapture] invalid sample %d: %@", id, reason)
         default:
           break
         }
@@ -256,7 +272,10 @@ final class ObjectCaptureController {
     } catch {
       throw ObjectCaptureError.reconstructionFailed(error.localizedDescription)
     }
-    photogrammetry = nil
+    // Deliberately NOT released here. Breaking out of `outputs` before the
+    // session's worker thread has fully wound down and then dropping the last
+    // reference was a SIGSEGV on device, right after the GLB was written. It
+    // is released on the next start()/cancel() instead.
 
     guard let modelURL else {
       throw ObjectCaptureError.reconstructionFailed("PhotogrammetrySession finished without a model file")
@@ -264,7 +283,10 @@ final class ObjectCaptureController {
 
     progressListeners.forEach { $0(1.0, "exporting") }
     let glbURL = rootDir.appendingPathComponent("model.glb")
+    NSLog("[ObjectCapture] exporting GLB from %@", modelURL.path)
+    let started = Date()
     let bbox = try GLBExporter.export(usdz: modelURL, to: glbURL)
+    NSLog("[ObjectCapture] GLB written in %.1fs, bbox=%@", Date().timeIntervalSince(started), String(describing: bbox))
 
     let imageCount = (try? FileManager.default.contentsOfDirectory(atPath: imagesDir.path).count) ?? 0
     return ReconstructionResult(

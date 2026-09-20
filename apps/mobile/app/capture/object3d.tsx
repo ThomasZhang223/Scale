@@ -6,7 +6,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ObjectCaptureModule, ObjectCaptureView } from "../../modules/object-capture";
 import type { ObjectCaptureState, ReconstructionResult } from "../../modules/object-capture";
-import { postJSON, putUpload } from "../../src/lib/api";
+import { ApiError, postJSON, putUpload } from "../../src/lib/api";
 import { CameraGlass, GlassButton, GlassCloseButton } from "../../src/theme/Glass";
 import { colors, spacing } from "../../src/theme/tokens";
 import { Readout, ReadoutHint } from "../../src/ui/Readout";
@@ -130,7 +130,19 @@ export default function CaptureObject3DScreen() {
         objectId: object.objectId,
       });
       await putUpload(result.glbPath, putUrl, "model/gltf-binary");
-      await postJSON(`/objects/${object.objectId}/mesh`, { key });
+      try {
+        await postJSON(`/objects/${object.objectId}/mesh`, { key });
+      } catch (e) {
+        // ceiling: POST /objects/{id}/mesh ships in workers/ with this screen but the deployed
+        // Worker may predate it. The row and the mesh are both stored by now; only the flip to
+        // ready is missing. Land on the object page anyway — it shows Measured, and the flip
+        // happens once `cd workers && npx wrangler deploy` runs. Only a 404 takes this path.
+        if (!(e instanceof ApiError) || !/HTTP 404/.test(e.message)) throw e;
+        Alert.alert(
+          "Saved, 3D flag pending",
+          "The model is uploaded. Marking it ready needs the latest Worker deploy; it will show as Measured until then."
+        );
+      }
       router.replace(`/object/${object.objectId}`);
     } catch (e) {
       fail("Save failed", e);

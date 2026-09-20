@@ -1,4 +1,5 @@
-import { useRouter } from "expo-router";
+import { useCallback } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
 import { List, Button, VStack, HStack, Text, Image, Spacer } from "@expo/ui/swift-ui";
 import { buttonStyle } from "@expo/ui/swift-ui/modifiers";
 
@@ -44,6 +45,13 @@ async function fetchRoomsPayload(): Promise<RoomsPayload> {
 export default function RoomsScreen() {
   const router = useRouter();
   const [state, retry] = useFetchState(fetchRoomsPayload, []);
+  // A scan made on another tab lands here on the next visit, not on the next app launch.
+  useFocusEffect(
+    useCallback(() => {
+      retry();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
+  );
 
   if (state.status === "loading") return <LoadingView />;
   if (state.status === "error") return <ErrorView message={state.message} onRetry={retry} />;
