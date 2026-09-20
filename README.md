@@ -9,10 +9,6 @@
   on the phone in 3D and AR, and in a Meta Quest at 1:1.
 </p>
 
-<p align="center">
-  <img src="docs/assets/scale-hero.png" alt="Scale: phone capture to headset room" width="720">
-</p>
-
 Built at Hack the North 2026.
 
 ## What it does
