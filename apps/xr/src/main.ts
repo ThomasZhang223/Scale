@@ -1108,7 +1108,10 @@ async function start() {
       rows = await listBuiltIns();
     } catch (err) {
       listingsBusy = false;
-      return sayAloud(`Couldn't reach the library: ${(err as Error).message}`);
+      // Visible, not just spoken. sayAloud says nothing at all when the request was TYPED, so an
+      // error on this path used to reach console.info and nowhere else — the panel simply never
+      // appeared, which reads as "the library is empty" rather than "the library is unreachable".
+      return failedResults('library', text, `Couldn't reach the library: ${(err as Error).message}`);
     } finally {
       listingsBusy = false;
     }
@@ -1196,7 +1199,8 @@ async function start() {
     try {
       scans = await listScans();
     } catch (err) {
-      return sayAloud(`Couldn't reach your scans: ${(err as Error).message}`);
+      // Same reason as findLibrary: an unreachable scan library must not look like an empty one.
+      return failedResults('scans', text, `Couldn't reach your scans: ${(err as Error).message}`);
     } finally {
       listingsBusy = false;
     }
@@ -1266,6 +1270,16 @@ async function start() {
     findPanel.showResults(res.rows, res.note, res.mode, res.query);
     showPalette();
     renderListings();
+  }
+
+  /**
+   * A request that could not be answered at all. The panel is the only reader this path has, so
+   * the reason goes there as well as being spoken — an empty panel with no note is
+   * indistinguishable from a library that is genuinely empty.
+   */
+  function failedResults(mode: FindKind, query: string, reason: string) {
+    presentResults({ mode, query, rows: [], note: reason });
+    sayAloud(reason);
   }
 
   /** Spoken only, and only when the request was spoken. No on-screen text: the panel is the UI. */
