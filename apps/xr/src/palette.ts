@@ -22,6 +22,7 @@ export interface PaletteItem {
   accent?: boolean; // the one prominent, filled action (Accept, Rearrange)
   destructive?: boolean; // red text (Clear objects)
   section?: string; // grouped list section; consecutive items share one group
+  page?: string; // the tab this item lives under; a section with no page is its own page
 }
 
 // iOS dark-mode tokens, from apple-ui-styling.md.
@@ -45,7 +46,10 @@ const C = {
 const PX = 4000;
 const COLS = 4;                  // four cells across: wide and short
 const COL_W = 0.115;
-const WINDOW_SCALE = 2.2;        // the phone-scale layout, blown up to a window ~1 m wide
+// One page at a time, so the window no longer has to hold everything: it is ~0.74 m wide
+// instead of ~1.05 m. Body text still measures ~1.6 cm cap height at arm's length and rows
+// are ~5.7 cm tall, both above what a Quest can read and hit comfortably.
+const WINDOW_SCALE = 1.55;       // the phone-scale layout, blown up to a window ~0.74 m wide
 const WINDOW_DISTANCE = 1.4;     // metres ahead of the eyes when first shown
 const WINDOW_DROP = 0.2;         // metres below eye level (window centre)
 const BAR = { w: 0.14, h: 0.012, gap: 0.014 }; // the drag bar under the window, Quest-style
@@ -58,6 +62,16 @@ const BEZEL = 0.007;
 // The tab bar along the top, like a browser tab: a title, no notch.
 const TAB_H = 0.02;
 const TAB_GAP = 0.004;
+// The page tabs, a segmented control across the top of the screen, under the title. They sit
+// inside the screen and not on the title plate, which is the window's drag handle: a press
+// meant to change page must never start a drag.
+const PAGE_TAB_H = 0.034;
+const PAGE_TAB_GAP = 0.004;
+// A one-tile page would otherwise draw a window a few centimetres tall, which reads as broken
+// rather than as empty. ceiling: a page taller than the eye box is not split into sub-pages
+// yet; the upgrade is to slice `slots` at this height and add a "‹ 1 of 3 ›" footer row.
+const MIN_CONTENT_H = 0.12;
+const PAGE_KEY = 'fullscale.tablet.page'; // the page this session was last left on
 const ROW_W = COLS * COL_W + (COLS - 1) * GAP_X;
 const SCREEN_W = ROW_W + 2 * MARGIN;
 const RADIUS_CELL = 0.004; // ~12 pt, grouped list corners
@@ -95,6 +109,8 @@ export class Palette {
   private tiles: THREE.Mesh[] = [];
   private grabTargets: THREE.Object3D[] = [];
   private hovered: THREE.Mesh | null = null;
+  private items: PaletteItem[] = [];
+  private page: string | null = null;
 
   constructor() {
     this.group.name = 'palette';
@@ -122,15 +138,51 @@ export class Palette {
     return hit ?? null;
   }
 
+  /** The page now on screen, or null when the window is empty. */
+  get activePage(): string | null {
+    return this.page;
+  }
+
+  /** Switches tab. Called for a `page:<name>` action, which is what a tab tile carries. */
+  showPage(name: string) {
+    if (this.page === name) return;
+    this.page = name;
+    try {
+      sessionStorage.setItem(PAGE_KEY, name);
+    } catch {
+      // A Quest browser in private mode has no sessionStorage. The page still switches; it
+      // is only the memory of it across a reload that is lost.
+    }
+    this.render();
+  }
+
   setItems(items: PaletteItem[]) {
+    this.items = items;
+    this.render();
+  }
+
+  private render() {
+    const items = this.items;
     this.group.clear();
     this.tiles = [];
     this.hovered = null;
     this.group.visible = items.length > 0;
     if (!items.length) return;
 
-    const slots = layout(items);
-    const screenH = (slots.at(-1)!.y + slots.at(-1)!.h / 2) + MARGIN + TAB_H + TAB_GAP;
+    // One tab per page, in the order the pages first appear. An item with neither a page nor
+    // a section belongs to the unnamed page, which is the only page in that case and so needs
+    // no tab at all.
+    const pages: string[] = [];
+    for (const it of items) {
+      const p = pageOf(it);
+      if (!pages.includes(p)) pages.push(p);
+    }
+    if (!this.page || !pages.includes(this.page)) this.page = remembered(pages) ?? pages[0];
+
+    const slots = layout(items.filter((it) => pageOf(it) === this.page), this.page);
+    const contentH = slots.length ? slots.at(-1)!.y + slots.at(-1)!.h / 2 : 0;
+    const stripH = pages.length > 1 ? PAGE_TAB_H + PAGE_TAB_GAP : 0;
+    const screenH = Math.max(contentH, MIN_CONTENT_H) + MARGIN + TAB_H + TAB_GAP + stripH;
     const frameW = SCREEN_W + 2 * BEZEL;
     const frameH = screenH + 2 * BEZEL;
 
@@ -146,7 +198,17 @@ export class Palette {
     this.group.add(bar);
     this.grabTargets = [bar, tab, frame];
 
-    const top = screenH / 2 - TAB_H - TAB_GAP; // y of the screen's usable top edge
+    let top = screenH / 2 - TAB_H - TAB_GAP; // y of the screen's usable top edge
+    if (stripH) {
+      const w = (ROW_W - (pages.length - 1) * PAGE_TAB_GAP) / pages.length;
+      pages.forEach((name, i) => {
+        const t = pageTab(name, name === this.page, w, PAGE_TAB_H);
+        t.position.set((i - (pages.length - 1) / 2) * (w + PAGE_TAB_GAP), top - PAGE_TAB_H / 2, 0);
+        this.tiles.push(t); // hit like any other tile, so a trigger sends its `page:` action
+        this.group.add(t);
+      });
+      top -= stripH;
+    }
     for (const s of slots) {
       if (s.header) {
         const h = text(s.header, ROW_W, HEADER_H, { font: 'footnote', color: C.secondary, background: null, padding: 16 });
@@ -183,25 +245,68 @@ export class Palette {
   }
 }
 
+// ---------- pages ----------
+
+/** The tab an item belongs under. A section with no page of its own is its own page. */
+function pageOf(item: PaletteItem): string {
+  return item.page ?? item.section ?? '';
+}
+
+/** The page this session was left on, but only while it still exists. Never a guess. */
+function remembered(pages: string[]): string | null {
+  let stored: string | null = null;
+  try {
+    stored = typeof sessionStorage === 'undefined' ? null : sessionStorage.getItem(PAGE_KEY);
+  } catch {
+    stored = null; // private mode: fall through to the first page
+  }
+  return stored && pages.includes(stored) ? stored : null;
+}
+
+/** One segment of the page control: filled and white when it is the page on screen. */
+function pageTab(name: string, selected: boolean, w: number, h: number): THREE.Mesh {
+  const c = canvasFor(w, h);
+  const material = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, transparent: true });
+  if (c) {
+    const { canvas, ctx } = c;
+    ctx.fillStyle = selected ? C.accent : C.cell;
+    ctx.beginPath();
+    ctx.roundRect(0, 0, canvas.width, canvas.height, RADIUS_CELL * PX);
+    ctx.fill();
+    ctx.font = selected ? FONT.headline : FONT.body;
+    ctx.fillStyle = selected ? C.label : C.secondary;
+    ctx.textBaseline = 'middle';
+    const label = fitText(ctx, name, canvas.width - 32);
+    ctx.fillText(label, (canvas.width - ctx.measureText(label).width) / 2, canvas.height / 2 + 4);
+    material.map = texture(canvas);
+  }
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), material);
+  mesh.userData.item = { url: '', name, action: `page:${name}` } satisfies PaletteItem;
+  return mesh;
+}
+
 // ---------- layout ----------
 
 /** Rows for actions and text, a two-column widget grid for objects, grouped by section. */
-function layout(items: PaletteItem[]): Slot[] {
+function layout(items: PaletteItem[], pageName?: string | null): Slot[] {
   const slots: Slot[] = [];
   let y = 0;
   let i = 0;
   let lastSection: string | undefined;
   const isObject = (it: PaletteItem) => !it.action && !it.label;
+  // A section that gave the page its name is already written on the selected tab; drawing it
+  // again a centimetre below costs a line of screen and says nothing.
+  const titled = (section: string) => Boolean(section) && section !== pageName;
   while (i < items.length) {
     const item = items[i];
     const section = item.section ?? '';
     const newGroup = slots.length === 0 || section !== lastSection;
     if (newGroup) {
       y += slots.length ? GROUP_GAP : 0;
-      if (section) y += HEADER_H;
+      if (titled(section)) y += HEADER_H;
     }
     lastSection = section;
-    const header = newGroup && section ? section : undefined;
+    const header = newGroup && titled(section) ? section : undefined;
     const groupEnd = (k: number) => k >= items.length || (items[k].section ?? '') !== section;
     if (isObject(item)) {
       // A row of up to COLS widget cells, left to right.

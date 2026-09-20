@@ -55,3 +55,60 @@ test('only catalogue items that match a detected piece are auto-placed', () => {
   assert.equal(matchDetected('xander', detected, []), null);
   assert.equal(matchDetected('chair', detected, [chairId]), null, 'the chair spot is already taken');
 });
+
+// ---------- pages ----------
+
+const paged: PaletteItem[] = [
+  { url: '', name: 'Rearrange', action: 'rearrange', page: 'Designer' },
+  { url: '', name: 'Cozy', action: 'style:cozy', page: 'Designer' },
+  { url: '/objects/scan-a.glb', name: 'Captured object', page: 'Scans' },
+  { url: '/objects/scan-b.glb', name: 'Captured object', page: 'Scans' },
+  { url: '', name: 'Clear objects', action: 'clear', page: 'Room' },
+];
+
+/** Every tile the window can be hit on, by the name drawn on it. */
+function hittableNames(palette: Palette): string[] {
+  const grip = new THREE.Group();
+  palette.attachTo(grip);
+  grip.updateMatrixWorld(true);
+  return palette.group.children
+    .filter((c) => c.userData.item)
+    .map((c) => (c.userData.item as PaletteItem).name);
+}
+
+test('one page is on screen at a time, with one tab per page', () => {
+  const palette = new Palette();
+  palette.setItems(paged);
+  assert.equal(palette.activePage, 'Designer', 'the first page is shown when none is remembered');
+  // Three tabs, plus the two tiles of the Designer page. Nothing from Scans or Room.
+  assert.deepEqual(hittableNames(palette), ['Designer', 'Scans', 'Room', 'Rearrange', 'Cozy']);
+});
+
+test('a tab carries a page: action, and showPage swaps which tiles are drawn', () => {
+  const palette = new Palette();
+  palette.setItems(paged);
+  const grip = new THREE.Group();
+  palette.attachTo(grip);
+  grip.updateMatrixWorld(true);
+  const scansTab = palette.group.children.find((c) => (c.userData.item as PaletteItem | undefined)?.name === 'Scans')!;
+  assert.equal(palette.hitTest(rayInto(scansTab))?.action, 'page:Scans');
+
+  palette.showPage('Scans');
+  assert.equal(palette.activePage, 'Scans');
+  assert.deepEqual(hittableNames(palette), ['Designer', 'Scans', 'Room', 'Captured object', 'Captured object']);
+});
+
+test('a single page draws no tabs at all', () => {
+  const palette = new Palette();
+  palette.setItems(paged.filter((it) => it.page === 'Scans'));
+  assert.deepEqual(hittableNames(palette), ['Captured object', 'Captured object']);
+});
+
+test('a remembered page that no longer exists falls back to the first, never to a guess', () => {
+  const palette = new Palette();
+  palette.setItems(paged);
+  palette.showPage('Room');
+  // The scans have gone away and Room went with them: the window must not be left blank.
+  palette.setItems(paged.filter((it) => it.page === 'Designer'));
+  assert.equal(palette.activePage, 'Designer');
+});

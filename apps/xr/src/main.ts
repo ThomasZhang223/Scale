@@ -199,6 +199,18 @@ let stageLines: string[] = []; // per-store Browserbase progress, mirrored on th
 let voiceState: VoiceState = 'idle';
 let lastHeard: string | null = null;
 
+/**
+ * The tablet's four pages: which sections share one tab. Designer keeps the agent, the style
+ * presets and the way back to the listings popout; Room keeps what LiDAR found and the two
+ * destructive actions. "My scans" and "Furniture" are absent on purpose — a section missing
+ * from this map becomes a page of its own, which is what those two want, and a page named
+ * after its one section drops the header that would otherwise repeat the tab.
+ */
+const PAGE_OF: Record<string, string> = {
+  Listings: 'Designer',
+  Scanned: 'Room',
+};
+
 /** Whole-room styles: [button label, agent preset]. Each is a different set of rules in services/agent STYLES. */
 const STYLES: [string, string][] = [
   ['Cozy', 'cozy'],
@@ -240,12 +252,21 @@ async function start() {
     if (!hit) return null;
     return hit.kind === 'close' ? 'find:close' : `find:pick:${hit.objectId}`;
   });
-  // Designer tiles first (closest to the hand), then the catalogue, then Reset / Clear.
-  const showPalette = () => palette.setItems([...designerTiles(agent.snapshot), ...scannedTiles(), ...listingTiles(), ...catalog, ...PALETTE_ACTIONS]);
+  // Designer tiles first (closest to the hand), then the catalogue, then Reset / Clear. Each
+  // item's section decides which tab it lands under; a section named here shares a page with
+  // its neighbours, and one that is not named is its own page.
+  const showPalette = () =>
+    palette.setItems(
+      [...designerTiles(agent.snapshot), ...scannedTiles(), ...listingTiles(), ...catalog, ...PALETTE_ACTIONS].map((it) => ({
+        ...it,
+        page: PAGE_OF[it.section ?? ''] ?? it.section,
+      })),
+    );
   showPalette();
   renderAgentPanel(agent.snapshot);
 
   function onAction(action: string) {
+    if (action.startsWith('page:')) return palette.showPage(action.slice(5));
     if (action === 'listings:show') findPanel.reopen();
     if (action === 'find:close') findPanel.dismiss();
     if (action.startsWith('find:pick:')) void pickListing(action.slice(10));
@@ -257,8 +278,10 @@ async function start() {
       renderAgentPanel(agent.snapshot);
     }
     if (action === 'rearrange') {
-      if (!selectedStyle) return say('Pick a style first: Cozy, Spacious, Modern or Social.');
-      void askAgent({ preset: selectedStyle });
+      // A preset goes only when a person actually picked one on the laptop panel. With none
+      // picked the button's own meaning travels as free text, down the same route a spoken
+      // sentence takes — never a stand-in preset, which would be a style nobody asked for.
+      void askAgent(selectedStyle ? { preset: selectedStyle } : { text: 'Rearrange the room.' });
     }
     if (action.startsWith('preset:')) void askAgent({ preset: action.slice(7) });
     if (action === 'turn:left') turnLast(Math.PI / 2);
@@ -714,11 +737,10 @@ async function start() {
           tile('Turn 90° left', 'turn:left'),
           tile('Turn 90° right', 'turn:right'),
           ...(objects.size ? [tile('Remove', 'remove')] : []),
-          // Rearrange needs a style picked first (see STYLES in services/agent): the style tiles
-          // select, and only the selected one is filled; Rearrange appears once one is chosen.
-          // The style tiles sit right below it, so the gate needs no line of prose to explain it.
-          ...(objects.size && selectedStyle ? [tile('Rearrange', 'rearrange', true)] : []),
-          ...(objects.size ? STYLES.map(([name, preset]) => ({ ...tile(selectedStyle === preset ? `● ${name}` : name, `style:${preset}`, selectedStyle === preset), section: 'Style' })) : []),
+          // No style presets on the tablet and no gate in front of Rearrange: a style now
+          // arrives inside the spoken sentence ("make it cozy"), which reaches the agent as
+          // free text. The laptop panel keeps its preset buttons for a keyboard demo.
+          ...(objects.size ? [tile('Rearrange', 'rearrange', true)] : []),
           ...(undoAvailable ? [tile('Undo', 'undo')] : []),
         ];
     }
