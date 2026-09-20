@@ -7,7 +7,7 @@ import { ObjectLoader, type LoadedObject } from './objects';
 import { createPhysics } from './physics';
 import { Interaction } from './interaction';
 import {
-  getRoom, getObject, getVersion, postVersion, objectToItem, boundsMismatch, watchRoom, postFit, STUB,
+  getRoom, getObject, listObjects, getVersion, postVersion, objectToItem, boundsMismatch, watchRoom, postFit, STUB,
   type ObjectV1, type VersionV1, type PlacementV1,
 } from './api';
 import { FitOverlay, type FitReport } from './fit';
@@ -1027,7 +1027,7 @@ async function start() {
       return say(`${obj.name ?? obj.objectId}: ${(err as Error).message}.`);
     }
     if (catalog.some((c) => c.url === item.url)) return; // the feed can repeat an object
-    const entry: PaletteItem = { url: item.url, name: item.name, scale: 1, objectId: obj.objectId, section: 'Furniture' };
+    const entry: PaletteItem = { url: item.url, name: item.name, scale: 1, objectId: obj.objectId, section: obj.source === 'scan' ? 'Scanned' : 'Furniture' };
     catalog.push(entry);
     showPalette();
     renderCatalog();
@@ -1057,6 +1057,19 @@ async function start() {
       } catch (err) {
         say(`Object ${id}: ${(err as Error).message}`);
       }
+    }
+    // Everything the phone has scanned, without needing its id in the URL. Only a ready object
+    // with a glbUrl has a mesh; anything else is skipped by name, never drawn as something else.
+    try {
+      for (const o of await listObjects('scan')) {
+        if (o.state !== 'ready' || !o.glbUrl) {
+          console.warn(`skipping scanned object ${o.objectId}: state ${o.state}, glbUrl ${o.glbUrl}`);
+          continue;
+        }
+        await addServerObject(o);
+      }
+    } catch (err) {
+      console.warn('the scanned-object list did not answer:', err);
     }
   }
 

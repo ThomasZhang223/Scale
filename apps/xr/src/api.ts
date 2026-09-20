@@ -47,6 +47,16 @@ export async function getObject(objectId: string): Promise<ObjectV1> {
   return obj;
 }
 
+/** GET /v1/objects?source=&limit= — the library listing (workers routes/index.ts). */
+export async function listObjects(source?: ObjectV1['source'], limit = 200): Promise<ObjectV1[]> {
+  const p = new URLSearchParams({ limit: String(limit) });
+  if (source) p.set('source', source);
+  const list = await get<ObjectV1[]>(`/objects?${p}`);
+  if (!Array.isArray(list)) throw new Error('GET /objects did not return a list — ask Thomas');
+  for (const o of list) checkSchema(o, 'Object');
+  return list;
+}
+
 /** The fail-loud rule from the contract: a mismatch is a person problem, not a fallback. */
 export function checkSchema(doc: { schemaVersion?: unknown }, what: string) {
   if (doc.schemaVersion !== EXPECTED_SCHEMA_VERSION) {
