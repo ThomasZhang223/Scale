@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { needFromText, needFromDetected, rank, findListings, isShoppingRequest, parseLengthMetres, productQuery, findLive, STOREFRONTS, type Listing } from './listings.ts';
+import { needFromText, needFromDetected, rank, findListings, isShoppingRequest, classifyUtterance, SHOP_VERBS, parseLengthMetres, productQuery, findLive, STOREFRONTS, type Listing } from './listings.ts';
 
 const catalog: Listing[] = JSON.parse(readFileSync(new URL('../public/catalog.json', import.meta.url), 'utf-8'));
 
@@ -93,6 +93,111 @@ test('productQuery strips the imperative and the length phrases, keeping the pro
   assert.equal(productQuery('lamp'), 'lamp');
   assert.equal(productQuery('show me something 1 m wide'), 'something');
   assert.equal(productQuery('find another lamp'), 'another lamp');
+});
+
+/*
+ * The routing table. Every line is a sentence a person actually says to a headset, in the shape
+ * ElevenLabs STT returns it: sentence case, no trailing period on a statement, a question mark
+ * on a question, "80-centimeter" for a spoken length, and a leading filler.
+ *
+ * The three marked LIVE are verbatim from a real TTS -> STT round trip against the deployed
+ * proxy on 2026-09-20; the rest are written in the same shape.
+ */
+const ROUTING: [string, 'mine' | 'shop' | 'design'][] = [
+  // (a) the user's own scans — "my" beats every shopping verb
+  ['Show me the chair I scanned with my phone', 'mine'],                    // LIVE
+  ['Show me my scans', 'mine'],
+  ['What have I scanned?', 'mine'],
+  ['Find my chair', 'mine'],
+  ['Where is my chair?', 'mine'],
+  ['Bring in the thing I just scanned', 'mine'],
+  ['Put my latest scan in the room', 'mine'],
+  ['Can you show me the stuff I captured on my phone?', 'mine'],
+  ['What did I scan earlier?', 'mine'],
+  ['Add my last scan', 'mine'],
+  // (b) shopping — the merchants
+  ['Hey, can you show me some lamps that fit the 80-centimeter gap beside my desk?', 'shop'], // LIVE
+  ['Find me a lamp', 'shop'],
+  ['Can you show me some chairs?', 'shop'],
+  ['I need a new side table', 'shop'],
+  ['Get me a coffee table under 1 meter', 'shop'],
+  ['Look for a floor lamp', 'shop'],
+  ['Do you have any lamps?', 'shop'],
+  ['Ok so, find something that fits the 80-centimeter gap beside my desk', 'shop'],
+  ['Show me what is for sale', 'shop'],
+  ['Um, I want a dresser', 'shop'],
+  ['Search for a walnut sideboard', 'shop'],
+  ['Browse nightstands', 'shop'],
+  // (c) everything else — the layout agent, exactly as before
+  ['Move the sofa to the window', 'design'],                                // LIVE
+  ['Make it cozy', 'design'],
+  ['Turn it 90 degrees', 'design'],
+  ['I need the sofa moved to the window', 'design'],
+  ['Rearrange the room', 'design'],
+  ['Clear everything', 'design'],
+  ['Put the lamp in the corner', 'design'],
+  ['Undo that', 'design'],
+];
+
+test('every routing-table sentence reaches the handler it belongs to', () => {
+  const wrong = ROUTING.filter(([text, want]) => classifyUtterance(text).kind !== want)
+    .map(([text, want]) => `${JSON.stringify(text)} wanted ${want}, got ${classifyUtterance(text).kind}`);
+  assert.deepEqual(wrong, []);
+  assert.ok(ROUTING.length >= 25, `only ${ROUTING.length} transcripts`);
+});
+
+test('"my" that says WHERE a thing goes is not a claim to own it', () => {
+  // The positioning sentence in CLAUDE.md. It must reach the merchants, not the scan library.
+  assert.equal(classifyUtterance('find something that fits the 80 cm gap beside my desk').kind, 'shop');
+  assert.equal(classifyUtterance('what fits next to my sofa?').kind, 'shop');
+  assert.equal(classifyUtterance('put a lamp beside my desk').kind, 'design');
+  // ...but the same possessive naming the thing itself does.
+  assert.equal(classifyUtterance('put my lamp beside the desk').kind, 'mine');
+});
+
+test('the newest and list-only flags come off the words that mean them', () => {
+  for (const t of ['my latest scan', 'the thing I just scanned', 'add my last scan', 'my newest capture'])
+    assert.equal(classifyUtterance(t).newest, true, t);
+  for (const t of ['show me my scans', 'what have I scanned?', 'list my scans'])
+    assert.equal(classifyUtterance(t).listOnly, true, t);
+  assert.equal(classifyUtterance('find my chair').newest, false);
+  assert.equal(classifyUtterance('find my chair').listOnly, false);
+});
+
+test('routing and productQuery read ONE verb list, so routing can never be the narrower of the two', () => {
+  // The root cause of "voice only rearranges": the router tested a shorter set than the parser
+  // behind it could handle. Every shop verb must both route to shopping and be stripped.
+  for (const verb of SHOP_VERBS) {
+    const sentence = `${verb} a walnut side table`;
+    assert.equal(classifyUtterance(sentence).kind, 'shop', sentence);
+    assert.equal(productQuery(sentence), 'walnut side table', sentence);
+  }
+});
+
+test('isShoppingRequest is the shop branch of the same function', () => {
+  assert.ok(isShoppingRequest('find something that fits beside my desk'));
+  assert.ok(isShoppingRequest('recommend a lamp'));
+  assert.ok(!isShoppingRequest('make it cozy'));
+  assert.ok(!isShoppingRequest('move the sofa to the window'));
+  assert.ok(!isShoppingRequest('show me my scans'), 'my stuff is not shopping');
+});
+
+test('a spoken length reaches the metric filter, hyphen and US spelling and all', () => {
+  // ElevenLabs writes "eighty centimetres" as "80-centimeter"; \s* between number and unit
+  // dropped the bound silently on every voice request.
+  assert.equal(needFromText('a lamp that fits the 80-centimeter gap').maxW, 0.8);
+  assert.equal(needFromText('a lamp that fits the 80 centimetres gap').maxW, 0.8);
+  assert.equal(needFromText('a lamp that fits the 80cm gap').maxW, 0.8);
+  assert.equal(needFromText('a shelf no taller than 1.5-m').maxH, 1.5);
+  assert.equal(needFromText('a desk 60-cm deep').maxD, 0.6);
+});
+
+test('a leading filler no longer sends the whole sentence to the merchant search', () => {
+  assert.equal(productQuery('Hey, can you find me a floor lamp?'), 'floor lamp?');
+  assert.equal(productQuery('Ok so, get me a side table'), 'side table');
+  assert.equal(productQuery('Um, show me some chairs'), 'chairs');
+  // The anchor stays: a verb in the middle of a sentence is not an imperative.
+  assert.equal(productQuery('the lamp I want to get'), 'the lamp I want to get');
 });
 
 test('findLive posts one /find per storefront in parallel, reports stages, and merges listings', async () => {

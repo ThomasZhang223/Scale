@@ -66,7 +66,10 @@ export function needFromDetected(box: { identifier: string; category: string; di
   };
 }
 
-const LENGTH = /(\d+(?:\.\d+)?)\s*(cm|centimet\w*|m|metres?|meters?|mm|millimet\w*|in|inch\w*|"|ft|feet|foot|')/gi;
+// [\s-]*, not \s*: ElevenLabs STT writes a spoken length as "80-centimeter", with a hyphen and
+// the US spelling, so \s* dropped the bound silently on every voice request while the same
+// phrase typed by hand worked. STT also writes "eighty" as "80", so no word-number parser here.
+const LENGTH = /(\d+(?:\.\d+)?)[\s-]*(cm|centimet\w*|m|metres?|meters?|mm|millimet\w*|in|inch\w*|"|ft|feet|foot|')/gi;
 
 /** Metres from a spoken or typed length; conversion happens here, at the UI edge, and nowhere else. */
 export function parseLengthMetres(value: number, unit: string): number {
@@ -117,8 +120,30 @@ export const STOREFRONTS: readonly { merchant: string; storefront: string }[] = 
   { merchant: 'Sabai Design', storefront: 'https://sabai.design/' },
 ];
 
-const IMPERATIVE = /^\s*(?:(?:please|can you|could you)\s+)?(?:find|show|get|recommend|suggest|search(?: for)?|look for|buy|shop for)\s+(?:me\s+)?(?:(?:a|an|some|the)\b)?\s*/i;
-const LENGTH_PHRASE = /\b(?:under|below|less than|no more than|up to|max(?:imum)?|at most|no (?:wider|deeper|taller) than)?\s*\d+(?:\.\d+)?\s*(?:cm|centimet\w*|m|metres?|meters?|mm|millimet\w*|in|inch\w*|"|ft|feet|foot|')\s*(?:wide|deep|tall|high|long)?\b/gi;
+/**
+ * The verbs that mean "get me one of these", in ONE list, read by both the intent router and
+ * productQuery.
+ *
+ * Keeping two lists is what broke voice: routing tested a shorter set than the parser behind it
+ * could handle, so "show me some lamps" went to the layout agent while productQuery was
+ * perfectly able to turn it into "lamps". A verb added here is understood by both, or by
+ * neither.
+ */
+export const SHOP_VERBS = [
+  'find', 'show', 'get', 'recommend', 'suggest', 'search for', 'search', 'look for',
+  'looking for', 'buy', 'shop for', 'shop', 'purchase', 'order', 'browse',
+] as const;
+
+/** Longest first, so "search for" wins over "search" inside one alternation. */
+const VERBS = [...SHOP_VERBS].sort((a, b) => b.length - a.length).join('|').replace(/ /g, '\\s+');
+
+// Speech starts with noise a keyboard never does: "Hey, can you…", "Ok so, find me…". The
+// anchor stays — an unanchored verb match would eat "the lamp I want to get" — and the fillers
+// are consumed ahead of it instead.
+const FILLER = String.raw`(?:(?:hey|hi|hello|ok|okay|so|um|uh|well|alright|right)\b[\s,]*)*`;
+const POLITE = String.raw`(?:(?:can|could|would|will)\s+you\s+|i(?:'d|\s+would)\s+like\s+(?:you\s+to\s+)?|i\s+(?:want|need)\s+|please\s+)*`;
+const IMPERATIVE = new RegExp(`^\\s*${FILLER}${POLITE}(?:${VERBS})\\s+(?:me\\s+)?(?:(?:a|an|some|the)\\b)?\\s*`, 'i');
+const LENGTH_PHRASE = /\b(?:under|below|less than|no more than|up to|max(?:imum)?|at most|no (?:wider|deeper|taller) than)?[\s-]*\d+(?:\.\d+)?[\s-]*(?:cm|centimet\w*|m|metres?|meters?|mm|millimet\w*|in|inch\w*|"|ft|feet|foot|')\s*(?:wide|deep|tall|high|long)?\b/gi;
 const GAP_PHRASE = /\b(?:for|in|into)\s+the\s+gap\b/gi;
 
 /**
@@ -248,14 +273,19 @@ export function rank(listings: Listing[], need: Need, limit = 8): Recommendation
   const out: Recommendation[] = [];
   for (const l of listings) {
     if (!fitsNeed(l.bboxMeters, need)) continue;
-    // The merchant's category decides the kind; the title only when there is no category
-    // ("Light Teak" is a colour, not a lamp).
-    const hay = (l.category && l.category !== 'furniture' ? l.category : l.name ?? '').toLowerCase();
+    // A merchant category is free text — the live "lamp" result set carries "christmas",
+    // "decor/home accents" and "tables" — so it cannot be the only thing that gates a row named
+    // "Small Natural LED Lamps"; reading the category alone dropped five of those six rows. The
+    // title counts too, but only when the bucket does not say otherwise, which is what keeps
+    // "Chair-side lamp" out of a search for a chair.
+    const cat = (l.category ?? '').toLowerCase();
+    const title = (l.name ?? '').toLowerCase();
     const reasons: string[] = [];
     let score = 0;
 
-    const kindHit = need.categoryWords?.some((w) => hay.includes(w)) ?? false;
     const bucketHit = need.bucket != null && l.bucket === need.bucket;
+    const wrongBucket = need.bucket != null && l.bucket != null && l.bucket !== need.bucket;
+    const kindHit = need.categoryWords?.some((w) => cat.includes(w) || (!wrongBucket && title.includes(w))) ?? false;
     if (need.categoryWords || need.bucket) {
       if (kindHit) {
         score += 0.5;
@@ -355,7 +385,71 @@ export async function findListings(
   return { recommendations: rank(rows, need, limit), source: 'bundled', note };
 }
 
+/*
+ * Intent routing. Three destinations, decided by this one pure function and nothing else: the
+ * user's own scans, the merchant search, or the layout agent. No LLM decides a route
+ * (standing rule 3) — an LLM turns an intent into an objective, it does not pick the handler.
+ */
+
+export type IntentKind = 'mine' | 'shop' | 'design';
+
+export interface Intent {
+  kind: IntentKind;
+  /** The utterance names the most recent scan ("my latest scan", "the one I just scanned"). */
+  newest: boolean;
+  /** The utterance asks to SEE the scans rather than to place one ("what have I scanned"). */
+  listOnly: boolean;
+}
+
+/** Unambiguous: these can only be about something the user captured. */
+const MINE_STRONG = /\b(?:i (?:just )?scanned|i(?:'ve|\s+have) scanned|have i scanned|did i scan|i (?:just )?captured|i(?:'ve|\s+have) captured|my scans?|my captures?|my stuff|my things|my own|from my phone|with my phone|on my phone)\b/i;
+
+/** "my desk" in "beside my desk" is where a thing goes, not the thing being asked for. */
+const LOCATIVE_MY = /\b(?:beside|next to|nearby|near|by|against|behind|under|underneath|below|over|above|on|onto|in|into|in front of|opposite|across from|around|between|to the (?:left|right) of)\s+(?:the\s+)?(?:my|mine)\b/gi;
+
+const MY = /\b(?:my|mine)\b/gi;
+const NEWEST = /\b(?:latest|newest|last|most recent|just (?:scanned|captured)|i just)\b/i;
+const LIST_ONLY = /\b(?:my scans|my captures|what have i scanned|what did i scan|everything i(?:'ve|\s+have) scanned|all my|list my|which .{0,20}(?:have i|did i) scan)\b/i;
+
+/** A strong buy-word: nothing else it could mean, so it outranks a rearranging verb. */
+const SHOP_STRONG = /\b(?:find|buy|purchase|order|shop|shopping|browse|for sale|listings?|in stock|to buy)\b/i;
+/** A weak one: it means shopping only when nothing is being moved. */
+const SHOP_WEAK = new RegExp(`\\b(?:${VERBS}|do you (?:have|sell|stock)|i (?:need|want)|something that fits|what fits|anything that fits)\\b`, 'i');
+/**
+ * Moving what is already here. Beats a weak shop word: "I need the sofa moved" is not shopping.
+ * Stems, because speech inflects them — "moved", "facing", "rearranging". "Fits" is deliberately
+ * absent: "something that fits the gap" is the shopping sentence this whole feature exists for.
+ */
+const REARRANGE = /\b(?:mov|turn|rotat|spin|fac|put|plac|slid|push|pull|swap|shift|arrang|rearrang|tidy|clear|remov|delet|undo|redo)\w*\b|\bmake (?:it|the|this)\b/i;
+
+/**
+ * Which of the three handlers a sentence belongs to. "my" beats shopping, so "find my chair"
+ * asks the scan library and not the merchants.
+ *
+ * ceiling: regular expressions over English, which is why every rule above is one the report can
+ * quote and the table below can test. The upgrade path is an intent classifier on the Worker —
+ * not an LLM choosing the handler, but one turning the utterance into a structured request.
+ */
+export function classifyUtterance(text: string): Intent {
+  const t = text.trim();
+  const newest = NEWEST.test(t);
+  const listOnly = LIST_ONLY.test(t);
+  if (MINE_STRONG.test(t) || ownsAnUnplacedMy(t)) return { kind: 'mine', newest, listOnly };
+  if (SHOP_STRONG.test(t)) return { kind: 'shop', newest: false, listOnly: false };
+  if (REARRANGE.test(t)) return { kind: 'design', newest: false, listOnly: false };
+  if (SHOP_WEAK.test(t)) return { kind: 'shop', newest: false, listOnly: false };
+  return { kind: 'design', newest: false, listOnly: false };
+}
+
+/** At least one "my" that names the thing asked for rather than where it goes. */
+function ownsAnUnplacedMy(text: string): boolean {
+  const placed = new Set<number>();
+  for (const m of text.matchAll(LOCATIVE_MY)) placed.add(m.index! + m[0].toLowerCase().lastIndexOf('m'));
+  for (const m of text.matchAll(MY)) if (!placed.has(m.index!)) return true;
+  return false;
+}
+
 /** True when the sentence is a shopping request rather than a rearranging one. */
 export function isShoppingRequest(text: string): boolean {
-  return /\b(find|recommend|suggest|buy|shop|shopping|for sale|listing|listings|purchase|something that fits|what fits|replace)\b/i.test(text);
+  return classifyUtterance(text).kind === 'shop';
 }
