@@ -49,7 +49,10 @@ async function fetchRoomsPayload(): Promise<RoomsPayload> {
   const localIds = localRoomIds();
   const targets = [
     ...[...localIds, ...SEED_ROOM_IDS.filter((id) => !localIds.includes(id))].map((id) => ({ id, stub: false })),
-    { id: DEMO_ROOM_ID, stub: true },
+    // Live, like every other room: the demo room is a real row in D1. Through the stub layer the
+    // Worker answers with its fixture's OWN roomId, so the card was keyed by a different id and
+    // found no bundled picture (and no versions).
+    { id: DEMO_ROOM_ID, stub: false },
   ];
   const settled = await Promise.all(
     targets.map(({ id, stub }) =>
@@ -63,7 +66,7 @@ async function fetchRoomsPayload(): Promise<RoomsPayload> {
   const failed = settled.flatMap((r) => ("error" in r ? [r] : []));
   // Every room failing is an error screen with the reason, not an empty list that reads "no rooms".
   if (rooms.length === 0 && failed.length > 0) throw new Error(failed[0].error);
-  const counts = await Promise.all(rooms.map((r) => versionCountFor(r.roomId, r.roomId === DEMO_ROOM_ID)));
+  const counts = await Promise.all(rooms.map((r) => versionCountFor(r.roomId, false)));
   const versionCount = Object.fromEntries(rooms.map((r, i) => [r.roomId, counts[i]]));
   return { rooms, versionCount, failed };
 }
@@ -244,7 +247,12 @@ const styles = StyleSheet.create({
   useButtonText: { color: colors.accent, fontSize: 15, fontWeight: "600" },
   useButtonTextSelected: { color: "white" },
   header: { backgroundColor: "rgba(255,255,255,0.35)" },
-  photo: { width: "100%", aspectRatio: 4 / 3 },
+  // 3:2 is the exact ratio every bundled room picture is cropped to (assets/ROOM_PHOTOS.md), so
+  // the box and the pixels agree and nothing can stretch. On RN 0.86 the `resizeMode` PROP did not
+  // take effect on device (a 3:2 photo filled a 4:3 box, 12% too tall); it is set in style as well.
+  // ceiling: a photo taken on this phone (roomPhotoUri) is whatever the camera gave; it relies on
+  // resizeMode "cover" to crop. If that still stretches, crop it to 3:2 when it is saved.
+  photo: { width: "100%", aspectRatio: 3 / 2, resizeMode: "cover" },
   planWrap: { alignItems: "center", justifyContent: "center", paddingVertical: spacing.lg },
   body: { padding: spacing.md, gap: spacing.md },
   titleRow: { flexDirection: "row", alignItems: "center" },
