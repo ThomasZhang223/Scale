@@ -34,7 +34,7 @@ function fixture() {
   const dispatcher = new MeshDispatcher({ storage }, env);
   env.MESH_DISPATCHER = { idFromName: name => name, get: () => ({ fetch: (url, init) => dispatcher.fetch(new Request(url, init)) }) };
   const enqueue = params => dispatcher.fetch(new Request("https://dispatcher/enqueue", { method: "POST", body: JSON.stringify(params) }));
-  return { env, records, states, started, sql, dispatcher, enqueue };
+  return { env, records, states, started, sql, dispatcher, enqueue, getAlarm: () => alarm };
 }
 const params = id => ({ jobId: id, objectId: id, tier: "live", apiOrigin: "https://worker.example", roomId: null });
 
@@ -81,7 +81,7 @@ test("queue acknowledges only after durable admission; failures retry", async ()
   const f = fixture(); let ack = 0, retry = 0;
   const message = { id: "delivery", body: params("a"), ack: () => ack++, retry: () => retry++ };
   await consumeMeshJobs({ queue: "test", messages: [message] }, f.env);
-  assert.equal(ack, 1); assert.equal(retry, 0); assert.deepEqual(f.started, []);
+  assert.equal(ack, 1); assert.equal(retry, 0); assert.deepEqual(f.started, ["a"]);
   f.env.MESH_DISPATCHER.get = () => ({ fetch: async () => new Response(null, { status: 503 }) });
   await consumeMeshJobs({ queue: "test", messages: [message] }, f.env);
   assert.equal(ack, 1); assert.equal(retry, 1);
@@ -116,4 +116,51 @@ test("manifest and extraction objects normalize to the same stable identity", as
 
 test("paid catalogue intake requires the configured ingestion token", async () => {
   await assert.rejects(postCatalogIngest(new Request("https://worker/v1/catalog/ingest", { method: "POST", body: "[]" }), {}, "https://worker"), /X-Upstream-Token/);
+});
+
+test("durable acceptance notifies dispatcher at the same fake-clock instant, without cron", async () => {
+  const events = [], original = Date.now;
+  Date.now = () => 123000;
+  try {
+    const env = {
+      DB: { prepare: () => ({ bind() { return this; }, run: async () => {} }),
+        batch: async () => events.push(["durable", Date.now()]) },
+      MESH_DISPATCHER: { idFromName: x => x, get: () => ({ fetch: async () => {
+        events.push(["notified", Date.now()]); return new Response();
+      } }) },
+    };
+    await enqueueMesh(env, params("live"));
+    assert.deepEqual(events, [["durable", 123000], ["notified", 123000]]);
+    env.DB.batch = async () => { throw Error("D1 failed"); };
+    await assert.rejects(enqueueMesh(env, params("failed")));
+    assert.equal(events.length, 2);
+  } finally { Date.now = original; }
+});
+
+test("live requests pass queued catalog work; concurrent notifications preserve one slot", async () => {
+  const f = fixture();
+  await f.enqueue(params("active"));
+  await Promise.all([f.enqueue({ ...params("catalog"), catalog: {} }), f.enqueue(params("live"))]);
+  assert.deepEqual(f.started, ["active"]);
+  f.states.set("active", "complete");
+  await f.dispatcher.fetch(new Request("https://dispatcher/complete", {
+    method: "POST", body: JSON.stringify({ jobId: "active" }),
+  }));
+  assert.deepEqual(f.started, ["active", "live"]);
+});
+
+test("completion callback never releases a still-running prediction", async () => {
+  const f = fixture(), original = Date.now;
+  Date.now = () => 1000;
+  try {
+    await f.enqueue(params("a")); await f.enqueue(params("b"));
+    await f.dispatcher.fetch(new Request("https://dispatcher/complete", {
+      method: "POST", body: JSON.stringify({ jobId: "a" }),
+    }));
+    assert.deepEqual(f.started, ["a"]);
+    assert.equal(f.getAlarm(), 1250);
+    f.states.set("a", "complete");
+    await f.dispatcher.alarm();
+    assert.deepEqual(f.started, ["a", "b"]);
+  } finally { Date.now = original; }
 });

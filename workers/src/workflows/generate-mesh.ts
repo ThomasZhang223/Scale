@@ -19,6 +19,7 @@ import { advanceJob, markObjectFailed, markObjectReady, insertObject, getObject 
 import type { CatalogItem } from "../lib/catalog-ingest";
 import { emitToRoom } from "../lib/notify";
 import { embedInput } from "../lib/embedding";
+import { notifyMeshFinished } from "../lib/mesh-dispatch";
 
 export interface GenerateMeshParams {
   jobId: string;
@@ -276,6 +277,8 @@ export class GenerateMeshWorkflow extends WorkflowEntrypoint<Env, GenerateMeshPa
       await advanceJob(this.env, p.jobId, "failed", 100, message.slice(0, 500), nowIso());
       await markObjectFailed(this.env, p.objectId);
       throw err;
+    } finally {
+      await notifyMeshFinished(this.env, p.jobId);
     }
   }
 }
