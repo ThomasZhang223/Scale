@@ -1,0 +1,1202 @@
+{
+  "schemaVersion": 1,
+  "note": "Library models for the headset's Furniture page. Every row is source:\"primitive\" \u2014 a library model, never a merchant product. Sizes are as authored, in metres; nothing here was ever rescaled.",
+  "license": {
+    "id": "CC0-1.0",
+    "url": "https://polyhaven.com/license",
+    "statement": "Poly Haven publishes every asset on the site as CC0. Redistribution and commercial use are permitted and attribution is not required; the authors are recorded here anyway."
+  },
+  "packing": {
+    "tool": "gltf-transform 4.5.0 optimize",
+    "args": [
+      "--compress",
+      "false",
+      "--instance",
+      "false",
+      "--simplify",
+      "false",
+      "--palette",
+      "false",
+      "--texture-size",
+      "1024",
+      "--texture-compress",
+      "auto"
+    ],
+    "textureSize": 1024,
+    "compression": "none",
+    "reason": "The headset's GLTFLoader has Draco, KTX2 and Meshopt wired (apps/xr/src/objects.ts), so compression is available but not needed at this size. Uncompressed geometry also keeps POSITION min/max readable, so the uploaded bytes are the measured bytes."
+  },
+  "models": [
+    {
+      "source": "polyhaven",
+      "assetId": "sofa_02",
+      "name": "Two-seat fabric sofa",
+      "category": "sofa",
+      "url": "https://polyhaven.com/a/sofa_02",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://polyhaven.com/license",
+      "objectId": "211f2885-10b0-5fd7-97c5-34518b16f6b2",
+      "status": "seeded",
+      "attribution": [
+        "Kirill Sannikov"
+      ],
+      "polyhavenPolycount": 2728,
+      "sourceFileUrl": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/sofa_02/sofa_02_1k.gltf",
+      "sourceBytes": 427171,
+      "sourceSha256": "5df114209f9b956ccd4831eaeef469a81339ab371d0056eb6d5d29eee08eb431",
+      "triangles": 2728,
+      "bytes": 464976,
+      "packedSha256": "4a16e505abe8681499ccf7f8951d9c05f6435c6193b2f8380adf4fa62e4fdd30",
+      "textureSize": 1024,
+      "compression": "none",
+      "bboxMeters": {
+        "w": 1.8072,
+        "h": 0.7095,
+        "d": 0.8178
+      },
+      "measuredTransformed": true,
+      "apiDimensionDriftM": 0.0,
+      "glbKey": "objects/211f2885-10b0-5fd7-97c5-34518b16f6b2/mesh.glb",
+      "verified": {
+        "ok": true,
+        "problems": [],
+        "glbUrl": "https://full-scale-workers.thomaszhangdev.workers.dev/v1/assets/objects/211f2885-10b0-5fd7-97c5-34518b16f6b2/mesh.glb",
+        "state": "ready",
+        "listed": true
+      }
+    },
+    {
+      "source": "polyhaven",
+      "assetId": "sofa_03",
+      "name": "Large sectional sofa",
+      "category": "sofa",
+      "url": "https://polyhaven.com/a/sofa_03",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://polyhaven.com/license",
+      "objectId": "fb4faf19-1e41-5b72-a932-4c7cd0afba9b",
+      "status": "seeded",
+      "attribution": [
+        "Fran Calvente"
+      ],
+      "polyhavenPolycount": 8004,
+      "sourceFileUrl": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/sofa_03/sofa_03_1k.gltf",
+      "sourceBytes": 668033,
+      "sourceSha256": "123f491bef4e9bda153bda770a5d12810bfc9b87ce56aa5973aed041ea17fd92",
+      "triangles": 8004,
+      "bytes": 665628,
+      "packedSha256": "02042fafea9a759290f512aa5b3c6f3ddc6cd2a8b81b29526c105219c9e875b7",
+      "textureSize": 1024,
+      "compression": "none",
+      "bboxMeters": {
+        "w": 2.7312,
+        "h": 1.1183,
+        "d": 0.9251
+      },
+      "measuredTransformed": false,
+      "apiDimensionDriftM": 0.0,
+      "glbKey": "objects/fb4faf19-1e41-5b72-a932-4c7cd0afba9b/mesh.glb",
+      "verified": {
+        "ok": true,
+        "problems": [],
+        "glbUrl": "https://full-scale-workers.thomaszhangdev.workers.dev/v1/assets/objects/fb4faf19-1e41-5b72-a932-4c7cd0afba9b/mesh.glb",
+        "state": "ready",
+        "listed": true
+      }
+    },
+    {
+      "source": "polyhaven",
+      "assetId": "Sofa_01",
+      "name": "Compact loveseat",
+      "category": "sofa",
+      "url": "https://polyhaven.com/a/Sofa_01",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://polyhaven.com/license",
+      "objectId": "7cb3dcef-ea92-5e24-a450-a205ac7900e2",
+      "status": "seeded",
+      "attribution": [
+        "Kirill Sannikov"
+      ],
+      "polyhavenPolycount": 4101,
+      "sourceFileUrl": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/Sofa_01/Sofa_01_1k.gltf",
+      "sourceBytes": 517935,
+      "sourceSha256": "dc9d331a24fc8994606ae5a283826cb28feb3166782f59d006d0f10cc92cc830",
+      "triangles": 4101,
+      "bytes": 534216,
+      "packedSha256": "99be9715d2b64d007d1689e1dfe1bff5e1edb519c7ed26a32a7c4673dace6207",
+      "textureSize": 1024,
+      "compression": "none",
+      "bboxMeters": {
+        "w": 1.5715,
+        "h": 0.7965,
+        "d": 0.658
+      },
+      "measuredTransformed": false,
+      "apiDimensionDriftM": 0.0,
+      "glbKey": "objects/7cb3dcef-ea92-5e24-a450-a205ac7900e2/mesh.glb",
+      "verified": {
+        "ok": true,
+        "problems": [],
+        "glbUrl": "https://full-scale-workers.thomaszhangdev.workers.dev/v1/assets/objects/7cb3dcef-ea92-5e24-a450-a205ac7900e2/mesh.glb",
+        "state": "ready",
+        "listed": true
+      }
+    },
+    {
+      "source": "polyhaven",
+      "assetId": "modern_arm_chair_01",
+      "name": "Modern armchair",
+      "category": "armchair",
+      "url": "https://polyhaven.com/a/modern_arm_chair_01",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://polyhaven.com/license",
+      "objectId": "6441ab4f-f202-54dd-93ba-d25991749268",
+      "status": "already_seeded",
+      "attribution": [
+        "Vibrant Nordic"
+      ],
+      "polyhavenPolycount": 8916,
+      "sourceFileUrl": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/modern_arm_chair_01/modern_arm_chair_01_1k.gltf",
+      "sourceBytes": 2698032,
+      "sourceSha256": "d31be520add2603447b43acedbdacf9516866f7c89e9ea9230c9edbac9cc6e6a",
+      "triangles": 8916,
+      "bytes": 906264,
+      "packedSha256": "3cd063dddd772dabae7725b743b74168560c6b06e1c51f8caf19a63c04a12c09",
+      "textureSize": 1024,
+      "compression": "none",
+      "bboxMeters": {
+        "w": 0.8203,
+        "h": 1.0229,
+        "d": 0.9866
+      },
+      "measuredTransformed": false,
+      "apiDimensionDriftM": 0.0,
+      "verified": {
+        "ok": true,
+        "problems": [],
+        "glbUrl": "https://full-scale-workers.thomaszhangdev.workers.dev/v1/assets/objects/6441ab4f-f202-54dd-93ba-d25991749268/mesh.glb",
+        "state": "ready",
+        "listed": true
+      }
+    },
+    {
+      "source": "polyhaven",
+      "assetId": "mid_century_lounge_chair",
+      "name": "Mid-century lounge chair",
+      "category": "armchair",
+      "url": "https://polyhaven.com/a/mid_century_lounge_chair",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://polyhaven.com/license",
+      "objectId": "add7f5ae-cc6b-5393-9375-38ab21b4da5c",
+      "status": "seeded",
+      "attribution": [
+        "Kuutti Siitonen"
+      ],
+      "polyhavenPolycount": 6148,
+      "sourceFileUrl": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/mid_century_lounge_chair/mid_century_lounge_chair_1k.gltf",
+      "sourceBytes": 2087019,
+      "sourceSha256": "47c5769ee4dfa350e2506a6a76d8ef58a1e1060344acda35c503ddff46645d26",
+      "triangles": 6148,
+      "bytes": 650560,
+      "packedSha256": "8d0e96d0c3912fef15e9e0eade85d833be8c06c04fff0c139335acad0e396125",
+      "textureSize": 1024,
+      "compression": "none",
+      "bboxMeters": {
+        "w": 1.0086,
+        "h": 1.1691,
+        "d": 1.1903
+      },
+      "measuredTransformed": false,
+      "apiDimensionDriftM": 0.0,
+      "glbKey": "objects/add7f5ae-cc6b-5393-9375-38ab21b4da5c/mesh.glb",
+      "verified": {
+        "ok": true,
+        "problems": [],
+        "glbUrl": "https://full-scale-workers.thomaszhangdev.workers.dev/v1/assets/objects/add7f5ae-cc6b-5393-9375-38ab21b4da5c/mesh.glb",
+        "state": "ready",
+        "listed": true
+      }
+    },
+    {
+      "source": "polyhaven",
+      "assetId": "ArmChair_01",
+      "name": "Vintage carved armchair",
+      "category": "armchair",
+      "url": "https://polyhaven.com/a/ArmChair_01",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://polyhaven.com/license",
+      "objectId": "4034d0b1-ccee-5e71-80bb-dd9b67536c99",
+      "status": "seeded",
+      "attribution": [
+        "Kirill Sannikov"
+      ],
+      "polyhavenPolycount": 5626,
+      "sourceFileUrl": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/ArmChair_01/ArmChair_01_1k.gltf",
+      "sourceBytes": 769144,
+      "sourceSha256": "91e39d5b35f36c8074b7b6432f6fd77f5f1a257c4d6af3924c0b263eb674286b",
+      "triangles": 5626,
+      "bytes": 801224,
+      "packedSha256": "3443fcde92b991bf4ec7ef436bfbc150a5fdddf91ab9fcfe03e77f83ac145207",
+      "textureSize": 1024,
+      "compression": "none",
+      "bboxMeters": {
+        "w": 0.8484,
+        "h": 1.0651,
+        "d": 0.7658
+      },
+      "measuredTransformed": false,
+      "apiDimensionDriftM": 0.0,
+      "glbKey": "objects/4034d0b1-ccee-5e71-80bb-dd9b67536c99/mesh.glb",
+      "verified": {
+        "ok": true,
+        "problems": [],
+        "glbUrl": "https://full-scale-workers.thomaszhangdev.workers.dev/v1/assets/objects/4034d0b1-ccee-5e71-80bb-dd9b67536c99/mesh.glb",
+        "state": "ready",
+        "listed": true
+      }
+    },
+    {
+      "source": "polyhaven",
+      "assetId": "GreenChair_01",
+      "name": "Green upholstered chair",
+      "category": "chair",
+      "url": "https://polyhaven.com/a/GreenChair_01",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://polyhaven.com/license",
+      "objectId": "cd684b31-9448-5619-8c4c-2e464e1e6c89",
+      "status": "seeded",
+      "attribution": [
+        "Kirill Sannikov"
+      ],
+      "polyhavenPolycount": 4213,
+      "sourceFileUrl": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/GreenChair_01/GreenChair_01_1k.gltf",
+      "sourceBytes": 608044,
+      "sourceSha256": "d1e4946ac99ab9e64c82d802fe5cd49d962750e34b8d284762b3fe2b00ba8a45",
+      "triangles": 4213,
+      "bytes": 657628,
+      "packedSha256": "ecb43cdb83ec51fc4394507bdec538e23f2b57cbb453080e5d03b4d942caba62",
+      "textureSize": 1024,
+      "compression": "none",
+      "bboxMeters": {
+        "w": 0.6731,
+        "h": 1.0585,
+        "d": 0.6644
+      },
+      "measuredTransformed": false,
+      "apiDimensionDriftM": 0.0,
+      "glbKey": "objects/cd684b31-9448-5619-8c4c-2e464e1e6c89/mesh.glb",
+      "verified": {
+        "ok": true,
+        "problems": [],
+        "glbUrl": "https://full-scale-workers.thomaszhangdev.workers.dev/v1/assets/objects/cd684b31-9448-5619-8c4c-2e464e1e6c89/mesh.glb",
+        "state": "ready",
+        "listed": true
+      }
+    },
+    {
+      "source": "polyhaven",
+      "assetId": "dining_chair_02",
+      "name": "Wooden dining chair",
+      "category": "chair",
+      "url": "https://polyhaven.com/a/dining_chair_02",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://polyhaven.com/license",
+      "objectId": "c49695d1-3e28-595d-b990-b286a86224cc",
+      "status": "seeded",
+      "attribution": [
+        "James Ray Cock"
+      ],
+      "polyhavenPolycount": 22013,
+      "sourceFileUrl": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/dining_chair_02/dining_chair_02_1k.gltf",
+      "sourceBytes": 921075,
+      "sourceSha256": "88352a44a17319846f61fe03ce75c79fb1849aa508b6a262366c149c1bbd06b8",
+      "triangles": 22013,
+      "bytes": 951776,
+      "packedSha256": "baf16700d55b87fd2f58d4a87ee2af5bf7759557928e99f9b17d123cdfb1e905",
+      "textureSize": 1024,
+      "compression": "none",
+      "bboxMeters": {
+        "w": 0.4336,
+        "h": 0.9734,
+        "d": 0.5764
+      },
+      "measuredTransformed": false,
+      "apiDimensionDriftM": 0.0,
+      "glbKey": "objects/c49695d1-3e28-595d-b990-b286a86224cc/mesh.glb",
+      "verified": {
+        "ok": true,
+        "problems": [],
+        "glbUrl": "https://full-scale-workers.thomaszhangdev.workers.dev/v1/assets/objects/c49695d1-3e28-595d-b990-b286a86224cc/mesh.glb",
+        "state": "ready",
+        "listed": true
+      }
+    },
+    {
+      "source": "polyhaven",
+      "assetId": "metal_stool_02",
+      "name": "Low metal stool",
+      "category": "stool",
+      "url": "https://polyhaven.com/a/metal_stool_02",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://polyhaven.com/license",
+      "objectId": "ebc05305-4c2f-502b-93b7-be2f8d1de73c",
+      "status": "seeded",
+      "attribution": [
+        "Ulan Cabanilla"
+      ],
+      "polyhavenPolycount": 6532,
+      "sourceFileUrl": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/metal_stool_02/metal_stool_02_1k.gltf",
+      "sourceBytes": 2540986,
+      "sourceSha256": "de8d603993443294b8a0aed48ea631ac38f2b15872491ea929551f72be726fcb",
+      "triangles": 6532,
+      "bytes": 792808,
+      "packedSha256": "5f8f5b9b475ec445c25588156d34b4557746da90ba8f5d3909146cae47e0aff1",
+      "textureSize": 1024,
+      "compression": "none",
+      "bboxMeters": {
+        "w": 0.4481,
+        "h": 0.4581,
+        "d": 0.4731
+      },
+      "measuredTransformed": true,
+      "apiDimensionDriftM": 0.0,
+      "glbKey": "objects/ebc05305-4c2f-502b-93b7-be2f8d1de73c/mesh.glb",
+      "verified": {
+        "ok": true,
+        "problems": [],
+        "glbUrl": "https://full-scale-workers.thomaszhangdev.workers.dev/v1/assets/objects/ebc05305-4c2f-502b-93b7-be2f8d1de73c/mesh.glb",
+        "state": "ready",
+        "listed": true
+      }
+    },
+    {
+      "source": "polyhaven",
+      "assetId": "bar_chair_round_01",
+      "name": "Round bar stool",
+      "category": "stool",
+      "url": "https://polyhaven.com/a/bar_chair_round_01",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://polyhaven.com/license",
+      "objectId": "8bd60225-f036-57c1-b0fa-8bee5cb58467",
+      "status": "seeded",
+      "attribution": [
+        "Dairon Sanchez"
+      ],
+      "polyhavenPolycount": 14373,
+      "sourceFileUrl": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/bar_chair_round_01/bar_chair_round_01_1k.gltf",
+      "sourceBytes": 2812333,
+      "sourceSha256": "6a8f92123245268cbb69fc96f305ee710b32a7a06761b143d3049eaabfcbdd32",
+      "triangles": 14373,
+      "bytes": 1546204,
+      "packedSha256": "e3adb430113c5e66719fa7a02d606ffbb23aba3b2416002c1ac938bee8d484ee",
+      "textureSize": 1024,
+      "compression": "none",
+      "bboxMeters": {
+        "w": 0.4832,
+        "h": 0.7505,
+        "d": 0.486
+      },
+      "measuredTransformed": true,
+      "apiDimensionDriftM": 0.0,
+      "glbKey": "objects/8bd60225-f036-57c1-b0fa-8bee5cb58467/mesh.glb",
+      "verified": {
+        "ok": true,
+        "problems": [],
+        "glbUrl": "https://full-scale-workers.thomaszhangdev.workers.dev/v1/assets/objects/8bd60225-f036-57c1-b0fa-8bee5cb58467/mesh.glb",
+        "state": "ready",
+        "listed": true
+      }
+    },
+    {
+      "source": "polyhaven",
+      "assetId": "Ottoman_01",
+      "name": "Upholstered ottoman",
+      "category": "stool",
+      "url": "https://polyhaven.com/a/Ottoman_01",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://polyhaven.com/license",
+      "objectId": "73722cf8-7582-5ef4-a1df-2fcbafbdbb6f",
+      "status": "seeded",
+      "attribution": [
+        "Caspian Fortune"
+      ],
+      "polyhavenPolycount": 4240,
+      "sourceFileUrl": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/Ottoman_01/Ottoman_01_1k.gltf",
+      "sourceBytes": 652112,
+      "sourceSha256": "cb515553924d7ca85b94807aba7d7d5110fafa0fedf7132573b105ac8b900584",
+      "triangles": 4240,
+      "bytes": 660200,
+      "packedSha256": "2685592c9a0b7cebcc6fea6f3beb7fc9ac70c4f6de1436f262c6acb56becf444",
+      "textureSize": 1024,
+      "compression": "none",
+      "bboxMeters": {
+        "w": 0.8846,
+        "h": 0.6243,
+        "d": 0.6211
+      },
+      "measuredTransformed": false,
+      "apiDimensionDriftM": 0.0,
+      "glbKey": "objects/73722cf8-7582-5ef4-a1df-2fcbafbdbb6f/mesh.glb",
+      "verified": {
+        "ok": true,
+        "problems": [],
+        "glbUrl": "https://full-scale-workers.thomaszhangdev.workers.dev/v1/assets/objects/73722cf8-7582-5ef4-a1df-2fcbafbdbb6f/mesh.glb",
+        "state": "ready",
+        "listed": true
+      }
+    },
+    {
+      "source": "polyhaven",
+      "assetId": "painted_wooden_bench",
+      "name": "Painted wooden bench",
+      "category": "bench",
+      "url": "https://polyhaven.com/a/painted_wooden_bench",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://polyhaven.com/license",
+      "objectId": "2e7a06e2-dcbf-5983-9d90-d01f96f7e18a",
+      "status": "seeded",
+      "attribution": [
+        "Kirill Sannikov"
+      ],
+      "polyhavenPolycount": 630,
+      "sourceFileUrl": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/painted_wooden_bench/painted_wooden_bench_1k.gltf",
+      "sourceBytes": 1989639,
+      "sourceSha256": "2289ab82f3fe3045bf18f7b9541743d2c65b9f071cb34bbe424d2bc998f3e507",
+      "triangles": 630,
+      "bytes": 508016,
+      "packedSha256": "ccb951b8f535bff3ecc234d206c854e01d7029f8c924442e06273e34d0422802",
+      "textureSize": 1024,
+      "compression": "none",
+      "bboxMeters": {
+        "w": 1.1649,
+        "h": 0.8893,
+        "d": 0.4965
+      },
+      "measuredTransformed": false,
+      "apiDimensionDriftM": 0.0,
+      "glbKey": "objects/2e7a06e2-dcbf-5983-9d90-d01f96f7e18a/mesh.glb",
+      "verified": {
+        "ok": true,
+        "problems": [],
+        "glbUrl": "https://full-scale-workers.thomaszhangdev.workers.dev/v1/assets/objects/2e7a06e2-dcbf-5983-9d90-d01f96f7e18a/mesh.glb",
+        "state": "ready",
+        "listed": true
+      }
+    },
+    {
+      "source": "polyhaven",
+      "assetId": "dining_table",
+      "name": "Dining table",
+      "category": "dining",
+      "url": "https://polyhaven.com/a/dining_table",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://polyhaven.com/license",
+      "objectId": "f00bfb46-6bcc-5d2a-86f6-ea6e1c99b401",
+      "status": "seeded",
+      "attribution": [
+        "Aron \u0141yczek"
+      ],
+      "polyhavenPolycount": 1048,
+      "sourceFileUrl": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/dining_table/dining_table_1k.gltf",
+      "sourceBytes": 2283933,
+      "sourceSha256": "6af2b850b0524d364b4c89869c6c70112b8d340317a256cf35fbe739040654c7",
+      "triangles": 1048,
+      "bytes": 639220,
+      "packedSha256": "88896cd9d7c437f5ae8cd287f21fdfab9281fcbb0809505b1fce9d85b3555700",
+      "textureSize": 1024,
+      "compression": "none",
+      "bboxMeters": {
+        "w": 2.2559,
+        "h": 0.877,
+        "d": 1.3902
+      },
+      "measuredTransformed": false,
+      "apiDimensionDriftM": 0.0,
+      "glbKey": "objects/f00bfb46-6bcc-5d2a-86f6-ea6e1c99b401/mesh.glb",
+      "verified": {
+        "ok": true,
+        "problems": [],
+        "glbUrl": "https://full-scale-workers.thomaszhangdev.workers.dev/v1/assets/objects/f00bfb46-6bcc-5d2a-86f6-ea6e1c99b401/mesh.glb",
+        "state": "ready",
+        "listed": true
+      }
+    },
+    {
+      "source": "polyhaven",
+      "assetId": "round_wooden_table_02",
+      "name": "Small round dining table",
+      "category": "table",
+      "url": "https://polyhaven.com/a/round_wooden_table_02",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://polyhaven.com/license",
+      "objectId": "f32a4001-3f69-5f29-8ea1-5505e64e8394",
+      "status": "seeded",
+      "attribution": [
+        "Ulan Cabanilla"
+      ],
+      "polyhavenPolycount": 4254,
+      "sourceFileUrl": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/round_wooden_table_02/round_wooden_table_02_1k.gltf",
+      "sourceBytes": 1921292,
+      "sourceSha256": "df65c35148280a06efcc06bfa75432bb13f29318e869597fc94f364ce2b55974",
+      "triangles": 4254,
+      "bytes": 646104,
+      "packedSha256": "d058f0bbfbef302564706f7e479954eb24201e5ff9a6e8332741b0a157cdb3ad",
+      "textureSize": 1024,
+      "compression": "none",
+      "bboxMeters": {
+        "w": 0.7962,
+        "h": 0.746,
+        "d": 0.7962
+      },
+      "measuredTransformed": false,
+      "apiDimensionDriftM": 0.0,
+      "glbKey": "objects/f32a4001-3f69-5f29-8ea1-5505e64e8394/mesh.glb",
+      "verified": {
+        "ok": true,
+        "problems": [],
+        "glbUrl": "https://full-scale-workers.thomaszhangdev.workers.dev/v1/assets/objects/f32a4001-3f69-5f29-8ea1-5505e64e8394/mesh.glb",
+        "state": "ready",
+        "listed": true
+      }
+    },
+    {
+      "source": "polyhaven",
+      "assetId": "modern_coffee_table_01",
+      "name": "Modern coffee table",
+      "category": "coffee table",
+      "url": "https://polyhaven.com/a/modern_coffee_table_01",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://polyhaven.com/license",
+      "objectId": "fcfd30fa-dd4c-537d-ab8d-eea959df3ab5",
+      "status": "seeded",
+      "attribution": [
+        "Amin"
+      ],
+      "polyhavenPolycount": 4504,
+      "sourceFileUrl": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/modern_coffee_table_01/modern_coffee_table_01_1k.gltf",
+      "sourceBytes": 1331297,
+      "sourceSha256": "a35d811da4c174d0c888f23353dda21501763dbf5505c66f57fef4b3f613e50c",
+      "triangles": 4504,
+      "bytes": 409964,
+      "packedSha256": "d40428ad14151570afb3b4a0f4e8371b861be8f688d71e62eb09dfee2515e8cb",
+      "textureSize": 1024,
+      "compression": "none",
+      "bboxMeters": {
+        "w": 0.6,
+        "h": 0.39,
+        "d": 1.2018
+      },
+      "measuredTransformed": false,
+      "apiDimensionDriftM": 0.6018,
+      "glbKey": "objects/fcfd30fa-dd4c-537d-ab8d-eea959df3ab5/mesh.glb",
+      "verified": {
+        "ok": true,
+        "problems": [],
+        "glbUrl": "https://full-scale-workers.thomaszhangdev.workers.dev/v1/assets/objects/fcfd30fa-dd4c-537d-ab8d-eea959df3ab5/mesh.glb",
+        "state": "ready",
+        "listed": true
+      }
+    },
+    {
+      "source": "polyhaven",
+      "assetId": "modern_coffee_table_02",
+      "name": "Round coffee table",
+      "category": "coffee table",
+      "url": "https://polyhaven.com/a/modern_coffee_table_02",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://polyhaven.com/license",
+      "objectId": "3d99e0ed-c4ec-559a-ab8e-841d7d5ee01a",
+      "status": "seeded",
+      "attribution": [
+        "Amin"
+      ],
+      "polyhavenPolycount": 13645,
+      "sourceFileUrl": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/modern_coffee_table_02/modern_coffee_table_02_1k.gltf",
+      "sourceBytes": 2955725,
+      "sourceSha256": "59acb8abec936a74d52d83f9208aa0314accc4363586b5b94f89ab2d8b85ad76",
+      "triangles": 13645,
+      "bytes": 1313772,
+      "packedSha256": "4d731aac06b06921e6d9b8aee362d664f673ebbc837eea52517d19b8c204cc53",
+      "textureSize": 1024,
+      "compression": "none",
+      "bboxMeters": {
+        "w": 1.1991,
+        "h": 0.3692,
+        "d": 1.1997
+      },
+      "measuredTransformed": false,
+      "apiDimensionDriftM": 0.0,
+      "glbKey": "objects/3d99e0ed-c4ec-559a-ab8e-841d7d5ee01a/mesh.glb",
+      "verified": {
+        "ok": true,
+        "problems": [],
+        "glbUrl": "https://full-scale-workers.thomaszhangdev.workers.dev/v1/assets/objects/3d99e0ed-c4ec-559a-ab8e-841d7d5ee01a/mesh.glb",
+        "state": "ready",
+        "listed": true
+      }
+    },
+    {
+      "source": "polyhaven",
+      "assetId": "coffee_table_round_01",
+      "name": "Large round coffee table",
+      "category": "coffee table",
+      "url": "https://polyhaven.com/a/coffee_table_round_01",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://polyhaven.com/license",
+      "objectId": "bdaf82c1-ad6d-5223-ab79-a428d34050c2",
+      "status": "seeded",
+      "attribution": [
+        "Ulan Cabanilla"
+      ],
+      "polyhavenPolycount": 4044,
+      "sourceFileUrl": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/coffee_table_round_01/coffee_table_round_01_1k.gltf",
+      "sourceBytes": 1563153,
+      "sourceSha256": "58fe785584f8999f760e590b04ce74f83962d42c9440ab9415910f63a31165dc",
+      "triangles": 4044,
+      "bytes": 483928,
+      "packedSha256": "4407c87269b5b49ae270e7835ed876f2f77b623abd56326f2fe6a199340a48cf",
+      "textureSize": 1024,
+      "compression": "none",
+      "bboxMeters": {
+        "w": 1.3013,
+        "h": 0.491,
+        "d": 1.3013
+      },
+      "measuredTransformed": false,
+      "apiDimensionDriftM": 0.0,
+      "glbKey": "objects/bdaf82c1-ad6d-5223-ab79-a428d34050c2/mesh.glb",
+      "verified": {
+        "ok": true,
+        "problems": [],
+        "glbUrl": "https://full-scale-workers.thomaszhangdev.workers.dev/v1/assets/objects/bdaf82c1-ad6d-5223-ab79-a428d34050c2/mesh.glb",
+        "state": "ready",
+        "listed": true
+      }
+    },
+    {
+      "source": "polyhaven",
+      "assetId": "side_table_01",
+      "name": "Square side table",
+      "category": "side table",
+      "url": "https://polyhaven.com/a/side_table_01",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://polyhaven.com/license",
+      "objectId": "156ac074-cfc8-5bd0-b45a-0ca9c3956bc8",
+      "status": "seeded",
+      "attribution": [
+        "James Ray Cock"
+      ],
+      "polyhavenPolycount": 2756,
+      "sourceFileUrl": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/side_table_01/side_table_01_1k.gltf",
+      "sourceBytes": 505268,
+      "sourceSha256": "a441125a4f660a23a31601aedd9aa379c6febf2b35171c08814187b5ec5a3309",
+      "triangles": 2756,
+      "bytes": 506944,
+      "packedSha256": "bbb56daffb1d8293255aaba420b01a3b12ac49c0097fc3f92a75c6257d4e1d33",
+      "textureSize": 1024,
+      "compression": "none",
+      "bboxMeters": {
+        "w": 0.55,
+        "h": 0.5507,
+        "d": 0.45
+      },
+      "measuredTransformed": false,
+      "apiDimensionDriftM": 0.0,
+      "glbKey": "objects/156ac074-cfc8-5bd0-b45a-0ca9c3956bc8/mesh.glb",
+      "verified": {
+        "ok": true,
+        "problems": [],
+        "glbUrl": "https://full-scale-workers.thomaszhangdev.workers.dev/v1/assets/objects/156ac074-cfc8-5bd0-b45a-0ca9c3956bc8/mesh.glb",
+        "state": "ready",
+        "listed": true
+      }
+    },
+    {
+      "source": "polyhaven",
+      "assetId": "ClassicNightstand_01",
+      "name": "Classic nightstand",
+      "category": "side table",
+      "url": "https://polyhaven.com/a/ClassicNightstand_01",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://polyhaven.com/license",
+      "objectId": "73fc375b-f8a7-5a0b-b752-cb0e79f3048f",
+      "status": "seeded",
+      "attribution": [
+        "Kirill Sannikov"
+      ],
+      "polyhavenPolycount": 2002,
+      "sourceFileUrl": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/ClassicNightstand_01/ClassicNightstand_01_1k.gltf",
+      "sourceBytes": 444940,
+      "sourceSha256": "e8218ceead6c07d2641a0bd54974a67b13dd7ebc110e07e9738e17c206c7b892",
+      "triangles": 2002,
+      "bytes": 457552,
+      "packedSha256": "ea29002d995c86ecbe5ac8b447a29f3924331412f3e50d5cb531092da55541c3",
+      "textureSize": 1024,
+      "compression": "none",
+      "bboxMeters": {
+        "w": 0.5678,
+        "h": 0.7,
+        "d": 0.4242
+      },
+      "measuredTransformed": false,
+      "apiDimensionDriftM": 0.0,
+      "glbKey": "objects/73fc375b-f8a7-5a0b-b752-cb0e79f3048f/mesh.glb",
+      "verified": {
+        "ok": true,
+        "problems": [],
+        "glbUrl": "https://full-scale-workers.thomaszhangdev.workers.dev/v1/assets/objects/73fc375b-f8a7-5a0b-b752-cb0e79f3048f/mesh.glb",
+        "state": "ready",
+        "listed": true
+      }
+    },
+    {
+      "source": "polyhaven",
+      "assetId": "metal_office_desk",
+      "name": "Metal office desk",
+      "category": "desk",
+      "url": "https://polyhaven.com/a/metal_office_desk",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://polyhaven.com/license",
+      "objectId": "88a849a3-a61b-5216-8908-ee5306395ce2",
+      "status": "seeded",
+      "attribution": [
+        "Ulan Cabanilla"
+      ],
+      "polyhavenPolycount": 6898,
+      "sourceFileUrl": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/metal_office_desk/metal_office_desk_1k.gltf",
+      "sourceBytes": 1606530,
+      "sourceSha256": "f07032a5ee89aacceebf10fd9fa192c22775ae81861cfb0bdb1594497179373c",
+      "triangles": 6898,
+      "bytes": 616340,
+      "packedSha256": "8cf6492f47ba76bd2e50a276bf7007cbff44515c52e702dbfd9ff3ac993fb7a5",
+      "textureSize": 1024,
+      "compression": "none",
+      "bboxMeters": {
+        "w": 2.0,
+        "h": 0.7875,
+        "d": 0.9472
+      },
+      "measuredTransformed": false,
+      "apiDimensionDriftM": 0.0,
+      "glbKey": "objects/88a849a3-a61b-5216-8908-ee5306395ce2/mesh.glb",
+      "verified": {
+        "ok": true,
+        "problems": [],
+        "glbUrl": "https://full-scale-workers.thomaszhangdev.workers.dev/v1/assets/objects/88a849a3-a61b-5216-8908-ee5306395ce2/mesh.glb",
+        "state": "ready",
+        "listed": true
+      }
+    },
+    {
+      "source": "polyhaven",
+      "assetId": "Shelf_01",
+      "name": "Tall open shelf",
+      "category": "shelf",
+      "url": "https://polyhaven.com/a/Shelf_01",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://polyhaven.com/license",
+      "objectId": "dd9e7bcb-54d3-50df-ac2c-91a5846a9f55",
+      "status": "seeded",
+      "attribution": [
+        "Gabriel Radi\u0107"
+      ],
+      "polyhavenPolycount": 182,
+      "sourceFileUrl": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/Shelf_01/Shelf_01_1k.gltf",
+      "sourceBytes": 605448,
+      "sourceSha256": "715bce6ff1886eccdd43d558f5cf9242a24396e0eb9e8ae391905186bb339e52",
+      "triangles": 182,
+      "bytes": 617428,
+      "packedSha256": "6eca97c23196e960b43f5079d9c7bcf00067ccc3368a1890ed9ffa199c0bdc44",
+      "textureSize": 1024,
+      "compression": "none",
+      "bboxMeters": {
+        "w": 1.0034,
+        "h": 2.0803,
+        "d": 0.257
+      },
+      "measuredTransformed": false,
+      "apiDimensionDriftM": 0.0,
+      "glbKey": "objects/dd9e7bcb-54d3-50df-ac2c-91a5846a9f55/mesh.glb",
+      "verified": {
+        "ok": true,
+        "problems": [],
+        "glbUrl": "https://full-scale-workers.thomaszhangdev.workers.dev/v1/assets/objects/dd9e7bcb-54d3-50df-ac2c-91a5846a9f55/mesh.glb",
+        "state": "ready",
+        "listed": true
+      }
+    },
+    {
+      "source": "polyhaven",
+      "assetId": "steel_frame_shelves_01",
+      "name": "Steel frame shelving",
+      "category": "shelf",
+      "url": "https://polyhaven.com/a/steel_frame_shelves_01",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://polyhaven.com/license",
+      "objectId": "c1c06059-c3b1-52ef-ba7e-93d6f3ff0f0d",
+      "status": "skipped",
+      "attribution": [
+        "James Ray Cock"
+      ],
+      "polyhavenPolycount": 4348,
+      "sourceFileUrl": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/steel_frame_shelves_01/steel_frame_shelves_01_1k.gltf",
+      "sourceBytes": 1597356,
+      "sourceSha256": "4eff8994825d654e337f8dc425e959ed6add7f4773188c87ba64402d9edd9842",
+      "triangles": 4348,
+      "bytes": 509484,
+      "packedSha256": "080536e061ad8e762aa8b218b7a18154b5d56837ff2918249decc5cdc56d2e33",
+      "textureSize": 1024,
+      "compression": "none",
+      "bboxMeters": {
+        "w": 10.9741,
+        "h": 21.405,
+        "d": 5.0212
+      },
+      "measuredTransformed": false,
+      "reason": "largest side 21.405 m is outside the plausible 0.5-3.0 m for a shelf"
+    },
+    {
+      "source": "polyhaven",
+      "assetId": "wooden_bookshelf_worn",
+      "name": "Wooden bookcase",
+      "category": "bookcase",
+      "url": "https://polyhaven.com/a/wooden_bookshelf_worn",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://polyhaven.com/license",
+      "objectId": "8635d0da-201b-58d5-9e4e-3e4ea036d412",
+      "status": "seeded",
+      "attribution": [
+        "Ulan Cabanilla"
+      ],
+      "polyhavenPolycount": 10106,
+      "sourceFileUrl": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/wooden_bookshelf_worn/wooden_bookshelf_worn_1k.gltf",
+      "sourceBytes": 2777194,
+      "sourceSha256": "a1c5b3f1e71ae0b5eb73047e8097bceaa5f17e5d2d0d7ae1b8053d5ec0878fc6",
+      "triangles": 10106,
+      "bytes": 1038800,
+      "packedSha256": "3e3d4ebdee6aee7e99df0adf9a2e4ed577690620cacce467f65176834872dff0",
+      "textureSize": 1024,
+      "compression": "none",
+      "bboxMeters": {
+        "w": 1.374,
+        "h": 2.0634,
+        "d": 0.5813
+      },
+      "measuredTransformed": false,
+      "apiDimensionDriftM": 0.0,
+      "glbKey": "objects/8635d0da-201b-58d5-9e4e-3e4ea036d412/mesh.glb",
+      "verified": {
+        "ok": true,
+        "problems": [],
+        "glbUrl": "https://full-scale-workers.thomaszhangdev.workers.dev/v1/assets/objects/8635d0da-201b-58d5-9e4e-3e4ea036d412/mesh.glb",
+        "state": "ready",
+        "listed": true
+      }
+    },
+    {
+      "source": "polyhaven",
+      "assetId": "modern_wooden_cabinet",
+      "name": "Modern sideboard",
+      "category": "cabinet",
+      "url": "https://polyhaven.com/a/modern_wooden_cabinet",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://polyhaven.com/license",
+      "objectId": "149620fe-1e89-5699-8c0d-bf318d3bde01",
+      "status": "seeded",
+      "attribution": [
+        "Patrik Pangerl"
+      ],
+      "polyhavenPolycount": 24976,
+      "sourceFileUrl": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/modern_wooden_cabinet/modern_wooden_cabinet_1k.gltf",
+      "sourceBytes": 2855522,
+      "sourceSha256": "9c0765063297018e854d11bc27da3cbab3c33904a3be2f5c15f46635df7e857f",
+      "triangles": 24976,
+      "bytes": 1550436,
+      "packedSha256": "6c2eb5daeaa9bc955b5b81943ea9f429a39f9ba764995b8c908298b4524692bf",
+      "textureSize": 1024,
+      "compression": "none",
+      "bboxMeters": {
+        "w": 2.44,
+        "h": 0.6801,
+        "d": 0.52
+      },
+      "measuredTransformed": true,
+      "apiDimensionDriftM": 0.0,
+      "glbKey": "objects/149620fe-1e89-5699-8c0d-bf318d3bde01/mesh.glb",
+      "verified": {
+        "ok": true,
+        "problems": [],
+        "glbUrl": "https://full-scale-workers.thomaszhangdev.workers.dev/v1/assets/objects/149620fe-1e89-5699-8c0d-bf318d3bde01/mesh.glb",
+        "state": "ready",
+        "listed": true
+      }
+    },
+    {
+      "source": "polyhaven",
+      "assetId": "painted_wooden_cabinet",
+      "name": "Painted wooden cabinet",
+      "category": "cabinet",
+      "url": "https://polyhaven.com/a/painted_wooden_cabinet",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://polyhaven.com/license",
+      "objectId": "347769f0-d363-557d-be89-79c80587a996",
+      "status": "seeded",
+      "attribution": [
+        "Kirill Sannikov"
+      ],
+      "polyhavenPolycount": 2227,
+      "sourceFileUrl": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/painted_wooden_cabinet/painted_wooden_cabinet_1k.gltf",
+      "sourceBytes": 1861779,
+      "sourceSha256": "ce04543cdb10e05fe9c2cc08e9c118b16c1c717a07bcbfac9b99859465c8d1ed",
+      "triangles": 2227,
+      "bytes": 550848,
+      "packedSha256": "c868f8e331710dc96779f492cf0c27f178cac2ed3322d77e05373959339529d9",
+      "textureSize": 1024,
+      "compression": "none",
+      "bboxMeters": {
+        "w": 1.1947,
+        "h": 1.1819,
+        "d": 0.6166
+      },
+      "measuredTransformed": false,
+      "apiDimensionDriftM": 0.0,
+      "glbKey": "objects/347769f0-d363-557d-be89-79c80587a996/mesh.glb",
+      "verified": {
+        "ok": true,
+        "problems": [],
+        "glbUrl": "https://full-scale-workers.thomaszhangdev.workers.dev/v1/assets/objects/347769f0-d363-557d-be89-79c80587a996/mesh.glb",
+        "state": "ready",
+        "listed": true
+      }
+    },
+    {
+      "source": "polyhaven",
+      "assetId": "drawer_cabinet",
+      "name": "Chest of drawers",
+      "category": "dresser",
+      "url": "https://polyhaven.com/a/drawer_cabinet",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://polyhaven.com/license",
+      "objectId": "b129aab0-06f8-5d13-b2cb-acb171e6051a",
+      "status": "seeded",
+      "attribution": [
+        "Ulan Cabanilla"
+      ],
+      "polyhavenPolycount": 26406,
+      "sourceFileUrl": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/drawer_cabinet/drawer_cabinet_1k.gltf",
+      "sourceBytes": 1143429,
+      "sourceSha256": "899581e6a041644139a138f909c6ba001684cc55b5d1702e08f01094e20d0617",
+      "triangles": 26406,
+      "bytes": 1134880,
+      "packedSha256": "4a2427d23aab9d3af1e3ef00b60cd13414860c8f4c7f5307641bd86e64873d8c",
+      "textureSize": 1024,
+      "compression": "none",
+      "bboxMeters": {
+        "w": 1.1411,
+        "h": 1.8813,
+        "d": 0.4881
+      },
+      "measuredTransformed": false,
+      "apiDimensionDriftM": 0.0,
+      "glbKey": "objects/b129aab0-06f8-5d13-b2cb-acb171e6051a/mesh.glb",
+      "verified": {
+        "ok": true,
+        "problems": [],
+        "glbUrl": "https://full-scale-workers.thomaszhangdev.workers.dev/v1/assets/objects/b129aab0-06f8-5d13-b2cb-acb171e6051a/mesh.glb",
+        "state": "ready",
+        "listed": true
+      }
+    },
+    {
+      "source": "polyhaven",
+      "assetId": "old_bed_frame",
+      "name": "Single bed frame",
+      "category": "bed",
+      "url": "https://polyhaven.com/a/old_bed_frame",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://polyhaven.com/license",
+      "objectId": "e864e435-4ac6-507e-97e5-4913d9fc40fa",
+      "status": "seeded",
+      "attribution": [
+        "Luca B"
+      ],
+      "polyhavenPolycount": 49990,
+      "sourceFileUrl": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/old_bed_frame/old_bed_frame_1k.gltf",
+      "sourceBytes": 4041628,
+      "sourceSha256": "661055e76d292ae5ec812f05077a6870414527c2d63947574ea8fc739e16de08",
+      "triangles": 49990,
+      "bytes": 2154960,
+      "packedSha256": "d65b97f86d26c3a1a35c1abf2c024603051e1d812d543fb0407e1bb918bc517d",
+      "textureSize": 1024,
+      "compression": "none",
+      "bboxMeters": {
+        "w": 0.9047,
+        "h": 1.2015,
+        "d": 2.0017
+      },
+      "measuredTransformed": false,
+      "apiDimensionDriftM": 0.0,
+      "glbKey": "objects/e864e435-4ac6-507e-97e5-4913d9fc40fa/mesh.glb",
+      "verified": {
+        "ok": true,
+        "problems": [],
+        "glbUrl": "https://full-scale-workers.thomaszhangdev.workers.dev/v1/assets/objects/e864e435-4ac6-507e-97e5-4913d9fc40fa/mesh.glb",
+        "state": "ready",
+        "listed": true
+      }
+    },
+    {
+      "source": "polyhaven",
+      "assetId": "modern_ceiling_lamp_01",
+      "name": "Modern pendant lamp",
+      "category": "lamp",
+      "url": "https://polyhaven.com/a/modern_ceiling_lamp_01",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://polyhaven.com/license",
+      "objectId": "36cdbb8d-ef3e-572f-8f92-07cecd5c940d",
+      "status": "seeded",
+      "attribution": [
+        "James Ray Cock"
+      ],
+      "polyhavenPolycount": 5602,
+      "sourceFileUrl": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/modern_ceiling_lamp_01/modern_ceiling_lamp_01_1k.gltf",
+      "sourceBytes": 436065,
+      "sourceSha256": "f88b5d0a81fa813457a77474e7e4e812f97ad5fac2109ba03ddb183274be3f8c",
+      "triangles": 5602,
+      "bytes": 441608,
+      "packedSha256": "769cae1fa8cb93a0a99492dfddbae6a8b2eb38ef7f3753320a9674ffda6a861a",
+      "textureSize": 1024,
+      "compression": "none",
+      "bboxMeters": {
+        "w": 0.4316,
+        "h": 0.9516,
+        "d": 0.4317
+      },
+      "measuredTransformed": false,
+      "apiDimensionDriftM": 0.0,
+      "glbKey": "objects/36cdbb8d-ef3e-572f-8f92-07cecd5c940d/mesh.glb",
+      "verified": {
+        "ok": true,
+        "problems": [],
+        "glbUrl": "https://full-scale-workers.thomaszhangdev.workers.dev/v1/assets/objects/36cdbb8d-ef3e-572f-8f92-07cecd5c940d/mesh.glb",
+        "state": "ready",
+        "listed": true
+      }
+    },
+    {
+      "source": "polyhaven",
+      "assetId": "desk_lamp_arm_01",
+      "name": "Adjustable desk lamp",
+      "category": "lamp",
+      "url": "https://polyhaven.com/a/desk_lamp_arm_01",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://polyhaven.com/license",
+      "objectId": "c40ad8af-15ef-55d4-99fd-cad669866c5e",
+      "status": "seeded",
+      "attribution": [
+        "Kuutti Siitonen",
+        "Yann Kervran"
+      ],
+      "polyhavenPolycount": 25710,
+      "sourceFileUrl": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/desk_lamp_arm_01/desk_lamp_arm_01_1k.gltf",
+      "sourceBytes": 2875984,
+      "sourceSha256": "2ac8389afc1519449a9cfdf7efd9fa36780a2177bb47ab58f7a7dda7d247dc8c",
+      "triangles": 24102,
+      "bytes": 1364784,
+      "packedSha256": "c6bf9e3ec2a534b264020d68864e369a98af7d3f5a0f233878c3f6ade6dd7f41",
+      "textureSize": 1024,
+      "compression": "none",
+      "bboxMeters": {
+        "w": 0.2017,
+        "h": 0.8926,
+        "d": 0.6139
+      },
+      "measuredTransformed": false,
+      "apiDimensionDriftM": 0.4156,
+      "glbKey": "objects/c40ad8af-15ef-55d4-99fd-cad669866c5e/mesh.glb",
+      "verified": {
+        "ok": true,
+        "problems": [],
+        "glbUrl": "https://full-scale-workers.thomaszhangdev.workers.dev/v1/assets/objects/c40ad8af-15ef-55d4-99fd-cad669866c5e/mesh.glb",
+        "state": "ready",
+        "listed": true
+      }
+    },
+    {
+      "source": "polyhaven",
+      "assetId": "potted_plant_01",
+      "name": "Tall potted plant",
+      "category": "plant",
+      "url": "https://polyhaven.com/a/potted_plant_01",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://polyhaven.com/license",
+      "objectId": "07966fd9-db9b-598c-a6d9-57314efff048",
+      "status": "seeded",
+      "attribution": [
+        "Rico Cilliers"
+      ],
+      "polyhavenPolycount": 96030,
+      "sourceFileUrl": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/potted_plant_01/potted_plant_01_1k.gltf",
+      "sourceBytes": 6325139,
+      "sourceSha256": "23b30294407684b02f14800d6685bd8938da5d2111e17753ac8dd3c37d8c88a0",
+      "simplifiedRatio": 0.5675,
+      "triangles": 100006,
+      "bytes": 3854584,
+      "packedSha256": "7c35c2f98b8acf8aad729d000149667ab0b77301ed371c96b26cfc03a99c7b39",
+      "textureSize": 1024,
+      "compression": "none",
+      "bboxMeters": {
+        "w": 0.5874,
+        "h": 1.3365,
+        "d": 0.6336
+      },
+      "measuredTransformed": false,
+      "apiDimensionDriftM": 0.0143,
+      "glbKey": "objects/07966fd9-db9b-598c-a6d9-57314efff048/mesh.glb",
+      "verified": {
+        "ok": true,
+        "problems": [],
+        "glbUrl": "https://full-scale-workers.thomaszhangdev.workers.dev/v1/assets/objects/07966fd9-db9b-598c-a6d9-57314efff048/mesh.glb",
+        "state": "ready",
+        "listed": true
+      }
+    },
+    {
+      "source": "polyhaven",
+      "assetId": "potted_plant_02",
+      "name": "Potted plant",
+      "category": "plant",
+      "url": "https://polyhaven.com/a/potted_plant_02",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://polyhaven.com/license",
+      "objectId": "3f6a9f76-f885-5c05-8ddd-02b234db8cf1",
+      "status": "seeded",
+      "attribution": [
+        "Rico Cilliers"
+      ],
+      "polyhavenPolycount": 69806,
+      "sourceFileUrl": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/potted_plant_02/potted_plant_02_1k.gltf",
+      "sourceBytes": 2634698,
+      "sourceSha256": "c533dcce0d1aa4379eb7db04601a04983f8df2422b28578de922655a416e64a9",
+      "triangles": 69806,
+      "bytes": 2632864,
+      "packedSha256": "a72fd6eaeadb3d780133221a03f98b4fba259a910d81c4248602f06ea75577e7",
+      "textureSize": 1024,
+      "compression": "none",
+      "bboxMeters": {
+        "w": 0.7012,
+        "h": 0.8412,
+        "d": 0.6574
+      },
+      "measuredTransformed": true,
+      "apiDimensionDriftM": 0.0,
+      "glbKey": "objects/3f6a9f76-f885-5c05-8ddd-02b234db8cf1/mesh.glb",
+      "verified": {
+        "ok": true,
+        "problems": [],
+        "glbUrl": "https://full-scale-workers.thomaszhangdev.workers.dev/v1/assets/objects/3f6a9f76-f885-5c05-8ddd-02b234db8cf1/mesh.glb",
+        "state": "ready",
+        "listed": true
+      }
+    }
+  ]
+}
