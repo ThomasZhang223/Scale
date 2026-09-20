@@ -109,6 +109,96 @@ export function needFromText(text: string): Need {
   return need;
 }
 
+/** The verified Shopify storefronts (services/ingest/merchants.verified.json), searched live. */
+// ceiling: a fixed list; the upgrade is GET /v1/merchants once Paul's scout table is seeded.
+export const STOREFRONTS: readonly { merchant: string; storefront: string }[] = [
+  { merchant: 'Poly & Bark', storefront: 'https://polyandbark.com/' },
+  { merchant: 'InStyle Home', storefront: 'https://instylehome.ca/' },
+  { merchant: 'Sabai Design', storefront: 'https://sabai.design/' },
+];
+
+const IMPERATIVE = /^\s*(?:(?:please|can you|could you)\s+)?(?:find|show|get|recommend|suggest|search(?: for)?|look for|buy|shop for)\s+(?:me\s+)?(?:a|an|some|the)?\s*/i;
+const LENGTH_PHRASE = /\b(?:under|below|less than|no more than|up to|max(?:imum)?|at most|no (?:wider|deeper|taller) than)?\s*\d+(?:\.\d+)?\s*(?:cm|centimet\w*|m|metres?|meters?|mm|millimet\w*|in|inch\w*|"|ft|feet|foot|')\s*(?:wide|deep|tall|high|long)?\b/gi;
+const GAP_PHRASE = /\b(?:for|in|into)\s+the\s+gap\b/gi;
+
+/**
+ * The product words the merchant's own search should see: the sentence minus the imperative
+ * ("find me a") and minus the lengths needFromText already turned into bounds. No LLM; the
+ * merchant's search knows its own vocabulary better than a parser here would.
+ */
+export function productQuery(text: string): string {
+  return text
+    .replace(IMPERATIVE, '')
+    .replace(LENGTH_PHRASE, ' ')
+    .replace(GAP_PHRASE, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/^[\s,.]+|[\s,.]+$/g, '')
+    .trim();
+}
+
+export type FindStage = 'searching' | 'measuring' | 'done' | 'failed';
+export interface StageInfo { merchant: string; stage: FindStage; detail: string }
+export type OnStage = (info: StageInfo) => void;
+
+interface FindResponse {
+  merchant: string; searchUrl: string | null; handles: number; products: number; measured: number; fitting: number;
+  fallbackSuspected: boolean; warning: string | null;
+  listings: (Listing & { extraction?: { imageUrl?: string | null; fits?: boolean } })[];
+}
+
+// ceiling: /v1/find is one round trip, so the headset cannot see the find→extract boundary.
+// The row flips to "measuring" on a timer instead. Upgrade path: stream stages from the Worker.
+const MEASURING_AFTER_MS = 12_000;
+
+/**
+ * Live search: POST /v1/find per storefront, in parallel, through Browserbase on the server.
+ * Reports each store's stage as it goes; resolves with every store's measured rows merged.
+ * Throws only when every store failed, so the caller can fall back and say why.
+ */
+export async function findLive(need: Need, limit: number, onStage: OnStage = () => {}, fetchFn: typeof fetch = fetch): Promise<Listing[]> {
+  const query = productQuery(need.text ?? need.categoryWords?.[0] ?? '');
+  if (!query) throw new Error('nothing to search for');
+  const fit: Record<string, number> = {};
+  if (need.maxW != null) fit.maxW = need.maxW;
+  if (need.maxH != null) fit.maxH = need.maxH;
+  if (need.maxD != null) fit.maxD = need.maxD;
+
+  const one = async ({ merchant, storefront }: { merchant: string; storefront: string }): Promise<Listing[]> => {
+    onStage({ merchant, stage: 'searching', detail: 'rendering the search page…' });
+    const timer = setTimeout(() => onStage({ merchant, stage: 'measuring', detail: 'measuring products…' }), MEASURING_AFTER_MS);
+    try {
+      const res = await fetchFn(`${API_BASE}/find`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', ...(STUB ? { 'X-Stub': '1' } : {}) },
+        body: JSON.stringify({ storefront, merchant, query, limit, ...(Object.keys(fit).length ? { fit } : {}) }),
+      });
+      if (!res.ok) {
+        let detail = `${res.status} ${res.statusText}`;
+        try { detail = ((await res.json()) as { message?: string }).message ?? detail; } catch { /* not JSON */ }
+        throw new Error(detail);
+      }
+      const out = (await res.json()) as FindResponse;
+      const rows = out.listings.map((l) => ({ ...l, merchant: l.merchant ?? merchant, imageUrl: l.imageUrl ?? l.extraction?.imageUrl ?? null }));
+      const fits = out.listings.filter((l) => l.extraction?.fits !== false).length;
+      onStage({ merchant, stage: 'done', detail: out.fallbackSuspected ? `${out.measured} measured, none match — ${out.warning ?? 'store fallback'}` : `${out.handles} found, ${out.measured} measured, ${fits} fit` });
+      return rows;
+    } catch (err) {
+      onStage({ merchant, stage: 'failed', detail: (err as Error).message });
+      throw err;
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+
+  const settled = await Promise.allSettled(STOREFRONTS.map(one));
+  const rows = settled.flatMap((s) => (s.status === 'fulfilled' ? s.value : []));
+  if (settled.every((s) => s.status === 'rejected')) {
+    const reasons = settled.map((s, i) => `${STOREFRONTS[i].merchant}: ${(s as PromiseRejectedResult).reason?.message ?? 'failed'}`).join('; ');
+    throw new Error(`every store failed (${reasons})`);
+  }
+  return rows;
+}
+
 /** Fits within every bound the need sets; a bound that isn't set never fails. */
 export function fitsNeed(b: BBoxMeters, need: Need): boolean {
   if (need.maxW != null && b.w > need.maxW) return false;
@@ -214,8 +304,12 @@ export interface ListingsResult {
 }
 
 /** Live first; the bundled scrape only when live has nothing, and the result says so. */
-export async function findListings(need: Need, limit = 8, opts: { live?: (n: Need, l: number) => Promise<Listing[]>; bundled?: () => Promise<Listing[]> } = {}): Promise<ListingsResult> {
-  const live = opts.live ?? liveSearch;
+export async function findListings(
+  need: Need,
+  limit = 8,
+  opts: { live?: (n: Need, l: number) => Promise<Listing[]>; bundled?: () => Promise<Listing[]>; onStage?: OnStage } = {},
+): Promise<ListingsResult> {
+  const live = opts.live ?? ((n: Need, l: number) => findLive(n, l, opts.onStage));
   let note: string | null = null;
   try {
     const rows = await live(need, limit);
