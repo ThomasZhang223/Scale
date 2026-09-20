@@ -87,24 +87,67 @@ enum WallRectifier {
     return url
   }
 
-  /// World points for the four corners, by raycast against the face's plane. Walls are vertical
-  /// planes, floor and ceiling horizontal; an estimated plane is accepted when no detected plane
-  /// geometry covers the corner yet. Nil if any corner misses — never a guessed corner.
+  /// World points for the four corners. First a raycast against the face's plane (detected
+  /// plane geometry, then an estimated plane); when neither covers the corner — ceilings and
+  /// featureless walls rarely get a plane — the LiDAR depth map is read directly at that pixel
+  /// and unprojected. Nil only if a corner has no depth either: never a guessed corner.
   static func measure(frame: ARFrame, session: ARSession, quad: DetectedQuad, vertical: Bool) -> [SIMD3<Float>]? {
     var points: [SIMD3<Float>] = []
     for c in quad.corners {
       let imagePoint = CGPoint(x: c.x, y: 1 - c.y) // Vision bottom-left -> ARKit top-left
       let alignment: ARRaycastQuery.TargetAlignment = vertical ? .vertical : .horizontal
-      var hit: ARRaycastResult?
+      var world: SIMD3<Float>?
       for target in [ARRaycastQuery.Target.existingPlaneGeometry, .estimatedPlane] {
         let query = frame.raycastQuery(from: imagePoint, allowing: target, alignment: alignment)
-        if let h = session.raycast(query).first { hit = h; break }
+        if let h = session.raycast(query).first {
+          let t = h.worldTransform.columns.3
+          world = SIMD3(t.x, t.y, t.z)
+          break
+        }
       }
-      guard let hit else { return nil }
-      let t = hit.worldTransform.columns.3
-      points.append(SIMD3(t.x, t.y, t.z))
+      if world == nil { world = unproject(frame: frame, imagePoint: imagePoint) }
+      guard let world else { return nil }
+      points.append(world)
     }
     return points
+  }
+
+  /// One image point (top-left normalised, raw buffer) to a world point through sceneDepth:
+  /// median depth of a small window around the pixel, K⁻¹ scaled to the depth map's size, then
+  /// the CV-to-ARKit axis flip — the same derivation as object-measure's DepthUnprojector.
+  static func unproject(frame: ARFrame, imagePoint: CGPoint) -> SIMD3<Float>? {
+    guard let depthData = frame.sceneDepth ?? frame.smoothedSceneDepth else { return nil }
+    let map = depthData.depthMap
+    let w = CVPixelBufferGetWidth(map), h = CVPixelBufferGetHeight(map)
+    let col = min(max(Int(imagePoint.x * CGFloat(w)), 0), w - 1)
+    let row = min(max(Int(imagePoint.y * CGFloat(h)), 0), h - 1)
+
+    CVPixelBufferLockBaseAddress(map, .readOnly)
+    defer { CVPixelBufferUnlockBaseAddress(map, .readOnly) }
+    guard let base = CVPixelBufferGetBaseAddress(map) else { return nil }
+    let stride = CVPixelBufferGetBytesPerRow(map)
+    var samples: [Float] = []
+    for dr in -3...3 {
+      for dc in -3...3 {
+        let r = row + dr, c = col + dc
+        guard r >= 0, r < h, c >= 0, c < w else { continue }
+        let z = base.advanced(by: r * stride).assumingMemoryBound(to: Float32.self)[c]
+        if z.isFinite, z > 0.05 { samples.append(z) }
+      }
+    }
+    guard samples.count >= 5 else { return nil }
+    samples.sort()
+    let z = samples[samples.count / 2]
+
+    let k = frame.camera.intrinsics
+    let res = frame.camera.imageResolution
+    let sx = Float(w) / Float(res.width), sy = Float(h) / Float(res.height)
+    let fx = k[0][0] * sx, fy = k[1][1] * sy, cx = k[2][0] * sx, cy = k[2][1] * sy
+    let x = (Float(col) - cx) / fx * z
+    let y = (Float(row) - cy) / fy * z
+    let local = SIMD4<Float>(x, -y, -z, 1) // CV (Y down, Z forward) -> ARKit camera (Y up, Z back)
+    let wp = frame.camera.transform * local
+    return SIMD3(wp.x, wp.y, wp.z)
   }
 
   /// Size and pose from four world corners (top-left, top-right, bottom-right, bottom-left).
