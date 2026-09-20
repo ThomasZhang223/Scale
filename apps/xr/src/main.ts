@@ -8,7 +8,7 @@ import { createPhysics } from './physics';
 import { Interaction } from './interaction';
 import {
   getRoom, getObject, listObjects, getVersion, postVersion, objectToItem, boundsMismatch, watchRoom, postFit, STUB, listScans, listBuiltIns, sameOrigin, getJob, postListingsGenerate,
-  type ObjectV1, type VersionV1, type PlacementV1,
+  type ObjectV1, type VersionV1, type PlacementV1, getActiveRoom, getRoomLive
 } from './api';
 import { FitOverlay, type FitReport } from './fit';
 import { fromPlacement, layoutToVersion, toPlacement, type PlacedLayout } from './placements';
@@ -1387,6 +1387,38 @@ async function start() {
   }
 
   await loadRoom();
+
+  /**
+   * The room picked on the phone becomes the surroundings here. Polled from this page's own
+   * dev server (vite.config.ts) every 3 s; a change fetches the live room and rebuilds the
+   * scene through the same path a dropped scan file uses. Objects already placed stay in
+   * the palette; the floor and walls under them change.
+   */
+  let activeRoomId: string | null = null;
+  async function followPhoneRoom() {
+    let picked: string | null;
+    try {
+      picked = await getActiveRoom();
+    } catch {
+      return;
+    }
+    if (!picked || picked === activeRoomId) return;
+    try {
+      // Live first (a room built on the phone exists only there); the stub second, which is
+      // where the committed demo room lives.
+      const scan = await getRoomLive(picked).catch(() => getRoom(picked));
+      activeRoomId = picked;
+      showScan(scan, `Room ${picked.slice(0, 8)}… picked on the phone`);
+      setConnection('server');
+      say('Now in the room you picked on the phone.');
+    } catch (err) {
+      activeRoomId = picked; // do not retry a room the server cannot give us every 3 s
+      say(`Couldn’t load the room picked on the phone: ${(err as Error).message}`);
+    }
+  }
+  void followPhoneRoom();
+  setInterval(() => void followPhoneRoom(), 3_000);
+
   // Phone captures arrive while the headset is on. Poll rather than SSE: the sync feed is
   // per room and stubbed by default, while this list is always the live table. Ten seconds
   // is invisible next to the minutes a capture takes.

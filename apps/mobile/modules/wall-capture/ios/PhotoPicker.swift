@@ -15,6 +15,10 @@ final class PhotoPicker: NSObject, PHPickerViewControllerDelegate {
 
   static func pick() async throws -> String? {
     try await withCheckedThrowingContinuation { (c: CheckedContinuation<String?, Error>) in
+      guard current == nil else {
+        c.resume(throwing: NSError(domain: "WallCapture", code: 4, userInfo: [NSLocalizedDescriptionKey: "A photo picker is already open"]))
+        return
+      }
       guard let top = topViewController() else {
         c.resume(throwing: NSError(domain: "WallCapture", code: 1, userInfo: [NSLocalizedDescriptionKey: "No view controller to present the photo picker from"]))
         return

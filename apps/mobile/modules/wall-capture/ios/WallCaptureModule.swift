@@ -43,7 +43,7 @@ public final class WallCaptureModule: Module {
       guard let r = WallRectifier.rectifyLibraryPhoto(path: path) else {
         throw NSError(domain: "WallCapture", code: 3, userInfo: [NSLocalizedDescriptionKey: "Could not read or straighten that photo"])
       }
-      return ["imagePath": r.imagePath, "aspect": r.aspect, "detected": r.detected, "confidence": r.confidence]
+      return ["imagePath": r.imagePath, "aspect": r.aspect, "aspectIsMetric": r.aspectIsMetric, "detected": r.detected, "confidence": r.confidence]
     }
 
     View(WallCaptureNativeView.self) {}

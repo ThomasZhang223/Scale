@@ -14,6 +14,9 @@ export type PhotoRoom = {
   widthMeters: number; // along front/back
   depthMeters: number; // along left/right
   heightMeters: number;
+  // Names of faces whose size came from the whole photo or a non-metric ratio: the room's
+  // size is approximate along that axis. Said out loud, never hidden.
+  approximate: string[];
 };
 
 function uuid(): string {
@@ -34,9 +37,20 @@ function mean(values: number[]): number | null {
 
 export function roomFromPhotos(faces: PhotoFaces, heightMeters: number): PhotoRoom {
   if (!(heightMeters > 1 && heightMeters < 10)) throw new Error("Enter the ceiling height in metres, between 1 and 10.");
-  const W = mean([faces.front, faces.back].filter(Boolean).map((f) => f!.aspect * heightMeters));
-  const D = mean([faces.left, faces.right].filter(Boolean).map((f) => f!.aspect * heightMeters));
-  if (W === null || D === null) throw new Error("Add at least one of front/back and one of left/right so the room has a width and a depth.");
+  // A face whose rectangle was found with a metric aspect is exact; the rest are approximate.
+  // Exact faces win the axis when present; approximate ones are used only when nothing better
+  // exists, and reported.
+  const approximate: string[] = [];
+  const axis = (ids: ("front" | "back" | "left" | "right")[]): number | null => {
+    const present = ids.filter((id) => faces[id]);
+    const exact = present.filter((id) => faces[id]!.detected && faces[id]!.aspectIsMetric);
+    const use = exact.length ? exact : present;
+    if (!exact.length) approximate.push(...present);
+    return mean(use.map((id) => faces[id]!.aspect * heightMeters));
+  };
+  const W = axis(["front", "back"]);
+  const D = axis(["left", "right"]);
+  if (W === null || D === null) throw new Error("Add one of front/back and one of left/right so the room has a width and a depth.");
 
   const H = heightMeters;
   const placements: Record<"front" | "back" | "left" | "right", { center: { x: number; y: number; z: number }; yawDeg: number; width: number }> = {
@@ -79,5 +93,6 @@ export function roomFromPhotos(faces: PhotoFaces, heightMeters: number): PhotoRo
     widthMeters: W,
     depthMeters: D,
     heightMeters: H,
+    approximate,
   };
 }

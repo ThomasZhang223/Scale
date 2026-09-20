@@ -1,4 +1,5 @@
 import { defineConfig, loadEnv, type Plugin } from 'vite';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), 'VITE_');
@@ -30,8 +31,50 @@ export default defineConfig(({ mode }) => {
     },
   };
 
+  // The phone's room choice, for the headset. GET /local/active-room → { roomId }, POST sets it.
+  // Lives on this dev server because the Worker has no such route (contracts.md) and both
+  // devices already reach this Mac: the phone for Metro, the Quest for this page. Persisted to
+  // a git-ignored file so a dev-server restart keeps the choice.
+  // ceiling: dev only. The deployed page (worker/index.ts) has no equivalent yet.
+  const activeRoomFile = '.active-room.json';
+  const activeRoom: Plugin = {
+    name: 'full-scale-active-room',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        if (!req.url?.startsWith('/local/active-room')) return next();
+        res.setHeader('access-control-allow-origin', '*');
+        res.setHeader('access-control-allow-headers', 'content-type');
+        res.setHeader('access-control-allow-methods', 'GET, POST, OPTIONS');
+        res.setHeader('cache-control', 'no-store');
+        res.setHeader('content-type', 'application/json');
+        if (req.method === 'OPTIONS') { res.statusCode = 204; return res.end(); }
+        if (req.method === 'GET') {
+          const current = existsSync(activeRoomFile) ? readFileSync(activeRoomFile, 'utf8') : '{"roomId":null}';
+          return res.end(current);
+        }
+        if (req.method === 'POST') {
+          let body = '';
+          req.on('data', (c) => (body += c));
+          req.on('end', () => {
+            try {
+              const { roomId } = JSON.parse(body || '{}');
+              if (typeof roomId !== 'string' || !roomId) throw new Error('roomId must be a non-empty string');
+              writeFileSync(activeRoomFile, JSON.stringify({ roomId, at: new Date().toISOString() }));
+              res.end(JSON.stringify({ roomId }));
+            } catch (err) {
+              res.statusCode = 400;
+              res.end(JSON.stringify({ error: (err as Error).message }));
+            }
+          });
+          return;
+        }
+        next();
+      });
+    },
+  };
+
   return {
-    plugins: [voiceGuard],
+    plugins: [voiceGuard, activeRoom],
     server: {
       host: true,
       port: 5173,

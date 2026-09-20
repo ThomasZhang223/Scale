@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { WallCaptureModule } from "../../modules/wall-capture";
@@ -22,8 +22,11 @@ export default function NewRoomFromPhotosScreen() {
   const [heightCm, setHeightCm] = useState("");
   const [busyFace, setBusyFace] = useState<FaceId | null>(null);
   const [saving, setSaving] = useState(false);
+  const picking = useRef(false);
 
   const pick = useCallback(async (face: (typeof FACES)[number]) => {
+    if (picking.current) return; // one picker at a time: the native side holds a single slot
+    picking.current = true;
     setBusyFace(face.id);
     try {
       const path = await WallCaptureModule.pickPhoto();
@@ -33,40 +36,50 @@ export default function NewRoomFromPhotosScreen() {
     } catch (e) {
       Alert.alert("Could not use that photo", e instanceof Error ? e.message : String(e));
     } finally {
+      picking.current = false;
       setBusyFace(null);
     }
   }, []);
 
   const wallCount = WALL_FACES.filter((f) => faces[f]).length;
   const heightM = Number(heightCm.replace(",", ".")) / 100;
-  const ready = wallCount >= 2 && heightM > 1 && !saving;
+  // A width (front or back) AND a depth (left or right); any two walls is not enough.
+  const hasWidth = Boolean(faces.front || faces.back);
+  const hasDepth = Boolean(faces.left || faces.right);
+  const ready = hasWidth && hasDepth && heightM > 1 && !saving;
 
   const build = useCallback(async () => {
     setSaving(true);
     try {
-      const { room, widthMeters, depthMeters } = roomFromPhotos(faces, heightM);
+      const { room, widthMeters, depthMeters, approximate } = roomFromPhotos(faces, heightM);
       const { roomId } = await postJSON<{ roomId: string }>("/rooms", room);
-      rememberRoom(roomId);
-      const meta: Record<string, { aspect: number; detected: boolean }> = {};
-      for (const [face, photo] of Object.entries(faces)) {
-        if (!photo) continue;
-        try {
-          saveRoomFace(roomId, face, photo.imagePath);
-          meta[face] = { aspect: photo.aspect, detected: photo.detected };
-        } catch {
-          // that face is simply absent from the stitched view
+      // The room exists on the Worker from here on. A local write failure must not read as
+      // "not built" and must not re-enable Build: a retry would POST a second room.
+      let localError: unknown = null;
+      try {
+        rememberRoom(roomId);
+        const meta: Record<string, { aspect: number; detected: boolean }> = {};
+        for (const [face, photo] of Object.entries(faces)) {
+          if (!photo) continue;
+          try {
+            saveRoomFace(roomId, face, photo.imagePath);
+            meta[face] = { aspect: photo.aspect, detected: photo.detected };
+          } catch {
+            // that face is simply absent from the stitched view
+          }
         }
+        saveRoomFaceMeta(roomId, meta);
+        const cover = faces.front?.imagePath ?? Object.values(faces)[0]?.imagePath;
+        if (cover) saveRoomPhoto(roomId, cover);
+      } catch (e) {
+        localError = e;
       }
-      saveRoomFaceMeta(roomId, meta);
-      const cover = faces.front?.imagePath ?? Object.values(faces)[0]?.imagePath;
-      if (cover) {
-        try {
-          saveRoomPhoto(roomId, cover);
-        } catch {
-          // card falls back to the floor plan
-        }
-      }
-      Alert.alert("Room built", `${widthMeters.toFixed(1)} × ${depthMeters.toFixed(1)} m, ${heightM.toFixed(2)} m tall.`);
+      const size = `${widthMeters.toFixed(1)} × ${depthMeters.toFixed(1)} m, ${heightM.toFixed(2)} m tall.`;
+      const note = approximate.length ? ` Size along ${approximate.join(", ")} is approximate: no wall rectangle or focal length in that photo.` : "";
+      Alert.alert(
+        localError ? "Room saved on the server, not fully on this phone" : "Room built",
+        size + note + (localError ? ` Photos: ${localError instanceof Error ? localError.message : String(localError)}` : "")
+      );
       router.replace(`/room/${roomId}`);
     } catch (e) {
       Alert.alert("Could not build the room", e instanceof Error ? e.message : String(e));
@@ -87,7 +100,7 @@ export default function NewRoomFromPhotosScreen() {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content} contentInsetAdjustmentBehavior="automatic" keyboardDismissMode="on-drag">
-      <Text style={styles.lead}>Tap a face and choose a photo of it. Two opposite walls and the ceiling height are enough; six faces give the full stitched room.</Text>
+      <Text style={styles.lead}>Tap a face and choose a photo of it. Two adjacent walls and the ceiling height are enough; six faces give the full stitched room.</Text>
 
       <FaceNet images={images} captions={captions} onPress={pick} />
 
@@ -111,7 +124,7 @@ export default function NewRoomFromPhotosScreen() {
         <Text style={styles.status}>{wallCount} of 4 walls{faces.floor ? " · floor" : ""}{faces.ceiling ? " · ceiling" : ""}</Text>
         <Pressable disabled={!ready} onPress={build} style={({ pressed }) => [styles.build, !ready && styles.buildDisabled, pressed && styles.pressed]}>
           <Text style={styles.buildText}>
-            {saving ? "Building…" : wallCount < 2 ? "Add two walls to start" : !(heightM > 1) ? "Enter the ceiling height" : "Build the room"}
+            {saving ? "Building…" : !(hasWidth && hasDepth) ? "Add two adjacent walls to start" : !(heightM > 1) ? "Enter the ceiling height" : "Build the room"}
           </Text>
         </Pressable>
       </Card>

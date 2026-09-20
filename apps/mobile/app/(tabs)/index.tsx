@@ -1,6 +1,6 @@
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { useFocusEffect, useRouter } from "expo-router";
-import { Image, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { SymbolView } from "expo-symbols";
 import { withTabFade } from "../../src/ui/TabFade";
 
@@ -13,15 +13,27 @@ import { ErrorView } from "../../src/ui/ErrorView";
 import { RoomInsideView } from "../../src/ui/RoomInsideView";
 import { GlassHost } from "../../src/ui/glass";
 import { LoadingView } from "../../src/ui/LoadingView";
-import { localRoomIds, roomPhotoUri } from "../../src/ui/roomPhotos";
+import { activeRoomId, localRoomIds, roomPhotoUri, setActiveRoomId } from "../../src/ui/roomPhotos";
+import { setActiveRoomOnHeadset } from "../../src/lib/devServer";
 import { SymbolView as Symbol } from "expo-symbols";
 import type { RoomCaptureV1, VersionSummary } from "../../src/ui/types";
 import { useFetchState } from "../../src/ui/useFetchState";
 
 type RoomsPayload = {
   rooms: RoomCaptureV1[];
-  versionCount: number | null;
+  versionCount: Record<string, number | null>;
+  failed: { id: string; error: string }[];
 };
+
+async function versionCountFor(roomId: string, stub: boolean): Promise<number | null> {
+  try {
+    const versions = await getJSON<VersionSummary[]>(`/v1/rooms/${roomId}/versions`, { stub });
+    return versions.length;
+  } catch {
+    // Missing data, not a guessed decision: the metric reads "—".
+    return null;
+  }
+}
 
 async function fetchRoomsPayload(): Promise<RoomsPayload> {
   const room = await getJSON<RoomCaptureV1>(`/v1/rooms/${DEMO_ROOM_ID}`, {
@@ -34,21 +46,21 @@ async function fetchRoomsPayload(): Promise<RoomsPayload> {
   // version-count metric to "unknown" rather than breaking the screen —
   // this is missing data, not a guessed decision (CLAUDE.md "Fail loud"
   // targets the latter).
-  let versionCount: number | null = null;
-  try {
-    const versions = await getJSON<VersionSummary[]>(`/v1/rooms/${DEMO_ROOM_ID}/versions`, {
-      stub: true,
-    });
-    versionCount = versions.length;
-  } catch {
-    versionCount = null;
-  }
   // Rooms built on this phone (photo upload, wall capture): live reads, newest first. One
-  // failing id does not hide the rest.
+  // failing id does not hide the rest, but it is reported, not dropped (CLAUDE.md "Fail loud").
   const local = await Promise.all(
-    localRoomIds().map((id) => getJSON<RoomCaptureV1>(`/v1/rooms/${id}`, { schemaLabel: "RoomCapture v1" }).catch(() => null))
+    localRoomIds().map((id) =>
+      getJSON<RoomCaptureV1>(`/v1/rooms/${id}`, { schemaLabel: "RoomCapture v1" }).then(
+        (r) => ({ room: r }),
+        (err: unknown) => ({ id, error: err instanceof Error ? err.message : String(err) })
+      )
+    )
   );
-  return { rooms: [...local.filter((r): r is RoomCaptureV1 => r !== null), room], versionCount };
+  const rooms = [...local.flatMap((r) => ("room" in r ? [r.room] : [])), room];
+  const failed = local.flatMap((r) => ("error" in r ? [r] : []));
+  const counts = await Promise.all(rooms.map((r) => versionCountFor(r.roomId, r.roomId === DEMO_ROOM_ID)));
+  const versionCount = Object.fromEntries(rooms.map((r, i) => [r.roomId, counts[i]]));
+  return { rooms, versionCount, failed };
 }
 
 function timeAgo(iso: string): string {
@@ -70,6 +82,23 @@ function RoomsScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const [state, retry] = useFetchState(fetchRoomsPayload, []);
+  const [selected, setSelected] = useState<string | null>(() => activeRoomId());
+  const [sending, setSending] = useState<string | null>(null);
+
+  // Picking a room makes it the headset's surroundings: remembered here, and posted to the
+  // XR dev server the Quest polls (src/lib/devServer.ts).
+  const choose = useCallback(async (roomId: string) => {
+    setSelected(roomId);
+    setActiveRoomId(roomId);
+    setSending(roomId);
+    try {
+      await setActiveRoomOnHeadset(roomId);
+    } catch (e) {
+      Alert.alert("Selected on the phone, not on the headset", e instanceof Error ? e.message : String(e));
+    } finally {
+      setSending(null);
+    }
+  }, []);
 
   // A scan made on another tab lands here on the next visit, not on the next app launch.
   useFocusEffect(
@@ -82,7 +111,7 @@ function RoomsScreen() {
   if (state.status === "loading") return <LoadingView />;
   if (state.status === "error") return <ErrorView message={state.message} onRetry={retry} />;
 
-  const { rooms, versionCount } = state.data;
+  const { rooms, versionCount, failed } = state.data;
 
   if (rooms.length === 0) {
     return (
@@ -107,15 +136,20 @@ function RoomsScreen() {
           <Text style={styles.newButtonText}>New from photos</Text>
         </Pressable>
       </View>
+      {failed.length > 0 ? (
+        <Text style={styles.warn}>{`${failed.length} room${failed.length === 1 ? "" : "s"} on this phone could not be loaded: ${failed[0].error}`}</Text>
+      ) : null}
       {rooms.map((r) => {
         const photo = roomPhotoUri(r.roomId);
+        const isSelected = selected === r.roomId;
         return (
           <Pressable
             key={r.roomId}
             onPress={() => router.push({ pathname: "/room/[id]", params: { id: r.roomId } })}
+            onLongPress={() => choose(r.roomId)}
             style={({ pressed }) => [pressed && styles.pressed]}
           >
-            <Card style={styles.card}>
+            <Card style={[styles.card, isSelected && styles.cardSelected]}>
               <View style={styles.header}>
                 {photo ? (
                   <Image source={{ uri: photo }} style={styles.photo} resizeMode="cover" />
@@ -135,8 +169,18 @@ function RoomsScreen() {
                   <Metric label="Area" value={`${r.floor.areaM2.toFixed(1)} m²`} />
                   <Metric label="Walls" value={`${r.walls.length}`} />
                   <Metric label="Openings" value={`${r.openings.length}`} />
-                  <Metric label="Versions" value={versionCount === null ? "—" : `${versionCount}`} />
+                  <Metric label="Versions" value={versionCount[r.roomId] == null ? "—" : `${versionCount[r.roomId]}`} />
                 </View>
+                <Pressable
+                  onPress={() => choose(r.roomId)}
+                  disabled={sending === r.roomId}
+                  style={({ pressed }) => [styles.useButton, isSelected && styles.useButtonSelected, pressed && styles.pressed]}
+                >
+                  <SymbolView name={isSelected ? "checkmark.circle.fill" : "visionpro"} size={16} tintColor={isSelected ? "white" : colors.accent} weight="semibold" />
+                  <Text style={[styles.useButtonText, isSelected && styles.useButtonTextSelected]}>
+                    {sending === r.roomId ? "Sending to headset…" : isSelected ? "In the headset" : "Use in headset"}
+                  </Text>
+                </Pressable>
               </View>
             </Card>
           </Pressable>
@@ -163,6 +207,21 @@ const styles = StyleSheet.create({
   newButton: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: colors.accent, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 999, marginBottom: 6 },
   newButtonText: { color: "white", fontSize: 14, fontWeight: "600" },
   card: {},
+  warn: { fontSize: 13, color: colors.danger, paddingHorizontal: 4 },
+  cardSelected: { borderWidth: 3, borderColor: colors.accent },
+  useButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    borderRadius: 999,
+    paddingVertical: 11,
+    borderWidth: 1.5,
+    borderColor: colors.accent,
+  },
+  useButtonSelected: { backgroundColor: colors.accent },
+  useButtonText: { color: colors.accent, fontSize: 15, fontWeight: "600" },
+  useButtonTextSelected: { color: "white" },
   header: { backgroundColor: "rgba(255,255,255,0.35)" },
   photo: { width: "100%", aspectRatio: 4 / 3 },
   planWrap: { alignItems: "center", justifyContent: "center", paddingVertical: spacing.lg },

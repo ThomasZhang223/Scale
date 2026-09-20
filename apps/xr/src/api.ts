@@ -37,6 +37,21 @@ async function get<T>(path: string): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+/** The room the phone picked for the headset (dev server, see vite.config.ts). null = none. */
+export async function getActiveRoom(): Promise<string | null> {
+  const res = await fetch('/local/active-room', { cache: 'no-store' });
+  if (!res.ok) return null;
+  const body = (await res.json()) as { roomId?: string | null };
+  return body.roomId ?? null;
+}
+
+/** A room from the live table, never the stub: a room built on the phone exists only there. */
+export async function getRoomLive(roomId: string): Promise<Record<string, unknown>> {
+  const res = await fetch(`${API_BASE}/rooms/${roomId}`);
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText} from GET ${API_BASE}/rooms/${roomId}`);
+  return res.json() as Promise<Record<string, unknown>>;
+}
+
 /** RoomCapture v1. buildRoomFromScan checks its schemaVersion. */
 export function getRoom(roomId: string): Promise<Record<string, unknown>> {
   return get(`/rooms/${roomId}`);

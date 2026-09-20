@@ -66,7 +66,7 @@ final class WallCaptureController: NSObject, ARSessionDelegate {
   func capture(vertical: Bool) throws -> RectifiedFace {
     guard let frame = arSession.currentFrame else { throw WallCaptureError.noFrame }
     let detected = WallRectifier.detect(in: frame.capturedImage)
-    let quad = detected ?? WallRectifier.fullFrame()
+    let quad = detected ?? WallRectifier.fullRawFrame()
     guard let url = WallRectifier.rectify(frame.capturedImage, quad: quad) else { throw WallCaptureError.rectifyFailed }
     guard let corners = WallRectifier.measure(frame: frame, session: arSession, quad: quad, vertical: vertical) else {
       throw WallCaptureError.cornersOffPlane

@@ -18,7 +18,7 @@ export function saveObjectUsdz(objectId: string, sourcePath: string): void {
   if (!d.exists) d.create();
   const dest = new File(d, `${objectId}.usdz`);
   if (dest.exists) dest.delete();
-  asFile(sourcePath).copy(dest);
+  asFile(sourcePath).copySync(dest);
 }
 
 export function objectUsdzUri(objectId: string): string | null {
@@ -37,7 +37,7 @@ export function saveObjectPhoto(objectId: string, sourcePath: string): void {
   if (!d.exists) d.create();
   const dest = new File(d, `${objectId}.jpg`);
   if (dest.exists) dest.delete();
-  asFile(sourcePath).copy(dest);
+  asFile(sourcePath).copySync(dest);
 }
 
 export function objectPhotoUri(objectId: string): string | null {

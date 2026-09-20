@@ -23,6 +23,9 @@ export type WallCaptureViewProps = ViewProps;
 export interface RectifiedPhoto {
   imagePath: string;
   aspect: number;
+  // true: width/height recovered from the perspective (EXIF focal length or self-calibration);
+  // false: the straightened image's pixel ratio, which under-reads foreshortened walls.
+  aspectIsMetric: boolean;
   detected: boolean;
   confidence: number;
 }

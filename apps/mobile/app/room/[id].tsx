@@ -15,6 +15,7 @@ import { roomFaces, roomPhotoUri } from "../../src/ui/roomPhotos";
 import { StitchedRoom } from "../../src/ui/StitchedRoom";
 import { RoomInsideView } from "../../src/ui/RoomInsideView";
 import { ApiError } from "../../src/lib/api";
+import { DEMO_ROOM_ID } from "../../src/ui/demoIds";
 import type { RoomCaptureV1 } from "../../src/ui/types";
 import { useFetchState } from "../../src/ui/useFetchState";
 
@@ -32,13 +33,22 @@ function formatMeters(value: number): string {
 export default function RoomDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { width } = useWindowDimensions();
-  // Live first (rooms made on this phone exist only there); the stub answers the demo room.
+  // Live first (rooms made on this phone exist only there). The stub answers the demo room
+  // for EVERY id, so falling back to it is only right for the demo id itself; any other id
+  // must surface its error, never a substituted room (CLAUDE.md "Fail loud").
   const [state, retry] = useFetchState(
     () =>
-      getJSON<RoomCaptureV1>(`/v1/rooms/${id}`, { schemaLabel: "RoomCapture v1" }).catch((err: unknown) => {
-        if (err instanceof ApiError) return getJSON<RoomCaptureV1>(`/v1/rooms/${id}`, { stub: true, schemaLabel: "RoomCapture v1" });
-        throw err;
-      }),
+      getJSON<RoomCaptureV1>(`/v1/rooms/${id}`, { schemaLabel: "RoomCapture v1" })
+        .catch((err: unknown) => {
+          if (err instanceof ApiError && id === DEMO_ROOM_ID) {
+            return getJSON<RoomCaptureV1>(`/v1/rooms/${id}`, { stub: true, schemaLabel: "RoomCapture v1" });
+          }
+          throw err;
+        })
+        .then((room) => {
+          if (room.roomId !== id) throw new ApiError(`GET /v1/rooms/${id} answered room ${room.roomId} — wrong room`);
+          return room;
+        }),
     [id]
   );
 
@@ -51,7 +61,7 @@ export default function RoomDetailScreen() {
   const planWidth = width - spacing.md * 2;
   const photo = roomPhotoUri(room.roomId);
   const faces = roomFaces(room.roomId);
-  const stitched = Object.keys(faces.uris).length > 0;
+  const stitched = ["left", "front", "right", "back"].some((f) => faces.uris[f]);
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content} contentInsetAdjustmentBehavior="automatic">

@@ -19,7 +19,7 @@ export function saveRoomPhoto(roomId: string, sourcePath: string): void {
   if (!dir.exists) dir.create();
   const dest = new File(dir, `${roomId}.jpg`);
   if (dest.exists) dest.delete();
-  asFile(sourcePath).copy(dest);
+  asFile(sourcePath).copySync(dest);
 }
 
 export function roomPhotoUri(roomId: string): string | null {
@@ -66,7 +66,7 @@ export function saveRoomFace(roomId: string, face: string, sourcePath: string): 
   if (!d.exists) d.create();
   const dest = new File(d, `${face}.jpg`);
   if (dest.exists) dest.delete();
-  asFile(sourcePath).copy(dest);
+  asFile(sourcePath).copySync(dest);
 }
 
 export function saveRoomFaceMeta(roomId: string, meta: Record<string, RoomFaceMeta>): void {
@@ -91,4 +91,21 @@ export function roomFaces(roomId: string): { uris: Record<string, string>; meta:
     // no faces: the page shows the floor plan only
   }
   return { uris, meta };
+}
+
+// --- The room selected for the headset ------------------------------------------------------
+export function activeRoomId(): string | null {
+  try {
+    const f = new File(roomsDir(), "active.json");
+    if (!f.exists) return null;
+    return (JSON.parse(f.textSync()) as { roomId?: string }).roomId ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export function setActiveRoomId(roomId: string): void {
+  const dir = roomsDir();
+  if (!dir.exists) dir.create();
+  new File(dir, "active.json").write(JSON.stringify({ roomId }));
 }

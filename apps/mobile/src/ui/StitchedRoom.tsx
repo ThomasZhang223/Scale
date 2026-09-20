@@ -12,8 +12,10 @@ export function StitchedRoom({ uris, meta }: { uris: Record<string, string>; met
   const order = ["left", "front", "right", "back"].filter((f) => uris[f]);
   if (order.length === 0) return null;
   const widthOf = (f: string) => Math.max(80, Math.round(H * (meta[f]?.aspect ?? 1.4)));
-  const frontLeft = order.slice(0, order.indexOf("front")).reduce((a, f) => a + widthOf(f), 0);
-  const frontW = uris.front ? widthOf("front") : 0;
+  // Ceiling and floor strips sit over the width wall: front, else back (same real width).
+  const anchor = uris.front ? "front" : uris.back ? "back" : null;
+  const frontLeft = anchor ? order.slice(0, order.indexOf(anchor)).reduce((a, f) => a + widthOf(f), 0) : 0;
+  const frontW = anchor ? widthOf(anchor) : 0;
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.strip}>
       <View>

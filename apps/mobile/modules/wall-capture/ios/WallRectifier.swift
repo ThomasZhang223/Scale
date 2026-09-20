@@ -1,5 +1,6 @@
 import ARKit
 import CoreImage
+import ImageIO
 import UIKit
 import Vision
 import simd
@@ -35,8 +36,33 @@ struct RectifiedFace {
 enum WallRectifier {
   private static let ciContext = CIContext()
 
+  // The raw ARKit buffer is EXIF .right relative to the portrait UI: raw left = physical top,
+  // raw top = physical right. Vision labels corners in the frame it is given, so its raw-frame
+  // labels are a quarter turn off the wall's physical corners. Relabel once here; the
+  // coordinates themselves stay raw-buffer normalised (bottom-left origin). Without this,
+  // width and height swap, yaw is tracking noise, and the floor polygon collapses.
+  private static func uprightLabels(_ q: DetectedQuad) -> DetectedQuad {
+    DetectedQuad(topLeft: q.bottomLeft, topRight: q.topLeft, bottomRight: q.topRight, bottomLeft: q.bottomRight, confidence: q.confidence)
+  }
+
   static func detect(in buffer: CVPixelBuffer) -> DetectedQuad? {
-    detect(handler: VNImageRequestHandler(cvPixelBuffer: buffer, orientation: .up, options: [:]))
+    detect(handler: VNImageRequestHandler(cvPixelBuffer: buffer, orientation: .up, options: [:])).map(uprightLabels)
+  }
+
+  /// The whole raw ARKit buffer as a quad with physical labels: the live-capture fallback.
+  static func fullRawFrame() -> DetectedQuad { uprightLabels(fullFrame()) }
+
+  // A wall the user framed covers most of the photo. Vision ranks by edge confidence, not
+  // size, so a window or picture frame can be the one observation returned; below this
+  // coverage it is not the face. ceiling: tuned by eye — a portrait shot of a 4 × 2.6 m wall
+  // filling the width covers ~0.49; windows, doors and frames ≤ ~0.25.
+  private static let minimumCoverage: CGFloat = 0.35
+
+  private static func coverage(_ r: VNRectangleObservation) -> CGFloat {
+    let p = [r.topLeft, r.topRight, r.bottomRight, r.bottomLeft]
+    var a: CGFloat = 0
+    for i in 0..<4 { let q = p[i], n = p[(i + 1) % 4]; a += q.x * n.y - n.x * q.y }
+    return abs(a) / 2
   }
 
   static func detect(in cgImage: CGImage) -> DetectedQuad? {
@@ -56,7 +82,7 @@ enum WallRectifier {
     } catch {
       return nil
     }
-    guard let r = request.results?.first else { return nil }
+    guard let r = request.results?.first, coverage(r) >= minimumCoverage else { return nil }
     return DetectedQuad(topLeft: r.topLeft, topRight: r.topRight, bottomRight: r.bottomRight, bottomLeft: r.bottomLeft, confidence: r.confidence)
   }
 
@@ -78,8 +104,8 @@ enum WallRectifier {
     filter.setValue(px(quad.bottomRight), forKey: "inputBottomRight")
     filter.setValue(px(quad.bottomLeft), forKey: "inputBottomLeft")
     guard let corrected = filter.outputImage else { return nil }
-    // The raw buffer is landscape-right relative to a portrait phone.
-    let upright = corrected.oriented(.right)
+    // Labels are physical (see uprightLabels), so the corrected output is already upright.
+    let upright = corrected
     guard let cg = ciContext.createCGImage(upright, from: upright.extent) else { return nil }
     let ui = UIImage(cgImage: cg)
     // ~1600 px long edge: enough for a wall texture, small enough to keep.
@@ -96,9 +122,49 @@ enum WallRectifier {
 
   struct RectifiedPhoto {
     let imagePath: String
-    let aspect: Float // width / height of the straightened face
+    let aspect: Float // width / height of the face: metric when a focal length is known, else the image-space ratio
+    let aspectIsMetric: Bool
     let detected: Bool
     let confidence: Float
+  }
+
+  /// Focal length in pixels for an image whose long edge is `longEdge`, from the photo's EXIF
+  /// 35 mm-equivalent focal length. Nil for screenshots, edited exports and foreign files.
+  private static func focalPx(path: String, longEdge: CGFloat) -> Double? {
+    guard let src = CGImageSourceCreateWithURL(URL(fileURLWithPath: path) as CFURL, nil),
+          let props = CGImageSourceCopyPropertiesAtIndex(src, 0, nil) as? [CFString: Any],
+          let exif = props[kCGImagePropertyExifDictionary] as? [CFString: Any],
+          let f35 = exif[kCGImagePropertyExifFocalLenIn35mmFilm] as? Double, f35 > 0 else { return nil }
+    return f35 / 36.0 * Double(longEdge) // 36 mm is the full-frame width along the long edge
+  }
+
+  /// Physical width / height of a rectangle seen under perspective (Zhang & He, "Whiteboard
+  /// scanning and image enhancement"): a homography alone cannot give it, the focal length can.
+  /// Corners in pixels with the principal point at the image centre; `f` in pixels, or nil to
+  /// estimate it from the quad itself (only possible when the shot is not frontal).
+  private static func metricAspect(tl: CGPoint, tr: CGPoint, br: CGPoint, bl: CGPoint, size: CGSize, f known: Double?) -> Double? {
+    let w = Double(size.width), h = Double(size.height)
+    let hom = { (p: CGPoint) in SIMD3<Double>(Double(p.x) - w / 2, Double(p.y) - h / 2, 1) }
+    let m1 = hom(bl), m2 = hom(br), m3 = hom(tl), m4 = hom(tr)
+    let d24 = simd_dot(simd_cross(m2, m4), m3), d34 = simd_dot(simd_cross(m3, m4), m2)
+    guard abs(d24) > 1e-9, abs(d34) > 1e-9 else { return nil }
+    let k2 = simd_dot(simd_cross(m1, m4), m3) / d24
+    let k3 = simd_dot(simd_cross(m1, m4), m2) / d34
+    let n2 = k2 * m2 - m1, n3 = k3 * m3 - m1
+    var f = known
+    if f == nil {
+      let denom = n2.z * n3.z
+      guard abs(denom) > 1e-9 else { return nil }
+      let f2 = -(n2.x * n3.x + n2.y * n3.y) / denom
+      guard f2 > 0, f2.isFinite else { return nil }
+      f = f2.squareRoot()
+    }
+    guard let fpx = f, fpx > 1 else { return nil }
+    let num = (n2.x * n2.x + n2.y * n2.y) / (fpx * fpx) + n2.z * n2.z
+    let den = (n3.x * n3.x + n3.y * n3.y) / (fpx * fpx) + n3.z * n3.z
+    guard den > 0, num > 0 else { return nil }
+    let r = (num / den).squareRoot()
+    return r.isFinite && r > 0.1 && r < 10 ? r : nil
   }
 
   /// The same four-point transform for a photo from the library (no ARKit, so no metres):
@@ -129,9 +195,19 @@ enum WallRectifier {
           let data = UIImage(cgImage: outCG).jpegData(compressionQuality: 0.88) else { return nil }
     let url = FileManager.default.temporaryDirectory.appendingPathComponent("face-\(UUID().uuidString).jpg")
     do { try data.write(to: url) } catch { return nil }
+    // Metric aspect when possible: EXIF focal length first, self-calibration from the quad
+    // second (needs an angled shot); the image-space ratio last, flagged so the room builder
+    // can say the size is only approximate.
+    let px = { (p: CGPoint) in CGPoint(x: p.x * w, y: p.y * h) }
+    let known = focalPx(path: path, longEdge: max(w, h))
+    let metric: Double? = detected == nil ? nil : (
+      metricAspect(tl: px(quad.topLeft), tr: px(quad.topRight), br: px(quad.bottomRight), bl: px(quad.bottomLeft), size: CGSize(width: w, height: h), f: known)
+      ?? metricAspect(tl: px(quad.topLeft), tr: px(quad.topRight), br: px(quad.bottomRight), bl: px(quad.bottomLeft), size: CGSize(width: w, height: h), f: nil)
+    )
     return RectifiedPhoto(
       imagePath: url.path,
-      aspect: Float(corrected.extent.width / corrected.extent.height),
+      aspect: Float(metric ?? Double(corrected.extent.width / corrected.extent.height)),
+      aspectIsMetric: metric != nil,
       detected: detected != nil,
       confidence: quad.confidence
     )
