@@ -1412,6 +1412,12 @@ async function start() {
       physics.addObject(obj.id, loaded.node, loaded.size, loaded.hull, spot, 0, 0);
       report(obj);
       showPalette(); // Rearrange appears with the first object
+      // Saved as soon as it is in the room, not only once it has been moved. In VR the pull
+      // puts it straight into your hand and the release saves it, but an object added from the
+      // laptop's Add button is never grabbed, so without this it lived only in this tab.
+      // layoutChanged is debounced, so the grab-and-release that usually follows still costs
+      // one version, not two.
+      layoutChanged(obj.id);
       return obj.id;
     } catch (err) {
       console.error(`Loading ${item.name} failed:`, err);
