@@ -23,6 +23,7 @@ import {
   loadRoomCapture,
   putRoom,
   roomExists,
+  listObjects,
 } from "../lib/store";
 import {
   assertBBoxMeters,
@@ -273,6 +274,21 @@ export async function postObject(req: Request, env: Env, origin: string): Promis
   });
 
   return json(await getObject(env, objectId, origin));
+}
+
+// GET /v1/objects?source=scan|catalog&merchant=&limit=
+//
+// Not in contracts.md yet — see workers/DEPLOY.md "Schema proposals". The phone's Scanned and
+// Furniture tabs read this; until it existed they could only show the one fixture object.
+export async function getObjectList(req: Request, env: Env, origin: string): Promise<Response> {
+  const params = new URL(req.url).searchParams;
+  const source = params.get("source");
+  if (source !== null && source !== "scan" && source !== "catalog" && source !== "primitive") {
+    throw new HttpError(400, "bad_source", `source must be scan, catalog or primitive, got ${source}.`);
+  }
+  const limit = Math.min(Math.max(Number(params.get("limit") ?? 100) || 100, 1), 500);
+  const objects = await listObjects(env, { source, merchant: params.get("merchant"), limit }, origin);
+  return json(objects);
 }
 
 export async function getObjectById(env: Env, id: string, origin: string): Promise<Response> {

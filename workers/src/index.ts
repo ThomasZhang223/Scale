@@ -142,6 +142,7 @@ const routes: Route[] = [
     putUrl: "https://stub.local/uploads/objects/stub-upload/frames/0.jpg",
   })),
   route("POST", "/v1/objects", () => objectMacbook),
+  route("GET", "/v1/objects", () => [objectMacbook]),
   route("GET", "/v1/objects/{id}", () => objectMacbook),
   route("POST", "/v1/objects/{id}/generate", () => ({ jobId: STUB_JOB_ID })),
   route("GET", "/v1/jobs/{id}", () => ({
@@ -192,6 +193,7 @@ async function dispatch(req: Request, env: Env, pathname: string, origin: string
   if (m("POST", /^\/v1\/uploads$/)) return real.postUpload(req, env, origin);
 
   if (m("POST", /^\/v1\/objects$/)) return real.postObject(req, env, origin);
+  if (m("GET", /^\/v1\/objects$/)) return real.getObjectList(req, env, origin);
   if ((hit = m("GET", /^\/v1\/objects\/([^/]+)$/))) return real.getObjectById(env, hit[1], origin);
   if ((hit = m("POST", /^\/v1\/objects\/([^/]+)\/generate$/)))
     return real.postGenerate(req, env, hit[1], origin);

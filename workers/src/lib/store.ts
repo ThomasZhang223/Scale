@@ -72,6 +72,36 @@ export async function getObjects(env: Env, ids: string[], origin: string): Promi
   return (results ?? []).map((r) => toObjectV1(r, origin));
 }
 
+export interface ListObjectsQuery {
+  source?: ObjectV1["source"] | null;
+  merchant?: string | null;
+  limit: number;
+}
+
+/**
+ * The phone's library tabs. A plain filtered listing, newest first — deliberately not a search:
+ * no ranking, no embedder, no relaxation. `merchant` matches the stored string exactly, which is
+ * what the Furniture tab's merchant menu sends back (it got the values from this same route).
+ */
+export async function listObjects(env: Env, q: ListObjectsQuery, origin: string): Promise<ObjectV1[]> {
+  const where: string[] = ["state != 'failed'"];
+  const binds: (string | number)[] = [];
+  if (q.source) {
+    where.push("source = ?");
+    binds.push(q.source);
+  }
+  if (q.merchant) {
+    where.push("merchant = ?");
+    binds.push(q.merchant);
+  }
+  const { results } = await env.DB.prepare(
+    `SELECT * FROM objects WHERE ${where.join(" AND ")} ORDER BY created_at DESC LIMIT ?`,
+  )
+    .bind(...binds, q.limit)
+    .all<ObjectRow>();
+  return (results ?? []).map((r) => toObjectV1(r, origin));
+}
+
 export interface InsertObjectInput {
   objectId: string;
   source: ObjectV1["source"];

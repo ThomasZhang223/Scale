@@ -230,7 +230,7 @@ Neither this panel nor the local-edge panel may edit `contracts.md` directly. Tw
 The constraint list is **open**: a solver ignores a `kind` it does not implement and reports
 which ones it honoured, so adding a kind never breaks it. Lives in `src/lib/contracts.ts`.
 
-### Five routes not in the contract yet
+### Six routes not in the contract yet
 
 | Route | Why |
 | --- | --- |
@@ -239,6 +239,7 @@ which ones it honoured, so adding a kind never breaks it. Lives in `src/lib/cont
 | `POST /v1/scout` | The merchant retrieval agent's front door. |
 | `GET /v1/agents/{room\|scout}/{id}/memory` | Reads an agent's state and transcript. Demo material, and the fastest way to show a judge the agent remembers. |
 | `GET /v1/health` and `/v1/health/upstream` | Diagnostics. |
+| `GET /v1/objects?source=&merchant=&limit=` | A plain newest-first listing for the phone's Scanned and Furniture tabs. Not a search: no ranking, no relaxation. Stub answers `[object-macbook]`. |
 
 ### One deviation from the contract, deliberate
 
