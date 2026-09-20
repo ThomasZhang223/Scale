@@ -19,7 +19,7 @@ import { Palette, type PaletteItem } from './palette';
 import { matchDetected } from './placement';
 import { measuredBox } from './objects';
 import { Voice, type VoiceState } from './voice';
-import { findListings, needFromDetected, needFromText, classifyUtterance, productQuery, STOREFRONTS, type Listing, type ListingsResult, type Need, type Recommendation, type StageInfo } from './listings';
+import { findListings, needFromDetected, needFromText, classifyUtterance, productQuery, STOREFRONTS, type Command, type Listing, type ListingsResult, type Need, type Recommendation, type StageInfo } from './listings';
 import { FindPanel } from './findpanel';
 import { Outdoors } from './outdoors';
 import roomH from '../../../fixtures/room-h.json';
@@ -1003,12 +1003,43 @@ async function start() {
    */
   function routeRequest(text: string) {
     const intent = classifyUtterance(text);
+    if (intent.kind === 'command') return runCommand(intent.command!);
     if (intent.kind === 'mine') return findMine(text, intent);
     if (intent.kind === 'shop') {
       listingText.value = text;
       return findFor(needFromText(text), { autoAdd: VOICE_AUTO_ADD_TOP });
     }
     return askAgent({ text });
+  }
+
+  /**
+   * A spoken button press fires the SAME action the tile fires, through onAction — never a copy
+   * of a tile's body, so voice and hand can never drift apart. Nothing destructive is reachable:
+   * 'reset' and 'clear' are tablet-only on purpose, because a misheard word must not be able to
+   * empty the room on stage.
+   */
+  function runCommand(command: Command) {
+    // Verbatim from designerTiles: while the furniture is still gliding into the proposed
+    // layout the three decision tiles do not exist, so neither does the spoken command — firing
+    // 'accept' then would decide something the user cannot yet see.
+    const decidable = agent.snapshot.state === 'proposed' && !applier.active;
+    switch (command) {
+      case 'keep':
+        return decidable ? onAction('accept') : sayAloud('Nothing to keep yet.');
+      case 'ask_again':
+        return decidable ? onAction('ask_again') : sayAloud('There is no proposal to redo.');
+      // What a person means by "undo that" depends on what just happened: the proposal's Put
+      // back while one is pending, the layout Undo once it has been applied.
+      case 'putback':
+        if (decidable) return onAction('reject');
+        return undoAvailable ? onAction('undo') : sayAloud('There is nothing to put back.');
+      case 'rearrange':
+        return onAction('rearrange');
+      case 'listings':
+        return onAction('listings:show');
+      default:
+        return onAction(command); // page:<name>, the tab bar's own ids
+    }
   }
 
   /**

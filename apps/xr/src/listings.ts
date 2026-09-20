@@ -414,10 +414,57 @@ export async function findListings(
  * (standing rule 3) — an LLM turns an intent into an objective, it does not pick the handler.
  */
 
-export type IntentKind = 'mine' | 'shop' | 'design';
+export type IntentKind = 'command' | 'mine' | 'shop' | 'design';
+
+/**
+ * A spoken button press. The value is an intent, not an action id: `putback` means "undo what
+ * just happened", and only main.ts knows whether that is the proposal's Put back or the layout
+ * Undo. Nothing destructive is here on purpose — Reset room and Clear stay tablet-only, because
+ * a misheard word must not be able to empty the room on stage.
+ */
+export type Command =
+  | 'keep' | 'putback' | 'ask_again' | 'rearrange' | 'listings'
+  | 'page:Designer' | 'page:Room' | 'page:My scans' | 'page:Furniture';
+
+/**
+ * Whole utterance only, and short. "Keep it" is a command; "keep the sofa by the window" is a
+ * sentence for the layout agent, and anchoring both ends is what keeps the two apart. Every
+ * pattern here is matched against the utterance with its fillers and final punctuation already
+ * removed.
+ */
+const COMMANDS: [RegExp, Command][] = [
+  [/^(?:keep(?: it| this| that)?|accept(?: it| that)?|(?:that |it )?looks good|that works|perfect|i like it)$/, 'keep'],
+  [/^(?:put (?:it|that|them) back|undo(?: that| it)?|revert(?: that)?|never ?mind|cancel that|no thanks)$/, 'putback'],
+  [/^(?:try again|ask again|another option|other options|something else|a different one)$/, 'ask_again'],
+  [/^rearrange(?: the room| it| everything)?$/, 'rearrange'],
+  [/^(?:show|open|reopen)(?: the)?(?: my)? listings$/, 'listings'],
+  [/^(?:open|go to|switch to)(?: the)? designer$/, 'page:Designer'],
+  [/^(?:open|go to|switch to)(?: the)? room$/, 'page:Room'],
+  [/^(?:open|go to|switch to)(?: the| my)? scans$/, 'page:My scans'],
+  [/^(?:open|go to|switch to)(?: the)? (?:furniture|catalogue|catalog)$/, 'page:Furniture'],
+];
+
+/** The words either side of a command: "Ok, keep it." is "keep it". */
+function bareUtterance(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/^[\s,]*(?:(?:hey|hi|hello|ok|okay|so|um|uh|well|alright|right|please|yes|yeah)\b[\s,]*)*/, '')
+    .replace(/[\s.!?,]+$/, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** The command this utterance IS, or null when it is a sentence rather than a button press. */
+export function commandOf(text: string): Command | null {
+  const bare = bareUtterance(text);
+  for (const [pattern, command] of COMMANDS) if (pattern.test(bare)) return command;
+  return null;
+}
 
 export interface Intent {
   kind: IntentKind;
+  /** Set only when kind is 'command'. */
+  command: Command | null;
   /** The utterance names the most recent scan ("my latest scan", "the one I just scanned"). */
   newest: boolean;
   /** The utterance asks to SEE the scans rather than to place one ("what have I scanned"). */
@@ -455,13 +502,18 @@ const REARRANGE = /\b(?:mov|turn|rotat|spin|fac|put|plac|slid|push|pull|swap|shi
  */
 export function classifyUtterance(text: string): Intent {
   const t = text.trim();
+  const plain = { command: null, newest: false, listOnly: false };
+  // A command first, because it is the only test that must match the WHOLE utterance: a
+  // sentence long enough to be a request can never be one, so nothing else is shadowed.
+  const command = commandOf(t);
+  if (command) return { kind: 'command', command, newest: false, listOnly: false };
   const newest = NEWEST.test(t);
   const listOnly = LIST_ONLY.test(t);
-  if (MINE_STRONG.test(t) || ownsAnUnplacedMy(t)) return { kind: 'mine', newest, listOnly };
-  if (SHOP_STRONG.test(t)) return { kind: 'shop', newest: false, listOnly: false };
-  if (REARRANGE.test(t)) return { kind: 'design', newest: false, listOnly: false };
-  if (SHOP_WEAK.test(t)) return { kind: 'shop', newest: false, listOnly: false };
-  return { kind: 'design', newest: false, listOnly: false };
+  if (MINE_STRONG.test(t) || ownsAnUnplacedMy(t)) return { kind: 'mine', command: null, newest, listOnly };
+  if (SHOP_STRONG.test(t)) return { kind: 'shop', ...plain };
+  if (REARRANGE.test(t)) return { kind: 'design', ...plain };
+  if (SHOP_WEAK.test(t)) return { kind: 'shop', ...plain };
+  return { kind: 'design', ...plain };
 }
 
 /** At least one "my" that names the thing asked for rather than where it goes. */

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { needFromText, needFromDetected, rank, findListings, isShoppingRequest, classifyUtterance, SHOP_VERBS, SHOP_LEAD_INS, parseLengthMetres, productQuery, findLive, STOREFRONTS, type Listing } from './listings.ts';
+import { needFromText, needFromDetected, rank, findListings, isShoppingRequest, classifyUtterance, commandOf, SHOP_VERBS, SHOP_LEAD_INS, parseLengthMetres, productQuery, findLive, STOREFRONTS, type Listing } from './listings.ts';
 
 const catalog: Listing[] = JSON.parse(readFileSync(new URL('../public/catalog.json', import.meta.url), 'utf-8'));
 
@@ -103,7 +103,7 @@ test('productQuery strips the imperative and the length phrases, keeping the pro
  * The three marked LIVE are verbatim from a real TTS -> STT round trip against the deployed
  * proxy on 2026-09-20; the rest are written in the same shape.
  */
-const ROUTING: [string, 'mine' | 'shop' | 'design'][] = [
+const ROUTING: [string, 'command' | 'mine' | 'shop' | 'design'][] = [
   // (a) the user's own scans — "my" beats every shopping verb
   ['Show me the chair I scanned with my phone', 'mine'],                    // LIVE
   ['Show me my scans', 'mine'],
@@ -133,11 +133,76 @@ const ROUTING: [string, 'mine' | 'shop' | 'design'][] = [
   ['Make it cozy', 'design'],
   ['Turn it 90 degrees', 'design'],
   ['I need the sofa moved to the window', 'design'],
-  ['Rearrange the room', 'design'],
+  ['Rearrange the room', 'command'],
   ['Clear everything', 'design'],
   ['Put the lamp in the corner', 'design'],
-  ['Undo that', 'design'],
+  ['Undo that', 'command'],
 ];
+
+/*
+ * Spoken button presses. Each fires the tile's own action, so the table is about WHICH tile, not
+ * about what the tile does. The near-misses below matter more than the hits: a command must
+ * match the whole utterance, or "keep the sofa by the window" stops being a sentence.
+ */
+const COMMAND_TABLE: [string, ReturnType<typeof commandOf>][] = [
+  ['Keep it.', 'keep'],
+  ['Keep this', 'keep'],
+  ['Ok, looks good.', 'keep'],
+  ['That works', 'keep'],
+  ['Accept it', 'keep'],
+  ['Put it back', 'putback'],
+  ['Put that back.', 'putback'],
+  ['Undo that!', 'putback'],
+  ['Undo', 'putback'],
+  ['Revert that', 'putback'],
+  ['Never mind', 'putback'],
+  ['Try again', 'ask_again'],
+  ['Ask again.', 'ask_again'],
+  ['Another option', 'ask_again'],
+  ['Something else', 'ask_again'],
+  ['Rearrange.', 'rearrange'],
+  ['Rearrange the room', 'rearrange'],
+  ['Show the listings', 'listings'],
+  ['Open listings', 'listings'],
+  ['Open designer', 'page:Designer'],
+  ['Go to the room', 'page:Room'],
+  ['Open my scans', 'page:My scans'],
+  ['Open the catalogue', 'page:Furniture'],
+  ['Switch to furniture', 'page:Furniture'],
+  // Near-misses: a sentence, not a button press. Every one of these must stay null.
+  ['keep the sofa by the window', null],
+  ['put the lamp back by the desk', null],
+  ['open up the room a bit', null],
+  ['try again with a smaller table', null],
+  ['undo the mess in the corner', null],
+  ['show me the listings for a lamp', null],
+  ['rearrange the room so it feels open', null],
+  ['I like it here by the window', null],
+];
+
+test('a command phrase is a button press; a sentence containing the same words is not', () => {
+  const wrong = COMMAND_TABLE.filter(([text, want]) => commandOf(text) !== want)
+    .map(([text, want]) => `${JSON.stringify(text)} wanted ${want}, got ${commandOf(text)}`);
+  assert.deepEqual(wrong, []);
+  assert.ok(COMMAND_TABLE.filter(([, c]) => c !== null).length >= 15, 'at least 15 command phrasings');
+});
+
+test('a near-miss command falls through to the handler it would have reached anyway', () => {
+  // The danger of checking commands first is shadowing. These must be unchanged by it.
+  assert.equal(classifyUtterance('keep the sofa by the window').kind, 'design');
+  assert.equal(classifyUtterance('put the lamp back by the desk').kind, 'design');
+  assert.equal(classifyUtterance('show me the listings for a lamp').kind, 'shop');
+  assert.equal(classifyUtterance('open my scans folder on the phone').kind, 'mine');
+});
+
+test('nothing destructive is reachable by voice', () => {
+  // Reset room and Clear stay tablet-only: a misheard word must not empty the room on stage.
+  for (const [, command] of COMMAND_TABLE) {
+    assert.ok(command === null || !/^(reset|clear)$/.test(command), String(command));
+  }
+  for (const t of ['clear everything', 'reset the room', 'clear the room', 'start over'])
+    assert.equal(commandOf(t), null, t);
+});
 
 test('every routing-table sentence reaches the handler it belongs to', () => {
   const wrong = ROUTING.filter(([text, want]) => classifyUtterance(text).kind !== want)
