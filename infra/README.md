@@ -157,10 +157,11 @@ whoever's debugging to the tunnel when the real fix is a shorter CP-SAT time lim
 `services/fit`. If `/solve` starts timing out, check whether the solver itself is running long
 before assuming the tunnel dropped.
 
-## Contract additions, proposed
+## Contract additions
 
-Not landed here — `.claude/contracts.md` is Thomas's file by hand. This is everything a
-schema-change conversation needs, gathered in one place.
+ConstraintPlan v1 has landed: `services/fit` (`solve_bridge.py`) reads it, and the Worker sends it
+to `upstream:solver`. `.claude/contracts.md` is Thomas's file by hand and has not been updated
+yet; this section states what the code reads today.
 
 **The two tunnel-hop bodies.** The `RoomAgent` hydrates the public request before it reaches
 this laptop; the shapes differ from `.claude/contracts.md`'s public surface, on purpose:
@@ -175,13 +176,17 @@ POST {upstream:solver}/solve            headers: X-Upstream-Token
 -> { "placements": [<Placement v1>], "objective": <number>, "infeasible": <string|null> }
 
 POST {upstream:solver}/fit              headers: X-Upstream-Token
-{ "schemaVersion": 1, "room": <RoomCapture v1>, "placements": [<Placement v1>] }
+{ "schemaVersion": 1, "room": <RoomCapture v1>, "placements": [<Placement v1>],
+  "objects": { "<objectId>": <bboxMeters> } }      // the service is stateless: it cannot look objects up
 -> <FitReport v1>
 ```
 
 **ConstraintPlan v1** — the LLM's entire output. Never a coordinate; an objective and
 constraints only. The constraint list is open — a solver that doesn't implement a given
-`kind` ignores it and names what it did honour, and a new `kind` must never be a hard failure:
+`kind` ignores it and names what it did honour, and a new `kind` must never be a hard failure.
+The solver reads `min_clearance`, `against_wall`, `near` and `keep_clear`. It ignores `budget`
+and names it in the response's `ignored` list. It never reads `notes`; that field is only for
+the transcript:
 
 ```json
 { "schemaVersion": 1,
