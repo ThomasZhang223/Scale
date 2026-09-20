@@ -9,7 +9,8 @@ function run(args, executable = process.execPath) {
 }
 run([wrangler, "types"]);
 run([fileURLToPath(new URL("../node_modules/typescript/bin/tsc", import.meta.url)), "--noEmit"]);
-run(["--experimental-transform-types", "--test", "tests/mesh-queue.test.mjs", "tests/embedding.test.mjs"]);
+run(["--experimental-transform-types", "--test", "tests/mesh-queue.test.mjs", "tests/embedding.test.mjs",
+     "tests/find.test.mjs", "tests/find-ready.test.mjs", "tests/listings-generate.test.mjs"]);
 run([wrangler, "deploy", "--dry-run"]);
 if (process.argv.includes("--check")) process.exit(0);
 run([wrangler, "whoami"]);

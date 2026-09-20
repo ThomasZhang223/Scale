@@ -238,7 +238,7 @@ async function dispatch(
   if ((hit = m("GET", /^\/v1\/jobs\/([^/]+)$/))) return real.getJobById(env, hit[1]);
 
   if (m("POST", /^\/v1\/search$/)) return real.postSearch(req, env, origin);
-  if (m("POST", /^\/v1\/find$/)) return real.postFind(req, env);
+  if (m("POST", /^\/v1\/find$/)) return real.postFind(req, env, origin);
   if (m("POST", /^\/v1\/listings\/generate$/)) return real.postListingsGenerate(req, env, origin);
   if (m("POST", /^\/v1\/fit$/)) return real.postFit(req, env, origin);
   if (m("POST", /^\/v1\/solve$/)) return real.postSolve(req, env, origin);
