@@ -110,6 +110,35 @@ test('it fades in and out rather than appearing, and is not hittable while gone'
   assert.equal(picker.hitSurface(rayAt(0, -0.05)), false);
 });
 
+test('a failed switch says why and still lets you try again', () => {
+  const picker = opened();
+  picker.setState({ error: 'Skyline room did not load: 502' });
+  picker.group.updateMatrixWorld(true);
+  // An error is not a switch in flight. The room you tried for is still the room you want, so
+  // the tiles stay pressable — being told why and then being unable to retry is a dead end.
+  assert.deepEqual(picker.hitTest(atTile(1)), { kind: 'room', id: THERE });
+  assert.equal(pickerNote({ error: 'Skyline room did not load: 502' }, ROOMS), 'Skyline room did not load: 502');
+});
+
+test('an error from a previous attempt is not shown on a fresh open', () => {
+  const picker = opened();
+  picker.setState({ error: 'Skyline room did not load: 502' });
+  picker.hide();
+  picker.show();
+  // Reopening is a new attempt. A reason from one the person already walked away from reads
+  // as a fresh failure, which is worse than saying nothing.
+  assert.equal(pickerNote('idle', ROOMS), null);
+  assert.deepEqual(picker.hitTest(atTile(1)), null, 'not yet: the fade has to run first');
+  const head = new THREE.PerspectiveCamera();
+  head.position.set(0, 1.6, 0);
+  head.updateMatrixWorld(true);
+  for (let i = 0; i < 40; i++) picker.place(head, 1 / 60);
+  picker.group.position.set(0, 0, 0);
+  picker.group.quaternion.identity();
+  picker.group.updateMatrixWorld(true);
+  assert.deepEqual(picker.hitTest(atTile(1)), { kind: 'room', id: THERE }, 'and it is usable again');
+});
+
 test('it opens in front of you every time, not where it was left', () => {
   const picker = opened();
   picker.group.position.set(9, 9, 9); // dragged away, then closed

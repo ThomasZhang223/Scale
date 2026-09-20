@@ -22,6 +22,7 @@ import { measuredBox } from './objects';
 import { Voice, type VoiceState } from './voice';
 import { findListings, matchLibraryByWord, needFromDetected, needFromText, classifyUtterance, clearScanWinner, normalizeTranscript, productQuery, SIMILAR_ENOUGH, STOREFRONTS, type Command, type Listing, type ListingsResult, type Need, type Recommendation, type StageInfo } from './listings';
 import { FindPanel, type FindKind } from './findpanel';
+import { RoomPicker } from './roompicker';
 import { Outdoors } from './outdoors';
 import { RoomSwitch, ViewFade, disposeRoom, parseRooms, roomControl, seatIn, type RoomChoice } from './rooms';
 import roomH from '../../../fixtures/room-h.json';
@@ -138,7 +139,16 @@ findPanel.attachTo(scene);
 renderer.xr.addEventListener('sessionstart', () => findPanel.setPresenting(true));
 renderer.xr.addEventListener('sessionend', () => findPanel.setPresenting(false));
 
+// The room picker: a third window, opened from the Room page, that fades in over the room you
+// are in. It does not switch rooms itself; it calls roomControl.switchRoom and goes inert.
+const roomPicker = new RoomPicker();
+roomPicker.attachTo(scene);
+renderer.xr.addEventListener('sessionstart', () => roomPicker.setPresenting(true));
+renderer.xr.addEventListener('sessionend', () => roomPicker.setPresenting(false));
+
 const PALETTE_ACTIONS: PaletteItem[] = [
+  // Above the two destructive ones: changing room is the common thing to want on this page.
+  { url: '', name: 'Rooms…', action: 'rooms:open', section: 'Room' },
   { url: '', name: 'Reset room', action: 'reset', section: 'Room' },
   { url: '', name: 'Clear objects', action: 'clear', destructive: true, section: 'Room' },
 ];
@@ -274,13 +284,25 @@ async function start() {
     onChange: onAgentChange,
   });
   const interaction = new Interaction(renderer, scene, camera, controls, physics, palette, spawn, onAction, layoutChanged, onGrab, (id) => removeObject(id), (r) => {
+    // The picker sits in front of the popout when it is open, so it is asked first.
+    const picked = roomPicker.hitTest(r);
+    if (picked) return picked.kind === 'close' ? 'rooms:close' : `rooms:go:${picked.id}`;
     const hit = findPanel.hitTest(r);
     if (!hit) return null;
     return hit.kind === 'close' ? 'find:close' : `find:pick:${hit.objectId}`;
   });
+
+  // The picker is drawn in the room that is leaving, so it shows what the switch is doing and
+  // takes no second choice on top of the first. A failure leaves it up, in the room you are
+  // still in, saying why — that is the case the picker exists to handle well.
+  roomControl.onSwitchState((state) => {
+    roomPicker.setState(state);
+    if (state === 'idle') roomPicker.hide();
+  });
   // The popout stands in the room like the tablet does, and is moved by the same grab on the
   // same trigger. It is already in the scene (attachTo above); this only makes it grabbable.
   interaction.addWindow(findPanel);
+  interaction.addWindow(roomPicker);
   // Designer tiles first (closest to the hand), then the catalogue, then Reset / Clear. Each
   // item's section decides which tab it lands under; a section named here shares a page with
   // its neighbours, and one that is not named is its own page.
@@ -295,6 +317,17 @@ async function start() {
   renderAgentPanel(agent.snapshot);
 
   function onAction(action: string) {
+    if (action === 'rooms:open') {
+      roomPicker.setRooms(ROOMS, currentRoomId());
+      return roomPicker.show();
+    }
+    if (action === 'rooms:close') return roomPicker.hide();
+    if (action.startsWith('rooms:go:')) {
+      // No guard: switchRoom is a no-op on the current id and ignored while one is running.
+      // The picker fades out with the view rather than before it, so the two do not stack.
+      void roomControl.switchRoom(action.slice(9));
+      return;
+    }
     if (action.startsWith('page:')) return palette.showPage(action.slice(5));
     if (action === 'scroll:back') return palette.scrollBy(-1);
     if (action === 'scroll:next') return palette.scrollBy(1);
@@ -2043,6 +2076,7 @@ async function start() {
     physics.step(dt);
     thumbs.update(); // at most one tile picture drawn per frame, and only for the page on screen
     findPanel.place(renderer.xr.isPresenting ? renderer.xr.getCamera() : camera);
+    roomPicker.place(renderer.xr.isPresenting ? renderer.xr.getCamera() : camera, dt);
     if (!renderer.xr.isPresenting) controls.update();
     fade.update();
     renderer.render(scene, camera);

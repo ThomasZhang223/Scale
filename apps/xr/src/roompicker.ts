@@ -137,6 +137,11 @@ export class RoomPicker {
   show() {
     this.target = 1;
     this.posed = false; // it is a decision to make now: always in front, never where it was left
+    // A failed switch leaves its reason on the panel, which is right while the panel is up and
+    // wrong the next time it is opened: an error from an attempt the person has already walked
+    // away from reads as a fresh failure. Found by rendering the empty state after the error
+    // one and seeing the error still there.
+    if (typeof this.state === 'object') this.state = 'idle';
     this.redraw();
   }
 
