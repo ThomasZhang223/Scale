@@ -5,7 +5,7 @@
 # time the laptop side comes up. The values live in KV rather than in wrangler.toml so that
 # rotating one is a write, not a redeploy.
 #
-#   bash set-upstreams.sh https://a.trycloudflare.com https://b.trycloudflare.com https://c.trycloudflare.com
+#   bash set-upstreams.sh https://a.trycloudflare.com https://b.trycloudflare.com https://c.trycloudflare.com https://d.trycloudflare.com
 #
 # There is deliberately no default and no "reuse the last one". An unset key makes the Worker
 # answer 503 naming the key, which is the correct outcome: guessing which service you meant is
