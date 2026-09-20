@@ -21,7 +21,7 @@ import { matchDetected } from './placement';
 import { measuredBox } from './objects';
 import { Voice, type VoiceState } from './voice';
 import { findListings, matchLibraryByWord, needFromDetected, needFromText, classifyUtterance, productQuery, SIMILAR_ENOUGH, STOREFRONTS, type Command, type Listing, type ListingsResult, type Need, type Recommendation, type StageInfo } from './listings';
-import { FindPanel } from './findpanel';
+import { FindPanel, type FindKind } from './findpanel';
 import { Outdoors } from './outdoors';
 import roomH from '../../../fixtures/room-h.json';
 import roomLarge from '../public/room-large.json';
@@ -1217,12 +1217,9 @@ async function start() {
    * how they look. Today it drives the existing FindPanel, so nothing regresses before the popout
    * lands. `mode` says which library the rows came from: merchants, or the user's own scans.
    */
-  function presentResults(res: { mode: 'shop' | 'scans' | 'library'; query: string; rows: Recommendation[]; note: string | null }) {
+  function presentResults(res: { mode: FindKind; query: string; rows: Recommendation[]; note: string | null }) {
     listings = { recommendations: res.rows, source: 'live', note: res.note };
-    // 'library' is a kind P-UX is adding to findpanel.ts; until it lands the panel treats an
-    // unknown kind as a shop listing, which renders correctly and only labels the rows wrongly.
-    // The cast keeps this file out of theirs — remove it once their signature widens.
-    findPanel.showResults(res.rows, res.note, res.mode as 'shop' | 'scans', res.query);
+    findPanel.showResults(res.rows, res.note, res.mode, res.query);
     showPalette();
     renderListings();
   }

@@ -47,6 +47,10 @@ intent:
 - "design" — anything about arranging, moving, style or mood of the room.
 
 A named source always wins over the default. "find me a couch on shopify" is shop, not library.
+If NO source is named at all, a request for a piece of furniture is "library" — whatever the verb
+is. "find me a lamp", "I need a side table", "get me a coffee table" are all library, because
+nothing in them names a store. Only say "shop" when the sentence names one: shopify, the store,
+the shops, for sale, buy, online, the listings.
 
 query: the PRODUCT WORDS only, or null.
 The name of a source is never the product. "objects for shopify" means browse the shop: query is null.
@@ -64,8 +68,11 @@ const SHOTS: [string, ParsedIntent][] = [
   ["find me a couch on shopify", { intent: "shop", query: "couch", category: "seating", fit: null }],
   ["search my scanned objects", { intent: "scans", query: null, category: null, fit: null }],
   ["search my scans for a chair", { intent: "scans", query: "chair", category: "seating", fit: null }],
-  ["show me some lamps that fit the 80 centimeter gap beside my desk", { intent: "shop", query: "lamps", category: "lighting", fit: { maxW: 0.8 } }],
-  ["I need a new side table", { intent: "shop", query: "side table", category: "surface", fit: null }],
+  ["show me some lamps that fit the 80 centimeter gap beside my desk", { intent: "library", query: "lamps", category: "lighting", fit: { maxW: 0.8 } }],
+  ["I need a new side table", { intent: "library", query: "side table", category: "surface", fit: null }],
+  ["find me a lamp", { intent: "library", query: "lamp", category: "lighting", fit: null }],
+  ["get me a coffee table under 1 meter", { intent: "library", query: "coffee table", category: "surface", fit: null }],
+  ["show me chairs for sale", { intent: "shop", query: "chairs", category: "seating", fit: null }],
   ["bring in the thing I scanned on my phone", { intent: "scans", query: null, category: null, fit: null }],
   ["make the room feel cozy", { intent: "design", query: null, category: null, fit: null }],
   ["move the sofa to the window", { intent: "design", query: null, category: null, fit: null }],

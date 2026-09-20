@@ -561,14 +561,19 @@ export function isShoppingRequest(text: string): boolean {
  * sofa 0.9287, while lamp's best is 0.8907 and desk's is 0.8890 with nothing of either kind in
  * the library.
  *
- * ceiling: SIMILAR_ENOUGH is calibrated against a library of three rows, where everything is
- * near "sofa" or "chair". P-PAUL is adding 20-30 authored pieces; re-measure it against the
- * grown library (the same probe: POST /v1/search {text, source:"primitive"}) before trusting
- * the vector half. The word half needs no calibration and gets better as names get real.
+ * Re-measured 2026-09-20 against the grown library (33 authored rows, real names). The word
+ * half now carries most of the work — "desk" matches "Metal office desk", "nightstand" matches
+ * "Classic nightstand" — and the vector half is left with the true synonyms. Those score
+ * 0.9141 (bookshelf -> Wooden bookcase) to 0.9695 (couch -> sofa), while things the library
+ * genuinely does not have score 0.8610 to 0.8952 (swimming pool, bicycle, toaster, sandwich).
+ * The bar sits in that gap.
+ *
+ * ceiling: a bar tuned on one library. It was 0.93 when the library was three rows and would
+ * now reject "lamp" and "desk"; re-measure it the same way (POST /v1/search {text,
+ * source:"primitive"}, a handful of synonyms and a handful of absurdities) whenever the library
+ * changes size. The word half needs no calibration and gets better as names get better.
  */
-
-/** Below this, the nearest row is not what was asked for — measured, see above. */
-export const SIMILAR_ENOUGH = 0.93;
+export const SIMILAR_ENOUGH = 0.91;
 
 const STOP = new Set(['a', 'an', 'the', 'some', 'any', 'me', 'my', 'our', 'your', 'from', 'for', 'in', 'into',
   'of', 'on', 'to', 'and', 'or', 'is', 'are', 'it', 'this', 'that', 'please', 'new', 'one', 'like', 'want',
