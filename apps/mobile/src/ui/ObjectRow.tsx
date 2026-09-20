@@ -34,7 +34,7 @@ export function ObjectRow({ object, subtitle, trailing, onPress }: ObjectRowProp
           {trailing ? <Text modifiers={[font({ textStyle: "body", weight: "semibold" })]}>{trailing}</Text> : null}
           <Text modifiers={[font({ textStyle: "footnote" }), secondary]}>{formatDimensionsCm(w, h, d)}</Text>
         </VStack>
-        <Image systemName="chevron.right" size={13} color="#c7c7cc" />
+        <Image systemName="chevron.right" size={13} modifiers={[foregroundStyle({ type: "hierarchical", style: "tertiary" })]} />
       </HStack>
     </Button>
   );

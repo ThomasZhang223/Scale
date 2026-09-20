@@ -143,6 +143,7 @@ interface PlacedObject {
 }
 
 const localId = (name: string) => `local:${name}`;
+import { instanceObjectId } from './ids';
 
 let currentRoom: BuiltRoom | null = null;
 let lastScan: Record<string, unknown> | null = null;
@@ -151,6 +152,7 @@ let lastFitReport: FitReport | null = null;
 let undoAvailable = false;
 let lastTouchedId: string | null = null; // what the turn buttons act on when nothing is held
 let showRules = false; // the Rearrange guidelines, expanded on the wrist
+let selectedStyle: string | null = null; // the whole-room style Rearrange will use; none picked → Rearrange is disabled
 let listings: ListingsResult | null = null; // the last recommendation set, shown on the wrist and the laptop
 let listingsNeed: Need | null = null;
 let listingsBusy = false;
@@ -214,6 +216,15 @@ async function start() {
   function onAction(action: string) {
     if (action === 'reset' && lastScan) showScan(lastScan, 'Room reset');
     if (action === 'clear') clearObjects();
+    if (action.startsWith('style:')) {
+      selectedStyle = selectedStyle === action.slice(6) ? null : action.slice(6); // tap again to clear
+      showPalette();
+      renderAgentPanel(agent.snapshot);
+    }
+    if (action === 'rearrange') {
+      if (!selectedStyle) return say('Pick a style first: Cozy, Spacious, Modern or Social.');
+      void askAgent({ preset: selectedStyle });
+    }
     if (action.startsWith('preset:')) void askAgent({ preset: action.slice(7) });
     if (action === 'turn:left') turnLast(Math.PI / 2);
     if (action === 'turn:right') turnLast(-Math.PI / 2);
@@ -531,7 +542,8 @@ async function start() {
           label(p.explanation),
           ...(p.tradeoffs.length ? [label(p.tradeoffs[0], 'warn')] : []),
           ...(p.fit.red || p.fit.amber ? [label(`Fit: ${p.fit.red} red, ${p.fit.amber} amber`, p.fit.red ? 'warn' : 'info')] : []),
-          tile('Accept', 'accept', true), tile('Reject', 'reject'), tile('Ask again', 'ask_again'),
+          // The furniture is already gliding (previewProposal); the decision comes once it has landed.
+          ...(applier.active ? [label('Moving…')] : [tile('Keep', 'accept', true), tile('Put back', 'reject'), tile('Ask again', 'ask_again')]),
         ];
       }
       case 'applying':
@@ -547,9 +559,10 @@ async function start() {
           tile('Turn 90° left', 'turn:left'),
           tile('Turn 90° right', 'turn:right'),
           ...(objects.size ? [tile('Remove', 'remove')] : []),
-          ...(objects.size ? [tile('Rearrange', 'preset:tidy_room', true)] : []), // nothing to rearrange until something is down
-          // Styles: the same whole-room rearrange under a different ideology (see STYLES in services/agent).
-          ...(objects.size ? STYLES.map(([name, preset]) => ({ ...tile(name, `preset:${preset}`), section: 'Style' })) : []),
+          // Rearrange needs a style picked first (see STYLES in services/agent): the style tiles
+          // select, and only the selected one is filled; Rearrange appears once one is chosen.
+          ...(objects.size ? (selectedStyle ? [tile('Rearrange', 'rearrange', true)] : [label('Pick a style, then Rearrange')]) : []),
+          ...(objects.size ? STYLES.map(([name, preset]) => ({ ...tile(selectedStyle === preset ? `● ${name}` : name, `style:${preset}`, selectedStyle === preset), section: 'Style' })) : []),
           ...(undoAvailable ? [tile('Undo', 'undo')] : []),
           tile(showRules ? 'Hide rules' : 'Rules', 'rules'),
           ...(showRules ? REARRANGE_RULES.map(([kind, rule]) => label(`${kind}: ${rule}`)) : []),
@@ -571,7 +584,7 @@ async function start() {
       spokenFor = `failed:${s.error}`;
       speak(`That didn't work: ${s.error}`);
     }
-    if (s.state === 'proposed' && s.proposal) showGhosts(s.proposal);
+    if (s.state === 'proposed' && s.proposal) previewProposal(s.proposal);
     else if (s.state !== 'applying') ghosts.clear();
   }
 
@@ -596,7 +609,7 @@ async function start() {
       return b;
     };
     const buttons: HTMLButtonElement[] = [];
-    if (s.state === 'proposed') buttons.push(button('Accept', 'accept', true), button('Reject', 'reject'), button('Ask again', 'ask_again'));
+    if (s.state === 'proposed') buttons.push(button('Keep', 'accept', true), button('Put back', 'reject'), button('Ask again', 'ask_again'));
     if (s.state === 'failed') buttons.push(button('Try again', 'try_again'));
     if (s.state === 'room_changed') buttons.push(button('Ask again', 'ask_again'), button('Dismiss', 'try_again'));
     if (s.state === 'idle' && undoAvailable) buttons.push(button('Undo', 'undo'));
@@ -643,11 +656,17 @@ async function start() {
   async function askAgent(req: { preset?: string; text?: string }) {
     if (!currentRoom) return say('Load a room first.');
     await syncAgentState();
-    await agent.request({ ...req, pins: interaction.heldIds() });
+    // The agent pins by objectId (services/agent clean.ts); what the hands hold are placement ids.
+    const pins = interaction.heldIds().map((id) => objects.get(id)?.objectId ?? id);
+    await agent.request({ ...req, pins });
   }
 
   /** The object (placed or detected) a proposal talks about; the offline fixture uses obj_<category>. */
-  function resolveObject(objectId: string): { kind: 'placed'; obj: PlacedObject } | { kind: 'box'; box: ScannedObject } | null {
+  function resolveObject(objectId: string, placementId?: string): { kind: 'placed'; obj: PlacedObject } | { kind: 'box'; box: ScannedObject } | null {
+    // The placementId is the exact instance (it is our own objects-map key, uploaded as such);
+    // the objectId is only a fallback for proposals that don't carry one (the offline fixture).
+    const exact = placementId ? objects.get(placementId) : undefined;
+    if (exact) return { kind: 'placed', obj: exact };
     const placed = [...objects.values()].find((o) => o.objectId === objectId);
     if (placed) return { kind: 'placed', obj: placed };
     if (objectId.startsWith('box:')) {
@@ -661,56 +680,75 @@ async function start() {
     return box ? { kind: 'box', box } : null;
   }
 
-  function showGhosts(p: Proposal) {
-    if (!currentRoom) return;
-    const targets: GhostTarget[] = [];
-    for (const m of p.moves) {
-      const hit = resolveObject(m.objectId);
-      if (!hit) continue;
-      const to = fromPlacement(m.to, currentRoom.offset);
-      if (hit.kind === 'placed') {
-        const n = hit.obj.loaded.node;
-        targets.push({ node: n, from: [n.position.x, 0, n.position.z], to: to.position, rotY: to.rotationY, size: hit.obj.loaded.size });
-      } else {
-        const [w, h, d] = hit.box.dimensions;
-        targets.push({ node: hit.box.node, from: hit.box.position, to: to.position, rotY: to.rotationY, size: new THREE.Vector3(w, h, d) });
-      }
-    }
-    ghosts.show(targets);
+  // A proposal is shown by doing it: the furniture glides to the proposed spots as soon as the
+  // agent answers (instead of drawing ghost outlines), and Keep / Put back come after. What is
+  // still on the wrist during the glide is the summary, so the person sees the move and the
+  // reason together. `previewBefore` is where everything was, so Put back can glide it home.
+  // Grabbing something mid-glide still works: the applier drops it from the move and the rest
+  // continue (onGrab → applier.exclude).
+  type PlacedMove = { id: string; x: number; z: number; rotY: number };
+  type BoxPose = { box: ScannedObject; position: ScannedObject['position']; rotationY: number };
+  let previewedRequest: string | null = null; // onAgentChange fires on every status change; preview once per proposal
+  let previewBefore: { placed: PlacedMove[]; boxes: BoxPose[] } | null = null;
+
+  /** A detected box has no body: it simply moves, and its solid collider with it. */
+  function moveBox(box: ScannedObject, position: ScannedObject['position'], rotationY: number) {
+    box.node.position.set(position[0], position[1], position[2]);
+    box.node.rotation.y = rotationY;
+    box.position = position;
+    box.rotationY = rotationY;
+    physics.moveDetected(box.identifier, position[0], position[2], rotationY, box.dimensions);
   }
 
-  async function acceptProposal() {
-    const p = await agent.accept();
-    if (!p || !currentRoom) return;
+  function previewProposal(p: Proposal) {
+    if (!currentRoom || previewedRequest === p.requestId) return;
+    previewedRequest = p.requestId;
     ghosts.clear();
+    // ceiling: "Ask again" on top of an un-kept preview snapshots the previewed layout, not the
+    // one before it. Put back then returns to the first proposal, not to the hand-made layout.
+    const before: { placed: PlacedMove[]; boxes: BoxPose[] } = { placed: [], boxes: [] };
     const offset = currentRoom.offset;
-    const moves: { id: string; x: number; z: number; rotY: number }[] = [];
+    const moves: PlacedMove[] = [];
     for (const m of p.moves) {
-      const hit = resolveObject(m.objectId);
+      const hit = resolveObject(m.objectId, m.to.placementId);
       if (!hit) continue;
       const to = fromPlacement(m.to, offset);
-      if (hit.kind === 'placed') moves.push({ id: hit.obj.id, x: to.position[0], z: to.position[2], rotY: to.rotationY });
-      else {
-        // A detected box has no body: it simply moves, and its solid collider with it.
-        hit.box.node.position.set(to.position[0], to.position[1], to.position[2]);
-        hit.box.node.rotation.y = to.rotationY;
-        hit.box.position = to.position;
-        hit.box.rotationY = to.rotationY;
-        physics.moveDetected(hit.box.identifier, to.position[0], to.position[2], to.rotationY, hit.box.dimensions);
+      if (hit.kind === 'placed') {
+        const n = hit.obj.loaded.node;
+        before.placed.push({ id: hit.obj.id, x: n.position.x, z: n.position.z, rotY: physics.rotationY(hit.obj.id) });
+        moves.push({ id: hit.obj.id, x: to.position[0], z: to.position[2], rotY: to.rotationY });
+      } else {
+        before.boxes.push({ box: hit.box, position: hit.box.position, rotationY: hit.box.rotationY });
+        moveBox(hit.box, to.position, to.rotationY);
       }
     }
+    previewBefore = before;
     applier.start(moves, interaction.heldIds(), (result) => {
       if (result.stuck.length) say(`Couldn't reach its spot: ${result.stuck.map((id) => objects.get(id)?.name ?? id).join(', ')}. Left where physics stopped it.`);
-      undoAvailable = true;
-      agent.applied();
-      layoutChanged('');
-      void checkFit();
+      showPalette(); // "Moving…" becomes Keep / Put back
     });
   }
 
+  /** Keep: the furniture is already where the proposal put it; this only records the layout. */
+  async function acceptProposal() {
+    const p = await agent.accept();
+    if (!p) return;
+    previewBefore = null;
+    undoAvailable = true;
+    agent.applied();
+    layoutChanged('');
+    void checkFit();
+  }
+
+  /** Put back: everything glides home to where it was before the preview. */
   async function rejectProposal() {
+    const before = previewBefore;
+    previewBefore = null;
     await agent.reject();
     ghosts.clear();
+    if (!before) return;
+    for (const b of before.boxes) moveBox(b.box, b.position, b.rotationY);
+    applier.start(before.placed, interaction.heldIds(), () => layoutChanged(''));
   }
 
   async function undoLayout() {
@@ -757,10 +795,13 @@ async function start() {
       g.append(...children);
       return g;
     };
+    const rearrange = button('Rearrange', 'rearrange', 'filled');
+    rearrange.disabled = !selectedStyle;
+    rearrange.title = selectedStyle ? '' : 'Pick a style first';
     agentPresets.replaceChildren(
       group('segmented', button('Turn 90° left', 'turn:left', ''), button('Turn 90° right', 'turn:right', ''), button('Remove', 'remove', '')),
-      button('Rearrange', 'preset:tidy_room', 'filled'),
-      group('styles', ...STYLES.map(([text, preset]) => button(text, `preset:${preset}`, 'tinted'))),
+      group('styles', ...STYLES.map(([text, preset]) => button(text, `style:${preset}`, selectedStyle === preset ? 'filled' : 'tinted'))),
+      rearrange,
     );
   }
   document.getElementById('agent-ask')!.addEventListener('click', () => {
@@ -877,6 +918,11 @@ async function start() {
     return matchDetected(name, currentRoom.objects, [...objects.values()].map((o) => o.replaces?.identifier));
   }
 
+  /** An objectId no placed object already carries — see src/ids.ts for why that matters. */
+  function freshObjectId(base: string): string {
+    return instanceObjectId(base, [...objects.values()].map((o) => o.objectId));
+  }
+
   function placeAll() {
     for (const obj of objects.values()) obj.replaces = undefined;
     for (const obj of objects.values()) place(obj);
@@ -887,7 +933,7 @@ async function start() {
   async function addObject(url: string, name: string, scale?: number) {
     try {
       const loaded = await loader.load(url, scale);
-      const obj: PlacedObject = { id: crypto.randomUUID(), objectId: localId(name), name, loaded };
+      const obj: PlacedObject = { id: crypto.randomUUID(), objectId: freshObjectId(localId(name)), name, loaded };
       objects.set(obj.id, obj);
       lastTouchedId = obj.id;
       if (currentRoom && rise >= 1) {
@@ -905,7 +951,7 @@ async function start() {
     if (!currentRoom || rise < 1) return null;
     try {
       const loaded = await loader.load(item.url, item.scale);
-      const obj: PlacedObject = { id: crypto.randomUUID(), objectId: item.objectId ?? localId(item.name), name: item.name, loaded };
+      const obj: PlacedObject = { id: crypto.randomUUID(), objectId: freshObjectId(item.objectId ?? localId(item.name)), name: item.name, loaded };
       objects.set(obj.id, obj);
       lastTouchedId = obj.id;
       const spot = physics.findFreeSpot(loaded.size, 0, at);
@@ -1103,7 +1149,7 @@ async function start() {
           const loaded = await loader.load(item.url, item.scale);
           item.size = loaded.size;
           if (!findMatch(item.name)) return;
-          const obj: PlacedObject = { id: crypto.randomUUID(), objectId: localId(item.name), name: item.name, loaded };
+          const obj: PlacedObject = { id: crypto.randomUUID(), objectId: freshObjectId(localId(item.name)), name: item.name, loaded };
           objects.set(obj.id, obj);
           if (currentRoom && rise >= 1) place(obj); // otherwise placed when the walls are up
         } catch (err) {
