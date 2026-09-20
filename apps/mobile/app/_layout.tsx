@@ -28,6 +28,7 @@ export default function RootLayout() {
         >
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="room/[id]" options={{ title: "Room" }} />
+          <Stack.Screen name="room/new" options={{ title: "New room from photos" }} />
           <Stack.Screen name="object/[id]" options={{ title: "Object" }} />
           <Stack.Screen name="ar/[objectId]" options={{ title: "View at 1:1" }} />
           <Stack.Screen name="capture/room" options={{ headerShown: false }} />

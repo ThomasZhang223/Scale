@@ -13,12 +13,13 @@ import { ErrorView } from "../../src/ui/ErrorView";
 import { FloorPlan } from "../../src/ui/FloorPlan";
 import { GlassHost } from "../../src/ui/glass";
 import { LoadingView } from "../../src/ui/LoadingView";
-import { roomPhotoUri } from "../../src/ui/roomPhotos";
+import { localRoomIds, roomPhotoUri } from "../../src/ui/roomPhotos";
+import { SymbolView as Symbol } from "expo-symbols";
 import type { RoomCaptureV1, VersionSummary } from "../../src/ui/types";
 import { useFetchState } from "../../src/ui/useFetchState";
 
 type RoomsPayload = {
-  room: RoomCaptureV1;
+  rooms: RoomCaptureV1[];
   versionCount: number | null;
 };
 
@@ -42,7 +43,12 @@ async function fetchRoomsPayload(): Promise<RoomsPayload> {
   } catch {
     versionCount = null;
   }
-  return { room, versionCount };
+  // Rooms built on this phone (photo upload, wall capture): live reads, newest first. One
+  // failing id does not hide the rest.
+  const local = await Promise.all(
+    localRoomIds().map((id) => getJSON<RoomCaptureV1>(`/v1/rooms/${id}`, { schemaLabel: "RoomCapture v1" }).catch(() => null))
+  );
+  return { rooms: [...local.filter((r): r is RoomCaptureV1 => r !== null), room], versionCount };
 }
 
 function timeAgo(iso: string): string {
@@ -76,8 +82,7 @@ function RoomsScreen() {
   if (state.status === "loading") return <LoadingView />;
   if (state.status === "error") return <ErrorView message={state.message} onRetry={retry} />;
 
-  const { room, versionCount } = state.data;
-  const rooms = [room]; // see DEMO_ROOM_ID ceiling note above
+  const { rooms, versionCount } = state.data;
 
   if (rooms.length === 0) {
     return (
@@ -95,7 +100,13 @@ function RoomsScreen() {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content} contentInsetAdjustmentBehavior="automatic">
-      <Text style={styles.heading}>Rooms</Text>
+      <View style={styles.headingRow}>
+        <Text style={styles.heading}>Rooms</Text>
+        <Pressable onPress={() => router.push("/room/new")} style={({ pressed }) => [styles.newButton, pressed && styles.pressed]}>
+          <Symbol name="photo.on.rectangle.angled" size={15} tintColor="white" weight="semibold" />
+          <Text style={styles.newButtonText}>New from photos</Text>
+        </Pressable>
+      </View>
       {rooms.map((r) => {
         const photo = roomPhotoUri(r.roomId);
         return (
@@ -149,7 +160,10 @@ function Metric({ label, value }: { label: string; value: string }) {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#e8edf4" },
   content: { padding: spacing.md, gap: spacing.md, paddingBottom: spacing.xl * 2 },
-  heading: { fontSize: 34, fontWeight: "700", color: "#1c1c1e", letterSpacing: 0.2, paddingHorizontal: 4, paddingTop: spacing.sm },
+  headingRow: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", paddingTop: spacing.sm, paddingHorizontal: 4 },
+  heading: { fontSize: 34, fontWeight: "700", color: "#1c1c1e", letterSpacing: 0.2 },
+  newButton: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: colors.accent, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 999, marginBottom: 6 },
+  newButtonText: { color: "white", fontSize: 14, fontWeight: "600" },
   card: {},
   header: { backgroundColor: "rgba(255,255,255,0.35)" },
   photo: { width: "100%", aspectRatio: 4 / 3 },

@@ -11,7 +11,9 @@ import { ErrorView } from "../../src/ui/ErrorView";
 import { FloorPlan } from "../../src/ui/FloorPlan";
 import { LoadingView } from "../../src/ui/LoadingView";
 import { Metric } from "../../src/ui/Metric";
-import { roomPhotoUri } from "../../src/ui/roomPhotos";
+import { roomFaces, roomPhotoUri } from "../../src/ui/roomPhotos";
+import { StitchedRoom } from "../../src/ui/StitchedRoom";
+import { ApiError } from "../../src/lib/api";
 import type { RoomCaptureV1 } from "../../src/ui/types";
 import { useFetchState } from "../../src/ui/useFetchState";
 
@@ -29,8 +31,13 @@ function formatMeters(value: number): string {
 export default function RoomDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { width } = useWindowDimensions();
+  // Live first (rooms made on this phone exist only there); the stub answers the demo room.
   const [state, retry] = useFetchState(
-    () => getJSON<RoomCaptureV1>(`/v1/rooms/${id}`, { stub: true, schemaLabel: "RoomCapture v1" }),
+    () =>
+      getJSON<RoomCaptureV1>(`/v1/rooms/${id}`, { schemaLabel: "RoomCapture v1" }).catch((err: unknown) => {
+        if (err instanceof ApiError) return getJSON<RoomCaptureV1>(`/v1/rooms/${id}`, { stub: true, schemaLabel: "RoomCapture v1" });
+        throw err;
+      }),
     [id]
   );
 
@@ -42,10 +49,12 @@ export default function RoomDetailScreen() {
   const windows = room.openings.filter((o) => o.kind === "window");
   const planWidth = width - spacing.md * 2;
   const photo = roomPhotoUri(room.roomId);
+  const faces = roomFaces(room.roomId);
+  const stitched = Object.keys(faces.uris).length > 0;
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content} contentInsetAdjustmentBehavior="automatic">
-      {photo ? <Image source={{ uri: photo }} style={styles.photo} resizeMode="cover" /> : null}
+      {stitched ? <StitchedRoom uris={faces.uris} meta={faces.meta} /> : photo ? <Image source={{ uri: photo }} style={styles.photo} resizeMode="cover" /> : null}
       {/* Plain RN: FloorPlan draws with absolute-positioned, rotated Views,
           which is not SwiftUI content and can't nest inside a Host's tree
           (see FloorPlan.tsx / PaletteSwatches.tsx for the same rule from

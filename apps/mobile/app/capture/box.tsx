@@ -1,8 +1,7 @@
 import { router } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Alert, Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { SymbolView } from "expo-symbols";
 
 import { WallCaptureModule, WallCaptureView } from "../../modules/wall-capture";
 import type { CapturedFace, FaceId } from "../../modules/wall-capture";
@@ -10,20 +9,10 @@ import { postJSON } from "../../src/lib/api";
 import { CameraGlass, GlassButton, GlassCloseButton } from "../../src/theme/Glass";
 import { colors, radius, spacing } from "../../src/theme/tokens";
 import { Card } from "../../src/ui/Card";
+import { FaceNet, FACES as NET } from "../../src/ui/FaceNet";
 import { ReadoutHint } from "../../src/ui/Readout";
 import { roomFromFaces } from "../../src/ui/roomFromFaces";
 import { saveRoomPhoto } from "../../src/ui/roomPhotos";
-
-// The six faces of a box room, laid out as a cube net so every face is one
-// tap away: ceiling above, the four walls in a strip, floor below the front.
-const NET: { id: FaceId; label: string; col: number; row: number; vertical: boolean }[] = [
-  { id: "ceiling", label: "Ceiling", col: 1, row: 0, vertical: false },
-  { id: "left", label: "Left wall", col: 0, row: 1, vertical: true },
-  { id: "front", label: "Front wall", col: 1, row: 1, vertical: true },
-  { id: "right", label: "Right wall", col: 2, row: 1, vertical: true },
-  { id: "back", label: "Back wall", col: 3, row: 1, vertical: true },
-  { id: "floor", label: "Floor", col: 1, row: 2, vertical: false },
-];
 
 type Faces = Partial<Record<FaceId, CapturedFace>>;
 
@@ -148,34 +137,11 @@ export default function CaptureBoxScreen() {
         </View>
         <Text style={styles.lead}>Tap a face, fit the whole of it in the frame, capture. Four walls make a room.</Text>
 
-        <View style={styles.net}>
-          {NET.map((n) => {
-            const face = faces[n.id];
-            return (
-              <Pressable
-                key={n.id}
-                onPress={() => openCamera(n)}
-                style={({ pressed }) => [
-                  styles.face,
-                  { left: n.col * (FACE + GAP), top: n.row * (FACE + GAP) },
-                  face && styles.faceDone,
-                  pressed && styles.pressed,
-                ]}
-              >
-                {face ? (
-                  <Image source={{ uri: `file://${face.imagePath}` }} style={styles.faceImage} resizeMode="cover" />
-                ) : (
-                  <SymbolView name={n.vertical ? "rectangle.portrait" : "rectangle"} size={26} tintColor={colors.accent} weight="light" />
-                )}
-                <View style={styles.faceLabelWrap}>
-                  <Text style={[styles.faceLabel, face && styles.faceLabelDone]} numberOfLines={1}>
-                    {face ? `${Math.round(face.widthMeters * 100)} × ${Math.round(face.heightMeters * 100)} cm` : n.label}
-                  </Text>
-                </View>
-              </Pressable>
-            );
-          })}
-        </View>
+        <FaceNet
+          images={Object.fromEntries(Object.entries(faces).map(([k, v]) => [k, v!.imagePath]))}
+          captions={Object.fromEntries(Object.entries(faces).map(([k, v]) => [k, `${Math.round(v!.widthMeters * 100)} × ${Math.round(v!.heightMeters * 100)} cm`]))}
+          onPress={openCamera}
+        />
 
         <Card style={styles.status}>
           <Text style={styles.statusText}>
@@ -194,33 +160,12 @@ export default function CaptureBoxScreen() {
   );
 }
 
-const FACE = 82;
-const GAP = 8;
-
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#e8edf4" },
   safe: { flex: 1, paddingHorizontal: spacing.md, gap: spacing.md },
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingTop: spacing.sm },
   title: { fontSize: 20, fontWeight: "600", color: "#1c1c1e" },
   lead: { fontSize: 15, color: colors.textMuted, textAlign: "center", lineHeight: 21 },
-  net: { alignSelf: "center", width: FACE * 4 + GAP * 3, height: FACE * 3 + GAP * 2, marginTop: spacing.md },
-  face: {
-    position: "absolute",
-    width: FACE,
-    height: FACE,
-    borderRadius: radius.md,
-    backgroundColor: "rgba(255,255,255,0.86)",
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(60,60,67,0.12)",
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
-  },
-  faceDone: { borderColor: colors.accent, borderWidth: 2 },
-  faceImage: { width: "100%", height: "100%" },
-  faceLabelWrap: { position: "absolute", left: 0, right: 0, bottom: 0, paddingVertical: 4, paddingHorizontal: 4, backgroundColor: "rgba(255,255,255,0.8)" },
-  faceLabel: { fontSize: 11, fontWeight: "500", color: "#1c1c1e", textAlign: "center" },
-  faceLabelDone: { fontVariant: ["tabular-nums"] },
   status: { padding: spacing.md, gap: spacing.sm, alignItems: "center", marginTop: "auto", marginBottom: spacing.md },
   statusText: { fontSize: 15, color: colors.textMuted },
   build: { backgroundColor: colors.accent, paddingHorizontal: 22, paddingVertical: 13, borderRadius: 999 },
