@@ -6,7 +6,7 @@ public final class WallCaptureModule: Module {
 
     Events("onQuad")
 
-    OnCreate {
+    OnCreate { [weak self] in
       DispatchQueue.main.async { [weak self] in
         WallCaptureController.shared.quadListeners.append { quad in
           self?.sendEvent("onQuad", ["found": quad != nil, "confidence": quad?.confidence ?? 0])
