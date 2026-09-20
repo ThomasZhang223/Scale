@@ -242,6 +242,48 @@
         "from": "body_html",
         "raw": "15.5\" H 19.75\" L 18.5\" W"
       }
+    },
+    {
+      "name": "Schoolhouse",
+      "storefrontBaseUrl": "https://schoolhouse.com/",
+      "productsJsonVerified": true,
+      "verifiedAt": "2026-09-20",
+      "status": "ok",
+      "httpStatus": 200,
+      "productCount": 218,
+      "dimensionHitRate": 0.22,
+      "fullyDimensionedRate": 0.0,
+      "usableProducts": 0,
+      "sampleSize": 218,
+      "note": "0 usable from /products.json but 22% mention a dimension \u2014 the same shape as Branch Furniture, which yields 41/60 through step 2.5. Promoted for the rendered-page pass, not the API. If a --browserbase run returns near zero for it, drop it."
+    },
+    {
+      "name": "Color Cord Company",
+      "storefrontBaseUrl": "https://colorcord.com/",
+      "productsJsonVerified": true,
+      "verifiedAt": "2026-09-20",
+      "status": "ok",
+      "httpStatus": 200,
+      "productCount": 250,
+      "dimensionHitRate": 0.268,
+      "fullyDimensionedRate": 0.072,
+      "usableProducts": 18,
+      "categories": {
+        "light fixture": 17,
+        "wall sconce": 1
+      },
+      "sampleSize": 250,
+      "example": {
+        "title": "Slim 5-Arm Chandelier",
+        "bboxMeters": {
+          "w": 0.6858,
+          "h": 0.3556,
+          "d": 1.8288
+        },
+        "from": "body_html",
+        "raw": "length: 6 feet width: 27 height: 14 inches"
+      },
+      "note": "Lighting, and the second merchant in that category \u2014 Kohara supplied 14 of 20 lighting slots in the 2026-09-19 pre-bake, which was single-merchant risk on a whole demo category. Watch the axes: its copy reads 'length: 6 feet width: 27 height: 14 inches' for a chandelier, where the length is the hanging drop and lands in depth. validate.py flags those (axis_suspect, confidence 0.39), so they surface as unverified rather than as a 1.8 m deep light fixture."
     }
   ]
 }
