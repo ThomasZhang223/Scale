@@ -191,9 +191,16 @@ export async function parseIntent(env: Env, text: string): Promise<ParsedIntent>
               type: ["object", "null"],
               properties: { maxW: { type: "number" }, maxH: { type: "number" }, maxD: { type: "number" } },
             },
-            needs: { type: ["array", "null"], items: { type: "string", enum: [...FURNITURE_CATEGORIES] } },
+            // maxItems is load-bearing, not a nicety: guided decoding will happily keep emitting
+            // array items until max_tokens cuts the JSON mid-string, which is what "turn this
+            // corner into a reading nook" did on three runs out of three (929 characters, then
+            // a parse error). A bounded array ends by itself.
+            needs: { type: ["array", "null"], items: { type: "string", enum: [...FURNITURE_CATEGORIES] }, maxItems: 4 },
           },
-          required: ["intent"],
+          // `needs` has to be REQUIRED. Workers AI guided decoding simply never emits an optional
+          // property: with it absent from this list the field came back null for all 12 design
+          // sentences tested against the deployed model, including the ones the shots cover.
+          required: ["intent", "needs"],
         },
       },
     } as never),
