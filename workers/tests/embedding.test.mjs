@@ -639,3 +639,52 @@ test("postSolve and postScout hand the real request origin to their agent", asyn
   await postScout(new Request(`${REAL_ORIGIN}/v1/scout`, { method: "POST", body: JSON.stringify({ query: "x" }) }), env, REAL_ORIGIN);
   assert.deepEqual(bodies.map(body => body.origin), [REAL_ORIGIN, REAL_ORIGIN]);
 });
+
+// --- F-2: a text query with no source means the catalogue ------------------------------------------
+
+async function searchWith(body, { embedder = true } = {}) {
+  const { env } = pipelineEnvironment();
+  if (!embedder) env.CONFIG = { get: async () => null };
+  const filters = [];
+  env.OBJECTS_INDEX = { query: async (_values, options) => { filters.push(options.filter ?? null);
+    return { matches: [{ id: "object", score: 0.9 }] }; } };
+  const response = await postSearch(new Request("https://api.example/v1/search", { method: "POST", body: JSON.stringify(body) }),
+    env, "https://api.example");
+  return { response, filters };
+}
+
+test("a text search with no source queries the catalogue and says so in X-Search-Scope", async t => {
+  t.mock.method(globalThis, "fetch", async () => Response.json(vector));
+  for (const body of [{ text: "side table" }, { text: "side table", source: null }]) {
+    const { response, filters } = await searchWith(body);
+    assert.deepEqual(filters, [{ source: "catalog" }]);
+    assert.equal(response.headers.get("x-search-scope"), "catalog-default");
+    assert.equal(response.headers.get("x-ranker"), "vectorize");
+  }
+});
+
+test("an explicit source is always honoured and is not reported as narrowed", async t => {
+  t.mock.method(globalThis, "fetch", async () => Response.json(vector));
+  for (const source of ["scan", "catalog"]) {
+    const { response, filters } = await searchWith({ text: "side table", source });
+    assert.deepEqual(filters, [{ source }]);
+    assert.equal(response.headers.get("x-search-scope"), null);
+  }
+});
+
+test("a search with no text is not narrowed", async t => {
+  t.mock.method(globalThis, "fetch", async () => Response.json({ ...vector, modality: "image" }));
+  const env = pipelineEnvironment().env;
+  const filters = [];
+  env.OBJECTS_INDEX = { query: async (_v, options) => { filters.push(options.filter ?? null); return { matches: [] }; } };
+  const response = await postSearch(new Request("https://api.example/v1/search", { method: "POST",
+    body: JSON.stringify({ imageKey: "objects/id/frames/0.jpg" }) }), env, "https://api.example");
+  assert.deepEqual(filters, [null]);
+  assert.equal(response.headers.get("x-search-scope"), null);
+});
+
+test("the d1 fallback narrows the same way, and reports it", async () => {
+  const { response } = await searchWith({ text: "chair" }, { embedder: false });
+  assert.equal(response.headers.get("x-ranker"), "d1-fallback");
+  assert.equal(response.headers.get("x-search-scope"), "catalog-default");
+});

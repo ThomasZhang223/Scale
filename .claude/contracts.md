@@ -207,6 +207,10 @@ Notes on the rows above that are not in the table:
   skipped`, and their undelivered outbox rows are marked delivered. A generation job that already
   reached the workflow is refused by its first step when the object is `ready` with a `glb_key`, so
   an attached mesh is never overwritten.
+- `POST /search` with `text` and no `source` searches `source:"catalog"` only and answers
+  `X-Search-Scope: catalog-default`; the index holds catalogue rows as image vectors and scans and
+  primitives as text vectors, which score on different scales, so an unscoped text query would rank
+  every placeholder above every product. An explicit `source` is always honoured and adds no header.
 - `POST /objects/{id}/index`, `POST /ingest` and `POST /catalog/ingest` spend money or write a
   shared index, so all three need `X-Upstream-Token`.
 - Object ids on the catalogue intake are computed by the Worker, whichever route the row came

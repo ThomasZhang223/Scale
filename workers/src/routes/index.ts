@@ -513,7 +513,17 @@ export interface SearchBody {
 }
 
 export async function postSearch(req: Request, env: Env, origin: string): Promise<Response> {
-  const body = await readJson<SearchBody>(req);
+  const requested = await readJson<SearchBody>(req);
+  // One Vectorize namespace holds two kinds of vector: catalogue rows are indexed from their
+  // IMAGE (a text query scores them about 0.13), scans and primitives from TEXT (the same query
+  // scores them about 0.9). Unscoped, every text query is won by the placeholder meshes. A text
+  // query with no explicit source therefore means "shopping": search the catalogue, and say so in
+  // X-Search-Scope so the narrowing is never silent. An explicit source is always honoured.
+  // ceiling: this hides scans and primitives from unscoped text search. The real fix is one
+  // namespace per modality, queried by the modality of the request (Ani's index design).
+  const narrowed = Boolean(requested.text) && !requested.source;
+  const body: SearchBody = narrowed ? { ...requested, source: "catalog" } : requested;
+  const scope: Record<string, string> = narrowed ? { "x-search-scope": "catalog-default" } : {};
   const limit = Math.min(Math.max(body.limit ?? 8, 1), 50); // Vectorize caps topK at 50 with metadata.
 
   // Paul's service first, when one is configured. It is a COMPLETE search, not a re-rank stage:
@@ -534,7 +544,7 @@ export async function postSearch(req: Request, env: Env, origin: string): Promis
       // unembedded search that returns plausible rows and reports no error at all.
       const res = await callUpstreamRaw(env, "search", "/search", body, 8_000);
       const ranked = (await res.json()) as unknown;
-      const passthrough: Record<string, string> = { "x-ranker": "upstream" };
+      const passthrough: Record<string, string> = { ...scope, "x-ranker": "upstream" };
       // His headers say something the body does not: that the fit filter was widened, or that
       // his embedder was down. Losing them would hide a degradation.
       for (const h of ["x-fit-relaxed", "x-search-degraded"]) {
@@ -553,7 +563,7 @@ export async function postSearch(req: Request, env: Env, origin: string): Promis
 
   if (!embedding) {
     const hits = await d1Search(env, body, limit, origin);
-    return json(hits, 200, { "x-ranker": "d1-fallback" });
+    return json(hits, 200, { ...scope, "x-ranker": "d1-fallback" });
   }
 
   // $lte is Vectorize's numeric range operator. It only works on a field that has a metadata
@@ -600,7 +610,7 @@ export async function postSearch(req: Request, env: Env, origin: string): Promis
       },
     };
     const relaxedHits = await d1Search(env, relaxed, limit, origin);
-    return json(relaxedHits, 200, { "x-ranker": "relaxed" });
+    return json(relaxedHits, 200, { ...scope, "x-ranker": "relaxed" });
   }
 
   // Reaching here means either no ranker is configured, or the configured one failed. Both are
@@ -612,6 +622,7 @@ export async function postSearch(req: Request, env: Env, origin: string): Promis
   // five paths ran, so "these are not ranked" is one curl away rather than something you notice
   // on stage.
   return json(hits, 200, {
+    ...scope,
     "x-ranker": searchOrigin && !embeddingOrigin ? "vectorize-ranker-unreachable" : "vectorize",
   });
 }
