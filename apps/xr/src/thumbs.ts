@@ -34,6 +34,42 @@ const H = 256;
 const VIEW = new THREE.Vector3(1, 0.65, 1).normalize(); // three-quarter, slightly above
 const FOV = 35;
 const FILL = 0.88; // how much of the frame the object's widest corner should reach
+// JPEG has no alpha and the render does, so the background is chosen here rather than left to
+// the encoder, which would give black. White, because these pictures are embedded into the
+// same space as the catalogue's product photos — studio shots on white — and the closer the
+// two distributions sit, the better one text query ranks across both.
+const BACKGROUND = '#FFFFFF';
+export const JPEG_QUALITY = 0.9;
+
+/**
+ * THE picture of one object: 512 square, white, three-quarter, camera fitted to its own
+ * bounding box. Exported because two callers need exactly the same image and a second
+ * implementation would quietly drift — the headset, which uploads it so a scan can be found by
+ * what it looks like, and /thumb.html, which lets the pipeline render one with no headset in
+ * the loop. Change the framing here and it changes for both at once, which is the only way the
+ * two sets of vectors stay comparable.
+ *
+ * The canvas returned is its own, never the renderer's: the renderer's belongs to whatever is
+ * drawn next, so anything encoding asynchronously from it would sooner or later file one
+ * object's picture under another's id.
+ */
+export async function renderThumbnail(loader: ObjectLoader, url: string, scale?: number, stage: Stage = makeStage()): Promise<HTMLCanvasElement> {
+  const node = (await loader.load(url, scale)).node;
+  stage.scene.add(node);
+  fitCamera(stage.camera, node);
+  stage.renderer.render(stage.scene, stage.camera);
+  stage.scene.remove(node);
+  // No dispose(): ObjectLoader hands out a SkeletonUtils clone that shares its geometries and
+  // materials with the cached GLTF, so freeing them here would empty the same model where it
+  // stands in the room. Dropping the reference is the whole of the cleanup.
+  const out = document.createElement('canvas');
+  out.width = out.height = RENDER;
+  const ctx = out.getContext('2d')!;
+  ctx.fillStyle = BACKGROUND;
+  ctx.fillRect(0, 0, RENDER, RENDER);
+  ctx.drawImage(stage.renderer.domElement, 0, 0);
+  return out;
+}
 
 export class Thumbnails {
   private readonly cache = new Map<string, HTMLCanvasElement>();
@@ -100,65 +136,45 @@ export class Thumbnails {
   }
 
   private async draw({ key, url, scale, publish }: { key: string; url: string; scale?: number; publish?: boolean }) {
-    let node: THREE.Object3D;
+    let full: HTMLCanvasElement;
     try {
-      node = (await this.loader.load(url, scale)).node;
+      full = await renderThumbnail(this.loader, url, scale, (this.stage ??= makeStage()));
     } catch (err) {
       // Loud, and once: a tile with no mesh keeps its placeholder rather than borrowing another's.
       this.failed.add(key);
       console.warn(`No thumbnail for ${key}: ${(err as Error).message}`);
       return;
     }
-    const stage = (this.stage ??= makeStage());
-    stage.scene.add(node);
-    fitCamera(stage.camera, node);
-    stage.renderer.render(stage.scene, stage.camera);
-    stage.scene.remove(node);
-    // No dispose(): ObjectLoader hands out a SkeletonUtils clone that shares its geometries
-    // and materials with the cached GLTF, so freeing them here would empty the same model
-    // where it stands in the room. Dropping the reference is the whole of the cleanup.
-
+    // The tile keeps a downscale; the index gets the full one. A tile drawn down from 512 is
+    // sharper than one drawn at 256, so this costs nothing and saves a second render.
     const canvas = document.createElement('canvas');
     canvas.width = W;
     canvas.height = H;
-    canvas.getContext('2d')!.drawImage(stage.renderer.domElement, 0, 0, W, H);
+    canvas.getContext('2d')!.drawImage(full, 0, 0, W, H);
     this.cache.set(key, canvas);
-    if (publish) this.send(key, stage.renderer.domElement);
+    if (publish) this.send(key, full);
     this.onReady();
   }
 
   /**
-   * Sends one picture to the index, once, and never waits for it.
-   *
-   * The bytes are copied to a canvas of their own FIRST, synchronously. toBlob is asynchronous
-   * and the renderer's own canvas is overwritten by the next object in the queue, so encoding
-   * straight from it would sooner or later file one object's picture under another's id.
+   * Sends one picture to the index, once, and never waits for it. The canvas it is handed is
+   * renderThumbnail's own, so the asynchronous encode cannot race the next object's render.
    */
-  private send(objectId: string, source: HTMLCanvasElement) {
+  private send(objectId: string, picture: HTMLCanvasElement) {
     if (!this.publish || this.published.has(objectId)) return;
     this.published.add(objectId); // before the attempt: one try per object, success or not
-    const frozen = document.createElement('canvas');
-    frozen.width = frozen.height = RENDER;
-    const ctx = frozen.getContext('2d')!;
-    // The render has an alpha channel and JPEG has none, so the background is chosen here
-    // rather than left to the encoder, which would give black. White, because these vectors
-    // share a namespace with the catalogue's product photos — studio shots on white — and the
-    // closer the two sit in the same distribution, the better one text query ranks across both.
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fillRect(0, 0, RENDER, RENDER);
-    ctx.drawImage(source, 0, 0);
-    frozen.toBlob(
+    picture.toBlob(
       (blob) => {
         if (blob) this.publish!(objectId, blob);
         else console.warn(`No thumbnail bytes for ${objectId}: the canvas would not encode.`);
       },
       'image/jpeg',
-      0.9,
+      JPEG_QUALITY,
     );
   }
 }
 
-interface Stage {
+export interface Stage {
   renderer: THREE.WebGLRenderer;
   scene: THREE.Scene;
   camera: THREE.PerspectiveCamera;
@@ -169,8 +185,11 @@ interface Stage {
  * back out of the XR renderer means a synchronous GPU stall inside the frame the headset is
  * presenting; a separate 512 px context costs a little memory once and stalls nothing.
  */
-function makeStage(): Stage {
-  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+export function makeStage(): Stage {
+  // preserveDrawingBuffer so reading the canvas back is reliable everywhere, including the
+  // software rasteriser a headless browser uses. It costs nothing on a 512 px offscreen
+  // context and it is not the headset's renderer.
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
   renderer.setPixelRatio(1);
   renderer.setSize(RENDER, RENDER, false);
   renderer.setClearColor(0x000000, 0); // transparent: the tile's own cell colour shows through

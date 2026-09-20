@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>thumb</title>
+    <meta name="robots" content="noindex" />
+    <style>
+      /*
+       * The finished render is pinned at the top-left at its exact pixel size, on white, with
+       * nothing else on the page. A 512 x 512 screenshot of this page is therefore the picture
+       * itself — which matters because the driver may not be able to evaluate JS and read the
+       * data URL back. There must always be a way out that needs nothing but a screenshot.
+       */
+      html, body { margin: 0; padding: 0; background: #ffffff; overflow: hidden; }
+      canvas { position: fixed; top: 0; left: 0; display: block; }
+    </style>
+  </head>
+  <body>
+    <script type="module" src="/src/thumb.ts"></script>
+  </body>
+</html>
