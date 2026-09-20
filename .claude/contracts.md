@@ -188,6 +188,8 @@ B ships this surface as stubs in hours 0–2. Real logic lands behind it afterwa
 | `GET /sync/{roomId}` | — | SSE stream | D |
 | `POST /ingest` | `{ merchant, storefront, collection?, browserbase?, llm?, vlm? }`, `X-Upstream-Token` | `202 { workflowId, merchant, storefront }` | operator, P3 |
 | `POST /catalog/ingest` | `[item]` or `{ products \| objects \| items }`, 1-100, `X-Upstream-Token` | `202 { accepted, jobs: [{ objectId, jobId }] }` | scrapers |
+| `POST /find` | `{ storefront, merchant, query, fit?, limit? }` — one live storefront; the Worker fans into `services/ingest` `/find` then `/extract` with the upstream token the browser never holds | `{ merchant, storefront, searchUrl, searchedFor, handles, products, measured, fitting, fallbackSuspected, warning, listings: [Object v1-shaped row + imageUrl] }`. Writes nothing | F (headset, three stores in parallel) |
+| `POST /listings/generate` | `{ listing, roomId? }` — a row picked from `/find` | `202 { objectId, jobId }`. Reuses the catalogue intake: one D1 object (`source:"catalog"`) and one mesh job; `roomId` makes the ready mesh arrive on that room's SSE feed | F |
 
 Notes on the rows above that are not in the table:
 

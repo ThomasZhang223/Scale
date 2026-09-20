@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+# NOTE 2026-09-20: the source GLBs were REMOVED from the repo once this seed had run (the headset
+# loads its library from the Worker now). Eight of the eleven were untextured box/cylinder
+# placeholders and were later deleted from D1, R2 and Vectorize; `chair`, `sofa` and `xander` remain
+# as `source:"primitive"` rows. To add library models, put GLBs in a directory of your own and adapt
+# the path below. This script is kept as the record of how the cloud library was built.
+#
 # Seed the headset's bundled GLB library (apps/xr/public/objects/*.glb) into the cloud, so the
 # page can load every model from the Worker instead of from files shipped with the page.
 #

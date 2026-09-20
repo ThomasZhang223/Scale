@@ -11,6 +11,7 @@ the phone in 3D/AR, and in a Quest via WebXR at 1:1.
 | `.claude/sprint.md` | The 36-hour plan, four parallel swimlanes, sync points, kill criteria. |
 | `.claude/workstreams/<name>.md` | Your own scope. Read yours. Skim the others so you know who to ask. |
 | `BUILD_DOC.md` | The full design doc and the reasoning behind the decisions. Read once, then work from the three files above. |
+| `docs/SYSTEM_STATE.md` | **What is actually deployed and how data flows today.** Where the design doc and this file disagree about the running system, this file is right. |
 
 ## Who owns what
 
@@ -57,7 +58,8 @@ everyone else opens a pull request against it or asks.
 | `apps/mobile/src/voice/**` | **Paul** | The OMNI loop. See the handoff below. |
 | `apps/xr/**` | Justin | WebXR runtime |
 | `workers/**` | Thomas | Every HTTP route, including `/search` and `/solve` |
-| `services/fit/**` | Justin | Solver, its own HTTP service |
+| `services/fit/**` | Justin | One service answers BOTH `/fit` and `/solve` (OR-Tools). `services/layout` no longer exists |
+| `services/agent/**` | Justin | `designer-agent`, a second Cloudflare Worker: the agent the headset talks to at `/v1/agent/*` |
 | `services/gen/**` | Ani | Baseten deploy, binding, embeddings |
 | `services/ingest/**` | Paul | Scraper, extractor |
 | `services/search/**` | Paul | Ranking, its own HTTP service |
@@ -113,7 +115,8 @@ fixtures/                  the four committed fixtures
 apps/mobile/               Expo app (Thomas; voice subtree is Paul's)
 apps/xr/                   WebXR runtime (Justin)
 workers/                   Cloudflare Workers, every HTTP route (Thomas)
-services/fit/              solver (Justin)
+services/fit/              fit + solver, one service (Justin)
+services/agent/            designer-agent Worker (Justin)
 services/gen/              Baseten, binding, embeddings (Ani)
 services/ingest/           scraper, extractor (Paul)
 services/search/           ranking (Paul)
