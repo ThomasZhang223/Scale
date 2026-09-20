@@ -65,19 +65,37 @@ Optional, added post-launch — absent renders exactly as today, boxes with no c
 ```json
 "appearance": {
   "surfaces": {
-    "<wallId>": { "hex": "#c9c3b8", "textureUrl": null },
-    "floor":    { "hex": "#8a6a44", "textureUrl": null },
-    "ceiling":  { "hex": "#f2f0ec", "textureUrl": null }
+    "<wallId>": { "hex": "#9a968e", "textureKey": "rooms/{roomId}/appearance/front.jpg",
+                  "textureUrl": null, "rotationDeg": 0, "mirrored": false },
+    "floor":    { "hex": "#666560", "textureKey": null, "textureUrl": null },
+    "ceiling":  { "hex": "#80766e", "textureKey": null, "textureUrl": null, "rotationDeg": 180 }
   }
 }
 ```
 
-`textureUrl` is always `null` for now (per-wall rectified photos are plan section 4b step 3, out
-of scope unless Component A is ahead at H16). A surface key is present only when A actually
-sampled a colour for it — RoomPlan has no ceiling category, so `"ceiling"` is often absent, not a
-guessed default. **Appearance is never a source of dimensions.** When the shell and the
-parametric wall disagree, the parametric wall is right. Justin renders the visual on layer 0 and
-the parametric boxes on layer 1 at `visible = false`, so `raycaster.layers.set(1)` still hits them.
+A surface key is present only when A actually sampled a colour for it — RoomPlan has no ceiling
+category, so `"ceiling"` is often absent, not a guessed default. **Appearance is never a source
+of dimensions.** When the shell and the parametric wall disagree, the parametric wall is right.
+Justin renders the visual on layer 0 and the parametric boxes on layer 1 at `visible = false`, so
+`raycaster.layers.set(1)` still hits them — that is for a baked shell mesh arriving beside the
+walls. A per-surface photo needs no such split: it rides on the inward face of the parametric box
+itself, which is already the visual, the collider and the raycast target.
+
+Four fields, all optional, all additive — a surface with none of them renders exactly as before:
+
+| Field | Meaning |
+| --- | --- |
+| `textureKey` | The R2 key of that surface's rectified photo, `rooms/{roomId}/appearance/{surface}.jpg`. Stored in the capture. |
+| `textureUrl` | The same photo as a URL. **`GET /rooms/{id}` fills this in from `textureKey`**; a stored capture leaves it `null`. Key in the database, URL in the API, as for `glb_key` → `glbUrl`. A client never resolves a key. |
+| `rotationDeg` | `0`, `90`, `180` or `270`. Which image edge meets which wall. Any other value is rejected. |
+| `mirrored` | Mirrors the photo across its own vertical axis. The escape hatch; `false` everywhere today. |
+
+The photo is a four-point transform of the surface rectangle onto the WHOLE image, so **the image
+aspect is not the surface aspect**. It fills the surface's true metre rectangle exactly once —
+UV 0..1, never tiled, never aspect-fitted. That stretch is what undoes the transform.
+
+A wall that carries a photo is drawn whole: its door and window are in the picture already, so
+nothing is cut out of it. A wall with no photo still gets its openings cut, as before.
 
 Notes that matter:
 
@@ -272,6 +290,7 @@ The Quest subscribes on room open and never polls. This is pipeline P6.
 | Key | Written by |
 | --- | --- |
 | `rooms/{roomId}/capture.json` | B, on upload |
+| `rooms/{roomId}/appearance/{surface}.jpg` | A rectified photo of one surface. `{surface}` is a wall id, `floor` or `ceiling`. Written out of band today; there is no `POST /uploads` kind for it yet. |
 | `objects/{objectId}/frames/{n}.jpg` | A, presigned |
 | `objects/{objectId}/mesh.glb` | C; also a reviewed mesh attached to a catalogue object via `POST /objects/{id}/mesh` |
 | `objects/{objectId}/mesh-receipt.json` | C, optional |
