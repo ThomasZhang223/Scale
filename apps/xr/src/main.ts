@@ -101,8 +101,12 @@ const room = new THREE.Group();
 scene.add(room);
 const fitOverlay = new FitOverlay();
 scene.add(fitOverlay.group);
-// The transcript card sits past the top of the phone on the left hand (Palette.above).
+// The transcript panel: its own module, standing behind the phone on the left hand (placed
+// every frame in the loop below, from the head through the phone).
 const hud = new Hud();
+hud.attachTo(scene);
+renderer.xr.addEventListener('sessionstart', () => hud.setPresenting(true));
+renderer.xr.addEventListener('sessionend', () => hud.setPresenting(false));
 
 const PALETTE_ACTIONS: PaletteItem[] = [
   { url: '', name: 'Reset room', action: 'reset', section: 'Room' },
@@ -133,8 +137,8 @@ const micButton = document.getElementById('agent-mic') as HTMLButtonElement;
 panel.hidden = !SHOW_PANEL;
 const say = (text: string) => (note.textContent = text);
 
-// The transcript: what was heard and what was answered, shown in full on the card above the
-// phone (hud.ts). The phone keeps the buttons; the reasons live on the card.
+// The transcript: what was heard and what was answered, shown in full on its own panel behind
+// the phone (hud.ts). The phone keeps the buttons; the reasons live on the panel.
 const TRANSCRIPT_KEEP = 8;
 const transcript: HudLine[] = [];
 function tell(text: string, tone: Tone = 'info') {
@@ -177,7 +181,6 @@ let listings: ListingsResult | null = null; // the last recommendation set, show
 let listingsNeed: Need | null = null;
 let listingsBusy = false;
 let voiceState: VoiceState = 'idle';
-let voiceDetail: string | undefined; // the last error or transcript shown on the wrist
 let lastHeard: string | null = null;
 
 /** What Rearrange does with each kind of object (mirrors services/agent generatedPlan). */
@@ -208,16 +211,16 @@ async function start() {
   const physics = await createPhysics(scene);
   const loader = new ObjectLoader(renderer);
   const palette = new Palette();
-  hud.attachTo(palette.above);
   const applier = new ProposalApplier(physics);
   // Built before the first showPalette(): the talk row reads voice.supported.
   const voice = new Voice({
     onState(state, detail) {
       voiceState = state;
-      voiceDetail = detail;
       micButton.dataset.state = state;
       micButton.title = state === 'recording' ? 'Release to send' : state === 'error' ? detail ?? 'Voice error' : 'Hold to talk';
-      if (state === 'error' && detail) tell(`Voice: ${detail}`, 'error');
+      // Voice trouble (a blocked mic, a rejected ElevenLabs call) is a console matter, not a
+      // message on the wrist or the card: the layout work carries on without it.
+      if (state === 'error' && detail) console.warn(`Voice: ${detail}`);
       showPalette();
     },
   });
@@ -506,8 +509,7 @@ async function start() {
     if (voiceState === 'recording') rows.push({ ...tile('Listening… release to send', 'hold:talk', true), destructive: true });
     else if (voiceState === 'transcribing') rows.push(label('Transcribing…'));
     else rows.push(tile(voiceState === 'speaking' ? 'Hold to talk (interrupts)' : 'Hold to talk', 'hold:talk', true));
-    if (voiceState === 'error' && voiceDetail) rows.push(label(voiceDetail, 'warn'));
-    return rows; // what was heard is on the transcript card, not the wrist
+    return rows; // what was heard is on the transcript card, not the wrist; errors go to the console
   }
 
   async function talkDown() {
@@ -515,7 +517,7 @@ async function start() {
     try {
       await voice.start();
     } catch (err) {
-      say(`Voice: ${(err as Error).message}`);
+      console.warn('Voice:', err);
     }
   }
 
@@ -532,7 +534,7 @@ async function start() {
   /** Spoken output; a failure here is shown, never thrown, so voice never blocks the layout work. */
   function speak(text: string) {
     if (!voice.supported || !text) return;
-    voice.speak(text).catch((err) => say(`Voice: ${(err as Error).message}`));
+    voice.speak(text).catch((err) => console.warn('Voice:', err));
   }
 
   // Laptop: hold the mic button. The first press also asks for microphone permission.
@@ -1315,6 +1317,7 @@ async function start() {
     interaction.update(dt);
     applier.update(dt);
     physics.step(dt);
+    hud.place(renderer.xr.isPresenting ? renderer.xr.getCamera() : camera, palette.group);
     if (!renderer.xr.isPresenting) controls.update();
     renderer.render(scene, camera);
   });

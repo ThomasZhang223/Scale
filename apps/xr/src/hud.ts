@@ -1,13 +1,13 @@
 import * as THREE from 'three';
 
 /*
- * The transcript: a card on the left hand, just past the top of the phone panel (the phone
- * grows down from the hand, this grows up from the phone's top edge), that shows what was
- * heard and what the designer said back — the summary, why the layout is the way it is, the
- * trade-off, and any error, in full. It never truncates: lines wrap and the card grows.
- * It is a child of Palette.above, so it shares the phone's tilt and follows the hand.
- *
- * The phone keeps the buttons; the reasons live here, in the same glance.
+ * The transcript: its own panel, standing behind the phone on the left hand — further from
+ * the eyes than the phone, on the line from the head through the phone, facing the head. So
+ * the phone (items, arrangement options) is in front and the dialogue reads behind it, and
+ * both move with the hand. It shows what was heard and what the designer said back — the
+ * summary, why the layout is the way it is, the trade-off, and any error, in full. It never
+ * truncates: lines wrap and the panel grows downward. Hidden in the spectator view, where
+ * the laptop has its own log.
  */
 
 export type Tone = 'heard' | 'info' | 'warn' | 'error';
@@ -16,14 +16,15 @@ export interface HudLine {
   tone: Tone;
 }
 
-const PX = 4000;                 // canvas px per metre, the same density as the phone
-const WIDTH = 0.284;             // metres: the phone's frame width, so the two read as one stack
-const PAD = 0.012;
-const LINE_H = 0.0145;           // metres per wrapped footnote line, as on the phone
-const GAP = 0.006;               // between entries
-const RADIUS = 0.018;
-const MAX_LINES = 18;            // the card's ceiling; older lines fall off the top
-const GAP_ABOVE_PHONE = 0.008;
+const PX = 2400;                 // canvas px per metre
+const WIDTH = 0.6;               // metres: wider than the phone, so it shows on both sides of it
+const PAD = 0.024;
+const LINE_H = 0.03;             // metres per wrapped line
+const GAP = 0.01;                // between entries
+const RADIUS = 0.024;
+const MAX_LINES = 12;            // the panel's ceiling; older lines fall off the top
+const BEHIND = 0.5;              // metres past the phone, away from the eyes
+const LIFT = 0.12;               // raised so the phone covers the panel's lower part, not its text
 
 const COLOR: Record<Tone, string> = {
   heard: 'rgba(235,235,245,0.60)',
@@ -32,31 +33,59 @@ const COLOR: Record<Tone, string> = {
   error: '#FF453A',
 };
 const BACKGROUND = 'rgba(28,28,30,0.88)';
-const FONT = `${13 * 3.4}px -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", system-ui, sans-serif`;
+const FONT = `${0.02 * PX}px -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", system-ui, sans-serif`;
 
 export class Hud {
   readonly group = new THREE.Group();
   private mesh: THREE.Mesh | null = null;
   private lines: HudLine[] = [];
+  private presenting = false;
+
+  private readonly eye = new THREE.Vector3();
+  private readonly anchor = new THREE.Vector3();
+  private readonly dir = new THREE.Vector3();
 
   constructor() {
     this.group.name = 'hud';
-    this.group.position.y = GAP_ABOVE_PHONE;
     this.group.visible = false;
   }
 
-  /** Attach to Palette.above: the phone's top edge, in the phone's own plane. */
-  attachTo(anchor: THREE.Object3D) {
-    anchor.add(this.group);
+  /** Add to the scene; place() moves it every frame. */
+  attachTo(scene: THREE.Object3D) {
+    scene.add(this.group);
   }
 
-  /** Replaces the transcript. Empty hides the card. */
+  /**
+   * Once a frame: stand BEHIND metres past the phone on the line from the eyes through it,
+   * lifted a little, facing the eyes. With no phone yet (no left controller), stay hidden.
+   */
+  place(head: THREE.Object3D, phone: THREE.Object3D | null) {
+    if (!phone || !phone.visible || !phone.parent) {
+      this.group.visible = false;
+      return;
+    }
+    head.getWorldPosition(this.eye);
+    phone.getWorldPosition(this.anchor);
+    this.dir.subVectors(this.anchor, this.eye).normalize();
+    this.group.position.copy(this.anchor).addScaledVector(this.dir, BEHIND);
+    this.group.position.y += LIFT;
+    this.group.lookAt(this.eye);
+    this.group.visible = this.presenting && this.mesh !== null;
+  }
+
+  /** Only shown inside the headset; the spectator view has the laptop panel. */
+  setPresenting(on: boolean) {
+    this.presenting = on;
+    this.group.visible = on && this.mesh !== null;
+  }
+
+  /** Replaces the transcript. Empty hides the panel. */
   set(lines: HudLine[]) {
     this.lines = lines.filter((l) => l.text.trim());
     this.redraw();
   }
 
-  /** Adds one line at the bottom, dropping the oldest when the card is full. */
+  /** Adds one line at the bottom, dropping the oldest when the panel is full. */
   push(text: string, tone: Tone = 'info') {
     if (!text.trim()) return;
     this.lines.push({ text, tone });
@@ -116,13 +145,14 @@ export class Hud {
     texture.anisotropy = 4;
     this.mesh = new THREE.Mesh(
       new THREE.PlaneGeometry(WIDTH, height),
-      new THREE.MeshBasicMaterial({ map: texture, transparent: true, side: THREE.DoubleSide }),
+      new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthTest: false, depthWrite: false }),
     );
+    this.mesh.renderOrder = 999; // always readable, never clipped by a wall or the phone
     this.mesh.raycast = () => {};
-    // Grow upward, away from the phone: the bottom edge stays on the phone's top edge.
-    this.mesh.position.y = height / 2;
+    // Grow downward: the top edge stays put as the panel gets taller.
+    this.mesh.position.y = -height / 2;
     this.group.add(this.mesh);
-    this.group.visible = true;
+    this.group.visible = this.presenting;
   }
 }
 

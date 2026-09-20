@@ -10,7 +10,7 @@ import { colors, radius, spacing } from "../../src/theme/tokens";
 function CaptureHubScreen() {
   const router = useRouter();
 
-  async function startCapture(path: "/capture/room" | "/capture/object" | "/capture/object3d") {
+  async function startCapture(path: "/capture/room" | "/capture/object" | "/capture/object3d" | "/capture/box") {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     router.push(path);
   }
@@ -23,6 +23,12 @@ function CaptureHubScreen() {
           detail="Walk the walls. Doors, windows and furniture are picked up as you go."
           icon="house.fill"
           onPress={() => startCapture("/capture/room")}
+        />
+        <Tile
+          title="Photograph the walls"
+          detail="One photo per wall, straightened and measured. For rooms the scan can't read."
+          icon="square.stack.3d.up.fill"
+          onPress={() => startCapture("/capture/box")}
         />
         <Tile
           title="Capture an object in 3D"

@@ -33,6 +33,7 @@ export default function RootLayout() {
           <Stack.Screen name="capture/room" options={{ headerShown: false }} />
           <Stack.Screen name="capture/object" options={{ headerShown: false }} />
           <Stack.Screen name="capture/object3d" options={{ headerShown: false }} />
+          <Stack.Screen name="capture/box" options={{ headerShown: false }} />
         </Stack>
       </SafeAreaProvider>
     </GestureHandlerRootView>
