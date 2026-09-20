@@ -374,6 +374,10 @@ async function liveSearch(need: Need, limit: number): Promise<Listing[]> {
   return hits.map((h) => ({
     ...h.object,
     // Thumbnails live at a derived key (contracts.md: R2 key layout); the Worker serves them.
+    // HAZARD: this synthesises a URL whether or not an image exists, so a truthy imageUrl has
+    // never meant "this row has a picture". Anything deciding that question must read the raw
+    // ObjectV1 instead. A scan's render is stored at scans/{id}/thumb.jpg, not objects/, so this
+    // stays wrong for scans rather than silently becoming right the day they get images.
     imageUrl: h.object.imageUrl ?? `${API_BASE}/assets/objects/${h.object.objectId}/thumb.jpg`,
   }));
 }

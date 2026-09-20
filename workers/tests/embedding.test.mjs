@@ -348,17 +348,23 @@ test("a valid GLB at the scan key flips the row to ready with that glb_key", asy
 
 // --- One indexer -------------------------------------------------------------------------------
 
-test("embedInput admits catalogue source keys and still refuses every other key", async t => {
+test("embedInput admits catalogue, frame and scan-thumbnail keys and refuses every other key", async t => {
   const env = environment();
   env.BUCKET = { get: async () => ({ size: 3, arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer }) };
   t.mock.method(globalThis, "fetch", async () => Response.json({ ...vector, modality: "image" }));
   for (const good of ["catalog/Floyd_Home/9246282842274/source.jpg", "catalog/Poly___Bark/1/source.png",
-    "objects/id/frames/0.jpg"]) {
+    "objects/id/frames/0.jpg",
+    // A headset render of a scan's own mesh: the only picture a phone scan ever has.
+    "scans/6e812de9-65f5-4bd7-82c0-b098eef8fac5/thumb.jpg"]) {
     assert.equal((await embedInput(env, { imageKey: good })).modality, "image");
   }
   for (const bad of ["catalog/a/b/other.jpg", "catalog/a/source.jpg", "scans/id/mesh.glb", "objects/id/mesh.glb",
-    "rooms/id/capture.json", "catalog/a/b/c/source.jpg"]) {
-    await assert.rejects(embedInput(env, { imageKey: bad }), /Expected an object frame or catalogue source key/);
+    "rooms/id/capture.json", "catalog/a/b/c/source.jpg",
+    // The thumbnail rule is the whole key, not a prefix: an id that is not a uuid, another
+    // extension, or a deeper path are all still refused.
+    "scans/id/thumb.jpg", "scans/6e812de9-65f5-4bd7-82c0-b098eef8fac5/thumb.png",
+    "scans/6e812de9-65f5-4bd7-82c0-b098eef8fac5/a/thumb.jpg"]) {
+    await assert.rejects(embedInput(env, { imageKey: bad }), /Expected an object frame, catalogue source or scan thumbnail key/);
   }
 });
 
