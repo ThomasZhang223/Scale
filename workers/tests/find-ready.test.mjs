@@ -8,8 +8,9 @@ registerHooks({ resolve(specifier, context, next) {
   if (specifier.startsWith(".") && !/\.[a-z]+$/.test(specifier)) specifier += ".ts";
   return next(specifier, context);
 } });
-const { readyOnly, merchantSlug, catalogIdCandidates, restrictFindToReady, failedFindResult } =
+const { readyOnly, merchantSlug, catalogIdCandidates, restrictFindToReady, failedFindResult, orderByDistortion } =
   await import("../src/lib/find-ready.ts");
+const { DISTORTION_RATIOS, DISTORTION_LIMIT } = await import("../src/lib/distortion-ratios.ts");
 const { catalogObjectId } = await import("../src/lib/catalog-ingest.ts");
 
 const ORIGIN = "https://api.example";
@@ -106,7 +107,7 @@ test("a found listing whose row is ready is kept, with the D1 mesh, box and obje
   assert.deepEqual(kept.bboxMeters, { w: 0.3, h: 1.4, d: 0.3 });
   assert.equal(kept.findSource, "storefront");
   assert.equal(kept.price, null);
-  assert.equal(header, "storefront=1,catalog=0,dropped=0,unidentified=0");
+  assert.equal(header, "storefront=1,catalog=0,dropped=0,unidentified=0,stretched=0,unrated=1");
   assert.equal(result.measured, 1);
 });
 
@@ -115,7 +116,7 @@ test("a found listing whose row is only measured is dropped and counted", async 
   const env = fakeEnv([row(id, { state: "measured", glb_key: null })]);
   const { result, header } = await restrictFindToReady(env, ORIGIN, body, found([listing()]), noSearch);
   assert.deepEqual(result.listings, []);
-  assert.equal(header, "storefront=0,catalog=0,dropped=1,unidentified=0");
+  assert.equal(header, "storefront=0,catalog=0,dropped=1,unidentified=0,stretched=0,unrated=0");
 });
 
 test("a found listing with no identity is dropped as unidentified, never matched by title", async () => {
@@ -123,7 +124,7 @@ test("a found listing with no identity is dropped as unidentified, never matched
   const blind = listing({ productUrl: null, merchant: null, extraction: {} });
   const { result, header } = await restrictFindToReady(env, ORIGIN, body, found([blind]), noSearch);
   assert.deepEqual(result.listings, []);
-  assert.equal(header, "storefront=0,catalog=0,dropped=0,unidentified=1");
+  assert.equal(header, "storefront=0,catalog=0,dropped=0,unidentified=1,stretched=0,unrated=0");
 });
 
 test("a merchant-label variant joins: no productUrl, and D1 was written from the slug", async () => {
@@ -136,7 +137,7 @@ test("a merchant-label variant joins: no productUrl, and D1 was written from the
   const { result, header } = await restrictFindToReady(env, ORIGIN, body, live, noSearch);
   assert.equal(result.listings.length, 1);
   assert.equal(result.listings[0].objectId, id);
-  assert.equal(header, "storefront=1,catalog=0,dropped=0,unidentified=0");
+  assert.equal(header, "storefront=1,catalog=0,dropped=0,unidentified=0,stretched=0,unrated=1");
 });
 
 test("the top-up fills from ready catalogue rows only, keeps the ranking order and de-duplicates", async () => {
@@ -156,7 +157,7 @@ test("the top-up fills from ready catalogue rows only, keeps the ranking order a
   assert.equal(result.listings[1].findSource, "catalog");
   assert.equal(result.listings[1].state, "ready");
   assert.ok(result.listings[1].glbUrl.endsWith("/v1/assets/objects/ready-b/mesh.glb"));
-  assert.equal(header, "storefront=1,catalog=2,dropped=0,unidentified=0");
+  assert.equal(header, "storefront=1,catalog=2,dropped=0,unidentified=0,stretched=0,unrated=3");
 });
 
 test("the top-up passes the fit bounds through and stops at the tile target", async () => {
@@ -168,7 +169,7 @@ test("the top-up passes the fit bounds through and stops at the tile target", as
     fakeEnv(rows), ORIGIN, { ...body, fit }, found([]), search);
   assert.deepEqual(asked.fit, fit);
   assert.equal(result.listings.length, 6);
-  assert.equal(header, "storefront=0,catalog=6,dropped=0,unidentified=0");
+  assert.equal(header, "storefront=0,catalog=6,dropped=0,unidentified=0,stretched=0,unrated=6");
 });
 
 test("no top-up runs once the storefront already filled the menu", async () => {
@@ -178,7 +179,7 @@ test("no top-up runs once the storefront already filled the menu", async () => {
   const live = found(ids.map((_, n) => listing({ productUrl: `https://polyandbark.com/products/lamp-${n + 1}` })));
   const search = async () => { throw new Error("the top-up must not run"); };
   const { header } = await restrictFindToReady(env, ORIGIN, body, live, search);
-  assert.equal(header, "storefront=6,catalog=0,dropped=0,unidentified=0");
+  assert.equal(header, "storefront=6,catalog=0,dropped=0,unidentified=0,stretched=0,unrated=6");
 });
 
 test("failedFindResult names the storefront failure instead of hiding it", () => {
@@ -187,4 +188,52 @@ test("failedFindResult names the storefront failure instead of hiding it", () =>
   assert.deepEqual(out.listings, []);
   assert.equal(out.merchant, body.merchant);
   assert.equal(out.searchedFor, body.query);
+});
+
+test("the fixture covers every catalogue mesh P-PAUL bound, and the limit is the binder's", () => {
+  assert.equal(Object.keys(DISTORTION_RATIOS).length, 85);
+  assert.equal(DISTORTION_LIMIT, 1.5);
+  assert.ok(Object.values(DISTORTION_RATIOS).every((r) => typeof r === "number" && r >= 1));
+});
+
+test("orderByDistortion ranks a stretched mesh down, keeps every row, and holds the search order", () => {
+  // Real ids and ratios from the fixture: 1.0309, 1.1119, 8.7906.
+  const clean = "2e025e99-bcb5-522f-a84f-56ee2e473d7c";
+  const stretched = Object.entries(DISTORTION_RATIOS).find(([, r]) => r > 5)[0];
+  const rows = [
+    { objectId: stretched, name: "stretched" },
+    { objectId: "unrated-a", name: "unrated a" },
+    { objectId: clean, name: "clean" },
+    { objectId: "unrated-b", name: "unrated b" },
+  ];
+  const out = orderByDistortion(rows);
+  assert.deepEqual(out.map((r) => r.name), ["clean", "unrated a", "unrated b", "stretched"]);
+  // Nothing is hidden, and the two unrated rows keep the order they arrived in.
+  assert.equal(out.length, rows.length);
+});
+
+test("orderByDistortion puts the lower ratio first inside the good tier", () => {
+  const sorted = Object.entries(DISTORTION_RATIOS).filter(([, r]) => r <= DISTORTION_LIMIT).sort((a, b) => a[1] - b[1]);
+  const [lowId] = sorted[0];
+  const [highId] = sorted[sorted.length - 1];
+  const out = orderByDistortion([{ objectId: highId }, { objectId: lowId }]);
+  assert.deepEqual(out.map((r) => r.objectId), [lowId, highId]);
+});
+
+test("the returned rows are ordered by distortion across both branches at once", async () => {
+  const clean = "2e025e99-bcb5-522f-a84f-56ee2e473d7c"; // 1.0309 in the fixture
+  // A storefront hit that is itself stretched must rank below a clean catalogue row.
+  const keptId = await catalogObjectId({ merchant: "x", productId: "p" });
+  const live = found([listing({ productUrl: null, merchant: "x", extraction: { productId: "p" } })]);
+  const env = fakeEnv([row(keptId), row(clean)]);
+  DISTORTION_RATIOS[keptId] = 9.9;
+  try {
+    const { result, header } = await restrictFindToReady(env, ORIGIN, body, live, async () => [clean]);
+    assert.deepEqual(result.listings.map((l) => l.objectId), [clean, keptId]);
+    assert.equal(result.listings[0].findSource, "catalog");
+    assert.equal(result.listings[1].findSource, "storefront");
+    assert.ok(header.includes("stretched=1"), header);
+  } finally {
+    delete DISTORTION_RATIOS[keptId];
+  }
 });

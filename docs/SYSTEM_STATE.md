@@ -9,7 +9,7 @@ describes the running system. `.claude/contracts.md` stays the authority on sche
 | --- | --- | --- |
 | `full-scale-workers` | Cloudflare Worker, `https://full-scale-workers.thomaszhangdev.workers.dev` | The only front door. Deploy: `cd workers && npm ci && npm run deploy:mesh` (typecheck, tests, dry-run, both `IF NOT EXISTS` migrations, deploy). Roll back: `npx wrangler rollback`. |
 | `designer-agent` | Cloudflare Worker, `https://designer-agent.thomaszhangdev.workers.dev` | Justin's `services/agent`. The agent the headset talks to. Reads `upstream:solver` from the SAME KV namespace as the front door. Secrets: `UPSTREAM_TOKEN`, `OPENAI_API_KEY`. |
-| `full-scale-xr` | Cloudflare Worker + static page, `https://full-scale-xr.thomaszhangdev.workers.dev` | Deploy with LIVE data: `cd apps/xr && VITE_API_STUB=0 npm run deploy`. A plain `npm run deploy` ships the stub build, because `STUB` defaults ON in `src/api.ts`. |
+| `full-scale-xr` | Cloudflare Worker + static page, `https://full-scale-xr.thomaszhangdev.workers.dev` | Deploy: `cd apps/xr && npm run deploy`. `apps/xr/.env.production` is committed and supplies `VITE_API_STUB=0` (live data) and `VITE_ROOM_ID` (the demo room), so a plain deploy is now the right one. A shell `VITE_…=` still overrides it, and `?room=<id>` overrides at run time. |
 | D1 `full-scale-db` | Cloudflare | `rooms`, `versions`, `objects`, `jobs`, `mesh_outbox`. |
 | R2 `full-scale-objects` | Cloudflare | Not public. Served through `GET /v1/assets/{key}`. |
 | Vectorize `objects-v1` | Cloudflare | 768-dim SigLIP 2. One namespace = the encoder fingerprint (KV `embedding:fingerprint`). |
@@ -44,10 +44,22 @@ curl -s localhost:8003/health     # {"ok":true,"browserbase":true}
 | `objects/{objectId}/frames/{n}.jpg` | LiDAR-path frames from the phone. |
 | `catalog/{merchant}/{productId}/source.jpg` | A product photo. The image the embedding is made from. |
 | `rooms/{roomId}/capture.json` | RoomCapture v1. |
+| `rooms/{roomId}/appearance/{surface}.jpg` | A rectified photo of one surface, 2048 px longest side. `GET /v1/rooms/{id}` turns the `textureKey` in the capture into a `textureUrl`. |
 
 One object = one `objectId` across the D1 row, the R2 key, the Vectorize vector id and `glbUrl`.
 Catalogue ids are minted by the Worker (`stableId` in `workers/src/lib/catalog-ingest.ts`), never
 by a client. Do not apply `services/ingest/.load*/catalog.d1.sql`: it carries a second id rule.
+
+## The demo room
+
+`ccff7dec-1fc1-493e-96e3-3ab6f6ddfb2a` — Judging Room H, measured: **2.76 (short walls) x 4.72
+(long walls) x 2.96 m high**, four walls, no openings, all six surfaces photographed and rectified.
+The headset opens it with no URL parameter (see `.env.production` above). `fixtures/room-h.json` is
+the same room committed, and is what `X-Stub: 1` answers for `GET /v1/rooms/{id}`.
+
+Room `8b371353-…` is the older invented 4.0 x 3.5 x 2.4 m room. It and its six versions are
+untouched, and `fixtures/room-demo.json` still describes it, because four test suites across three
+owners assert against its numbers, its door and its table.
 
 ## The flows
 

@@ -197,3 +197,32 @@ test('a photographed wall keeps its openings painted rather than cut', () => {
   assert.equal(extrusions(withOpening), 0, 'a photographed wall is drawn whole');
   assert.equal(extrusions({ ...withOpening, appearance: undefined }), 1, 'an unphotographed wall is still cut');
 });
+
+test('a surface photo that covers a sub-region repeats, mirrored so the copies meet', () => {
+  const built = buildRoomFromScan(roomH);
+  const floor = roomMeshes(built).find((m) => Math.abs(worldPosition(m).y) < 1e-6)!;
+  const map = (floor.material as THREE.MeshBasicMaterial).map!;
+  // fixtures/room-h.json: the floor photo covers 2 x 3 carpet tiles, not the whole floor.
+  near(map.repeat.x, 2.2623, 'floor repeat u');
+  near(map.repeat.y, 2.5792, 'floor repeat v');
+  assert.equal(map.wrapS, THREE.MirroredRepeatWrapping);
+  assert.equal(map.wrapT, THREE.MirroredRepeatWrapping);
+  // 2.76 m across 2 tiles at that factor is a 0.61 m tile: the size it is bought at.
+  near(2.76 / (2 * map.repeat.x), 0.61, 'the rendered tile is its real size', 1e-3);
+
+  // Every other surface is one photo over the whole rectangle, and must not wrap at all.
+  const wall = roomMeshes(built).filter((m) => m.userData.collider === 'wall')[0];
+  const wallMap = (wall.material as THREE.MeshBasicMaterial[]).find((m) => m.map)!.map!;
+  near(wallMap.repeat.x, 1, 'a wall does not repeat');
+  assert.equal(wallMap.wrapS, THREE.ClampToEdgeWrapping);
+});
+
+test('a repeat that is not two positive numbers, or fights a quarter turn, fails loud', () => {
+  const withRepeat = (floor: unknown) => ({
+    ...roomH,
+    appearance: { surfaces: { ...roomH.appearance.surfaces, floor } },
+  });
+  assert.throws(() => buildRoomFromScan(withRepeat({ repeat: [0, 2] })), /above zero/);
+  assert.throws(() => buildRoomFromScan(withRepeat({ repeat: [2] })), /above zero/);
+  assert.throws(() => buildRoomFromScan(withRepeat({ rotationDeg: 90, repeat: [2, 3] })), /square repeat/);
+});

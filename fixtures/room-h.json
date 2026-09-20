@@ -66,7 +66,8 @@
         "hex": "#666560",
         "textureUrl": "/v1/assets/rooms/ccff7dec-1fc1-493e-96e3-3ab6f6ddfb2a/appearance/floor.jpg",
         "rotationDeg": 0,
-        "mirrored": false
+        "mirrored": false,
+        "repeat": [2.2623, 2.5792]
       },
       "ceiling": {
         "hex": "#80766e",

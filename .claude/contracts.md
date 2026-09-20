@@ -65,19 +65,46 @@ Optional, added post-launch — absent renders exactly as today, boxes with no c
 ```json
 "appearance": {
   "surfaces": {
-    "<wallId>": { "hex": "#c9c3b8", "textureUrl": null },
-    "floor":    { "hex": "#8a6a44", "textureUrl": null },
-    "ceiling":  { "hex": "#f2f0ec", "textureUrl": null }
+    "<wallId>": { "hex": "#9a968e", "textureKey": "rooms/{roomId}/appearance/front.jpg",
+                  "textureUrl": null, "rotationDeg": 0, "mirrored": false },
+    "floor":    { "hex": "#666560", "textureKey": null, "textureUrl": null,
+                  "repeat": [2.2623, 2.5792] },
+    "ceiling":  { "hex": "#80766e", "textureKey": null, "textureUrl": null, "rotationDeg": 180 }
   }
 }
 ```
 
-`textureUrl` is always `null` for now (per-wall rectified photos are plan section 4b step 3, out
-of scope unless Component A is ahead at H16). A surface key is present only when A actually
-sampled a colour for it — RoomPlan has no ceiling category, so `"ceiling"` is often absent, not a
-guessed default. **Appearance is never a source of dimensions.** When the shell and the
-parametric wall disagree, the parametric wall is right. Justin renders the visual on layer 0 and
-the parametric boxes on layer 1 at `visible = false`, so `raycaster.layers.set(1)` still hits them.
+A surface key is present only when A actually sampled a colour for it — RoomPlan has no ceiling
+category, so `"ceiling"` is often absent, not a guessed default. **Appearance is never a source
+of dimensions.** When the shell and the parametric wall disagree, the parametric wall is right.
+Justin renders the visual on layer 0 and the parametric boxes on layer 1 at `visible = false`, so
+`raycaster.layers.set(1)` still hits them — that is for a baked shell mesh arriving beside the
+walls. A per-surface photo needs no such split: it rides on the inward face of the parametric box
+itself, which is already the visual, the collider and the raycast target.
+
+Four fields, all optional, all additive — a surface with none of them renders exactly as before:
+
+| Field | Meaning |
+| --- | --- |
+| `textureKey` | The R2 key of that surface's rectified photo, `rooms/{roomId}/appearance/{surface}.jpg`. Stored in the capture. |
+| `textureUrl` | The same photo as a URL. **`GET /rooms/{id}` fills this in from `textureKey`**; a stored capture leaves it `null`. Key in the database, URL in the API, as for `glb_key` → `glbUrl`. A client never resolves a key. |
+| `rotationDeg` | `0`, `90`, `180` or `270`. Which image edge meets which wall. Any other value is rejected. |
+| `mirrored` | Mirrors the photo across its own vertical axis. The escape hatch; `false` everywhere today. |
+| `repeat` | `[u, v]`. How many times the photo covers the surface. **Absent means once, and once is the normal case.** Present only when the photo turned out to cover a sub-region, and then the factor comes from a measured physical size. A repeating photo wraps `MirroredRepeatWrapping`, so each copy meets its neighbour in its own reflection; a non-repeating one clamps. A quarter turn of 90° or 270° needs `u === v`, or the photo stretches along the wrong axis. |
+
+The photo is a four-point transform of the surface rectangle onto the WHOLE image, so **the image
+aspect is not the surface aspect**. It fills the surface's true metre rectangle exactly once —
+UV 0..1, never aspect-fitted. That stretch is what undoes the transform.
+
+`repeat` is the one exception, and it is a measurement, not a preference. The demo room's floor
+photo covers 2 × 3 carpet tiles rather than the whole floor, so stretched once the tiles rendered
+1.38 × 1.57 m. Taking the tile as **0.61 m square (24 in, the North American standard — nobody has
+put a tape on it)**, `repeat = [2.76 / (2 × 0.61), 4.72 / (3 × 0.61)]` puts it back at 0.61 m
+square. The two factors differ because the tiles are not square in the rectified photo; that is
+the warp, and separate u and v is what undoes it. **`repeat` is appearance, never a dimension.**
+
+A wall that carries a photo is drawn whole: its door and window are in the picture already, so
+nothing is cut out of it. A wall with no photo still gets its openings cut, as before.
 
 Notes that matter:
 
@@ -188,7 +215,7 @@ B ships this surface as stubs in hours 0–2. Real logic lands behind it afterwa
 | `GET /sync/{roomId}` | — | SSE stream | D |
 | `POST /ingest` | `{ merchant, storefront, collection?, browserbase?, llm?, vlm? }`, `X-Upstream-Token` | `202 { workflowId, merchant, storefront }` | operator, P3 |
 | `POST /catalog/ingest` | `[item]` or `{ products \| objects \| items }`, 1-100, `X-Upstream-Token` | `202 { accepted, jobs: [{ objectId, jobId }] }` | scrapers |
-| `POST /find` | `{ storefront, merchant, query, fit?, limit? }` — one live storefront; the Worker fans into `services/ingest` `/find` then `/extract` with the upstream token the browser never holds | `{ merchant, storefront, searchUrl, searchedFor, handles, products, measured, fitting, fallbackSuspected, warning, listings: [Object v1-shaped row + imageUrl] }`. Writes nothing. With `FIND_READY_ONLY="1"` each row also carries `findSource` (`"storefront"` \| `"catalog"`) and the response carries `X-Find-Source: storefront=N,catalog=N,dropped=N,unidentified=N` — see below | F (headset, three stores in parallel) |
+| `POST /find` | `{ storefront, merchant, query, fit?, limit? }` — one live storefront; the Worker fans into `services/ingest` `/find` then `/extract` with the upstream token the browser never holds | `{ merchant, storefront, searchUrl, searchedFor, handles, products, measured, fitting, fallbackSuspected, warning, listings: [Object v1-shaped row + imageUrl] }`. Writes nothing. With `FIND_READY_ONLY="1"` each row also carries `findSource` (`"storefront"` \| `"catalog"`) and the response carries `X-Find-Source: storefront=N,catalog=N,dropped=N,unidentified=N,stretched=N,unrated=N` — see below | F (headset, three stores in parallel) |
 | `POST /listings/generate` | `{ listing, roomId? }` — a row picked from `/find` | `202 { objectId, jobId }`. Reuses the catalogue intake: one D1 object (`source:"catalog"`) and one mesh job; `roomId` makes the ready mesh arrive on that room's SSE feed. When the object is ALREADY `ready` with a mesh: `200 { objectId, jobId: null, state, glbUrl }` — no second job, no state change | F |
 
 **`FIND_READY_ONLY` (Worker `[vars]`, additive and optional).** `"1"`: `/find` still runs the
@@ -198,7 +225,9 @@ in `workers/src/lib/catalog-ingest.ts` — `productUrl` first, `merchant:product
 the merchant label in both its raw and its slugged spelling). A short result is topped up from
 the same meshed catalogue through `/v1/search` restricted to `source:"catalog"`, for the same
 query text. Every kept row is `state:"ready"` with a `glbUrl`, so a client places the mesh at
-once and never draws a measured box for it. `"0"`: the fully live path — every found row, mesh
+once and never draws a measured box for it. Rows are then ordered least-distorted first — at or
+below the binder's 1.5 ratio, then unrated, then above it — from a committed fixture
+(`workers/src/lib/distortion-ratios.ts`). Nothing is hidden by that ordering. `"0"`: the fully live path — every found row, mesh
 generated on pick. Unset or any other value is a `500 bad_config`, never a guessed side.
 
 Notes on the rows above that are not in the table:
@@ -270,6 +299,7 @@ The Quest subscribes on room open and never polls. This is pipeline P6.
 | Key | Written by |
 | --- | --- |
 | `rooms/{roomId}/capture.json` | B, on upload |
+| `rooms/{roomId}/appearance/{surface}.jpg` | A rectified photo of one surface. `{surface}` is a wall id, `floor` or `ceiling`. Written out of band today; there is no `POST /uploads` kind for it yet. |
 | `objects/{objectId}/frames/{n}.jpg` | A, presigned |
 | `objects/{objectId}/mesh.glb` | C; also a reviewed mesh attached to a catalogue object via `POST /objects/{id}/mesh` |
 | `objects/{objectId}/mesh-receipt.json` | C, optional |
