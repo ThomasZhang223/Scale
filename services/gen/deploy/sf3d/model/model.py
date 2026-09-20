@@ -28,6 +28,12 @@ REVISIONS = {"sf3d_source": SOURCE_REVISION, "sf3d_weights": MODEL_REVISION,
              "rembg": "2.0.57", "u2net_md5": "60024c5c889badc19c04ad937298a77b"}
 
 
+def validate_bake_resolution(value):
+    if type(value) is not int or value not in (512, 1024):
+        raise ValueError("Bake resolution must be 512 or 1024")
+    return value
+
+
 class CudaRuntime:
     def __init__(self, token):
         startup = Timings()
@@ -93,7 +99,8 @@ class CudaRuntime:
         self.info["replica_id"] = uuid.uuid4().hex
         self.profile = True
 
-    def generate(self, image):
+    def generate(self, image, bake_resolution=1024):
+        validate_bake_resolution(bake_resolution)
         from contextlib import nullcontext
         start = time.perf_counter()
         t = self.torch
@@ -114,7 +121,7 @@ class CudaRuntime:
         t.cuda.reset_peak_memory_stats()
         hooks = profile_sf3d(self.model, timers) if getattr(self, "profile", False) else nullcontext()
         with hooks, t.inference_mode(), t.autocast(device_type="cuda", dtype=t.bfloat16):
-            mesh, _ = self.model.run_image(image, bake_resolution=SETTINGS["texture_resolution"],
+            mesh, _ = self.model.run_image(image, bake_resolution=bake_resolution,
                                           remesh="none", vertex_count=-1)
         t.cuda.synchronize()
         gen_end = time.perf_counter()
@@ -141,6 +148,7 @@ class Model:
         self._runtime = None
         self._lock = threading.Lock()
         self._ordinal = 0
+        self._allow_profile_override = os.environ.get("SF3D_PROFILE_ALLOW_BAKE_OVERRIDE") == "1"
 
     def load(self):
         with self._lock:
@@ -160,13 +168,20 @@ class Model:
             raise RuntimeError("SF3D is busy; one request at a time")
         try:
             start = time.perf_counter()
+            requested_bake = SETTINGS["texture_resolution"]
+            if self._allow_profile_override and isinstance(model_input, dict) and "_profile_bake_resolution" in model_input:
+                model_input = dict(model_input)
+                requested_bake = validate_bake_resolution(model_input.pop("_profile_bake_resolution"))
             diagnostics = {}
             image, input_hash = decode_request(model_input, diagnostics=diagnostics)
             decode_ms = (time.perf_counter() - start) * 1000
             self._ordinal += 1
-            raw, timings = self._runtime.generate(image)
+            raw, timings = (self._runtime.generate(image) if requested_bake == 1024 else
+                            self._runtime.generate(image, bake_resolution=requested_bake))
+            settings = {**SETTINGS, "texture_resolution": requested_bake}
+            diagnostics.update(requested_bake_resolution=requested_bake, effective_bake_resolution=requested_bake)
             response_started = time.perf_counter()
-            response = artifact_response(raw, input_hash, revisions=REVISIONS, settings=SETTINGS,
+            response = artifact_response(raw, input_hash, revisions=REVISIONS, settings=settings,
                                      runtime=self._runtime.info,
                                      timings={"decode_ms": decode_ms, **timings, **diagnostics,
                                               "request_ordinal": self._ordinal})

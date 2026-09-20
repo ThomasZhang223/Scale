@@ -14,7 +14,7 @@ from urllib.parse import urlsplit
 import httpx
 
 from model.transport import MAX_IMAGE_BYTES, MAX_RESPONSE_BYTES, decode_image, decode_response
-from model.model import MODEL_REVISION, SOURCE_REVISION
+from model.model import MODEL_REVISION, SOURCE_REVISION, validate_bake_resolution
 
 
 def validate_endpoint(endpoint):
@@ -26,7 +26,9 @@ def validate_endpoint(endpoint):
         raise ValueError("Use the dashboard's HTTPS synchronous custom-model /predict endpoint")
 
 
-def run_once(endpoint, image_path, output_dir, token, timeout=180, client=None):
+def run_once(endpoint, image_path, output_dir, token, timeout=180, client=None, bake_resolution=None):
+    if bake_resolution is not None:
+        validate_bake_resolution(bake_resolution)
     validate_endpoint(endpoint)
     if not token:
         raise ValueError("Set BASETEN_API_KEY securely; never pass it as a command argument")
@@ -40,6 +42,8 @@ def run_once(endpoint, image_path, output_dir, token, timeout=180, client=None):
     # A fresh directory prevents overwriting anyone's previous generated artifact.
     out.mkdir(parents=True, exist_ok=False)
     payload = {"image_base64": base64.b64encode(raw).decode("ascii")}
+    if bake_resolution is not None:
+        payload["_profile_bake_resolution"] = bake_resolution
     own_client = client is None
     client = client or httpx.Client(timeout=httpx.Timeout(timeout, connect=15),
                                     follow_redirects=False)
@@ -62,6 +66,8 @@ def run_once(endpoint, image_path, output_dir, token, timeout=180, client=None):
             result = json.loads(body)
         artifact = decode_response(result, input_hash)
         revisions = result.get("revisions", {})
+        if bake_resolution is not None and result.get("settings", {}).get("texture_resolution") != bake_resolution:
+            raise ValueError("Requested/effective bake resolution mismatch")
         if revisions.get("sf3d_source") != SOURCE_REVISION or revisions.get("sf3d_weights") != MODEL_REVISION:
             raise ValueError("Unexpected deployed SF3D revision")
         with (out / "mesh.glb").open("xb") as handle:
@@ -90,12 +96,14 @@ def main(argv=None):
     parser.add_argument("--image", required=True, type=Path)
     parser.add_argument("--output-dir", required=True, type=Path)
     parser.add_argument("--timeout", type=int, default=180)
+    parser.add_argument("--bake-resolution", type=int, choices=(512, 1024),
+                        help="Internal profiling deployment only; production defaults to 1024")
     args = parser.parse_args(argv)
     if not args.allow_paid_request:
         parser.error("No request sent: --allow-paid-request is required after explicit authorization")
     try:
         report = run_once(args.endpoint, args.image, args.output_dir,
-                          os.environ.get("BASETEN_API_KEY"), args.timeout)
+                          os.environ.get("BASETEN_API_KEY"), args.timeout, bake_resolution=args.bake_resolution)
     except (ValueError, RuntimeError, OSError) as exc:
         print(f"B02 failed: {exc}", file=sys.stderr)
         return 1
