@@ -27,7 +27,7 @@ interface Dynamic {
   size: THREE.Vector3;
   shape: RAPIER.Shape;
   pick: THREE.Mesh; // invisible box the rays hit: easier to point at than thin geometry
-  target?: { x: number; z: number; rotY: number };
+  target?: { x: number; z: number; rotY: number; y?: number }; // y: held height above the floor; unset = on the ground
   debug: THREE.Object3D;
 }
 
@@ -194,10 +194,10 @@ export class Physics {
 
   // ---------- moving things ----------
 
-  drag(id: string, x: number, z: number, rotY: number) {
+  drag(id: string, x: number, z: number, rotY: number, y?: number) {
     const d = this.dynamics.get(id);
     if (!d) return;
-    d.target = { x, z, rotY };
+    d.target = { x, z, rotY, y };
     d.body.wakeUp();
   }
 
@@ -330,7 +330,16 @@ export class Physics {
       }
       d.body.setRotation(rot, true);
       const v = d.body.linvel();
-      d.body.setLinvel({ x: 0, y: v.y, z: 0 }, true); // gravity only; no coasting
+      if (d.target.y !== undefined && d.target.y > 0) {
+        // Lifted: held at the asked height, no gravity while held. Let go and it falls onto
+        // whatever is under it — a table, a shelf, the floor.
+        const now = d.body.translation();
+        const ny = now.y + (d.target.y - now.y) * 0.35;
+        d.body.setTranslation({ x: now.x, y: Math.max(0, ny), z: now.z }, true);
+        d.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+      } else {
+        d.body.setLinvel({ x: 0, y: v.y, z: 0 }, true); // gravity only; no coasting
+      }
       d.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
     }
   }

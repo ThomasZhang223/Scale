@@ -43,8 +43,12 @@ const C = {
 
 // Metres on the wrist; canvas pixels map 1 m → 4000 px, so a 44 pt row is 0.034 m.
 const PX = 4000;
-const COLS = 4;                  // a tablet, not a phone: four cells across, a short list
+const COLS = 4;                  // four cells across: wide and short
 const COL_W = 0.115;
+const WINDOW_SCALE = 2.2;        // the phone-scale layout, blown up to a window ~1 m wide
+const WINDOW_DISTANCE = 1.4;     // metres ahead of the eyes when first shown
+const WINDOW_DROP = 0.2;         // metres below eye level (window centre)
+const BAR = { w: 0.14, h: 0.012, gap: 0.014 }; // the drag bar under the window, Quest-style
 const GAP_X = 0.006;
 const ROW_H = 0.037;
 const HEADER_H = 0.022;
@@ -82,22 +86,40 @@ function measure(): CanvasRenderingContext2D | null {
 }
 
 export class Palette {
-  /** Attach this to the left controller's grip. Hidden until it has items. */
+  /**
+   * A window floating in the room, like the Quest's own: it stands where you leave it, you
+   * drag it by its bar (or its frame) and push it further or pull it closer with the stick,
+   * and it never closes. Hidden until it has items.
+   */
   readonly group = new THREE.Group();
   private tiles: THREE.Mesh[] = [];
+  private grabTargets: THREE.Object3D[] = [];
   private hovered: THREE.Mesh | null = null;
 
   constructor() {
     this.group.name = 'palette';
     this.group.visible = false;
-    // Rests above the back of the hand like a tablet held flat, tilted toward the eyes when
-    // you look at your wrist. Wider than the hand on purpose: it is a screen, not a phone.
-    this.group.position.set(0, 0.075, -0.02);
-    this.group.rotation.x = -Math.PI / 3;
+    // The layout is drawn at phone scale (metres per row, canvas px per metre) and the whole
+    // window is scaled up: text, tiles and bar grow together, nothing is re-typeset.
+    this.group.scale.setScalar(WINDOW_SCALE);
   }
 
-  attachTo(grip: THREE.Object3D) {
-    grip.add(this.group);
+  attachTo(parent: THREE.Object3D) {
+    parent.add(this.group);
+  }
+
+  /** Puts the window ahead of the eyes, a little below eye level, facing them. */
+  placeInFront(eye: THREE.Vector3, forward: THREE.Vector3) {
+    this.group.position.copy(eye).addScaledVector(forward, WINDOW_DISTANCE);
+    this.group.position.y = eye.y - WINDOW_DROP;
+    this.group.lookAt(eye);
+  }
+
+  /** The bar or frame under the ray: the handle for dragging the window. */
+  hitGrab(raycaster: THREE.Raycaster): THREE.Intersection | null {
+    if (!this.group.visible) return null;
+    const [hit] = raycaster.intersectObjects(this.grabTargets, false);
+    return hit ?? null;
   }
 
   setItems(items: PaletteItem[]) {
@@ -112,13 +134,17 @@ export class Palette {
     const frameW = SCREEN_W + 2 * BEZEL;
     const frameH = screenH + 2 * BEZEL;
 
-    // The tablet: a thin bezel, the screen, and a tab bar with the app's name along the top.
-    this.group.add(plate(frameW, frameH, RADIUS_FRAME, C.frame, -0.0025));
+    // The window: a thin frame, the screen, a title bar along the top, and the drag bar below.
+    const frame = plate(frameW, frameH, RADIUS_FRAME, C.frame, -0.0025);
+    this.group.add(frame);
     this.group.add(plate(SCREEN_W, screenH, RADIUS_SCREEN, C.screen, -0.0015));
-    const tab = text('Full Scale', ROW_W, TAB_H, { font: 'footnote', color: C.secondary, background: C.island, padding: 20 });
+    const tab = text('Full Scale  ·  drag the bar to move, stick to push or pull', ROW_W, TAB_H, { font: 'footnote', color: C.secondary, background: C.island, padding: 20 });
     tab.position.set(0, screenH / 2 - TAB_H / 2 - 0.002, -0.0005);
-    tab.raycast = () => {};
     this.group.add(tab);
+    const bar = plate(BAR.w, BAR.h, BAR.h / 2, 'rgba(235,235,245,0.85)', 0);
+    bar.position.y = -frameH / 2 - BAR.gap;
+    this.group.add(bar);
+    this.grabTargets = [bar, tab, frame];
 
     const top = screenH / 2 - TAB_H - TAB_GAP; // y of the screen's usable top edge
     for (const s of slots) {

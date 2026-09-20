@@ -87,7 +87,13 @@ open it with `?scan=/room-scan.json`).
 Getting around on the Quest: **left thumbstick** glides you in the direction you look; flick the
 **right thumbstick** left or right to snap-turn 45°. Both only act from a hand that is not holding
 an object. Walking physically still works on top of it.
-| Laptop | **Add …** buttons in the panel | Drag with the mouse | Scroll while dragging (15° steps) |
+
+The palette is a floating window, not a wrist screen: it appears in front of you on entry, you
+drag it by the bar under it (or its frame) with the trigger, and while dragging the thumbstick
+pushes it further away or pulls it closer. It never closes. To lift a carried object off the
+floor, hold it with one trigger and press the other hand's trigger: raise that hand and the
+object rises; let go of that trigger and it holds its height until you drop it, when it lands
+on whatever is under it.
 
 Letting go leaves the object where it is. Every pull from the palette is a fresh copy.
 

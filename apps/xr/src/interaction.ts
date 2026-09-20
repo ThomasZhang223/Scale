@@ -36,6 +36,21 @@ interface Grab {
   id: string;
   offset: THREE.Vector3; // keeps the grabbed point under the ray instead of snapping to center
   rotY: number;
+  lift: number;          // metres above the floor while carried; 0 = sliding on the ground
+}
+
+/** The other hand raising a carried object: its trigger held, the object follows its height. */
+interface Lift {
+  grab: Grab;
+  hand: Hand;
+  y0: number;    // the lifting hand's height when its trigger was pressed
+  lift0: number; // the object's lift at that moment
+}
+
+/** A hand dragging the window: it stays at this distance along the ray, offset as grabbed. */
+interface WindowDrag {
+  distance: number;
+  offset: THREE.Vector3;
 }
 
 interface Hand {
@@ -44,6 +59,7 @@ interface Hand {
   source?: XRInputSource;
   grab?: Grab;
   pulling?: boolean; // trigger still held while a palette pull is loading
+  windowDrag?: WindowDrag;
   holding?: string; // a "hold:" palette action pressed and not yet released (push-to-talk)
   pressed: boolean[]; // face buttons last frame, to act once per press
 }
@@ -57,6 +73,13 @@ export class Interaction {
   readonly rig = new THREE.Group();
   private hands: Hand[] = [];
   private snapLatched = false;
+  private lift: Lift | null = null;
+  private windowPlaced = false;
+  private xrFrames = 0;
+  private readonly renderer: THREE.WebGLRenderer;
+  private readonly eye = new THREE.Vector3();
+  private readonly fwd = new THREE.Vector3();
+  private readonly q = new THREE.Quaternion();
   private raycaster = new THREE.Raycaster();
   private floor = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
   private hit = new THREE.Vector3();
@@ -83,18 +106,57 @@ export class Interaction {
     /** An action for a ray on one of the head-locked panels ('hud:close', 'find:close', 'find:pick:<objectId>'), or null. */
     private panelHit: (raycaster: THREE.Raycaster) => string | null = () => null,
   ) {
+    this.renderer = renderer;
     scene.add(this.rig);
     this.rig.add(camera);
+    // The window lives in the room, not on a hand; it is placed in front of you on entry.
+    this.palette.attachTo(scene);
     this.setUpControllers(renderer);
     this.setUpMouse(renderer.domElement);
   }
 
+  /** Eye position and floor-plane forward, from the (XR) camera. */
+  private headPose() {
+    this.camera.getWorldPosition(this.eye);
+    this.camera.getWorldQuaternion(this.q);
+    this.fwd.set(0, 0, -1).applyQuaternion(this.q);
+    this.fwd.y = 0;
+    if (this.fwd.lengthSq() < 1e-6) this.fwd.set(0, 0, -1);
+    this.fwd.normalize();
+  }
+
   update(dt: number) {
+    // First frames in VR: put the window in front of you once tracking has settled.
+    if (this.renderer.xr.isPresenting) {
+      if (!this.windowPlaced && ++this.xrFrames > 20) {
+        this.headPose();
+        this.palette.placeInFront(this.eye, this.fwd);
+        this.windowPlaced = true;
+      }
+    } else {
+      this.windowPlaced = false;
+      this.xrFrames = 0;
+    }
+    if (this.lift) {
+      // The object follows the lifting hand's height, amplified so a small raise goes far.
+      const y = this.lift.hand.controller.getWorldPosition(this.hit).y;
+      this.lift.grab.lift = Math.max(0, this.lift.lift0 + (y - this.lift.y0) * 2.5);
+    }
     let overPalette: PaletteItem | null = null;
     let hoverId: string | null = null;
     for (const hand of this.hands) {
       this.turnButtons(hand);
       this.raycaster.setFromXRController(hand.controller);
+      if (hand.windowDrag) {
+        const pad = hand.source?.gamepad;
+        const push = pad?.axes[3] ?? 0; // stick forward = further away, back = closer
+        if (Math.abs(push) > STICK_DEAD) hand.windowDrag.distance = Math.min(3.5, Math.max(0.45, hand.windowDrag.distance - push * 1.2 * dt));
+        this.palette.group.position.copy(this.raycaster.ray.origin).addScaledVector(this.raycaster.ray.direction, hand.windowDrag.distance).add(hand.windowDrag.offset);
+        this.headPose();
+        this.palette.group.lookAt(this.eye);
+        continue;
+      }
+      if (this.lift?.hand === hand) continue; // its trigger is busy lifting
       if (hand.grab) {
         const stick = hand.source?.gamepad?.axes[2] ?? 0;
         if (Math.abs(stick) > 0.2) hand.grab.rotY -= stick * TURN_SPEED * dt;
@@ -160,12 +222,12 @@ export class Interaction {
     while (root.parent && this.physics.idFromObject(root.parent) === id) root = root.parent;
     const anchor = this.raycaster.ray.intersectPlane(this.floor, this.hit) ?? first.point;
     const offset = new THREE.Vector3(root.position.x - anchor.x, 0, root.position.z - anchor.z);
-    return { id, offset, rotY: this.physics.rotationY(id) };
+    return { id, offset, rotY: this.physics.rotationY(id), lift: 0 };
   }
 
   private follow(grab: Grab) {
     if (!this.raycaster.ray.intersectPlane(this.floor, this.hit)) return;
-    this.physics.drag(grab.id, this.hit.x + grab.offset.x, this.hit.z + grab.offset.z, grab.rotY);
+    this.physics.drag(grab.id, this.hit.x + grab.offset.x, this.hit.z + grab.offset.z, grab.rotY, grab.lift > 0 ? grab.lift : undefined);
   }
 
   private isHeld(id: string) {
@@ -246,13 +308,19 @@ export class Interaction {
       const hand: Hand = { controller, ray, pressed: [] };
       controller.addEventListener('connected', (e) => {
         hand.source = e.data;
-        if (e.data.handedness === 'left') this.palette.attachTo(grip);
       });
       controller.addEventListener('disconnected', () => (hand.source = undefined));
       controller.addEventListener('selectstart', () => {
         this.raycaster.setFromXRController(controller);
         const panelAction = this.panelHit(this.raycaster);
         if (panelAction) return this.onAction(panelAction);
+        // The window's bar or frame: start dragging it.
+        const windowHit = this.palette.hitGrab(this.raycaster);
+        if (windowHit) {
+          hand.windowDrag = { distance: windowHit.distance, offset: this.palette.group.position.clone().sub(windowHit.point) };
+          hand.source?.gamepad?.hapticActuators?.[0]?.pulse?.(0.3, 30);
+          return;
+        }
         const item = this.palette.hitTest(this.raycaster);
         if (item?.action?.startsWith('hold:')) {
           // Press-and-release actions: the caller gets ":down" now and ":up" when the trigger lets go.
@@ -262,6 +330,14 @@ export class Interaction {
         }
         if (item?.action) return this.onAction(item.action);
         if (item) return this.pull(hand, item);
+        // The other hand already carries something: this trigger lifts it. Raise the hand,
+        // the object rises; let go of this trigger and it stays at that height until dropped.
+        const carrying = this.hands.find((h) => h !== hand && h.grab);
+        if (carrying?.grab && !this.lift) {
+          this.lift = { grab: carrying.grab, hand, y0: controller.getWorldPosition(new THREE.Vector3()).y, lift0: carrying.grab.lift };
+          hand.source?.gamepad?.hapticActuators?.[0]?.pulse?.(0.3, 30);
+          return;
+        }
         hand.grab = this.tryGrab();
         if (hand.grab) {
           hand.source?.gamepad?.hapticActuators?.[0]?.pulse?.(0.4, 40);
@@ -270,6 +346,8 @@ export class Interaction {
       });
       controller.addEventListener('selectend', () => {
         hand.pulling = false;
+        hand.windowDrag = undefined;
+        if (this.lift?.hand === hand) this.lift = null;
         if (hand.holding) {
           this.onAction(`${hand.holding}:up`);
           hand.holding = undefined;
@@ -309,7 +387,7 @@ export class Interaction {
     hand.source?.gamepad?.hapticActuators?.[0]?.pulse?.(0.4, 40);
     void this.spawn(item, spot).then((id) => {
       // Trigger already released while the file loaded: the object simply stays where it landed.
-      if (id && hand.pulling) hand.grab = { id, offset: new THREE.Vector3(), rotY: 0 };
+      if (id && hand.pulling) hand.grab = { id, offset: new THREE.Vector3(), rotY: 0, lift: 0 };
       hand.pulling = false;
     });
   }
