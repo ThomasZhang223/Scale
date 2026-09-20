@@ -1,14 +1,13 @@
 import * as THREE from 'three';
 
 /*
- * The transcript: a head-locked card a metre in front of the eyes, just under the line of
- * sight, that shows what was heard and what the designer said back — the summary, why the
- * layout is the way it is, the trade-off, and any error, in full. It never truncates: lines
- * wrap and the card grows downward. It is a child of the camera, so it follows the head in
- * the headset and is hidden in the spectator view (the laptop has its own log).
+ * The transcript: a card on the left hand, just past the top of the phone panel (the phone
+ * grows down from the hand, this grows up from the phone's top edge), that shows what was
+ * heard and what the designer said back — the summary, why the layout is the way it is, the
+ * trade-off, and any error, in full. It never truncates: lines wrap and the card grows.
+ * It is a child of Palette.above, so it shares the phone's tilt and follows the hand.
  *
- * The wrist stays for buttons; explanations live here so they can be read without looking
- * down at your hand.
+ * The phone keeps the buttons; the reasons live here, in the same glance.
  */
 
 export type Tone = 'heard' | 'info' | 'warn' | 'error';
@@ -17,15 +16,14 @@ export interface HudLine {
   tone: Tone;
 }
 
-const PX = 1600;                 // canvas px per metre
-const WIDTH = 0.72;              // metres; at 1.1 m that is ~36° wide
-const PAD = 0.03;
-const LINE_H = 0.036;            // metres per wrapped line
-const GAP = 0.012;               // between entries
-const RADIUS = 0.03;
-const MAX_LINES = 14;            // keep the card from covering the room
-const DISTANCE = 1.1;
-const DROP = -0.22;              // below the line of sight; the room stays visible above it
+const PX = 4000;                 // canvas px per metre, the same density as the phone
+const WIDTH = 0.284;             // metres: the phone's frame width, so the two read as one stack
+const PAD = 0.012;
+const LINE_H = 0.0145;           // metres per wrapped footnote line, as on the phone
+const GAP = 0.006;               // between entries
+const RADIUS = 0.018;
+const MAX_LINES = 18;            // the card's ceiling; older lines fall off the top
+const GAP_ABOVE_PHONE = 0.008;
 
 const COLOR: Record<Tone, string> = {
   heard: 'rgba(235,235,245,0.60)',
@@ -34,30 +32,22 @@ const COLOR: Record<Tone, string> = {
   error: '#FF453A',
 };
 const BACKGROUND = 'rgba(28,28,30,0.88)';
-const FONT = `${0.026 * PX}px -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", system-ui, sans-serif`;
+const FONT = `${13 * 3.4}px -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", system-ui, sans-serif`;
 
 export class Hud {
   readonly group = new THREE.Group();
   private mesh: THREE.Mesh | null = null;
   private lines: HudLine[] = [];
-  private presenting = false;
 
   constructor() {
     this.group.name = 'hud';
-    this.group.position.set(0, DROP, -DISTANCE);
-    this.group.rotation.x = -0.12; // tilted up toward the eyes
+    this.group.position.y = GAP_ABOVE_PHONE;
     this.group.visible = false;
   }
 
-  /** Attach to the camera (which must itself be in the scene) so the card follows the head. */
-  attachTo(camera: THREE.Object3D) {
-    camera.add(this.group);
-  }
-
-  /** Only shown inside the headset; the spectator view has the laptop panel. */
-  setPresenting(on: boolean) {
-    this.presenting = on;
-    this.group.visible = on && this.mesh !== null;
+  /** Attach to Palette.above: the phone's top edge, in the phone's own plane. */
+  attachTo(anchor: THREE.Object3D) {
+    anchor.add(this.group);
   }
 
   /** Replaces the transcript. Empty hides the card. */
@@ -126,14 +116,13 @@ export class Hud {
     texture.anisotropy = 4;
     this.mesh = new THREE.Mesh(
       new THREE.PlaneGeometry(WIDTH, height),
-      new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthTest: false, depthWrite: false }),
+      new THREE.MeshBasicMaterial({ map: texture, transparent: true, side: THREE.DoubleSide }),
     );
-    this.mesh.renderOrder = 999; // always on top of the room, never clipped by a wall
     this.mesh.raycast = () => {};
-    // Grow downward: the top edge stays put as the card gets taller.
-    this.mesh.position.y = -height / 2;
+    // Grow upward, away from the phone: the bottom edge stays on the phone's top edge.
+    this.mesh.position.y = height / 2;
     this.group.add(this.mesh);
-    this.group.visible = this.presenting;
+    this.group.visible = true;
   }
 }
 
