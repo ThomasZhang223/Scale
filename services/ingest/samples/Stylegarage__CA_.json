@@ -3,6 +3,11 @@
     "title": "CozyPad Sofabed",
     "handle": "cozypad-sofabed",
     "product_type": "Sofa",
+    "images": [
+      "https://cdn.shopify.com/s/files/1/0073/0166/0725/files/CozyPad-sofa-bed-with-arms-412-low-e1.jpg?v=1789582635",
+      "https://cdn.shopify.com/s/files/1/0073/0166/0725/files/CozyPad-Sofa-bed-With-Arms-412-Low_e13.jpg?v=1789582554",
+      "https://cdn.shopify.com/s/files/1/0073/0166/0725/files/CozyPad-sofa-bed-with-arms-413-Low-e4.jpg?v=1789582469"
+    ],
     "tags": [
       "Sofabeds"
     ],
@@ -30,6 +35,11 @@
     "title": "Kitchen Shelf with Hanger",
     "handle": "kitchen-shelf-with-hanger",
     "product_type": "Shelving",
+    "images": [
+      "https://cdn.shopify.com/s/files/1/0073/0166/0725/files/Kitchen1_v1.jpg?v=1789054650",
+      "https://cdn.shopify.com/s/files/1/0073/0166/0725/files/bp_hanger_black_brass_web_square_02.webp?v=1789054446",
+      "https://cdn.shopify.com/s/files/1/0073/0166/0725/files/usv-531925-lifestyle-1_26c7cc58-e663-42bd-a792-ba0265727031.webp?v=1789054445"
+    ],
     "tags": [
       "Fixtures",
       "Shelving"
@@ -62,6 +72,11 @@
     "title": "Dunes Rug",
     "handle": "dunes-rug",
     "product_type": "Floor Covering",
+    "images": [
+      "https://cdn.shopify.com/s/files/1/0073/0166/0725/products/14201_Teak_M_rack_21754_Sand_Dunes_rug_20157_Barrow_pouf_off_white_WEB.jpg?v=1744399792",
+      "https://cdn.shopify.com/s/files/1/0073/0166/0725/products/14201_M_rack_20157_Barrow_pouf_offwhite_20145_Ellipse_oat_60091_Stone_st_emperador_25944_Stability_ct_21751_Cumin_dunes_WEB.jpg?v=1744399792",
+      "https://cdn.shopify.com/s/files/1/0073/0166/0725/products/20054_20055_20057_20059_Mellow_sofa_25905_25906_Luna_coffee_table_25925_Celeste_sidetable_21752_Dunes_rug_WEB_2.jpg?v=1744399793"
+    ],
     "tags": [],
     "body_html": "<p data-mce-fragment=\"1\">The Dunes rug is made from hand spun sheep's wool which has been hand-knotted using Persian techniques to deliver a looser, high-pile finish. Character, durability and texture are supremely melded with quality and a wonderfully soft, casual - yet sophisticated - vibe.</p>",
     "variants": [
@@ -101,6 +116,11 @@
     "title": "Beat Floor Lamp",
     "handle": "beat-floor-lamp",
     "product_type": "Lighting",
+    "images": [
+      "https://cdn.shopify.com/s/files/1/0073/0166/0725/files/Beatfloorlampblack2.webp?v=1788469334",
+      "https://cdn.shopify.com/s/files/1/0073/0166/0725/files/TD_LIGHTING_SEP_2019-1532_Brand_image.jpg?v=1788536030",
+      "https://cdn.shopify.com/s/files/1/0073/0166/0725/files/BLF01EU_Beat_Floor_Light_Black_Side_Cut_out_1.jpg?v=1788536613"
+    ],
     "tags": [
       "Floor Lamps"
     ],
@@ -128,6 +148,11 @@
     "title": "Jack Portable Light",
     "handle": "jack-portable-light",
     "product_type": "Lighting",
+    "images": [
+      "https://cdn.shopify.com/s/files/1/0073/0166/0725/files/jack_portable_6.webp?v=1788465851",
+      "https://cdn.shopify.com/s/files/1/0073/0166/0725/files/jack_portable_7.webp?v=1788465851",
+      "https://cdn.shopify.com/s/files/1/0073/0166/0725/files/jack_portable_8.webp?v=1788465851"
+    ],
     "tags": [],
     "body_html": "<p>Jack is a playful portable light designed for effortless indoor and outdoor use. Lightweight, stackable and easy to move, it\u2019s made from durable polyethylene using an air rotation-moulding process making it lightweight and dynamic.\u00a0</p>\n<p>The matte white shade creates a soft, diffused glow from an integrated and replaceable 5W LED, delivering warm 2700K light. A dimmer allows smooth, continuous brightness control, while a remote can pair and control up to three lights simutaneously. Rechargeable via USB-C, JACK provides up to 8 hours of light. Fully IP65 rated, it\u2019s built for outdoor use and long-term durability, with replaceable electrical components.</p>",
     "variants": [
@@ -149,6 +174,11 @@
     "title": "Unda Office Chair",
     "handle": "unda-office-chair",
     "product_type": "Chair",
+    "images": [
+      "https://cdn.shopify.com/s/files/1/0073/0166/0725/files/50794_Boomerang_desk_Oak_50793_Boomerang_drawer_unit_Oak_50698_Unda_office_chair_Charchoal_fabric_Black_base_1_HQ.jpg?v=1787860789",
+      "https://cdn.shopify.com/s/files/1/0073/0166/0725/files/50699_50700_Unda_office_chair_Salt_fabric_black_base_with_wheels_det01_HQ.jpg?v=1787860877",
+      "https://cdn.shopify.com/s/files/1/0073/0166/0725/files/50698_Unda_office_chair_Charcoal_fabric_black_base_with_wheels_front_HQ.jpg?v=1787860763"
+    ],
     "tags": [
       "Chairs",
       "Desk Chairs"
@@ -191,6 +221,11 @@
     "title": "Unda Dining Table",
     "handle": "unda-dining-table",
     "product_type": "Dining Table",
+    "images": [
+      "https://cdn.shopify.com/s/files/1/0073/0166/0725/files/50701_Unda_dining_table_Oak_50695_Unda_dining_chair_Oak_Salt_fabric_HQ.jpg?v=1787858676",
+      "https://cdn.shopify.com/s/files/1/0073/0166/0725/files/50701_Unda_dining_table_oak_50695_Unda_dining_chair_oak_Salt_fabric_51347_PI_rack_Oak_HQ.jpg?v=1787858688",
+      "https://cdn.shopify.com/s/files/1/0073/0166/0725/files/50701_Unda_dining_table_oak_round_180_det01_HQ.jpg?v=1787858700"
+    ],
     "tags": [
       "Dining Tables"
     ],
@@ -214,6 +249,11 @@
     "title": "Sequence Dining Table",
     "handle": "sequence-dining-table",
     "product_type": "Dining Table",
+    "images": [
+      "https://cdn.shopify.com/s/files/1/0073/0166/0725/files/35155_Sequence_dining_table_varnished_mahogany_dark_brown_rectangular_51551_Bok_dining_chair_varnished_oak_brown_Brown_leather_29748_Satellite_bowl_varnished_mahogany_darkbrown_HQ.jpg?v=1787858233",
+      "https://cdn.shopify.com/s/files/1/0073/0166/0725/files/50251_Sequence_dining_table_Oak_51490_50073_Bok_dining_chair_Oak_1_HQ.jpg?v=1787858415",
+      "https://cdn.shopify.com/s/files/1/0073/0166/0725/files/50251_Sequence_dining_table_Oak_51490_50073_Bok_dining_chair_Oak_4_HQ.jpg?v=1787858426"
+    ],
     "tags": [
       "Dining Tables"
     ],

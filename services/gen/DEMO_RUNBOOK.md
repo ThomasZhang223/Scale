@@ -3,7 +3,10 @@
 **Works locally:** real cached embeddings, Paul's search handoff, B04 and B06
 software composition. **Real SF3D generation and saved-mesh B04: PASS.**
 Product relevance evaluation and deployed generation workflow/SSE remain unproven.
-No further Baseten/GPU calls are authorized; use the saved artifact below.
+The later bounded latency experiment has separate authorization and evidence.
+For judging activation, readiness and explicit shutdown, use
+[the resident SF3D procedure](SF3D_JUDGING.md). The saved baseline below remains
+historical evidence, not an instruction to leave compute running.
 
 ## Start the CPU service
 

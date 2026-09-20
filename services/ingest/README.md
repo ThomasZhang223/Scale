@@ -10,16 +10,52 @@ writes only through `.claude/contracts.md`.
 
 ## How to run
 
+Normally you don't run this service by hand. It is registered in the repo's
+`docker-compose.yml` as `ingest` on **host port 8003** (container 8080), and `infra/up.sh`
+brings it up with `fit` and `search`, tunnels it, and publishes the origin to the Worker:
+
 ```
-docker build -t ingest .
-docker run --rm -p 8081:8080 ingest
+cp infra/.env.example infra/.env     # then fill in UPSTREAM_TOKEN
+infra/up.sh
 ```
 
-Or locally:
+Config comes from `infra/.env`, which compose passes into the container. `UPSTREAM_TOKEN` is
+required — the service refuses to start without it, because an auth check that silently
+passes when unconfigured is worse than no auth. `BROWSERBASE_API_KEY` and `OPENAI_API_KEY` /
+`OPENAI_MODEL` are optional and gate the later extraction steps; see the comments in
+`infra/.env.example` and `EXTRACTION.md`.
+
+To run just this container:
+
+```
+docker compose --profile local up -d --build ingest
+curl -s localhost:8003/health          # {"ok":true,"browserbase":true|false}
+docker compose logs -f ingest
+```
+
+`/health` needs no token and reports whether step 2.5 is configured, so it tells you which
+mode a running container is in without spending a page fetch to find out.
+
+Or without Docker, from this directory:
 
 ```
 pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8081
+UPSTREAM_TOKEN=devtoken uvicorn app.main:app --reload --port 8080
+```
+
+Every route except `/health` needs `X-Upstream-Token` matching `UPSTREAM_TOKEN`:
+
+```
+curl -s -X POST localhost:8003/extract \
+  -H 'content-type: application/json' -H "X-Upstream-Token: $UPSTREAM_TOKEN" \
+  -d '{"merchant":"floyd","storefront":"https://floydhome.com","products":[]}'
+```
+
+The tests are plain scripts, not pytest — run one, or all of them:
+
+```
+UPSTREAM_TOKEN=devtoken python3 tests/test_service.py
+for t in tests/test_*.py; do UPSTREAM_TOKEN=devtoken python3 "$t"; done
 ```
 
 ## The service the Worker calls
@@ -226,6 +262,129 @@ dimensions.
 Rescued rows carry `extractedFrom` (`json_ld`, `spec_block` or `page_text`) so you can see
 which surface paid off. `measure.method` stays `"extracted"` — a page read is still extraction,
 and inventing a fourth enum value would be a schema change.
+
+### `POST /find` — a prompt, live
+
+The pipeline is otherwise merchant-driven: crawl a catalogue, extract all of it, curate. That
+pre-generates assets but cannot answer "find me a red chair". `/find` is the front half.
+
+```
+POST /find { storefront, query, limit? }
+  -> { query, searchedFor, searchUrl, count, handles, missing, products }
+```
+
+Browserbase renders the merchant's own `/search?q=` page and the product handles are read off
+it **in document order** — that is their relevance ranking, and their search knows a "Cloud" is
+a chair in a way title-matching never will. Handles are then joined back to `/products.json`,
+because the search page carries a title and a thumbnail while the catalogue carries variants,
+`body_html` and the image list, which is what the extraction pipeline takes. `/find` returns
+raw products; feed them to `/extract` to measure them.
+
+`query` is expected to describe a **product**. Separating the product from the place — "a
+bookshelf beside my desk" is a search for a bookshelf, not a desk — is the voice agent's job,
+which splits it into `find_anchor` and `search_objects` before anything reaches here. This
+endpoint only strips leftover imperative noise; it does not parse intent, because two places
+doing that is how they drift.
+
+To try it without running the service:
+
+```
+export BROWSERBASE_API_KEY=...
+python3 probe_find.py https://floydhome.com "red chair" --extract
+```
+
+That prints the URL fetched, the handles in the merchant's order, how many joined back to the
+catalogue, and with `--extract`, which are measurable from `/products.json` alone. If nothing
+parses, `--save-html out.html` keeps the page so the theme can be looked at — every theme
+renders search differently and that variety cannot be fixture-tested.
+
+### `fit` on `/extract` — the placing use case
+
+A search has two callers wanting different things. Someone browsing for a red chair wants
+every red chair. An agent putting one in the 0.8 m gap beside a desk wants only the ones that
+go there.
+
+```
+POST /extract { ..., "fit": { "maxW": 0.8, "maxH": 1.2, "maxD": 0.5 } }   # metres
+  -> objects[].extraction.fits: true|false
+  -> stats.fitting / stats.too_big
+```
+
+It belongs on `/extract`, not `/find`: nothing has a size until it has been measured, so the
+check happens after steps 1 through 3, whichever of them produced the number.
+
+**Flagged, not dropped.** An object that misses by a centimetre is worth showing with that
+said out loud rather than vanishing with no explanation, and the caller knows whether it is
+placing or browsing. An object with no measurement never passes a fit filter — "probably
+fine" about an unmeasured object is the one answer this pipeline must never give.
+
+A fit in the wrong units is a **422**, not a filter that quietly does nothing: `maxW: 80` is
+centimetres that escaped a UI edge, and silently matching everything looks exactly like a gap
+big enough for anything.
+
+`app/fit.py` mirrors `services/search/app/ranking.py` deliberately — the services deploy as
+separate images and cannot import each other. `tests/test_fit_agrees_with_search.py` imports
+**both** and asserts identical answers over a table of bounds and boxes, so changing one
+fails the build. Two fit rules that drift is the same failure as two places rescaling a mesh:
+nobody notices until a sofa is offered for a gap it cannot go in, on stage.
+
+### Testing a change without paying for ten merchants
+
+`--only` runs a subset, matched case-insensitively against the merchant name:
+
+```
+python3 build_prebake.py merchants.verified.json --only floyd \
+        --ai-limit 5 --browserbase-limit 5 --limit 10 --out /tmp/probe --llm --vlm
+```
+
+That is about 20 API calls instead of 1600, and the pages are already cached from earlier
+runs, so it comes back in well under a minute. `--only floyd,bend` takes several.
+
+An `--only` that matches nothing **exits non-zero and lists the available names** rather than
+falling back to all ten — standing rule 4. A typo that quietly became a full run would deliver
+the bill before the surprise.
+
+Read the step 3 line closely, because three different situations used to print `recovered 0`:
+
+```
+step 3 (vlm): recovered 0 — 12/40 products had a 2nd image, 31 call(s) made, 31 FAILED
+      31 x http_400: {"error":{"code":"invalid_image_format"}}
+```
+
+- `0 call(s) made` — no product had a second image. Step 3 reads images 2-4 on the theory that
+  a spec diagram is rarely the hero shot, so single-image products are skipped. Not a bug.
+- `N FAILED` with a reason — the calls are being rejected. The reason comes from the API.
+- calls made, none failed, still zero — the model looked and found no dimensioned diagram.
+  For most Shopify furniture listings this is the honest answer.
+
+### Steps 2 and 3: `--llm`, `--vlm`, and what they cost
+
+`--ai-limit` is **per merchant**, not per run. With ten verified merchants the default of 40
+is 400 products, and step 3 spends up to three calls on each — so a `--llm --vlm` run is up to
+1600 API calls. Run serially at roughly a second each that is over half an hour, which is what
+it was before these ran concurrently.
+
+Two things fixed that, and both matter more than the model you pick:
+
+- **`--ai-concurrency`** (default 8) overlaps the calls. They are round trips the process
+  otherwise spends asleep; measured against a 1.2s mock, 24 calls went from 30s to 2.5s at 16
+  workers. `--ai-concurrency 1` restores the old serial behaviour if you are rate-limited.
+- **Step 2.5 now reports what it did *not* solve.** It used to return only its rescues while
+  the caller kept the original list, so step 3 re-attempted every product 2.5 had already
+  measured — 252 of 548 on a real run, at three calls apiece, for rows that were already in
+  hand. `curate()` does not deduplicate, so those also cost demo slots.
+
+The run prints its own worst case before making the first call:
+
+```
+steps 2/3: up to 40 products per merchant x 10 merchants x 4 call(s) = up to 1600 API calls, 8 at a time
+```
+
+If that number is wrong for your budget, stop it there rather than thirty minutes later. The
+same concurrency applies inside the service (`AI_CONCURRENCY`, default 8), where it is not
+just speed: the calls are synchronous, and awaiting them on the event loop blocked `/health`
+long enough for Docker to mark a working container unhealthy. See
+`tests/test_health_under_load.py`, which fails against the blocking version.
 
 **It curates rather than dumps.** The ceiling is not how many products were extracted, it is how
 many get a mesh, and that is Ani's generation throughput: 60–100 (`BUILD_DOC.md`). So selection

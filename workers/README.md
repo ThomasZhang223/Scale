@@ -4,6 +4,9 @@ Owner: **Thomas**. Every HTTP route lives here, including `/search` and `/solve`
 worker proxies to services owned by Paul (`services/search`) and Justin (`services/fit`,
 for `/solve`'s solver) respectively — see `.claude/contracts.md` "Split ownership, stated once".
 
+For sequential catalogue ingestion, deployment commands and batch submission, see
+[MESH_QUEUE.md](MESH_QUEUE.md). That runbook describes the remaining generation adapter prerequisite.
+
 ## Scope
 
 The full `/v1` HTTP surface, R2/D1/Vectorize/Queue bindings, and the per-room SSE fan-out

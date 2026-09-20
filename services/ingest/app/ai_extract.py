@@ -29,6 +29,7 @@ import base64
 import json
 import os
 import re
+import time
 
 import httpx
 
@@ -36,6 +37,16 @@ from .dimensions import TO_METRES, MIN_M, MAX_M, DimensionHit, strip_html
 
 DEFAULT_BASE = "https://api.openai.com/v1"
 TIMEOUT_S = 20.0
+
+# A 429 means "ask again shortly", not "this product has no dimensions", but it was being
+# swallowed as the latter — the product lost its recovery for good. Seen for real on step 3:
+# images are token-expensive and eight concurrent 1024px ones hit a tokens-per-minute ceiling.
+# 5xx is the same shape of problem. Bounded, because a pass that never finishes is worse than
+# one that misses a few.
+RETRY_STATUS = {429, 500, 502, 503, 504}
+MAX_ATTEMPTS = 3
+BACKOFF_S = 2.0
+MAX_BACKOFF_S = 30.0
 
 # Strict mode requires every property in `required` and additionalProperties false, so the
 # optional fields are nullable rather than absent — the planner strips the same forced nulls.
@@ -152,34 +163,85 @@ def _to_hit(payload: dict | None, method: str, confidence: float) -> DimensionHi
     )
 
 
-def _ask(cfg: OpenAIConfig, system: str, content, client=None, model=None) -> dict | None:
+def _ask(cfg: OpenAIConfig, system: str, content, client=None, model=None,
+         errors: list | None = None) -> dict | None:
     """One constrained call. Returns the parsed object, or None — a failed extraction must
-    never take the pipeline with it, and these passes are additive by definition."""
+    never take the pipeline with it, and these passes are additive by definition.
+
+    `errors` is how a caller tells the two kinds of None apart. Swallowing both silently made
+    "every call is being rejected" look exactly like "the model found nothing", and step 3
+    reported a clean `recovered 0` across seven merchants while nobody could say which it was.
+    Append a short reason here and let the caller summarise; raising would still be wrong.
+
+    A retryable status is retried rather than recorded, because a 429 means "ask again
+    shortly", not "this product has no dimensions" — losing the product to a rate limit is a
+    silently wrong answer. Only the last attempt's failure is recorded.
+    """
     if not cfg.configured:
         return None
+
+    def note(reason: str) -> None:
+        if errors is not None:
+            errors.append(reason)
+
     http = client or httpx.Client(timeout=TIMEOUT_S)
-    try:
-        r = http.post(
-            f"{cfg.base}/chat/completions",
-            headers=cfg.headers(),
-            json={
-                "model": model or cfg.model,
-                "temperature": 0,  # reading a stated number is not a creative task
-                "messages": [
-                    {"role": "system", "content": system},
-                    {"role": "user", "content": content},
-                ],
-                "response_format": {"type": "json_schema", "json_schema": SCHEMA},
-            },
-        )
+    payload = {
+        "model": model or cfg.model,
+        "temperature": 0,  # reading a stated number is not a creative task
+        "messages": [
+            {"role": "system", "content": system},
+            {"role": "user", "content": content},
+        ],
+        "response_format": {"type": "json_schema", "json_schema": SCHEMA},
+    }
+
+    for attempt in range(MAX_ATTEMPTS):
+        last = attempt == MAX_ATTEMPTS - 1
+        try:
+            r = http.post(f"{cfg.base}/chat/completions", headers=cfg.headers(), json=payload)
+        except httpx.HTTPError as e:
+            if last:
+                note(f"{type(e).__name__}: {str(e)[:120]}")
+                return None
+            time.sleep(_backoff(None, attempt))
+            continue
+
+        if r.status_code in RETRY_STATUS and not last:
+            time.sleep(_backoff(r, attempt))
+            continue
+
         if r.status_code >= 400:
+            # The body is where the API says WHY — a tokens-per-minute ceiling, an expired
+            # key, a model that does not take images. Truncated because it can be long.
+            note(f"http_{r.status_code}: {r.text[:200].strip()}")
             return None
-        msg = (r.json().get("choices") or [{}])[0].get("message") or {}
-        if msg.get("refusal") or not msg.get("content"):
+
+        try:
+            msg = (r.json().get("choices") or [{}])[0].get("message") or {}
+            if msg.get("refusal"):
+                note(f"refusal: {str(msg['refusal'])[:120]}")
+                return None
+            if not msg.get("content"):
+                note("empty_content")
+                return None
+            return json.loads(msg["content"])
+        except (ValueError, KeyError, IndexError, TypeError) as e:
+            note(f"{type(e).__name__}: {str(e)[:120]}")
             return None
-        return json.loads(msg["content"])
-    except (httpx.HTTPError, ValueError, KeyError, IndexError, TypeError):
-        return None
+
+    return None
+
+
+def _backoff(response, attempt: int) -> float:
+    """How long to wait before retrying. The API's own Retry-After wins when it sends one,
+    since it knows when the window actually resets and guessing wastes the whole pass."""
+    header = (getattr(response, "headers", None) or {}).get("retry-after")
+    if header:
+        try:
+            return max(0.0, min(float(header), MAX_BACKOFF_S))
+        except (TypeError, ValueError):
+            pass
+    return min(BACKOFF_S * (2 ** attempt), MAX_BACKOFF_S)
 
 
 def product_text(product: dict, limit: int = 6000) -> str:
@@ -197,17 +259,19 @@ def product_text(product: dict, limit: int = 6000) -> str:
     return joined[:limit]
 
 
-def extract_with_llm(product: dict, cfg: OpenAIConfig, client=None) -> DimensionHit | None:
+def extract_with_llm(product: dict, cfg: OpenAIConfig, client=None,
+                     errors: list | None = None) -> DimensionHit | None:
     """Step 2. Confidence sits below a labelled regex hit and above whole-page text: the model
     reads prose a regex cannot, and is likelier than a regex to be confidently wrong."""
     text = product_text(product)
     if not text.strip():
         return None
-    return _to_hit(_ask(cfg, LLM_SYSTEM, f"Product text:\n\n{text}", client), "llm", 0.60)
+    return _to_hit(_ask(cfg, LLM_SYSTEM, f"Product text:\n\n{text}", client, errors=errors),
+                   "llm", 0.60)
 
 
 def extract_with_vlm(image_bytes: bytes, media_type: str, cfg: OpenAIConfig,
-                     client=None) -> DimensionHit | None:
+                     client=None, errors: list | None = None) -> DimensionHit | None:
     """Step 3. Last resort before "unknown", and the most expensive call in the pipeline."""
     if not image_bytes:
         return None
@@ -217,4 +281,5 @@ def extract_with_vlm(image_bytes: bytes, media_type: str, cfg: OpenAIConfig,
         {"type": "image_url",
          "image_url": {"url": f"data:{media_type or 'image/jpeg'};base64,{data}"}},
     ]
-    return _to_hit(_ask(cfg, VLM_SYSTEM, content, client, model=cfg.vlm_model), "vlm", 0.55)
+    return _to_hit(_ask(cfg, VLM_SYSTEM, content, client, model=cfg.vlm_model,
+                        errors=errors), "vlm", 0.55)

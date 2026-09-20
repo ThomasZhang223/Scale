@@ -23,7 +23,7 @@
 #   - hostname: fit.<your-domain>
 #     service: http://localhost:8001
 #   - hostname: search.<your-domain>
-#     service: http://localhost:8004
+#     service: http://localhost:8005
 #   - hostname: ingest.<your-domain>
 #     service: http://localhost:8003
 #   - hostname: xr-dev.<your-domain>

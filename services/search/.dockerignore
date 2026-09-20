@@ -1,0 +1,8 @@
+# The image runs the service: app/ and requirements.txt. Everything below is dev-time only
+# and not COPYed by the Dockerfile, but would still ship to the daemon as build context.
+tests/
+*.md
+
+__pycache__/
+*.pyc
+.pytest_cache/

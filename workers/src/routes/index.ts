@@ -8,6 +8,8 @@ import { HttpError, json, noContent, readJson } from "../lib/http";
 import { contentHash, nowIso, token, uuid } from "../lib/ids";
 import { R2Keys, contentTypeFor, keyFromAssetPath } from "../lib/keys";
 import { callUpstream, callUpstreamRaw, upstreamOrigin } from "../lib/config";
+import { embedInput, type Embedding } from "../lib/embedding";
+import { enqueueMesh } from "../lib/mesh-dispatch";
 import { emitToRoom, roomAgent, scoutAgent } from "../lib/notify";
 import {
   advanceJob,
@@ -315,10 +317,8 @@ export async function postGenerate(
   await env.DB.prepare("UPDATE objects SET state = 'generating' WHERE id = ?").bind(objectId).run();
 
   try {
-    await env.GENERATE_MESH.create({
-      id: jobId,
-      params: { jobId, objectId, tier, apiOrigin: origin, roomId: body.roomId ?? null },
-    });
+    const params = { jobId, objectId, tier, apiOrigin: origin, roomId: body.roomId ?? null };
+    await enqueueMesh(env, params);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     await advanceJob(env, jobId, "failed", 0, message.slice(0, 500), nowIso());
@@ -401,7 +401,10 @@ export async function postSearch(req: Request, env: Env, origin: string): Promis
   // This ordering also matters for cost: retrieving from Vectorize first and then discarding it
   // paid for a query nobody read.
   const searchOrigin = await env.CONFIG.get("upstream:search");
-  if (searchOrigin) {
+  // The laptop ranker's in-memory index is independent of Vectorize and may be empty.
+  // With Cloudflare embeddings configured, query the durable index we actually write.
+  const embeddingOrigin = await env.CONFIG.get("upstream:embedding");
+  if (searchOrigin && !embeddingOrigin) {
     try {
       // Verbatim. `{ query: body, candidates }` would nest every field one level too deep, and
       // his `body.get("text")` / `body.get("fit")` would read None — producing an unfiltered,
@@ -439,7 +442,8 @@ export async function postSearch(req: Request, env: Env, origin: string): Promis
   if (body.fit?.maxD != null) filter.d_mm = { $lte: Math.round(body.fit.maxD * 1000) };
   if (body.source) filter.source = body.source;
 
-  const matches = await env.OBJECTS_INDEX.query(embedding, {
+  const matches = await env.OBJECTS_INDEX.query(embedding.values, {
+    namespace: embedding.fingerprint,
     topK: limit,
     returnMetadata: "indexed",
     ...(Object.keys(filter).length > 0 ? { filter } : {}),
@@ -485,7 +489,7 @@ export async function postSearch(req: Request, env: Env, origin: string): Promis
   // five paths ran, so "these are not ranked" is one curl away rather than something you notice
   // on stage.
   return json(hits, 200, {
-    "x-ranker": searchOrigin ? "vectorize-ranker-unreachable" : "vectorize",
+    "x-ranker": searchOrigin && !embeddingOrigin ? "vectorize-ranker-unreachable" : "vectorize",
   });
 }
 
@@ -493,26 +497,14 @@ export async function postSearch(req: Request, env: Env, origin: string): Promis
  * A 768-dim SigLIP 2 query vector, or null when no embedder is reachable.
  *
  * Workers AI has no SigLIP or CLIP model, so this cannot be done at the edge. It has to come
- * from Ani's Baseten endpoint, whose text tower shares the vision tower's space. Returning
+ * from the dedicated CPU encoder, whose text tower shares the vision tower's space. Returning
  * null rather than a zero vector matters: a zero vector would return arbitrary nearest
  * neighbours that look like real results.
  */
-async function queryEmbedding(env: Env, body: SearchBody): Promise<number[] | null> {
+async function queryEmbedding(env: Env, body: SearchBody): Promise<Embedding | null> {
   if (!body.text && !body.imageKey) return null;
-  if (!env.BASETEN_URL) return null;
   try {
-    const res = await fetch(`${env.BASETEN_URL.replace(/\/+$/, "")}/embed`, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        ...(env.BASETEN_API_KEY ? { authorization: `Api-Key ${env.BASETEN_API_KEY}` } : {}),
-      },
-      body: JSON.stringify({ text: body.text ?? null, image_key: body.imageKey ?? null }),
-      signal: AbortSignal.timeout(6_000),
-    });
-    if (!res.ok) return null;
-    const out = (await res.json()) as { embedding?: number[] };
-    return out.embedding && out.embedding.length === 768 ? out.embedding : null;
+    return await embedInput(env, { text: body.text, imageKey: body.imageKey });
   } catch {
     return null;
   }
@@ -678,11 +670,13 @@ export async function getSync(env: Env, roomId: string): Promise<Response> {
  * configuration. One GET answers which.
  */
 export async function getHealth(env: Env): Promise<Response> {
-  const [solver, search, ingest, layout] = await Promise.all([
+  const [solver, search, ingest, layout, embedding, fingerprint] = await Promise.all([
     env.CONFIG.get("upstream:solver"),
     env.CONFIG.get("upstream:search"),
     env.CONFIG.get("upstream:ingest"),
     env.CONFIG.get("upstream:layout"),
+    env.CONFIG.get("upstream:embedding"),
+    env.CONFIG.get("embedding:fingerprint"),
   ]);
 
   let d1 = "unreachable";
@@ -702,15 +696,26 @@ export async function getHealth(env: Env): Promise<Response> {
       search: search ?? null,
       ingest: ingest ?? null,
       layout: layout ?? null,
+      embedding: embedding ?? null,
+    },
+    embeddingFingerprint: fingerprint ?? null,
+    meshPipeline: {
+      revision: "sequential-v1",
+      providerConfigured: Boolean(env.BASETEN_URL && env.BASETEN_API_KEY),
+      concurrency: 1,
+      intake: "/v1/catalog/ingest",
+      dispatch: "D1 outbox -> Cloudflare Queue -> MeshDispatcher -> GenerateMeshWorkflow",
     },
     secrets: {
       UPSTREAM_TOKEN: Boolean(env.UPSTREAM_TOKEN),
       BASETEN_URL: Boolean(env.BASETEN_URL),
       BASETEN_API_KEY: Boolean(env.BASETEN_API_KEY),
+      EMBEDDING_API_KEY: Boolean(env.EMBEDDING_API_KEY),
     },
     notes: [
       "upstream:solver unset -> POST /v1/fit returns 503. upstream:layout unset -> POST /v1/solve returns 503.",
-      "BASETEN_URL unset -> /v1/search uses the d1-fallback ranker and /v1/objects/{id}/generate fails.",
+      "Missing Baseten secrets -> accepted mesh jobs wait durably. A configured URL must serve the dimension-binding adapter, not raw SF3D.",
+      "Vector search requires upstream:embedding, embedding:fingerprint, and EMBEDDING_API_KEY.",
     ],
   });
 }

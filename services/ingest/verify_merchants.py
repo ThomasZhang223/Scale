@@ -57,12 +57,35 @@ TARGET_USABLE_PRODUCTS = 100
 # uncategorised, and "foyer/hall lanterns" and "night stands" were among them.
 DEMO_CATEGORIES = {
     "seating": ("chair", "sofa", "couch", "stool", "bench", "seating", "armchair", "ottoman",
-                "loveseat", "sectional", "settee", "recliner"),
+                "loveseat", "sectional", "settee", "recliner", "chaise"),
     "surface": ("desk", "table", "console", "nightstand", "night stand", "sideboard", "vanity"),
     "storage": ("shelf", "shelv", "bookcase", "bookshelf", "cabinet", "storage", "dresser",
                 "credenza", "wardrobe", "chest", "drawer"),
     "lighting": ("lamp", "light", "sconce", "pendant", "lantern", "chandelier", "flush mount"),
+    # Beds arrived as 20% of a real handoff through the `other` bucket, uncategorised, four
+    # colourways of one model among them. They are legitimate demo objects — a bed placed at
+    # true 1:1 in a headset is a striking thing to see — so they get a named category and a
+    # deliberate share, rather than arriving by accident because nothing else matched.
+    "sleeping": ("bed", "mattress", "headboard", "bunk", "daybed", "futon"),
 }
+
+
+# Soft goods and decor. They are not objects you place at true scale against a room scan, and
+# several of them collide with a real category by substring — "bedding" contains "bed",
+# "table runner" contains "table". Checked before any bucket matches, so a category keyword
+# can never drag one of these in.
+NOT_PLACEABLE = (
+    "bedding", "duvet", "sheet set", "pillowcase", "pillow case", "sham", "blanket", "throw",
+    "quilt", "comforter", "cushion cover", "slipcover", "cover set", "linen set",
+    "rug", "runner", "curtain", "drape", "art print", "wall art", "poster", "mirror",
+    "candle", "vase", "planter", "tray", "coaster", "knob", "pull", "hardware", "sample",
+    "swatch", "gift card", "care kit", "cleaner", "touch-up", "replacement part",
+    # Parts and soft goods a real run surfaced once the title was actually being read: a
+    # mattress topper, a crib mattress protector, a headboard add-on and a bed frame
+    # expansion kit all reached `sleeping`, and a tealight holder reached `lighting`.
+    "topper", "protector", "mattress pad", "add-on", "add on", "expansion kit",
+    "tealight", "candle holder", "bundle", "seat pad",
+)
 
 
 def bucket_for(ptype: str, title: str = "") -> str | None:
@@ -73,20 +96,36 @@ def bucket_for(ptype: str, title: str = "") -> str | None:
     "lighting 0" while holding a lighting merchant's catalogue. Otherwise the longest matching
     keyword wins, so "bookcase" beats a stray substring.
     """
-    # 101 usable products came back with an EMPTY product_type on the first real run. The
-    # title names the thing in every one of those cases, so fall back to it rather than
-    # discarding the product from coverage entirely.
-    text = (ptype or "").lower() or (title or "").lower()
-    if not text:
+    ptype_l = (ptype or "").lower()
+    title_l = (title or "").lower()
+
+    # Before anything else, and against BOTH fields: a duvet is not a bed, a table runner is
+    # not a table, and a swatch named "First Light" is not a lamp — that last one only says
+    # "swatch" in its product_type, so checking the title alone would have let it through.
+    if any(w in ptype_l or w in title_l for w in NOT_PLACEABLE):
         return None
-    if any(w in text for w in DEMO_CATEGORIES["lighting"]):
-        return "lighting"
-    best, best_len = None, 0
-    for bucket, words in DEMO_CATEGORIES.items():
-        for w in words:
-            if w in text and len(w) > best_len:
-                best, best_len = bucket, len(w)
-    return best
+
+    # product_type first, then the title. The fallback used to fire only when product_type was
+    # EMPTY, so a type that matched nothing — "Dining", "Furniture" — shadowed a title that
+    # said "Chair" outright. Six real chairs from Thuma and Lulu and Georgia were being counted
+    # as uncategorised for that reason. (101 products on the first real run had no
+    # product_type at all, which is why the title fallback exists in the first place.)
+    for text in (ptype_l, title_l):
+        if not text:
+            continue
+        # Lighting wins outright: "table lamps" is a lamp, and first-match-in-dict-order put it
+        # in `surface` because "table" is a surface keyword — which is how a real run reported
+        # "lighting 0" while holding a lighting merchant's catalogue.
+        if any(w in text for w in DEMO_CATEGORIES["lighting"]):
+            return "lighting"
+        best, best_len = None, 0
+        for bucket, words in DEMO_CATEGORIES.items():
+            for w in words:
+                if w in text and len(w) > best_len:
+                    best, best_len = bucket, len(w)
+        if best:
+            return best
+    return None
 
 
 def coverage(reports: list["MerchantReport"]) -> dict[str, int]:

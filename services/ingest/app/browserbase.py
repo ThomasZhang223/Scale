@@ -14,7 +14,9 @@ instructions, and any LLM pass over it must stay on a constrained output schema.
 
 from __future__ import annotations
 
+import hashlib
 import os
+import threading
 import time
 from dataclasses import dataclass
 
@@ -117,21 +119,48 @@ class CachedFetch:
         os.makedirs(cache_dir, exist_ok=True)
         self.hits = 0
         self.misses = 0
+        # Callers fetch from a thread pool, so the counters need a lock: `+= 1` is a
+        # read-modify-write and would quietly undercount.
+        self._lock = threading.Lock()
 
     def _path(self, url: str) -> str:
-        import hashlib
-        return os.path.join(self.cache_dir, hashlib.sha256(url.encode()).hexdigest()[:24] + ".html")
+        return os.path.join(self.cache_dir,
+                            hashlib.sha256(url.encode()).hexdigest()[:24] + ".html")
 
     def fetch(self, url: str) -> FetchResult:
         path = self._path(url)
         if os.path.exists(path):
-            self.hits += 1
+            with self._lock:
+                self.hits += 1
             with open(path) as f:
-                return FetchResult(url=url, status_code=200, content=f.read(), content_type="text/html")
+                return FetchResult(url=url, status_code=200, content=f.read(),
+                                   content_type="text/html")
         if self.upstream is None:
             raise FetchError(None, f"cache miss for {url} and no upstream fetcher configured")
-        self.misses += 1
+        with self._lock:
+            self.misses += 1
         result = self.upstream.fetch(url)
-        with open(path, "w") as f:
-            f.write(result.content)
+        self._write_atomically(path, result.content)
         return result
+
+    def _write_atomically(self, path: str, content: str) -> None:
+        """Write via a temp file and rename.
+
+        `open(path, "w")` truncates immediately, so a second thread reaching the
+        os.path.exists check mid-write would read a half-written or empty page — which this
+        pipeline cannot distinguish from a merchant that simply lists no dimensions. A wrong
+        answer that looks like a real one is the worst outcome here, and os.replace is atomic
+        on POSIX and Windows alike. The temp file carries the thread id so two threads racing
+        on the same URL cannot clobber each other's partial file either.
+        """
+        tmp = f"{path}.{os.getpid()}.{threading.get_ident()}.tmp"
+        try:
+            with open(tmp, "w") as f:
+                f.write(content)
+            os.replace(tmp, path)
+        except BaseException:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+            raise

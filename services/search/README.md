@@ -23,16 +23,20 @@ verbatim — this service is stateless and receives everything it needs in the r
 internal HTTP contract is identical to the public one documented in `.claude/contracts.md`
 (`{ text?, imageKey?, fit?, source?, limit }` in, `[{ objectId, score, object }]` out).
 
+Registered in the repo's `docker-compose.yml` as `search` on **host port 8005** (container
+8080). `infra/up.sh` brings it up with `fit` and `ingest`, tunnels it, and publishes the
+origin to the Worker — that is the normal path. To run just this container:
+
 ```
-docker build -t search .
-docker run --rm -p 8082:8080 search
+docker compose --profile local up -d --build search
+curl -s localhost:8005/health
 ```
 
-Or locally:
+Or locally, from this directory:
 
 ```
 pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8082
+UPSTREAM_TOKEN=dev uvicorn app.main:app --reload --port 8080
 ```
 
 ## What is implemented

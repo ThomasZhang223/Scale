@@ -8,16 +8,18 @@
 // job-state machine to keep in sync with reality.
 //
 // Free-plan budget: 1,024 steps per instance, 100 concurrent instances. This uses six steps.
-// The concurrency cap is why the unattended catalog pre-bake goes through the queue instead of
-// starting a hundred instances at once — see the queue consumer in src/index.ts.
+// Queue delivery is retriable, but its concurrency cap does not bound running Workflows.
 
 import { WorkflowEntrypoint, type WorkflowEvent, type WorkflowStep } from "cloudflare:workers";
 // NonRetryableError lives in cloudflare:workflows, not cloudflare:workers.
 import { NonRetryableError } from "cloudflare:workflows";
 import { R2Keys } from "../lib/keys";
 import { nowIso } from "../lib/ids";
-import { advanceJob, markObjectFailed, markObjectReady } from "../lib/store";
+import { advanceJob, markObjectFailed, markObjectReady, insertObject, getObject } from "../lib/store";
+import type { CatalogItem } from "../lib/catalog-ingest";
 import { emitToRoom } from "../lib/notify";
+import { embedInput } from "../lib/embedding";
+import { notifyMeshFinished } from "../lib/mesh-dispatch";
 
 export interface GenerateMeshParams {
   jobId: string;
@@ -27,10 +29,12 @@ export interface GenerateMeshParams {
   apiOrigin: string;
   /** Room to notify over SSE when the mesh lands. Null for a catalog pre-bake with no room. */
   roomId: string | null;
+  catalog?: CatalogItem;
 }
 
 interface ObjectMeta {
   objectId: string;
+  source: string;
   bboxMeters: { w: number; h: number; d: number };
   frameKeys: string[];
   name: string;
@@ -45,8 +49,6 @@ interface BasetenResult {
   glbBase64?: string;
   caption?: string;
   palette?: string[];
-  /** 768-dim SigLIP 2 embedding. Workers AI has no SigLIP or CLIP model, so it must come from here. */
-  embedding?: number[];
 }
 
 export class GenerateMeshWorkflow extends WorkflowEntrypoint<Env, GenerateMeshParams> {
@@ -54,6 +56,35 @@ export class GenerateMeshWorkflow extends WorkflowEntrypoint<Env, GenerateMeshPa
     const p = event.payload;
 
     try {
+      let catalogFrameKey: string | null = null;
+      if (p.catalog) {
+        const prepared = await step.do("prepare-catalog-image", { retries: { limit: 3, delay: "5 seconds", backoff: "exponential" }, timeout: "2 minutes" }, async () => {
+          const item = p.catalog!;
+          const res = await fetch(item.imageUrl, { signal: AbortSignal.timeout(60_000) });
+          if (!res.ok) throw new Error(`Catalogue image returned ${res.status}`);
+          const mime = res.headers.get("content-type")?.split(";")[0];
+          if (mime !== "image/jpeg" && mime !== "image/png") throw new NonRetryableError("Catalogue image must be JPEG or PNG.");
+          const reader = res.body!.getReader();
+          const chunks: Uint8Array[] = [];
+          let size = 0;
+          while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            size += value.length;
+            if (size > 10 * 1024 * 1024) { await reader.cancel(); throw new NonRetryableError("Catalogue image exceeds 10 MiB."); }
+            chunks.push(value);
+          }
+          const bytes = new Uint8Array(size);
+          let offset = 0;
+          for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
+          const key = `objects/${p.objectId}/frames/0.${mime === "image/png" ? "png" : "jpg"}`;
+          await this.env.BUCKET.put(key, bytes, { httpMetadata: { contentType: mime } });
+          await this.env.BUCKET.put(`objects/${p.objectId}/catalog.json`, JSON.stringify(item), { httpMetadata: { contentType: "application/json" } });
+          await insertObject(this.env, { ...item, source: "catalog", state: "generating", createdAt: nowIso() });
+          return { key };
+        });
+        catalogFrameKey = prepared.key;
+      }
       const meta = await step.do(
         "load-object",
         // D1 can hiccup, so two tries. Everything *inside* that is deterministic throws
@@ -64,11 +95,12 @@ export class GenerateMeshWorkflow extends WorkflowEntrypoint<Env, GenerateMeshPa
         async (): Promise<ObjectMeta> => {
         await advanceJob(this.env, p.jobId, "running", 5, null, nowIso());
         const row = await this.env.DB.prepare(
-          "SELECT id, name, category, bbox_w, bbox_h, bbox_d FROM objects WHERE id = ?",
+          "SELECT id, source, name, category, bbox_w, bbox_h, bbox_d FROM objects WHERE id = ?",
         )
           .bind(p.objectId)
           .first<{
             id: string;
+            source: string;
             name: string | null;
             category: string | null;
             bbox_w: number;
@@ -80,7 +112,7 @@ export class GenerateMeshWorkflow extends WorkflowEntrypoint<Env, GenerateMeshPa
         // Frames were uploaded to objects/{objectId}/frames/{n}.jpg. List rather than assume a
         // count: the phone decides how many frames it took, and a catalog product has one.
         const listed = await this.env.BUCKET.list({ prefix: `objects/${p.objectId}/frames/` });
-        const frameKeys = listed.objects.map((o) => o.key).sort();
+        const frameKeys = catalogFrameKey ? [catalogFrameKey] : listed.objects.map((o) => o.key).sort();
         if (frameKeys.length === 0) {
           throw new NonRetryableError(
             `No frames at objects/${p.objectId}/frames/. Upload at least one before generating.`,
@@ -88,6 +120,7 @@ export class GenerateMeshWorkflow extends WorkflowEntrypoint<Env, GenerateMeshPa
         }
         return {
           objectId: row.id,
+          source: row.source,
           bboxMeters: { w: row.bbox_w, h: row.bbox_h, d: row.bbox_d },
           frameKeys,
           name: row.name ?? "",
@@ -104,9 +137,8 @@ export class GenerateMeshWorkflow extends WorkflowEntrypoint<Env, GenerateMeshPa
 
       const generated = await step.do(
         "baseten-generate",
-        // A GPU endpoint fails transiently: cold start, queue timeout, a 502 from the proxy.
-        // Three tries with exponential backoff covers that without covering a real bug.
-        { retries: { limit: 3, delay: "5 seconds", backoff: "exponential" }, timeout: "5 minutes" },
+        // Retrying an ambiguous paid prediction can generate and charge twice.
+        { retries: { limit: 0, delay: "5 seconds" }, timeout: "5 minutes" },
         async (): Promise<BasetenResult> => {
           await advanceJob(this.env, p.jobId, "running", 25, null, nowIso());
 
@@ -120,6 +152,7 @@ export class GenerateMeshWorkflow extends WorkflowEntrypoint<Env, GenerateMeshPa
           }
 
           const res = await fetch(url, {
+            signal: AbortSignal.timeout(240_000),
             method: "POST",
             headers: {
               "content-type": "application/json",
@@ -134,15 +167,31 @@ export class GenerateMeshWorkflow extends WorkflowEntrypoint<Env, GenerateMeshPa
               image_url: frameUrl,
               bbox_meters: meta.bboxMeters,
               object_id: p.objectId,
+              source: meta.source,
               // Where to put the result if the Truss writes to R2 itself.
               upload_url: `${p.apiOrigin}/v1/uploads`,
-              want_embedding: true,
+              want_embedding: false, // The dedicated encoder below owns both image and text vectors.
             }),
           });
           if (!res.ok) {
             throw new Error(`Baseten returned ${res.status}: ${(await res.text()).slice(0, 300)}`);
           }
-          return (await res.json()) as BasetenResult;
+          const generated = (await res.json()) as BasetenResult & { kind?: string; glb_base64?: string; artifact?: Record<string, unknown> };
+          if (generated.kind === "raw_sf3d_unscaled" || generated.glb_base64) {
+            throw new NonRetryableError("BASETEN_URL points to raw SF3D. Configure the dimension-binding generation adapter; raw unscaled output cannot be marked ready.");
+          }
+          // Workflow step results are limited to 1 MiB. Persist the GLB here and
+          // checkpoint only its key; a multi-megabyte base64 result cannot be a step result.
+          const key = R2Keys.objectMesh(p.objectId);
+          if (generated.glbBase64) {
+            const bytes = base64ToBytes(generated.glbBase64);
+            assertGlb(bytes);
+            await this.env.BUCKET.put(key, bytes, { httpMetadata: { contentType: "model/gltf-binary" } });
+            generated.glbKey = key;
+          }
+          if (generated.glbKey !== key) throw new NonRetryableError("Generation must return this object's mesh key or glbBase64.");
+          if (generated.artifact) await this.env.BUCKET.put(`objects/${p.objectId}/mesh-receipt.json`, JSON.stringify(generated.artifact), { httpMetadata: { contentType: "application/json" } });
+          return { glbKey: key, caption: generated.caption, palette: generated.palette };
         },
       );
 
@@ -154,12 +203,13 @@ export class GenerateMeshWorkflow extends WorkflowEntrypoint<Env, GenerateMeshPa
         // If the Truss binds on the GPU box it writes R2 directly and reports the key, which
         // is one network hop instead of three. If it returns the mesh inline, we store it.
         if (generated.glbKey) {
-          const head = await this.env.BUCKET.head(generated.glbKey);
-          if (!head) {
+          const stored = await this.env.BUCKET.get(generated.glbKey, { range: { offset: 0, length: 20 } });
+          if (!stored) {
             throw new Error(
               `Baseten reported key ${generated.glbKey} but nothing is stored there.`,
             );
           }
+          assertGlb(new Uint8Array(await stored.arrayBuffer()), stored.size);
           return generated.glbKey;
         }
 
@@ -178,39 +228,6 @@ export class GenerateMeshWorkflow extends WorkflowEntrypoint<Env, GenerateMeshPa
         return key;
       });
 
-      await step.do("index-embedding", async (): Promise<{ indexed: boolean }> => {
-        await advanceJob(this.env, p.jobId, "running", 85, null, nowIso());
-        if (!generated.embedding || generated.embedding.length === 0) {
-          // Not fatal. The object is still usable in the room; it is only unfindable by
-          // similarity until an embedding arrives. Say so rather than failing the whole job.
-          return { indexed: false };
-        }
-        if (generated.embedding.length !== 768) {
-          throw new NonRetryableError(
-            `Embedding has ${generated.embedding.length} dimensions, expected 768 ` +
-              `(google/siglip2-base-patch16-224). The index will reject it.`,
-          );
-        }
-        await this.env.OBJECTS_INDEX.upsert([
-          {
-            id: p.objectId,
-            values: generated.embedding,
-            metadata: {
-              objectId: p.objectId,
-              source: "scan",
-              category: meta.category,
-              // Millimetres as integers, so Vectorize numeric range filters work on them.
-              // Metres would be floats between 0 and 2 and the filter would be useless.
-              w_mm: Math.round(meta.bboxMeters.w * 1000),
-              h_mm: Math.round(meta.bboxMeters.h * 1000),
-              d_mm: Math.round(meta.bboxMeters.d * 1000),
-              dominant_hex: generated.palette?.[0] ?? "#000000",
-            },
-          },
-        ]);
-        return { indexed: true };
-      });
-
       await step.do("finalize", async () => {
         await markObjectReady(this.env, p.objectId, {
           glbKey,
@@ -222,16 +239,40 @@ export class GenerateMeshWorkflow extends WorkflowEntrypoint<Env, GenerateMeshPa
         // The perceived-latency contract closes here: the phone has been showing a measured
         // box with real numbers since second one, and this is the event that swaps in the mesh.
         if (p.roomId) {
-          const row = await this.env.DB.prepare("SELECT * FROM objects WHERE id = ?")
-            .bind(p.objectId)
-            .first();
-          await emitToRoom(this.env, p.roomId, "object", {
-            ...(row as Record<string, unknown>),
-            glbUrl: `${p.apiOrigin}/v1/assets/${glbKey}`,
-          });
+          await emitToRoom(this.env, p.roomId, "object", await getObject(this.env, p.objectId, p.apiOrigin));
         }
         return { ok: true };
       });
+
+      const indexing = await step.do("index-embedding", { retries: { limit: 2, delay: "5 seconds" }, timeout: "45 seconds" }, async (): Promise<{ indexed: boolean; error: string | null }> => {
+        const embedding = await embedInput(this.env, { imageKey: meta.frameKeys[0] });
+        await this.env.OBJECTS_INDEX.upsert([
+          {
+            id: p.objectId,
+            values: embedding.values,
+            namespace: embedding.fingerprint,
+            metadata: {
+              objectId: p.objectId,
+              source: meta.source,
+              category: meta.category,
+              // Millimetres as integers, so Vectorize numeric range filters work on them.
+              // This matches the query's conversion from metres to millimetres.
+              w_mm: Math.round(meta.bboxMeters.w * 1000),
+              h_mm: Math.round(meta.bboxMeters.h * 1000),
+              d_mm: Math.round(meta.bboxMeters.d * 1000),
+              dominant_hex: generated.palette?.[0] ?? "#000000",
+            },
+          },
+        ]);
+        return { indexed: true, error: null };
+      }).catch((error: unknown) => ({ indexed: false, error: `Mesh saved; embedding failed: ${String(error).slice(0, 300)}` }));
+
+      if (indexing.error) {
+        await step.do("record-index-warning", async () => {
+          await advanceJob(this.env, p.jobId, "done", 100, indexing.error, nowIso());
+          return { ok: true };
+        }).catch(() => {});
+      }
 
       return { objectId: p.objectId, glbKey };
     } catch (err) {
@@ -242,13 +283,23 @@ export class GenerateMeshWorkflow extends WorkflowEntrypoint<Env, GenerateMeshPa
       await advanceJob(this.env, p.jobId, "failed", 100, message.slice(0, 500), nowIso());
       await markObjectFailed(this.env, p.objectId);
       throw err;
+    } finally {
+      await notifyMeshFinished(this.env, p.jobId);
     }
   }
 }
 
 function base64ToBytes(b64: string): Uint8Array {
+  if (b64.length > 24 * 1024 * 1024) throw new NonRetryableError("Mesh payload exceeds 24 MiB.");
   const binary = atob(b64);
   const out = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) out[i] = binary.charCodeAt(i);
   return out;
+}
+
+function assertGlb(bytes: Uint8Array, expectedSize = bytes.length): void {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  if (bytes.length < 20 || view.getUint32(0, true) !== 0x46546c67 || view.getUint32(4, true) !== 2 || view.getUint32(8, true) !== expectedSize) {
+    throw new NonRetryableError("Generation returned an invalid GLB header or length.");
+  }
 }

@@ -1,0 +1,310 @@
+[
+  {
+    "title": "TEST ITEM 3",
+    "handle": "test-item-1-e",
+    "product_type": "",
+    "images": [
+      "https://cdn.shopify.com/s/files/1/0215/2392/files/testitem1.jpg?v=1745556165"
+    ],
+    "tags": [
+      "test"
+    ],
+    "body_html": "<p>This is test item 3</p>",
+    "variants": [
+      {
+        "title": "medium"
+      }
+    ],
+    "options": [
+      {
+        "name": "Size",
+        "position": 1,
+        "values": [
+          "medium"
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Baltic Chair Leather",
+    "handle": "baltic-chair-leather",
+    "product_type": "Chair",
+    "images": [
+      "https://cdn.shopify.com/s/files/1/0215/2392/files/BalticChair-TucsonSiennaLeather_NaturalAsh-P01.jpg?v=1759772487",
+      "https://cdn.shopify.com/s/files/1/0215/2392/files/BalticChair-TucsonCharLeather_BlackAsh-P01.jpg?v=1759772487",
+      "https://cdn.shopify.com/s/files/1/0215/2392/files/BalticChair-TucsonCharLeather_BlackAsh-P02.jpg?v=1759761786"
+    ],
+    "tags": [
+      "CA Products",
+      "CHN",
+      "Duplicated",
+      "FSC",
+      "living",
+      "USA Products"
+    ],
+    "body_html": "<ul class=\"details\">\n<li>Solid wood frame featuring custom bent armrests and mortise and tenon joints is crafted from walnut or ash.</li>\n<li>Solid ash frame is FSC\u00ae-Certified in support of responsible forest management (FSC\u00ae 092551). By purchasing this product you help take care of the world's forests. Find more information at www.fsc.org</li>\n<li>\n<span data-contrast=\"auto\" lang=\"EN-CA\" class=\"TextRun SCXW238120146 BCX8\"><span class=\"NormalTextRun SCXW238120146 BCX8\">Natural grain of the frame is highlighted by a wire brush texture treatment (Black Ash only).</span></span><span class=\"EOP SCXW238120146 BCX8\" data-ccp-props='{\"201341983\":0,\"335559739\":0,\"335559740\":240}'>\u00a0</span>\n</li>\n<li>One piece seat and back is crafted with high resiliency medium density polyurethane foam.</li>\n<li>Webbed suspension system for comfort.</li>\n<li>Wood is a natural material, with variations in grain pattern and colour that make each design unique.</li>\n<li>Bumpers on the bottom of base to protect hardwood floors.<br>\n</li>\n<li><span data-olk-copy-source=\"MessageBody\">ANSI-BIFMA Compliant.</span></li>\n<li>Manufactured to meet California TB117-2013 fire safety standards without the use of flame retardant additives in the upholstery foam.</li>\n<li><span data-sheets-root=\"1\">Leather is top grain, aniline-dyed and crafted in Italy.</span></li>\n<li>Our leathers may have distinct surface characteristics, natural markings, grain pattern and colour variations which differ from hide to hide and from one product to another, making each leather product unique.</li>\n<li>Surface scratches and wear marks on leather are normal and to be expected. Over time they will contribute to the unique personality, patina and visual charm of the design. If desired, scratches and wear marks may be minimized with the use of leather conditioner.</li>\n<li>With all leather products, some stretching over time is normal. This \"working in\" of the leather only adds to the comfort, softness and character of the design.</li>\n<li>Product colours may vary slightly from those shown on your display. Visit a\u00a0<a title=\"Find a Gus* retailer\" href=\"http://gusmodern.com/pages/store-locator-1\">Gus* Modern retailer</a> to preview samples of fabric and finish options.</li>\n</ul>",
+    "variants": [
+      {
+        "title": "Tucson Sienna Leather / Classic Walnut"
+      },
+      {
+        "title": "Tucson Sienna Leather / Black Ash"
+      },
+      {
+        "title": "Tucson Sienna Leather / Natural Ash"
+      },
+      {
+        "title": "Tucson Char Leather / Classic Walnut"
+      },
+      {
+        "title": "Tucson Char Leather / Black Ash"
+      },
+      {
+        "title": "Tucson Char Leather / Natural Ash"
+      }
+    ],
+    "options": [
+      {
+        "name": "Upholstery",
+        "position": 1,
+        "values": [
+          "Tucson Sienna Leather",
+          "Tucson Char Leather"
+        ]
+      },
+      {
+        "name": "Frame",
+        "position": 2,
+        "values": [
+          "Classic Walnut",
+          "Black Ash",
+          "Natural Ash"
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Albion 6-3 Shelving Unit",
+    "handle": "albion-6-3-shelving-unit",
+    "product_type": "Shelving",
+    "images": [
+      "https://cdn.shopify.com/s/files/1/0215/2392/files/Albion6-3ShelvingUnit-VintageOak-P01-Web_31ac3c39-a562-4a42-9950-9cf32a099795.jpg?v=1775481100",
+      "https://cdn.shopify.com/s/files/1/0215/2392/files/Albion6-3ShelvingUnit-NaturalWalnut-P01-Web_9fdda490-1d96-49dc-b99b-10eda4da894a.jpg?v=1775481100",
+      "https://cdn.shopify.com/s/files/1/0215/2392/files/AlbionShelving6Tier3TierWalnut.jpg?v=1774550995"
+    ],
+    "tags": [
+      "CA Products",
+      "CHN",
+      "dining",
+      "FSC",
+      "living",
+      "new",
+      "USA Products",
+      "workspace"
+    ],
+    "body_html": "<ul class=\"details\">\n<li>Anti-tip hardware included. Placement against a wall is recommended.</li>\n<li>Wood is a natural material, with variations in grain pattern and colour that make each design unique.</li>\n<li>Infinite, elegant, open-storage options for residential or office spaces.</li>\n<li>Real wood veneer applied to engineered panels for strength and stability.</li>\n<li>3-tier shelving unit features two shelf heights of 13.5\" and one shelf height of 10.5\".</li>\n<li>6-tier shelving unit features three shelf heights of 13.5\" and two shelf heights of 10.5\".</li>\n<li>Max. weight per shelf 30lbs. Max overall weight for 3-Tier Unit is 90lbs. Max overall weight for 6-Tier Unit is 180lbs.</li>\n<li>Assembly required. All hardware and instructions provided.</li>\n<li>CARB Phase II and TSCA Title VI Compliant.</li>\n<li>Non-marking leveller feet can be adjusted for stability on uneven floor surfaces.</li>\n<li>Product colours may vary slightly from those shown on your display. Visit a<span> </span><a href=\"http://gusmodern.com/pages/store-locator-1\" title=\"Find a Gus* retailer\">Gus* Modern retailer</a> to preview samples of fabric and finish options.</li>\n</ul>",
+    "variants": [
+      {
+        "title": "Natural Walnut"
+      },
+      {
+        "title": "Vintage Oak"
+      }
+    ],
+    "options": [
+      {
+        "name": "Finish",
+        "position": 1,
+        "values": [
+          "Natural Walnut",
+          "Vintage Oak"
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Albion 6-3-3 Shelving Unit",
+    "handle": "albion-6-6-3-shelving-unit",
+    "product_type": "Shelving",
+    "images": [
+      "https://cdn.shopify.com/s/files/1/0215/2392/files/Albion6-3-3ShelvingUnit-NaturalWalnut-P01-Web.jpg?v=1774550770",
+      "https://cdn.shopify.com/s/files/1/0215/2392/files/Albion6-3-3ShelvingUnit-VintageOak-P01-Web.jpg?v=1774550770",
+      "https://cdn.shopify.com/s/files/1/0215/2392/files/AlbionShelving6Tier3Tier3Tier.jpg?v=1774550770"
+    ],
+    "tags": [
+      "CA Products",
+      "CHN",
+      "dining",
+      "FSC",
+      "living",
+      "new",
+      "USA Products",
+      "workspace"
+    ],
+    "body_html": "<ul class=\"details\">\n<li>Anti-tip hardware included. Placement against a wall is recommended.</li>\n<li>Wood is a natural material, with variations in grain pattern and colour that make each design unique.</li>\n<li>Infinite, elegant, open-storage options for residential or office spaces.</li>\n<li>Real wood veneer applied to engineered panels for strength and stability.</li>\n<li>3-tier shelving unit features two shelf heights of 13.5\" and one shelf height of 10.5\".</li>\n<li>6-tier shelving unit features three shelf heights of 13.5\" and two shelf heights of 10.5\".</li>\n<li>Max. weight per shelf 30lbs. Max overall weight for 3-Tier Unit is 90lbs. Max overall weight for 6-Tier Unit is 180lbs.</li>\n<li>Assembly required. All hardware and instructions provided.</li>\n<li>CARB Phase II and TSCA Title VI Compliant.</li>\n<li>Non-marking leveller feet can be adjusted for stability on uneven floor surfaces.</li>\n<li>Product colours may vary slightly from those shown on your display. Visit a<span> </span><a href=\"http://gusmodern.com/pages/store-locator-1\" title=\"Find a Gus* retailer\">Gus* Modern retailer</a> to preview samples of fabric and finish options.</li>\n</ul>",
+    "variants": [
+      {
+        "title": "Natural Walnut"
+      },
+      {
+        "title": "Vintage Oak"
+      }
+    ],
+    "options": [
+      {
+        "name": "Finish",
+        "position": 1,
+        "values": [
+          "Natural Walnut",
+          "Vintage Oak"
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Albion 6-6 Shelving Unit",
+    "handle": "albion-6-6-shelving-unit",
+    "product_type": "Shelving",
+    "images": [
+      "https://cdn.shopify.com/s/files/1/0215/2392/files/Albion6-6ShelvingUnit-VintageOak-P01-Web.jpg?v=1775481088",
+      "https://cdn.shopify.com/s/files/1/0215/2392/files/Albion6-6ShelvingUnit-NaturalWalnut-P01-Web.jpg?v=1775481088",
+      "https://cdn.shopify.com/s/files/1/0215/2392/files/AlbionShelving6Tier6Tier.jpg?v=1774549987"
+    ],
+    "tags": [
+      "CA Products",
+      "CHN",
+      "dining",
+      "FSC",
+      "living",
+      "new",
+      "USA Products",
+      "workspace"
+    ],
+    "body_html": "<ul class=\"details\">\n<li>Anti-tip hardware included. Placement against a wall is recommended.</li>\n<li>Wood is a natural material, with variations in grain pattern and colour that make each design unique.</li>\n<li>Infinite, elegant, open-storage options for residential or office spaces.</li>\n<li>Real wood veneer applied to engineered panels for strength and stability.</li>\n<li>3-tier shelving unit features two shelf heights of 13.5\" and one shelf height of 10.5\".</li>\n<li>6-tier shelving unit features three shelf heights of 13.5\" and two shelf heights of 10.5\".</li>\n<li>Max. weight per shelf 30lbs. Max overall weight for 3-Tier Unit is 90lbs. Max overall weight for 6-Tier Unit is 180lbs.</li>\n<li>Assembly required. All hardware and instructions provided.</li>\n<li>CARB Phase II and TSCA Title VI Compliant.</li>\n<li>Non-marking leveller feet can be adjusted for stability on uneven floor surfaces.</li>\n<li>Product colours may vary slightly from those shown on your display. Visit a<span> </span><a href=\"http://gusmodern.com/pages/store-locator-1\" title=\"Find a Gus* retailer\">Gus* Modern retailer</a> to preview samples of fabric and finish options.</li>\n</ul>",
+    "variants": [
+      {
+        "title": "Natural Walnut"
+      },
+      {
+        "title": "Vintage Oak"
+      }
+    ],
+    "options": [
+      {
+        "name": "Finish",
+        "position": 1,
+        "values": [
+          "Natural Walnut",
+          "Vintage Oak"
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Albion 3-3 Shelving Unit",
+    "handle": "albion-3-3-shelving-unit",
+    "product_type": "Shelving",
+    "images": [
+      "https://cdn.shopify.com/s/files/1/0215/2392/files/Albion3-3ShelvingUnit-VintageOak-P01-Web.jpg?v=1775481078",
+      "https://cdn.shopify.com/s/files/1/0215/2392/files/Albion3-3ShelvingUnit-NaturalWalnut-P01-Web.jpg?v=1775481078",
+      "https://cdn.shopify.com/s/files/1/0215/2392/files/AlbionShelving3TierSideBySideWalnut.jpg?v=1774549413"
+    ],
+    "tags": [
+      "CA Products",
+      "CHN",
+      "dining",
+      "FSC",
+      "living",
+      "new",
+      "USA Products",
+      "workspace"
+    ],
+    "body_html": "<ul class=\"details\">\n<li>Anti-tip hardware included. Placement against a wall is recommended.</li>\n<li>Wood is a natural material, with variations in grain pattern and colour that make each design unique.</li>\n<li>Infinite, elegant, open-storage options for residential or office spaces.</li>\n<li>Real wood veneer applied to engineered panels for strength and stability.</li>\n<li>3-tier shelving unit features two shelf heights of 13.5\" and one shelf height of 10.5\".</li>\n<li>6-tier shelving unit features three shelf heights of 13.5\" and two shelf heights of 10.5\".</li>\n<li>Max. weight per shelf 30lbs. Max overall weight for 3-Tier Unit is 90lbs. Max overall weight for 6-Tier Unit is 180lbs.</li>\n<li>Assembly required. All hardware and instructions provided.</li>\n<li>CARB Phase II and TSCA Title VI Compliant.</li>\n<li>Non-marking leveller feet can be adjusted for stability on uneven floor surfaces.</li>\n<li>Product colours may vary slightly from those shown on your display. Visit a<span> </span><a href=\"http://gusmodern.com/pages/store-locator-1\" title=\"Find a Gus* retailer\">Gus* Modern retailer</a> to preview samples of fabric and finish options.</li>\n</ul>",
+    "variants": [
+      {
+        "title": "Natural Walnut"
+      },
+      {
+        "title": "Vintage Oak"
+      }
+    ],
+    "options": [
+      {
+        "name": "Finish",
+        "position": 1,
+        "values": [
+          "Natural Walnut",
+          "Vintage Oak"
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Strand Dining Chair",
+    "handle": "strand-dining-chair",
+    "product_type": "Dining Chair",
+    "images": [
+      "https://cdn.shopify.com/s/files/1/0215/2392/files/StrandDiningChair-RoyalOak-P01-Web.jpg?v=1774464008",
+      "https://cdn.shopify.com/s/files/1/0215/2392/files/StrandDiningChair-RoyalOak-P02-Web.jpg?v=1774464008",
+      "https://cdn.shopify.com/s/files/1/0215/2392/files/StrandDiningChair-RoyalOak-P03-Web.jpg?v=1774464007"
+    ],
+    "tags": [
+      "CA Products",
+      "CHN",
+      "dining",
+      "new",
+      "USA Products"
+    ],
+    "body_html": "<ul class=\"details\">\n<li>Danish Cord woven seat and backrest is derived from natural wood fiber. This material is visually appealing and gets more comfortable over time.</li>\n<li>It is normal for solid wood to expand and shrink because of variations in environmental humidity. A consistent humidity level of approximately 50% is recommended to prevent cracks and surface splits.</li>\n<li>Wood is a natural material, with variations in grain pattern and colour that make each design unique.</li>\n<li>Frame crafted from solid Oak.</li>\n<li>Wood surfaces are finished with Rubio\u00ae Monocoat - a durable, matte, oil-based protector designed to highlight the beauty of natural wood.</li>\n<li>Wood finish is certified 0% VOC and is an all-natural, environmentally friendly product.</li>\n<li>Over time the finish will develop a rich patina which highlights the beauty of the natural wood.</li>\n<li>Surface can be revitalized as desired. Visit Rubio\u00ae Monocoat website for more information.</li>\n<li>Non-marking tack glide feet on legs to protect hardwood floors.</li>\n<li>Product colours may vary slightly from those shown on your display. Visit a\u00a0<a title=\"Find a Gus* retailer\" href=\"http://gusmodern.com/pages/store-locator-1\">Gus* Modern retailer</a><span>\u00a0</span>to preview samples of fabric and finish options.</li>\n</ul>",
+    "variants": [
+      {
+        "title": "White Oak"
+      }
+    ],
+    "options": [
+      {
+        "name": "Finish",
+        "position": 1,
+        "values": [
+          "White Oak"
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Lanark Dining Chair",
+    "handle": "lanark-dining-chair",
+    "product_type": "Dining Chair",
+    "images": [
+      "https://cdn.shopify.com/s/files/1/0215/2392/files/LanarkDiningChair-LundyTruffle_ClassicWalnut-P01-Web.jpg?v=1774471930",
+      "https://cdn.shopify.com/s/files/1/0215/2392/files/LanarkDiningChair-LundyTruffle_ClassicWalnut-P02-Web.jpg?v=1774471930",
+      "https://cdn.shopify.com/s/files/1/0215/2392/files/LanarkDiningChair-LundyTruffle_ClassicWalnut-P03-Web.jpg?v=1774471930"
+    ],
+    "tags": [
+      "CA Products",
+      "CHN",
+      "dining",
+      "new",
+      "USA Products"
+    ],
+    "body_html": "<ul class=\"details\">\n<li>High resiliency medium density foam seat and back are upholstered in durable fabrics.</li>\n<li>It is normal for solid wood to expand and shrink because of variations in environmental humidity. A consistent humidity level of approximately 50% is recommended to prevent cracks and surface splits.</li>\n<li>Wood is a natural material, with variations in grain pattern and colour that make each design unique.</li>\n<li>Frame crafted from solid Oak or Walnut.</li>\n<li>Back panel is plywood, surfaced with real wood veneer in Oak or Walnut.</li>\n<li>Wood surfaces are finished with Rubio\u00ae Monocoat - a durable, matte, oil-based protector designed to highlight the beauty of natural wood.</li>\n<li>Wood finish is certified 0% VOC and is an all-natural, environmentally friendly product.</li>\n<li>Over time the finish will develop a rich patina which highlights the beauty of the natural wood.</li>\n<li>Surface can be revitalized as desired. Visit Rubio\u00ae Monocoat website for more information.</li>\n<li>Non-marking tack glide feet on legs to protect hardwood floors.</li>\n<li>Manufactured to meet California TB117-2013 fire safety standards without the use of flame retardant additives in the upholstery foam.</li>\n<li>All fabric is California TB117-2013 certified and double rub tested.</li>\n<li>Product colours may vary slightly from those shown on your display. Visit a\u00a0<a href=\"http://gusmodern.com/pages/store-locator-1\" title=\"Find a Gus* retailer\">Gus* Modern retailer</a><span>\u00a0</span>to preview samples of fabric and finish options.</li>\n</ul>",
+    "variants": [
+      {
+        "title": "Lundy Vista"
+      },
+      {
+        "title": "Lundy Truffle"
+      }
+    ],
+    "options": [
+      {
+        "name": "Upholstery",
+        "position": 1,
+        "values": [
+          "Lundy Vista",
+          "Lundy Truffle"
+        ]
+      }
+    ]
+  }
+]

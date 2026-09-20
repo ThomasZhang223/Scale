@@ -272,6 +272,82 @@ def test_cli_file_mode_gates_on_product_count():
         os.unlink(path)
 
 
+
+# --- beds are a category, soft goods are not ------------------------------
+
+def test_beds_get_their_own_category_instead_of_falling_into_other():
+    """20 of 100 slots in a real handoff went to beds and mattresses via `other`, four
+    colourways of one model among them. If they are in the set they are in it on purpose."""
+    assert vm.bucket_for("beds", "Orbit Bed") == "sleeping"
+    assert vm.bucket_for("mattresses", "The Mattress 2.0") == "sleeping"
+    assert vm.bucket_for("daybeds", "") == "sleeping"
+    # product_type is often empty; the title has to carry it.
+    assert vm.bucket_for("", "The Floyd Bed — Upholstered, Lift Off") == "sleeping"
+
+
+def test_soft_goods_are_not_placeable_even_when_they_contain_a_category_word():
+    """"bedding" contains "bed" and "table runner" contains "table". Neither is an object you
+    place against a room scan, and substring matching would have taken both."""
+    assert vm.bucket_for("Bedding", "Duvet cover") is None
+    assert vm.bucket_for("Pillows", "Throw Pillow") is None
+    assert vm.bucket_for("Rugs", "Jute Runner") is None
+    assert vm.bucket_for("Mirrors", "Full Length Mirror") is None
+    assert vm.bucket_for("Gift Cards", "Gift card") is None
+
+
+def test_the_exclusion_does_not_swallow_real_furniture():
+    assert vm.bucket_for("Sofas", "Sectional") == "seating"
+    assert vm.bucket_for("Bedside Tables", "Nightstand") == "surface"
+    assert vm.bucket_for("Table Lamps", "") == "lighting"
+    assert vm.bucket_for("Bookcases", "") == "storage"
+
+
+# --- a product_type that matches nothing must not shadow the title -------
+
+def test_a_product_type_that_matches_nothing_falls_through_to_the_title():
+    """The fallback used to fire only when product_type was EMPTY, so a type that matched no
+    keyword shadowed a title saying "Chair" outright. Real, from the round-3 samples: Thuma
+    ships "Studio Dining Chair" under product_type "Dining", Lulu and Georgia ships "Leni
+    Outdoor Dining Chair" under "Furniture". Seven real chairs counted as uncategorised."""
+    assert vm.bucket_for("Dining", "Studio Dining Chair") == "seating"
+    assert vm.bucket_for("Furniture", "Leni Outdoor Dining Chair") == "seating"
+    assert vm.bucket_for("Furniture", "Leni Outdoor Chaise") == "seating"
+
+
+def test_the_product_type_still_wins_when_it_does_match():
+    """Reading the title is a fallback, not a takeover."""
+    assert vm.bucket_for("Table Lamps", "Aurora") == "lighting"
+    assert vm.bucket_for("Bookcases", "Astrid") == "storage"
+
+
+def test_not_placeable_is_checked_against_the_product_type_too():
+    """Sixpenny's fabric swatch is literally titled "First Light" and only says "Swatch" in
+    its product_type — checking the title alone let it into lighting."""
+    assert vm.bucket_for("Swatch", "First Light") is None
+    assert vm.bucket_for("Decor/Home Decor/Candle Holders", "Tealight Holder Set") is None
+
+
+def test_parts_and_bundles_are_not_placeable_objects():
+    """Reading the title recovered real chairs and also a pile of things that are not objects:
+    a mattress topper, a crib mattress protector, a headboard add-on, a bed frame expansion
+    kit, and six desk bundles. None of them is a thing you place in a room at 1:1."""
+    for ptype, title in [
+        ("Topper", "Grand Luxe Mattress Topper"),
+        ("Protector", "Organic Crib Mattress Pad Protector"),
+        ("Add On/Expansion", "Headboard Add-On - Cherry"),
+        ("Add On/Expansion", "Bed Frame Expansion Kit - Cherry"),
+        ("", "Executive Bundle"),
+        ("Padding", "Folding Freddie Seat Pad"),
+    ]:
+        assert vm.bucket_for(ptype, title) is None, f"{ptype!r} {title!r} was categorised"
+
+
+def test_real_furniture_still_buckets_after_all_that():
+    assert vm.bucket_for("Sofas", "Bergen Sofa") == "seating"
+    assert vm.bucket_for("", "The Floyd Bed") == "sleeping"
+    assert vm.bucket_for("Desks", "Standing Desk") == "surface"
+    assert vm.bucket_for("Floor Lamps", "Arc Lamp") == "lighting"
+
 if __name__ == "__main__":
     fails = 0
     for name, fn in sorted(globals().items()):

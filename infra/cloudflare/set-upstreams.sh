@@ -13,8 +13,8 @@
 
 set -euo pipefail
 
-if [ $# -ne 3 ]; then
-	echo "usage: set-upstreams.sh <solver-url> <search-url> <ingest-url>" >&2
+if [ $# -ne 3 ] && [ $# -ne 4 ]; then
+	echo "usage: set-upstreams.sh <solver-url> <search-url> <ingest-url> [embedding-url]" >&2
 	echo "  pass the literal string SKIP for a service that is not running yet" >&2
 	exit 2
 fi
@@ -42,6 +42,7 @@ echo "==> Writing upstream origins to KV"
 set_one solver "$1"
 set_one search "$2"
 set_one ingest "$3"
+if [ $# -eq 4 ]; then set_one embedding "$4"; fi
 
 echo
 echo "Verify the whole wiring with:"

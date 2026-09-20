@@ -135,7 +135,8 @@ def test_local_compat_only_and_canonical_auth_preserved(monkeypatch):
     class Encoder:
         fingerprint = FP
         def response(self, **kw):
-            return {**embedding(), "modality": "text"}
+            return {**embedding(), "modality": "text",
+                    "inputHash": hashlib.sha256(kw["text"].encode("utf-8")).hexdigest()}
     app = create_app(encoder=Encoder(), authenticator=ServiceTokenAuth("test-only"))
     monkeypatch.setenv("EMBEDDING_LOCAL_SEARCH", "1")
     monkeypatch.setenv("EMBEDDING_SEARCH_FINGERPRINT", FP)

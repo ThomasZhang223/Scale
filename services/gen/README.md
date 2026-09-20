@@ -26,7 +26,7 @@ measured timings, fallback behavior and exact teammate dependencies.
   -> Thomas `glbBase64`/`glbKey`; no second jobs, storage or SSE system.
 - [SF3D package](deploy/sf3d/README.md): isolated GPU candidate and bounded runner.
 
-`app.main` serves embeddings on port 8002. `/generate` has an authenticated,
+`app.main` serves embeddings on port 8004. `/generate` has an authenticated,
 injectable composition seam; it returns 503 until provider/job authority is
 configured. `/ready` reports embedding readiness only, not generation readiness.
 The unused `/bind`, `/baseten`, `/bgremove` stage stubs were removed: binding is a
@@ -41,3 +41,6 @@ palette/thumbnail helpers (no current required consumer), best-frame scoring,
 large benchmarks, fine-tuning, extra vector databases and advanced caching.
 The existing gen Docker image is embedding-only; its Linux runtime has not been
 live-tested here. Use the local checkout for the CPU composition/search helpers.
+
+Container and Cloudflare setup: [EMBEDDING_DEPLOY.md](EMBEDDING_DEPLOY.md).
+The Compose service is `embedding`; search now uses host port 8005.

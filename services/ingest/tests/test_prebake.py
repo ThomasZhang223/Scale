@@ -273,6 +273,90 @@ def test_a_verified_file_with_no_merchants_fails_loudly():
     assert r.returncode != 0 and "no verified merchants" in r.stderr
 
 
+def _verified_file(tmp, names):
+    v = os.path.join(tmp, "v.json")
+    with open(v, "w") as f:
+        json.dump({"merchants": [
+            {"name": n, "storefrontBaseUrl": "https://example.invalid",
+             "productsJsonVerified": True} for n in names]}, f)
+    return v
+
+
+def test_only_that_matches_nothing_fails_rather_than_running_everything():
+    """A typo must not quietly become a full ten-merchant run. That bill arrives before the
+    surprise does."""
+    tmp = tempfile.mkdtemp()
+    v = _verified_file(tmp, ["Floyd Home", "Poly & Bark"])
+    r = subprocess.run([sys.executable, "build_prebake.py", v, "--only", "flyod",
+                        "--out", tmp], cwd=ROOT, capture_output=True, text=True)
+    assert r.returncode != 0, "a no-match --only exited 0"
+    assert "matched no verified merchant" in r.stderr
+    # The message has to name what WAS available, or the fix is a guessing game.
+    assert "Floyd Home" in r.stderr and "Poly & Bark" in r.stderr
+
+
+def test_only_selects_by_case_insensitive_substring():
+    tmp = tempfile.mkdtemp()
+    v = _verified_file(tmp, ["Floyd Home", "Poly & Bark", "Bend Goods"])
+    r = subprocess.run([sys.executable, "build_prebake.py", v, "--only", "FLOYD",
+                        "--out", tmp], cwd=ROOT, capture_output=True, text=True)
+    assert "--only: 1 merchant(s): Floyd Home" in r.stderr, r.stderr[:400]
+    assert "Poly & Bark" not in r.stderr.split("--only:")[1][:120]
+
+
+def test_only_takes_several_merchants_comma_separated():
+    tmp = tempfile.mkdtemp()
+    v = _verified_file(tmp, ["Floyd Home", "Poly & Bark", "Bend Goods"])
+    r = subprocess.run([sys.executable, "build_prebake.py", v, "--only", "floyd,bend",
+                        "--out", tmp], cwd=ROOT, capture_output=True, text=True)
+    assert "--only: 2 merchant(s)" in r.stderr, r.stderr[:400]
+    assert "Floyd Home" in r.stderr and "Bend Goods" in r.stderr
+
+
+
+def test_other_only_fills_what_the_named_categories_leave():
+    """`other` used to sit in the round-robin as a peer and took a guaranteed fifth of the
+    set — 20 of 100 slots went to beds nothing had categorised."""
+    def row(bucket, conf):
+        return {"bucket": bucket, "measure": {"confidence": conf}}
+    # Plenty of real rows, plus a pile of uncategorised ones.
+    cands = ([row("seating", 0.9) for _ in range(10)]
+             + [row("surface", 0.9) for _ in range(10)]
+             + [row(None, 0.99) for _ in range(50)])   # higher confidence, still a remainder
+    picked = bp.curate(cands, 20)
+    assert len(picked) == 20
+    assert all(p["bucket"] for p in picked), "an uncategorised row took a named slot"
+
+
+def test_other_still_fills_the_gap_when_named_categories_run_dry():
+    """A remainder, not a ban. If the real categories cannot fill the set, use what is left
+    rather than shipping a short manifest."""
+    def row(bucket, conf):
+        return {"bucket": bucket, "measure": {"confidence": conf}}
+    cands = [row("seating", 0.9)] * 3 + [row(None, 0.4)] * 10
+    picked = bp.curate(cands, 8)
+    assert len(picked) == 8
+    assert sum(1 for p in picked if p["bucket"] is None) == 5
+
+
+def test_an_excluded_merchant_is_skipped_and_says_why():
+    """Excluding on evidence from a run, not on a pre-Browserbase statistic — the merchants
+    step 2.5 exists to rescue all report 0 usable products in /products.json."""
+    tmp = tempfile.mkdtemp()
+    v = os.path.join(tmp, "v.json")
+    with open(v, "w") as f:
+        json.dump({"merchants": [
+            {"name": "Dead Store", "storefrontBaseUrl": "https://dead.invalid",
+             "productsJsonVerified": True, "excluded": "nothing from any step on 2026-09-19"},
+        ]}, f)
+    r = subprocess.run([sys.executable, "build_prebake.py", v, "--out", tmp],
+                       cwd=ROOT, capture_output=True, text=True)
+    assert "skipping Dead Store" in r.stderr, r.stderr[:300]
+    assert "nothing from any step" in r.stderr, "skipped without saying why"
+    # Every merchant excluded means no merchants, which is still an error.
+    assert r.returncode != 0 and "no verified merchants" in r.stderr
+
+
 if __name__ == "__main__":
     fails = 0
     for name, fn in sorted(globals().items()):
