@@ -8,6 +8,7 @@ import { createPhysics } from './physics';
 import { Interaction } from './interaction';
 import {
   getRoom, getObject, listObjects, getVersion, postVersion, objectToItem, boundsMismatch, watchRoom, postFit, STUB, listScans, sameOrigin,
+  getJob, postListingsGenerate,
   type ObjectV1, type VersionV1, type PlacementV1,
 } from './api';
 import { FitOverlay, type FitReport } from './fit';
@@ -20,7 +21,8 @@ import { Palette, type PaletteItem } from './palette';
 import { matchDetected } from './placement';
 import { measuredBox } from './objects';
 import { Voice, type VoiceState } from './voice';
-import { findListings, needFromDetected, needFromText, isShoppingRequest, type Listing, type ListingsResult, type Need } from './listings';
+import { findListings, needFromDetected, needFromText, isShoppingRequest, productQuery, STOREFRONTS, type Listing, type ListingsResult, type Need, type StageInfo } from './listings';
+import { FindPanel } from './findpanel';
 import { Outdoors } from './outdoors';
 import roomDemo from '../../../fixtures/room-demo.json';
 import roomLarge from '../public/room-large.json';
@@ -111,6 +113,13 @@ hud.attachTo(scene);
 renderer.xr.addEventListener('sessionstart', () => hud.setPresenting(true));
 renderer.xr.addEventListener('sessionend', () => hud.setPresenting(false));
 
+// The find panel: head-locked ahead and to the right, showing per-store Browserbase progress
+// and then the listing cards. Its own module (findpanel.ts), like hud.ts.
+const findPanel = new FindPanel();
+findPanel.attachTo(scene);
+renderer.xr.addEventListener('sessionstart', () => findPanel.setPresenting(true));
+renderer.xr.addEventListener('sessionend', () => findPanel.setPresenting(false));
+
 const PALETTE_ACTIONS: PaletteItem[] = [
   { url: '', name: 'Reset room', action: 'reset', section: 'Room' },
   { url: '', name: 'Clear objects', action: 'clear', destructive: true, section: 'Room' },
@@ -183,6 +192,7 @@ let selectedStyle: string | null = null; // the whole-room style Rearrange will 
 let listings: ListingsResult | null = null; // the last recommendation set, shown on the wrist and the laptop
 let listingsNeed: Need | null = null;
 let listingsBusy = false;
+let stageLines: string[] = []; // per-store Browserbase progress, mirrored on the laptop
 let voiceState: VoiceState = 'idle';
 let lastHeard: string | null = null;
 
@@ -234,7 +244,12 @@ async function start() {
     offlineProposal: offlineProposal as unknown as Proposal,
     onChange: onAgentChange,
   });
-  const interaction = new Interaction(renderer, scene, camera, controls, physics, palette, spawn, onAction, layoutChanged, onGrab, (r) => hud.hitTest(r));
+  const interaction = new Interaction(renderer, scene, camera, controls, physics, palette, spawn, onAction, layoutChanged, onGrab, (r) => {
+    if (hud.hitTest(r)) return 'hud:close';
+    const hit = findPanel.hitTest(r);
+    if (!hit) return null;
+    return hit.kind === 'close' ? 'find:close' : `find:pick:${hit.objectId}`;
+  });
   // Designer tiles first (closest to the hand), then the catalogue, then Reset / Clear.
   const showPalette = () => palette.setItems([...designerTiles(agent.snapshot), ...scannedTiles(), ...listingTiles(), ...catalog, ...PALETTE_ACTIONS]);
   showPalette();
@@ -242,6 +257,8 @@ async function start() {
 
   function onAction(action: string) {
     if (action === 'hud:close') hud.dismiss();
+    if (action === 'find:close') findPanel.dismiss();
+    if (action.startsWith('find:pick:')) void pickListing(action.slice(10));
     if (action === 'reset' && lastScan) showScan(lastScan, 'Room reset');
     if (action === 'clear') clearObjects();
     if (action.startsWith('style:')) {
@@ -329,15 +346,24 @@ async function start() {
   async function findFor(need: Need) {
     listingsNeed = need;
     listingsBusy = true;
+    stageLines = [];
+    const query = need.text ? productQuery(need.text) : need.categoryWords?.[0] ?? '';
+    findPanel.showSearching(query, STOREFRONTS.map((s) => s.merchant));
     showPalette();
     renderListings();
+    const onStage = (s: StageInfo) => {
+      findPanel.setStage(s);
+      stageLines = [...stageLines.filter((l) => !l.startsWith(`${s.merchant}:`)), `${s.merchant}: ${s.detail}`];
+      renderListings();
+    };
     try {
-      listings = await findListings(need, 8);
+      listings = await findListings(need, 8, { onStage });
     } catch (err) {
       listings = { recommendations: [], source: 'bundled', note: `Listings unavailable: ${(err as Error).message}` };
     } finally {
       listingsBusy = false;
     }
+    findPanel.showResults(listings.recommendations, listings.note);
     showPalette();
     renderListings();
     const top = listings.recommendations[0];
@@ -383,6 +409,75 @@ async function start() {
     layoutChanged(obj.id);
   }
 
+  /**
+   * A card was picked in the headset: the box goes in now at true size, the Worker enqueues the
+   * Baseten job, and the mesh replaces the box when the job is done — by SSE if the room is
+   * live, else by polling GET /jobs/{id}.
+   */
+  async function pickListing(objectId: string) {
+    const rec = listings?.recommendations.find((r) => r.listing.objectId === objectId);
+    if (!rec) return say('That listing is no longer in the results.');
+    const l = rec.listing;
+    await addListing(objectId); // the measured box, placed where it belongs
+    const placed = [...objects.values()].reverse().find((o) => o.objectId === objectId);
+    findPanel.setProgress(objectId, 'Queued for Baseten…');
+    let job: { objectId: string; jobId: string };
+    try {
+      job = await postListingsGenerate(l, SERVER_ROOM_ID);
+    } catch (err) {
+      findPanel.setProgress(objectId, `Couldn’t queue the mesh: ${(err as Error).message}`);
+      return tell(`${l.name}: couldn’t queue the mesh — ${(err as Error).message}`, 'error');
+    }
+    // The server mints a stable id; the placed box keeps tracking it so SSE dedupe works.
+    if (placed) placed.objectId = job.objectId;
+    tell(`${l.name}: mesh job queued. It’s in the room as a box until Baseten answers.`, 'info');
+    const started = Date.now();
+    // ceiling: 3 s polling for up to 10 min; the SSE `object` event usually lands first and
+    // addServerObject dedupes by objectId, so the poll only matters when the room feed is stubbed.
+    for (;;) {
+      await new Promise((r) => setTimeout(r, 3000));
+      let j;
+      try { j = await getJob(job.jobId); } catch (err) { findPanel.setProgress(objectId, `Job status unavailable: ${(err as Error).message}`); continue; }
+      if (j.state === 'done') {
+        try {
+          const obj = await getObject(job.objectId);
+          const item = objectToItem(obj);
+          const loaded = await loader.load(item.url, 1); // scale 1: the mesh normalisation contract
+          const mismatch = boundsMismatch(loaded.size, item.expected);
+          if (mismatch) tell(`${item.name}: ${mismatch}.`, 'warn');
+          if (placed && objects.has(placed.id)) swapLoaded(placed, loaded);
+          findPanel.setProgress(objectId, 'Mesh placed at true scale');
+          tell(`${l.name}: mesh ready and placed.`, 'info');
+        } catch (err) {
+          findPanel.setProgress(objectId, `Mesh failed to load: ${(err as Error).message}`);
+          tell(`${l.name}: ${(err as Error).message}`, 'error');
+        }
+        return;
+      }
+      if (j.state === 'failed') {
+        findPanel.setProgress(objectId, `Generation failed: ${j.error ?? 'unknown'}`);
+        return tell(`${l.name}: generation failed — ${j.error ?? 'unknown error'}. The box stays.`, 'error');
+      }
+      const waiting = j.state === 'queued' && Date.now() - started > 20_000;
+      findPanel.setProgress(objectId, waiting ? 'Waiting on Baseten — box placed at true size' : `Generating mesh ${j.progressPct}%`);
+      if (Date.now() - started > 600_000) return findPanel.setProgress(objectId, 'Still waiting on Baseten; the box stays.');
+    }
+  }
+
+  /** Replaces a placed object's mesh in place: same id, same spot, same heading. */
+  function swapLoaded(obj: PlacedObject, loaded: LoadedObject) {
+    const node = physics.nodeOf(obj.id);
+    const x = node?.position.x ?? 0, z = node?.position.z ?? -1;
+    const rotY = physics.rotationY(obj.id);
+    physics.remove(obj.id);
+    obj.loaded.node.removeFromParent();
+    obj.loaded = loaded;
+    scene.add(loaded.node);
+    physics.addObject(obj.id, loaded.node, loaded.size, loaded.hull, { x, z }, rotY);
+    showPalette();
+    layoutChanged(obj.id);
+  }
+
   /** Laptop: the LiDAR pieces as rows with a Find-a-match button. */
   function renderScanned() {
     const rows = (currentRoom?.objects ?? []).map((box) => {
@@ -406,7 +501,7 @@ async function start() {
   /** Laptop: photo cards for the recommendations, the top one outlined, with why it was chosen. */
   function renderListings() {
     listingNote.textContent = listingsBusy
-      ? 'Searching…'
+      ? ['Searching via Browserbase…', ...stageLines].join(' · ')
       : listings
         ? [listings.note, listings.source === 'live' ? 'From the live catalogue.' : null, listingsNeed?.replaces ? `Fits where the scanned ${listingsNeed.replaces.category} stands.` : null].filter(Boolean).join(' ')
         : 'Pick a scanned piece above, or describe what you need.';
@@ -437,8 +532,8 @@ async function start() {
       const add = document.createElement('button');
       add.type = 'button';
       add.className = i === 0 ? 'filled' : 'tinted';
-      add.textContent = l.glbUrl ? 'Add' : 'Add as box';
-      add.addEventListener('click', () => void addListing(l.objectId));
+      add.textContent = l.glbUrl ? 'Add' : 'Add + generate mesh';
+      add.addEventListener('click', () => void pickListing(l.objectId));
       actions.append(add);
       if (l.productUrl) {
         const open = document.createElement('a');
@@ -1345,6 +1440,7 @@ async function start() {
     applier.update(dt);
     physics.step(dt);
     hud.place(renderer.xr.isPresenting ? renderer.xr.getCamera() : camera, palette.group);
+    findPanel.place(renderer.xr.isPresenting ? renderer.xr.getCamera() : camera);
     if (!renderer.xr.isPresenting) controls.update();
     renderer.render(scene, camera);
   });

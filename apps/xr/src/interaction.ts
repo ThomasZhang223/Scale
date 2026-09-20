@@ -80,8 +80,8 @@ export class Interaction {
     private onRelease: (id: string) => void,
     /** An object was grabbed (the designer agent treats it as pinned). */
     private onGrab: (id: string) => void = () => {},
-    /** True when the ray is on the transcript panel's × (hud.ts); pressing it sends 'hud:close'. */
-    private hudHit: (raycaster: THREE.Raycaster) => boolean = () => false,
+    /** An action for a ray on one of the head-locked panels ('hud:close', 'find:close', 'find:pick:<objectId>'), or null. */
+    private panelHit: (raycaster: THREE.Raycaster) => string | null = () => null,
   ) {
     scene.add(this.rig);
     this.rig.add(camera);
@@ -104,7 +104,7 @@ export class Interaction {
       this.locomotion(hand, dt);
       const item = this.palette.hitTest(this.raycaster);
       if (item) overPalette = item;
-      const onClose = !item && this.hudHit(this.raycaster);
+      const onClose = !item && this.panelHit(this.raycaster) !== null;
       const over = item || onClose ? null : this.hitId();
       if (over) hoverId = over;
       (hand.ray.material as THREE.LineBasicMaterial).color.setHex(item || onClose ? PALETTE_RAY : over ? HOVER_RAY : IDLE_RAY);
@@ -251,7 +251,8 @@ export class Interaction {
       controller.addEventListener('disconnected', () => (hand.source = undefined));
       controller.addEventListener('selectstart', () => {
         this.raycaster.setFromXRController(controller);
-        if (this.hudHit(this.raycaster)) return this.onAction('hud:close');
+        const panelAction = this.panelHit(this.raycaster);
+        if (panelAction) return this.onAction(panelAction);
         const item = this.palette.hitTest(this.raycaster);
         if (item?.action?.startsWith('hold:')) {
           // Press-and-release actions: the caller gets ":down" now and ":up" when the trigger lets go.

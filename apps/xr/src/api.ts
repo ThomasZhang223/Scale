@@ -55,6 +55,17 @@ export async function getObject(objectId: string): Promise<ObjectV1> {
   return obj;
 }
 
+export interface JobV1 { state: 'queued' | 'running' | 'done' | 'failed'; progressPct: number; objectId: string; error: string | null }
+
+export function getJob(jobId: string): Promise<JobV1> {
+  return get(`/jobs/${jobId}`);
+}
+
+/** POST /listings/generate: a picked /find row becomes an object and a mesh job. Not in contracts.md yet. */
+export function postListingsGenerate(listing: unknown, roomId: string | null): Promise<{ objectId: string; jobId: string }> {
+  return post('/listings/generate', { listing, roomId });
+}
+
 /**
  * The phone's own captures that have a mesh: source "scan", state "ready", a glbUrl. Always the
  * live table, never the stub — a fixture cannot hold something you scanned a minute ago. Two
