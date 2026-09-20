@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { needFromText, needFromDetected, rank, findListings, isShoppingRequest, classifyUtterance, SHOP_VERBS, parseLengthMetres, productQuery, findLive, STOREFRONTS, type Listing } from './listings.ts';
+import { needFromText, needFromDetected, rank, findListings, isShoppingRequest, classifyUtterance, SHOP_VERBS, SHOP_LEAD_INS, parseLengthMetres, productQuery, findLive, STOREFRONTS, type Listing } from './listings.ts';
 
 const catalog: Listing[] = JSON.parse(readFileSync(new URL('../public/catalog.json', import.meta.url), 'utf-8'));
 
@@ -164,14 +164,35 @@ test('the newest and list-only flags come off the words that mean them', () => {
   assert.equal(classifyUtterance('find my chair').listOnly, false);
 });
 
-test('routing and productQuery read ONE verb list, so routing can never be the narrower of the two', () => {
+test('routing and productQuery read ONE list, so routing can never be the narrower of the two', () => {
   // The root cause of "voice only rearranges": the router tested a shorter set than the parser
-  // behind it could handle. Every shop verb must both route to shopping and be stripped.
-  for (const verb of SHOP_VERBS) {
-    const sentence = `${verb} a walnut side table`;
+  // behind it could handle. Every opener must BOTH route to shopping and be stripped — an
+  // opener that only does one of the two is the defect this test exists to catch.
+  for (const head of [...SHOP_VERBS, ...SHOP_LEAD_INS]) {
+    const sentence = `${head} a walnut side table`;
     assert.equal(classifyUtterance(sentence).kind, 'shop', sentence);
     assert.equal(productQuery(sentence), 'walnut side table', sentence);
   }
+});
+
+test('a declarative lead-in is stripped like an imperative, and "new" is an article', () => {
+  assert.equal(productQuery('I need a new side table'), 'side table');
+  assert.equal(productQuery('Do you have any lamps?'), 'lamps');
+  assert.equal(productQuery('Is there a walnut sideboard?'), 'walnut sideboard');
+  assert.equal(productQuery("I'm looking for a floor lamp"), 'floor lamp');
+  assert.equal(productQuery('How about a dresser?'), 'dresser');
+});
+
+test('the fit clause is not sent to the storefront: the bounds already carry it', () => {
+  // One live Browserbase render per store, so the query it gets has to be the product words.
+  const spoken = 'Hey, can you show me some lamps that fit the 80-centimeter gap beside my desk?';
+  assert.equal(productQuery(spoken), 'lamps');
+  assert.equal(needFromText(spoken).maxW, 0.8, 'the bound must survive where the words did not');
+  // The bare article stays: productQuery strips an OPENER, and "a bookcase…" has none.
+  assert.equal(productQuery('a bookcase that will fit the alcove'), 'a bookcase');
+  assert.equal(productQuery('a sideboard which fits under the window'), 'a sideboard');
+  // "fits" inside the product words, with no relative pronoun, is left alone.
+  assert.equal(productQuery('find a lamp'), 'lamp');
 });
 
 test('isShoppingRequest is the shop branch of the same function', () => {
@@ -193,7 +214,7 @@ test('a spoken length reaches the metric filter, hyphen and US spelling and all'
 });
 
 test('a leading filler no longer sends the whole sentence to the merchant search', () => {
-  assert.equal(productQuery('Hey, can you find me a floor lamp?'), 'floor lamp?');
+  assert.equal(productQuery('Hey, can you find me a floor lamp?'), 'floor lamp');
   assert.equal(productQuery('Ok so, get me a side table'), 'side table');
   assert.equal(productQuery('Um, show me some chairs'), 'chairs');
   // The anchor stays: a verb in the middle of a sentence is not an imperative.

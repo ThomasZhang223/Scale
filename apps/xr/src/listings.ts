@@ -134,17 +134,39 @@ export const SHOP_VERBS = [
   'looking for', 'buy', 'shop for', 'shop', 'purchase', 'order', 'browse',
 ] as const;
 
+/**
+ * The same thing said as a statement or a question rather than an order. "I need a new side
+ * table" is what a person actually says to a headset, and it has no imperative verb in it at
+ * all, so routing and productQuery both need it here or neither gets it.
+ */
+export const SHOP_LEAD_INS = [
+  "i need", "i want", "i'd like", "i would like", "i'm looking for", "i am looking for",
+  "do you have", "do you sell", "is there", "are there", "how about",
+] as const;
+
 /** Longest first, so "search for" wins over "search" inside one alternation. */
-const VERBS = [...SHOP_VERBS].sort((a, b) => b.length - a.length).join('|').replace(/ /g, '\\s+');
+const alt = (words: readonly string[]) =>
+  [...words].sort((a, b) => b.length - a.length).join('|').replace(/ /g, '\\s+');
+const VERBS = alt(SHOP_VERBS);
+/** Everything a shopping sentence can open with. One list, read by the router and the parser. */
+const HEADS = alt([...SHOP_VERBS, ...SHOP_LEAD_INS]);
 
 // Speech starts with noise a keyboard never does: "Hey, can you…", "Ok so, find me…". The
 // anchor stays — an unanchored verb match would eat "the lamp I want to get" — and the fillers
 // are consumed ahead of it instead.
 const FILLER = String.raw`(?:(?:hey|hi|hello|ok|okay|so|um|uh|well|alright|right)\b[\s,]*)*`;
-const POLITE = String.raw`(?:(?:can|could|would|will)\s+you\s+|i(?:'d|\s+would)\s+like\s+(?:you\s+to\s+)?|i\s+(?:want|need)\s+|please\s+)*`;
-const IMPERATIVE = new RegExp(`^\\s*${FILLER}${POLITE}(?:${VERBS})\\s+(?:me\\s+)?(?:(?:a|an|some|the)\\b)?\\s*`, 'i');
+const POLITE = String.raw`(?:(?:can|could|would|will)\s+you\s+|i(?:'d|\s+would)\s+like\s+you\s+to\s+|please\s+)*`;
+/** "a new side table" and "any lamps" are both the article, not the product. */
+const ARTICLE = String.raw`(?:(?:a|an|any|some|the|new)\b\s*)*`;
+const IMPERATIVE = new RegExp(`^\\s*${FILLER}${POLITE}(?:${HEADS})\\s+(?:me\\s+)?${ARTICLE}`, 'i');
 const LENGTH_PHRASE = /\b(?:under|below|less than|no more than|up to|max(?:imum)?|at most|no (?:wider|deeper|taller) than)?[\s-]*\d+(?:\.\d+)?[\s-]*(?:cm|centimet\w*|m|metres?|meters?|mm|millimet\w*|in|inch\w*|"|ft|feet|foot|')\s*(?:wide|deep|tall|high|long)?\b/gi;
 const GAP_PHRASE = /\b(?:for|in|into)\s+the\s+gap\b/gi;
+/**
+ * "…that fits the 80 cm gap beside my desk" — needFromText has already turned that into maxW,
+ * and the merchant's search engine does worse with it than without it. Everything from the
+ * relative pronoun to the end goes, which is where such a clause always sits in speech.
+ */
+const FIT_CLAUSE = /\b(?:that|which)\s+(?:will\s+|would\s+)?fits?\b.*$/i;
 
 /**
  * The product words the merchant's own search should see: the sentence minus the imperative
@@ -154,10 +176,11 @@ const GAP_PHRASE = /\b(?:for|in|into)\s+the\s+gap\b/gi;
 export function productQuery(text: string): string {
   return text
     .replace(IMPERATIVE, '')
+    .replace(FIT_CLAUSE, ' ')
     .replace(LENGTH_PHRASE, ' ')
     .replace(GAP_PHRASE, ' ')
     .replace(/\s+/g, ' ')
-    .replace(/^[\s,.]+|[\s,.]+$/g, '')
+    .replace(/^[\s,.]+|[\s,.?!]+$/g, '')
     .trim();
 }
 
@@ -414,7 +437,7 @@ const LIST_ONLY = /\b(?:my scans|my captures|what have i scanned|what did i scan
 /** A strong buy-word: nothing else it could mean, so it outranks a rearranging verb. */
 const SHOP_STRONG = /\b(?:find|buy|purchase|order|shop|shopping|browse|for sale|listings?|in stock|to buy)\b/i;
 /** A weak one: it means shopping only when nothing is being moved. */
-const SHOP_WEAK = new RegExp(`\\b(?:${VERBS}|do you (?:have|sell|stock)|i (?:need|want)|something that fits|what fits|anything that fits)\\b`, 'i');
+const SHOP_WEAK = new RegExp(`\\b(?:${HEADS}|do you stock|something that fits|what fits|anything that fits)\\b`, 'i');
 /**
  * Moving what is already here. Beats a weak shop word: "I need the sofa moved" is not shopping.
  * Stems, because speech inflects them — "moved", "facing", "rearranging". "Fits" is deliberately
