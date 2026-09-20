@@ -7,11 +7,15 @@
 // mention centimetres.
 
 import type {
+  LayoutRule,
   ObjectV1,
   PlacementV1,
   RoomCaptureV1,
   SolveRequest,
   SolveResponse,
+  SolverPoint,
+  SolverRule,
+  SolverZone,
 } from "./contracts";
 import { HttpError } from "./http";
 import { uuid } from "./ids";
@@ -89,6 +93,33 @@ interface Opening {
 }
 
 /**
+ * The real wall and opening ids of a room, each with the side it sits on, so the model can
+ * name them in a rule. `toSolveRequest` resolves those names; without ids in front of it the
+ * model can only invent one.
+ */
+export function describeRoom(room: RoomCaptureV1): {
+  walls: { id: string; side: string }[];
+  openings: { id: string; kind: string; side: string }[];
+} {
+  const b = boundsFromFloor(room);
+  const sideAt = (transform: unknown) => {
+    const { x, z } = originOf(transform);
+    return sideOf(cm(x), cm(z), b);
+  };
+  return {
+    walls: ((room?.walls ?? []) as { id: string; transform: number[] }[]).map((w) => ({
+      id: w.id,
+      side: sideAt(w.transform),
+    })),
+    openings: ((room?.openings ?? []) as unknown as Opening[]).map((o) => ({
+      id: o.id,
+      kind: o.kind,
+      side: sideAt(o.transform),
+    })),
+  };
+}
+
+/**
  * Build the solver's view of the room and the furniture in it.
  *
  * `fixed` are placements that already exist; `candidates` supply each object's measured size.
@@ -99,7 +130,7 @@ export function toSolveRequest(args: {
   room: RoomCaptureV1;
   candidates: ObjectV1[];
   placements: PlacementV1[];
-  rules: SolveRequest["rules"];
+  rules: LayoutRule[];
   movable?: string[];
   walkwayCm?: number;
   timeLimitMs?: number;
@@ -165,10 +196,72 @@ export function toSolveRequest(args: {
     };
   });
 
+  // The model writes rules with string targets. The solver reads {object}, {point} and {rect}
+  // and cardinal sides (services/fit/app/solver.py point_of / against_wall / keep_clear), so
+  // every reference is resolved here against this room. A reference that resolves to nothing
+  // throws and names it: dropping the rule, or guessing a target, would place furniture against
+  // a rule the model believes is in force.
+  const unresolved = (rule: string, field: string, ref: unknown): never => {
+    throw new HttpError(
+      422,
+      "unknown_rule_target",
+      `Rule ${rule}: ${field} ${JSON.stringify(ref)} matches no object, door, window or wall in this room.`,
+    );
+  };
+  const after = (ref: unknown, prefix: string): string | null =>
+    typeof ref === "string" && ref.startsWith(prefix) ? ref.slice(prefix.length) : null;
+
+  const pointOf = (rule: string, field: string, ref: unknown): SolverPoint => {
+    if (typeof ref === "string" && byId.has(ref)) return { object: ref };
+    if (ref === "center") return { point: [centreX, centreZ] };
+    for (const kind of ["door", "window"]) {
+      const id = after(ref, `${kind}:`);
+      const o = id === null ? undefined : openings.find((op) => op.kind === kind && op.id === id);
+      if (o) {
+        const { x, z } = originOf(o.transform);
+        return { point: [cm(x), cm(z)] };
+      }
+    }
+    return unresolved(rule, field, ref);
+  };
+
+  const zoneOf = (rule: string, ref: unknown): SolverZone => {
+    if (ref === "walkway") return "walkway";
+    const doorId = after(ref, "door:");
+    const door = doorId === null ? undefined : doors.find((d) => d.id === doorId);
+    if (door) return { rect: { ...door.keepOut } };
+    const windowId = after(ref, "window:");
+    const win = windowId === null ? undefined : windows.find((w) => w.id === windowId);
+    if (win) {
+      // Same treatment as a door's keep-out: a square of the opening's width around its centre.
+      const half = Math.round(win.widthCm / 2);
+      return { rect: { minX: win.xCm - half, maxX: win.xCm + half, minZ: win.zCm - half, maxZ: win.zCm + half } };
+    }
+    return unresolved(rule, "zone", ref);
+  };
+
+  const wallOf = (rule: string, ref: unknown): string => {
+    if (ref === "any" || ref === "north" || ref === "south" || ref === "east" || ref === "west") return ref;
+    const id = after(ref, "wall:");
+    const wall = id === null ? undefined : walls.find((w) => w.id === id);
+    return wall ? wall.side : unresolved(rule, "wall", ref);
+  };
+
+  const rules: SolverRule[] = args.rules.map((r) => {
+    const { b, target, zone, wall, ...rest } = r;
+    return {
+      ...rest,
+      ...(wall != null && { wall: wallOf(r.id, wall) }),
+      ...(b != null && { b: pointOf(r.id, "b", b) }),
+      ...(target != null && { target: pointOf(r.id, "target", target) }),
+      ...(zone != null && { zone: zoneOf(r.id, zone) }),
+    };
+  });
+
   return {
     room: { boundsCm: b, doors, windows, walls },
     objects,
-    rules: args.rules,
+    rules,
     // 60 cm is his documented default. The time limit keeps a hard solve inside the Worker's
     // 25-second upstream timeout with room to spare; his prototype solved in 267 ms.
     settings: { walkwayCm: args.walkwayCm ?? 60, timeLimitMs: args.timeLimitMs ?? 2000 },
@@ -198,7 +291,7 @@ export function toPlacements(res: SolveResponse, existing: PlacementV1[]): Place
  */
 export function infeasibleReason(
   res: SolveResponse,
-  rules: SolveRequest["rules"],
+  rules: { id: string; why?: string }[],
 ): string | null {
   if (res.status === "OPTIMAL" || res.status === "FEASIBLE") return null;
   if (res.status === "TIMEOUT") {

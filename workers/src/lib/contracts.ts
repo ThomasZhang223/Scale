@@ -112,6 +112,21 @@ export interface LayoutRule {
   why?: string;
 }
 
+/**
+ * A rule as services/fit/app/solver.py reads it. `toSolveRequest` resolves the model's string
+ * targets into these: an object becomes {object}, a door or window becomes {point} in
+ * centimetres, a wall id becomes a cardinal side, a door or window zone becomes a {rect}.
+ */
+export type SolverPoint = { object: string } | { point: [number, number] };
+export type SolverZone =
+  | "walkway"
+  | { rect: { minX: number; maxX: number; minZ: number; maxZ: number } };
+export type SolverRule = Omit<LayoutRule, "b" | "target" | "zone"> & {
+  b?: SolverPoint;
+  target?: SolverPoint;
+  zone?: SolverZone;
+};
+
 /** What the language model outputs. It still cannot express a coordinate. */
 export interface LayoutPlan {
   summary: string;
@@ -136,7 +151,7 @@ export interface SolveRequest {
     rotDeg: number;
     movable: boolean;
   }[];
-  rules: LayoutRule[];
+  rules: SolverRule[];
   settings: { walkwayCm: number; timeLimitMs: number };
 }
 
@@ -151,9 +166,12 @@ export interface SolveResponse {
   solveMs?: number;
 }
 
-/** Request body for POST {solverOrigin}/fit. Unchanged — the validator is a separate service. */
+/** Request body for POST {solverOrigin}/fit. */
 export interface FitRequest {
   schemaVersion: number;
   room: RoomCaptureV1;
   placements: PlacementV1[];
+  /** REQUIRED in practice. services/fit/app/fit.py load_placements raises without it: the
+   *  service is stateless and never fetches an object. */
+  objects: Record<string, BBoxMeters>;
 }

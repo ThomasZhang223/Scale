@@ -658,18 +658,24 @@ export async function postFit(req: Request, env: Env, origin: string): Promise<R
   const room = (await loadRoomCapture(env, roomId)) as RoomCaptureV1;
 
   let placements = body.placements;
-  if (!placements) {
-    const versionId = required(body.versionId, "versionId or placements");
-    placements = (await getVersion(env, versionId)).placements;
+  if (!placements && body.versionId) {
+    placements = (await getVersion(env, body.versionId)).placements;
   }
+  // The headset sends `{roomId}` alone. ceiling: "the current layout" means the newest version;
+  // a room with no versions checks an empty layout, which is correctly ok:true.
+  placements ??= (await latestVersion(env, roomId))?.placements ?? [];
+
+  // services/fit is stateless: it needs each placed object's box inlined, or it 422s.
+  const objs = await getObjects(env, [...new Set(placements.map((p) => p.objectId))], origin);
+  const objects = Object.fromEntries(objs.map((o) => [o.objectId, o.bboxMeters]));
 
   const report = await callUpstream<FitReportV1>(env, "solver", "/fit", {
     schemaVersion: SCHEMA_VERSION,
     room,
     placements,
+    objects,
   });
   await emitToRoom(env, roomId, "fit", report);
-  void origin;
   return json(report);
 }
 
@@ -796,11 +802,10 @@ export async function getSync(env: Env, roomId: string): Promise<Response> {
  * configuration. One GET answers which.
  */
 export async function getHealth(env: Env): Promise<Response> {
-  const [solver, search, ingest, layout, embedding, fingerprint] = await Promise.all([
+  const [solver, search, ingest, embedding, fingerprint] = await Promise.all([
     env.CONFIG.get("upstream:solver"),
     env.CONFIG.get("upstream:search"),
     env.CONFIG.get("upstream:ingest"),
-    env.CONFIG.get("upstream:layout"),
     env.CONFIG.get("upstream:embedding"),
     env.CONFIG.get("embedding:fingerprint"),
   ]);
@@ -821,7 +826,6 @@ export async function getHealth(env: Env): Promise<Response> {
       solver: solver ?? null,
       search: search ?? null,
       ingest: ingest ?? null,
-      layout: layout ?? null,
       embedding: embedding ?? null,
     },
     embeddingFingerprint: fingerprint ?? null,
@@ -839,7 +843,7 @@ export async function getHealth(env: Env): Promise<Response> {
       EMBEDDING_API_KEY: Boolean(env.EMBEDDING_API_KEY),
     },
     notes: [
-      "upstream:solver unset -> POST /v1/fit returns 503. upstream:layout unset -> POST /v1/solve returns 503.",
+      "upstream:solver unset -> POST /v1/fit AND POST /v1/solve both return 503 (one service answers both).",
       "Missing Baseten secrets -> accepted mesh jobs wait durably. A configured URL must serve the dimension-binding adapter, not raw SF3D.",
       "Vector search requires upstream:embedding, embedding:fingerprint, and EMBEDDING_API_KEY.",
     ],
