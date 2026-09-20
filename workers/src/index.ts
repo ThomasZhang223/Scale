@@ -247,7 +247,7 @@ async function dispatch(
   if ((hit = m("GET", /^\/v1\/sync\/([^/]+)$/))) return real.getSync(env, hit[1]);
 
   // Agent entry points. Not in contracts.md yet — see workers/DEPLOY.md "Schema proposals".
-  if (m("POST", /^\/v1\/scout$/)) return real.postScout(req, env);
+  if (m("POST", /^\/v1\/scout$/)) return real.postScout(req, env, origin);
   if (m("POST", /^\/v1\/scout\/seed$/)) return real.postScoutSeed(req, env);
   if ((hit = m("GET", /^\/v1\/agents\/room\/([^/]+)\/memory$/)))
     return real.getAgentMemory(env, "room", hit[1]);

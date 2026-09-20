@@ -1,4 +1,5 @@
-// Generates simple stand-in furniture GLBs (real-world sizes, metres) into public/objects/,
+// Generates simple stand-in furniture GLBs (real-world sizes, metres) into public/objects/ (not
+// served by the page any more: the built-in furniture lives in the cloud library, source 'primitive'),
 // one per kind the Rearrange rules know about, so the rearrangement can be watched without
 // waiting for real scans. Run: node scripts/make-furniture.mjs
 import { writeFileSync } from 'node:fs';

@@ -15,6 +15,7 @@
 import { Agent } from "agents";
 import { runToolLoop, type ToolDef } from "../lib/ai";
 import { callUpstream } from "../lib/config";
+import { requireOrigin } from "../lib/http";
 import { contentHash, nowIso, uuid } from "../lib/ids";
 import {
   getObjects,
@@ -34,6 +35,7 @@ import type {
 } from "../lib/contracts";
 import { describeRoom, infeasibleReason, toPlacements, toSolveRequest } from "../lib/solveframe";
 import { SCHEMA_VERSION } from "../lib/contracts";
+import { postSearch } from "../routes/index";
 
 export interface RoomAgentState {
   roomId: string;
@@ -195,7 +197,7 @@ export class RoomAgent extends Agent<Env, RoomAgentState> {
       case "broadcast":
         return this.handleBroadcast(request);
       case "plan":
-        return this.handlePlan(request, url.origin);
+        return this.handlePlan(request);
       case "memory":
         return Response.json({
           state: this.state,
@@ -284,13 +286,16 @@ export class RoomAgent extends Agent<Env, RoomAgentState> {
 
   // --- The layout agent --------------------------------------------------------------------
 
-  private async handlePlan(request: Request, origin: string): Promise<Response> {
+  private async handlePlan(request: Request): Promise<Response> {
     const body = (await request.json()) as {
       roomId: string;
       intent: string;
       budgetCents?: number | null;
       fixed?: PlacementV1[];
+      origin?: string;
     };
+    // Not request.url's origin: that is the synthetic https://agent the Worker reached us at.
+    const origin = requireOrigin(body.origin);
 
     this.setState({ ...this.state, roomId: body.roomId });
     this.proposed = body.fixed ?? [];
@@ -365,20 +370,27 @@ export class RoomAgent extends Agent<Env, RoomAgentState> {
   }
 
   private async toolSearch(args: Record<string, unknown>, origin: string): Promise<unknown> {
-    const res = await fetch(`${origin}/v1/search`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        text: args.text,
-        fit: {
-          maxW: args.maxW ?? null,
-          maxH: args.maxH ?? null,
-          maxD: args.maxD ?? null,
-        },
-        maxPriceCents: args.maxPriceCents ?? null,
-        limit: args.limit ?? 8,
+    // In-process, not an HTTP self-fetch: a Worker fetching its own workers.dev URL from inside a
+    // Durable Object can be answered with Cloudflare's own 404 page. `origin` is still needed —
+    // it is what postSearch builds each hit's glbUrl from.
+    const res = await postSearch(
+      new Request(`${origin}/v1/search`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          text: args.text,
+          fit: {
+            maxW: args.maxW ?? null,
+            maxH: args.maxH ?? null,
+            maxD: args.maxD ?? null,
+          },
+          maxPriceCents: args.maxPriceCents ?? null,
+          limit: args.limit ?? 8,
+        }),
       }),
-    });
+      this.env,
+      origin,
+    );
     if (!res.ok) throw new Error(`search returned ${res.status}`);
     const hits = (await res.json()) as { objectId: string; score: number; object: ObjectV1 }[];
     // Hand the model only what it can reason about. A full Object v1 per hit would spend the

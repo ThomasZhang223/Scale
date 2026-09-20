@@ -6,7 +6,7 @@
 
 import { HttpError, json, noContent, readJson } from "../lib/http";
 import { contentHash, nowIso, token, uuid } from "../lib/ids";
-import { R2Keys, contentTypeFor, keyFromAssetPath } from "../lib/keys";
+import { R2Keys, contentTypeFor, isCatalogSourceKey, keyFromAssetPath, sniffImageType } from "../lib/keys";
 import { callUpstream, callUpstreamRaw, upstreamOrigin } from "../lib/config";
 import { embedInput, indexObject, type Embedding } from "../lib/embedding";
 import { enqueueMesh } from "../lib/mesh-dispatch";
@@ -18,6 +18,7 @@ import {
   getObject,
   getObjects,
   getVersion,
+  closeParkedMeshJobs,
   insertObject,
   insertVersion,
   latestVersion,
@@ -234,9 +235,19 @@ export async function getAsset(env: Env, pathname: string): Promise<Response> {
   const obj = await env.BUCKET.get(key);
   if (!obj) throw new HttpError(404, "asset_not_found", `Nothing stored at ${key}.`);
 
-  return new Response(obj.body, {
+  let contentType = obj.httpMetadata?.contentType ?? contentTypeFor(key);
+  let body: BodyInit | null = obj.body;
+  if (isCatalogSourceKey(key)) {
+    // The header must match the bytes. ceiling: the photo is buffered to look at its first bytes;
+    // catalogue photos are small (embedInput refuses anything over 10 MiB).
+    const bytes = new Uint8Array(await obj.arrayBuffer());
+    contentType = sniffImageType(bytes) ?? contentType;
+    body = bytes;
+  }
+
+  return new Response(body, {
     headers: {
-      "content-type": obj.httpMetadata?.contentType ?? contentTypeFor(key),
+      "content-type": contentType,
       etag: obj.httpEtag,
       // A key is derived from an immutable id, so the bytes at a key never change. The Quest
       // reloading a room should not refetch a 4 MB mesh it already has.
@@ -335,15 +346,20 @@ export async function postGenerate(
 
 // POST /v1/objects/{id}/mesh  { key, roomId? }
 //
-// The phone's Object Capture path (apps/mobile/modules/object-capture) reconstructs the mesh
-// on-device with Apple's PhotogrammetrySession and uploads the GLB itself through POST /uploads
-// (kind scanMesh, stored under scans/). This is how it then flips the object to ready. Not in contracts.md yet —
-// same standing as GET /v1/objects, see workers/DEPLOY.md "Schema proposals".
+// Attaches an already-uploaded GLB to an object and flips it to ready. Which key is acceptable
+// follows the ROW's source, and there is no fallback either way:
+//   scan               scans/{id}/mesh.glb    the phone's Object Capture path
+//                      (apps/mobile/modules/object-capture reconstructs on-device with Apple's
+//                      PhotogrammetrySession and uploads through POST /uploads, kind scanMesh)
+//   catalog/primitive  objects/{id}/mesh.glb  a reviewed hero mesh (services/gen's
+//                      WorkerArtifactSink, kind objectMesh — services/gen asserts that literal key)
+// A scan is never attached under objects/ and a catalogue object never under scans/.
+// Not in contracts.md yet — same standing as GET /v1/objects, see workers/DEPLOY.md "Schema proposals".
 //
 // Standing rule 2 ("the scale binding happens exactly once, in C") is honoured, not skipped:
-// Object Capture output is already in metres at true size, so no binding step exists for this
+// Object Capture output is already in metres at true size, so no binding step exists for a scan
 // mesh at all — nothing here or downstream rescales it. `bboxMeters` on the object row was
-// measured from that same mesh on the phone.
+// measured from that same mesh on the phone. A reviewed catalogue mesh was bound in C.
 export async function postObjectMesh(
   req: Request,
   env: Env,
@@ -353,11 +369,30 @@ export async function postObjectMesh(
 ): Promise<Response> {
   const body = await readJson<{ key: string; roomId?: string | null }>(req);
   const key = required(body.key, "key");
-  if (key !== R2Keys.scanMesh(objectId)) {
-    throw new HttpError(400, "bad_mesh_key", `key must be ${R2Keys.scanMesh(objectId)}, got ${key}.`);
-  }
-  // 404 before touching the row, and a loud error if the client marks ready before its PUT landed.
+  // 404 before anything else; the row decides which key is acceptable.
   const object0 = await getObject(env, objectId, origin);
+  let expected: string;
+  switch (object0.source) {
+    case "scan":
+      expected = R2Keys.scanMesh(objectId);
+      break;
+    case "catalog":
+    case "primitive":
+      expected = R2Keys.objectMesh(objectId);
+      break;
+    default:
+      // Standing rule 4: an unrecognised source has no folder, and guessing one would file a
+      // mesh where nothing looks for it.
+      throw new HttpError(422, "unknown_object_source", `Object ${objectId} has source "${object0.source}".`);
+  }
+  if (key !== expected) {
+    throw new HttpError(
+      400,
+      "bad_mesh_key",
+      `key must be ${expected} for a ${object0.source} object, got ${key}.`,
+    );
+  }
+  // A loud error if the client marks ready before its PUT landed.
   const head = await env.BUCKET.head(key);
   if (!head) throw new HttpError(409, "mesh_not_uploaded", `Nothing is stored at ${key} yet. PUT it first.`);
   // A truncated upload or an HTML error page must not flip a row to ready. Same check
@@ -379,6 +414,9 @@ export async function postObjectMesh(
   }
 
   await markObjectReady(env, objectId, { glbKey: key });
+  // A catalogue object may have mesh jobs parked (queued, undelivered) waiting for a Baseten
+  // that is not configured. Close them so configuring it later cannot regenerate over this mesh.
+  if (object0.source !== "scan") await closeParkedMeshJobs(env, objectId, nowIso());
 
   // A phone-uploaded GLB never passes through the mesh Workflow, so this is the only place a
   // scanned object can reach Vectorize. Same indexer as the Workflow — there is not a second one.
@@ -404,7 +442,7 @@ export async function postObjectMesh(
     ctx.waitUntil(
       indexObject(env, {
         objectId,
-        source: "scan",
+        source: object0.source,
         category: object0.category,
         bboxMeters: object0.bboxMeters,
         dominantHex: object0.palette?.[0] ?? null,
@@ -487,7 +525,17 @@ export interface SearchBody {
 }
 
 export async function postSearch(req: Request, env: Env, origin: string): Promise<Response> {
-  const body = await readJson<SearchBody>(req);
+  const requested = await readJson<SearchBody>(req);
+  // One Vectorize namespace holds two kinds of vector: catalogue rows are indexed from their
+  // IMAGE (a text query scores them about 0.13), scans and primitives from TEXT (the same query
+  // scores them about 0.9). Unscoped, every text query is won by the placeholder meshes. A text
+  // query with no explicit source therefore means "shopping": search the catalogue, and say so in
+  // X-Search-Scope so the narrowing is never silent. An explicit source is always honoured.
+  // ceiling: this hides scans and primitives from unscoped text search. The real fix is one
+  // namespace per modality, queried by the modality of the request (Ani's index design).
+  const narrowed = Boolean(requested.text) && !requested.source;
+  const body: SearchBody = narrowed ? { ...requested, source: "catalog" } : requested;
+  const scope: Record<string, string> = narrowed ? { "x-search-scope": "catalog-default" } : {};
   const limit = Math.min(Math.max(body.limit ?? 8, 1), 50); // Vectorize caps topK at 50 with metadata.
 
   // Paul's service first, when one is configured. It is a COMPLETE search, not a re-rank stage:
@@ -508,7 +556,7 @@ export async function postSearch(req: Request, env: Env, origin: string): Promis
       // unembedded search that returns plausible rows and reports no error at all.
       const res = await callUpstreamRaw(env, "search", "/search", body, 8_000);
       const ranked = (await res.json()) as unknown;
-      const passthrough: Record<string, string> = { "x-ranker": "upstream" };
+      const passthrough: Record<string, string> = { ...scope, "x-ranker": "upstream" };
       // His headers say something the body does not: that the fit filter was widened, or that
       // his embedder was down. Losing them would hide a degradation.
       for (const h of ["x-fit-relaxed", "x-search-degraded"]) {
@@ -527,7 +575,7 @@ export async function postSearch(req: Request, env: Env, origin: string): Promis
 
   if (!embedding) {
     const hits = await d1Search(env, body, limit, origin);
-    return json(hits, 200, { "x-ranker": "d1-fallback" });
+    return json(hits, 200, { ...scope, "x-ranker": "d1-fallback" });
   }
 
   // $lte is Vectorize's numeric range operator. It only works on a field that has a metadata
@@ -574,7 +622,7 @@ export async function postSearch(req: Request, env: Env, origin: string): Promis
       },
     };
     const relaxedHits = await d1Search(env, relaxed, limit, origin);
-    return json(relaxedHits, 200, { "x-ranker": "relaxed" });
+    return json(relaxedHits, 200, { ...scope, "x-ranker": "relaxed" });
   }
 
   // Reaching here means either no ranker is configured, or the configured one failed. Both are
@@ -586,6 +634,7 @@ export async function postSearch(req: Request, env: Env, origin: string): Promis
   // five paths ran, so "these are not ranked" is one curl away rather than something you notice
   // on stage.
   return json(hits, 200, {
+    ...scope,
     "x-ranker": searchOrigin && !embeddingOrigin ? "vectorize-ranker-unreachable" : "vectorize",
   });
 }
@@ -735,15 +784,16 @@ export async function postSolve(req: Request, env: Env, origin: string): Promise
       intent: body.intent,
       budgetCents: body.budgetCents ?? null,
       fixed: body.fixed ?? [],
+      // The agent is reached through a synthetic URL, so it cannot learn the real origin itself.
+      origin,
     }),
   });
-  void origin;
   return json(await res.json(), res.status);
 }
 
 // --- Agent entry points ----------------------------------------------------------------------
 
-export async function postScout(req: Request, env: Env): Promise<Response> {
+export async function postScout(req: Request, env: Env, origin: string): Promise<Response> {
   const body = await readJson<{ sessionId?: string; query: string }>(req);
   // One agent per session, so its memory of what it already ingested survives the follow-up
   // question. A caller that sends no sessionId gets a fresh agent with no memory, which is
@@ -753,7 +803,8 @@ export async function postScout(req: Request, env: Env): Promise<Response> {
   const res = await agent.fetch("https://agent/scout", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ query: required(body.query, "query") }),
+    // origin: the agent is reached through a synthetic URL, so it cannot learn the real one itself.
+    body: JSON.stringify({ query: required(body.query, "query"), origin }),
   });
   const out = (await res.json()) as Record<string, unknown>;
   return json({ sessionId, ...out }, res.status);

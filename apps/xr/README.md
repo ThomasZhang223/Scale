@@ -51,7 +51,7 @@ open it with `?scan=/room-scan.json`).
 
 1. **Real size is kept.** Object Capture exports in meters, so objects are never stretched
    to fit a box. Files that are clearly in centimeters or millimeters (bigger than 5 m)
-   are converted, and the panel says so. A `scale` in `objects.json` overrides this.
+   are converted, and the panel says so. A `scale` in an `?objects=` manifest overrides this (the built-in furniture is served at scale 1).
 2. **Origin moves to the bottom-center**, so an object's position is the spot on the floor
    under it.
 3. **A physics shape is made from its surface**: a convex hull around the real shape,
@@ -94,8 +94,9 @@ Letting go leaves the object where it is. Every pull from the palette is a fresh
 ## Adding your own
 
 - **Room:** open `?scan=<url>` or drop a `.json` on the page, in either format above.
-- **Objects:** list them in `public/objects.json`, or drop `.glb` files on the page
-  (several at once works):
+- **Objects:** the built-in furniture comes from the cloud library (`GET /v1/objects?source=primitive`,
+  always live, no bundled copy). To use your own list, open `?objects=<url>` with a manifest, or drop
+  `.glb` files on the page (several at once works):
 
 ```json
 [
@@ -129,8 +130,7 @@ until you pull it out.
 | `src/palette.ts` | The wrist palette in VR |
 | `src/halo.ts` | Blue halo on the pointed-at / held object |
 | `public/room-scan.json` | Sample room (off-center like a real ARKit scan) |
-| `public/objects.json` | Objects loaded at start |
-| `public/objects/` | Sample chair and sofa (CC BY 4.0, see `ATTRIBUTION.md`) |
+| `public/objects/ATTRIBUTION.md` | Credit (CC BY 4.0) for the chair and sofa models, now served from the cloud library |
 
 ## Checked so far
 
