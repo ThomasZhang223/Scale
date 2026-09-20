@@ -29,7 +29,7 @@ run_worker_first = ["/v1/*"]
 API_ORIGIN = "https://full-scale-workers.thomaszhangdev.workers.dev"
 # Where /v1/agent goes: services/agent, deployed as its own Worker. Empty means "send it to
 # API_ORIGIN too" (Thomas's Worker can forward /v1/agent/* in one line).
-AGENT_ORIGIN = ""
+AGENT_ORIGIN = "https://designer-agent.thomaszhangdev.workers.dev"
 # Voice (worker/index.ts, /v1/voice/*): ElevenLabs. The API KEY IS A SECRET, never a var:
 #   npx wrangler secret put ELEVENLABS_API_KEY
 # Without it the routes answer 501 with that exact instruction. The voice id is a premade
