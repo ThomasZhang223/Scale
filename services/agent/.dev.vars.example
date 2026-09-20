@@ -3,5 +3,7 @@ OPENAI_API_KEY=sk-...
 # Optional: route OpenAI calls through Cloudflare AI Gateway.
 # AI_GATEWAY_URL=https://gateway.ai.cloudflare.com/v1/<account_id>/<gateway_id>/openai
 # CF_AIG_TOKEN=...
-# When the agent runs on Cloudflare and the solver on a laptop behind a tunnel:
-# SOLVER_URL=https://solver.example.com
+# The fit container's origin is not a var: it is the KV key upstream:solver (binding CONFIG).
+# Local dev (wrangler dev uses a local KV store): point it at the docker compose fit container once with
+#   npx wrangler kv key put --binding CONFIG "upstream:solver" "http://127.0.0.1:8001" --local
+# Deployed: infra/up.sh writes it. An unset key is an error that names this command.

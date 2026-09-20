@@ -20,10 +20,15 @@ OPENAI_MODEL = "gpt-4o-mini"
 # OpenAI through Cloudflare AI Gateway: https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway_id}/openai
 # Empty means "call api.openai.com directly" (still logged as offline-planner if no key).
 AI_GATEWAY_URL = ""
-# The fit container (services/fit) serves both /fit and /solve (OR-Tools). Locally that's
-# docker compose's port 8001 (infra/README.md); deployed, the fit tunnel's *.trycloudflare.com
-# origin. Both calls carry X-Upstream-Token (the UPSTREAM_TOKEN secret, same value as infra/.env).
-FIT_URL = "http://127.0.0.1:8001"
-SOLVER_URL = "http://127.0.0.1:8001"
+# The fit container (services/fit) serves both /fit and /solve (OR-Tools); its origin is the KV
+# key upstream:solver (below), not a var. Both calls carry X-Upstream-Token (the UPSTREAM_TOKEN
+# secret, same value as infra/.env).
+
+# The fit container's quick-tunnel origin, written by infra/cloudflare/set-upstreams.sh on every
+# `infra/up.sh`. Same namespace as workers/wrangler.toml: a quick tunnel gets a new random
+# hostname each restart, so this must be a KV read at request time, never a [vars] entry.
+[[kv_namespaces]]
+binding = "CONFIG"
+id = "601059204ab74578a49b99ace41c9e4a"
 
 # Secrets (wrangler secret put ..., or .dev.vars locally): OPENAI_API_KEY, UPSTREAM_TOKEN, CF_AIG_TOKEN (optional)

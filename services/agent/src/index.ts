@@ -14,8 +14,7 @@ export interface Env {
   OPENAI_MODEL?: string;
   AI_GATEWAY_URL?: string;
   CF_AIG_TOKEN?: string;
-  FIT_URL: string;
-  SOLVER_URL: string;
+  CONFIG: KVNamespace;
   UPSTREAM_TOKEN?: string;
 }
 
