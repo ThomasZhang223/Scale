@@ -444,8 +444,13 @@ test('a lamp that needs a mount is never offered, and the taller light comes fir
   // The category is read from the row, not from its position in the list.
   assert.equal(rowCategory(row('Tall open shelf', 'shelf')), 'shelf');
   assert.equal(rowCategory(row('Mid-century lounge chair', 'armchair')), 'armchair');
-  // No category field: the name decides, in the app's vocabulary.
+  // No category the app knows: the HEAD NOUN of the name decides, never any word in it.
   assert.equal(rowCategory(row('Wooden bookcase', 'unknown')), 'bookcase');
+  assert.equal(rowCategory(row('Glass Natural Small Lamps', 'decor/home accents')), 'lamp');
+  // The one that sent a pot of pens to the top of "set up a home office".
+  assert.equal(rowCategory(row('Desk stationery', 'stationery')), null);
+  assert.equal(rowCategory(row('Laptop computer', 'laptop')), null);
+  assert.equal(rowCategory(row('Metal office desk', 'desk')), 'desk');
 });
 
 test('an exact match outranks a relative', () => {

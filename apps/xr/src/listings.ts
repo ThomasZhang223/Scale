@@ -736,12 +736,27 @@ const NEEDS_A_MOUNT = /\b(?:pendant|ceiling|chandelier|sconce|wall[- ]light|flus
 /** A lamp that stands on the floor or on a table, which is the only kind that can be placed. */
 const STANDS_BY_ITSELF = /\b(?:floor|desk|table|standing|tripod)\b/i;
 
-/** The category a row IS, from the server's own field first and its name second. */
+/**
+ * The category a row IS: the server's own field when the app knows that word, and otherwise the
+ * HEAD NOUN of its name — the last word, not any word in it.
+ *
+ * Any-word matching offered "Desk stationery", a 30 x 16 x 8 cm pot of pens, as the desk for
+ * "set up a home office", because its name contains "desk". In English the head noun of a
+ * furniture name is its last word: "Metal office desk" is a desk, "Desk stationery" is
+ * stationery, "Wooden bookcase" is a bookcase. A plural is still the head ("Glass Natural Small
+ * Lamps").
+ *
+ * ceiling: a merchant row titled "Coffee Table - Limited Item" now matches nothing, so the shop
+ * top-up loses rows whose title carries a suffix. That is the safe way to be wrong — the library
+ * answers almost every category, and a row that is the wrong KIND of thing is worse on screen
+ * than a row that never appears. The upgrade is the catalogue carrying its own category in this
+ * vocabulary, which ingest could do at extract time.
+ */
 export function rowCategory(row: Listing): string | null {
   const direct = canonicalCategory(row.category);
   if (direct) return direct;
-  const name = (row.name ?? '').toLowerCase();
-  return KNOWN_CATEGORIES.find((c) => name.includes(c)) ?? null;
+  const name = (row.name ?? '').toLowerCase().replace(/[^a-z\s]+$/, '').trim();
+  return KNOWN_CATEGORIES.find((c) => name.endsWith(c) || name.endsWith(`${c}s`)) ?? null;
 }
 
 /** Rows that are the kind of thing a need asks for, exact matches first, mounted lights never. */
