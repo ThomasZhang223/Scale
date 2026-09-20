@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { needFromText, needFromDetected, rank, findListings, isShoppingRequest, classifyUtterance, clearScanWinner, commandOf, normalizeTranscript, SHOP_VERBS, SHOP_LEAD_INS, parseLengthMetres, productQuery, findLive, STOREFRONTS, type Listing } from './listings.ts';
+import { missingCategories, recommendationsFor, rowsForCategory, rowCategory, recommendTitle, listCategories, canonicalCategory, STARTER_CATEGORIES, KNOWN_CATEGORIES, needFromText, needFromDetected, rank, findListings, isShoppingRequest, classifyUtterance, clearScanWinner, commandOf, normalizeTranscript, SHOP_VERBS, SHOP_LEAD_INS, parseLengthMetres, productQuery, findLive, STOREFRONTS, type Listing } from './listings.ts';
 
 const catalog: Listing[] = JSON.parse(readFileSync(new URL('../public/catalog.json', import.meta.url), 'utf-8'));
 
@@ -392,4 +392,110 @@ test('a scan is placed unasked only when it clearly beats the next one', () => {
   assert.equal(clearScanWinner([hit('person', 0.1132), hit('bust', 0.1120)]), null);        // 1.01x
   assert.equal(clearScanWinner([hit('only', 0.01)])?.objectId, 'only');
   assert.equal(clearScanWinner([]), null);
+});
+
+
+/* ---------- what the room is missing, and what to offer for it (P-RECS) ---------- */
+
+const row = (name: string, category: string, over: Partial<Listing> = {}): Listing => ({
+  schemaVersion: 1, objectId: name, source: 'primitive', state: 'ready', name, category,
+  glbUrl: `https://example/${name}.glb`, bboxMeters: { w: 1, h: 1, d: 1 },
+  ...over,
+} as unknown as Listing);
+
+const LIBRARY: Listing[] = [
+  row('Two-seat fabric sofa', 'sofa'),
+  row('Compact loveseat', 'sofa'),
+  row('Modern armchair', 'armchair'),
+  row('Wooden dining chair', 'chair'),
+  row('Low metal stool', 'stool'),
+  row('Adjustable desk lamp', 'lamp'),
+  row('Modern pendant lamp', 'lamp'),
+  row('Square side table', 'side table'),
+  row('Wooden bookcase', 'bookcase'),
+];
+
+test('a need the room already answers is not missing', () => {
+  assert.deepEqual(missingCategories(['armchair', 'lamp', 'side table'], ['sofa', 'side table']), ['armchair', 'lamp']);
+  // A relative answers a general need: somewhere to sit is somewhere to sit.
+  assert.deepEqual(missingCategories(['chair'], ['armchair']), []);
+  // But asking for an armchair is not answered by a dining chair.
+  assert.deepEqual(missingCategories(['armchair'], ['chair']), ['armchair']);
+  assert.deepEqual(missingCategories(['couch'], ['sofa']), []);
+});
+
+test('a word outside the vocabulary can neither create a need nor answer one', () => {
+  // P-PAUL's new props (laptop, books, vase) carry categories this app has no meaning for.
+  assert.deepEqual(missingCategories(['lamp', 'reading light'], ['laptop', 'books']), ['lamp']);
+  assert.equal(canonicalCategory('laptop'), null);
+  assert.equal(canonicalCategory('LAMP'), 'lamp');
+});
+
+test('nothing needed means nothing missing, and a furnished room opens no panel', () => {
+  assert.deepEqual(missingCategories(null, ['sofa']), []);
+  assert.deepEqual(missingCategories([], []), []);
+  assert.deepEqual(missingCategories(['desk', 'chair'], ['desk', 'chair']), []);
+});
+
+test('a lamp that needs a mount is never offered, and the taller light comes first', () => {
+  const lamps = rowsForCategory([...LIBRARY, row('Small metal table lantern', 'lamp', { bboxMeters: { w: 0.12, h: 0.29, d: 0.1 } })], 'lamp');
+  // The pendant is gone entirely; the 29 cm lantern is kept but ranked under the 1 m desk lamp.
+  assert.deepEqual(lamps.map((l) => l.name), ['Adjustable desk lamp', 'Small metal table lantern']);
+  // The category is read from the row, not from its position in the list.
+  assert.equal(rowCategory(row('Tall open shelf', 'shelf')), 'shelf');
+  assert.equal(rowCategory(row('Mid-century lounge chair', 'armchair')), 'armchair');
+  // No category field: the name decides, in the app's vocabulary.
+  assert.equal(rowCategory(row('Wooden bookcase', 'unknown')), 'bookcase');
+});
+
+test('an exact match outranks a relative', () => {
+  assert.deepEqual(rowsForCategory(LIBRARY, 'chair').map((l) => l.name), ['Wooden dining chair', 'Modern armchair', 'Low metal stool']);
+});
+
+test('every category gets a row before any category gets two', () => {
+  const { rows, unfilled } = recommendationsFor(['armchair', 'lamp', 'sofa'], (need) => rowsForCategory(LIBRARY, need));
+  assert.deepEqual(rows.map((r) => r.listing.name), ['Modern armchair', 'Adjustable desk lamp', 'Two-seat fabric sofa', 'Compact loveseat']);
+  assert.deepEqual(rows.map((r) => r.reasons[0]), ['an armchair', 'a lamp', 'a sofa', 'a sofa']);
+  assert.deepEqual(unfilled, []);
+});
+
+test('a category nothing was found for is reported, never silently dropped', () => {
+  const { rows, unfilled } = recommendationsFor(['rug', 'lamp'], (need) => rowsForCategory(LIBRARY, need));
+  assert.deepEqual(unfilled, ['rug']);
+  assert.equal(rows.length, 1);
+});
+
+test('the panel is never overfilled', () => {
+  const many = recommendationsFor(['sofa', 'chair', 'lamp', 'armchair'], (need) => rowsForCategory(LIBRARY, need));
+  assert.ok(many.rows.length <= 6);
+  assert.equal(new Set(many.rows.map((r) => r.listing.objectId)).size, many.rows.length);
+});
+
+test('the title says what happened and never what to do', () => {
+  assert.equal(recommendTitle('emptyRoom', []), 'Nothing in the room to arrange');
+  // Nothing was found: the heading carries that, and the note line is left off rather than
+  // saying "no rug" twice under itself.
+  assert.equal(recommendTitle('nothingFound', ['rug']), 'Nothing found for rug');
+  assert.equal(recommendTitle('missing', ['lamp', 'armchair']), 'Your room has no lamp or armchair');
+  assert.equal(recommendTitle('alongside', ['lamp']), 'Still no lamp');
+  // The panel's title line holds about 45 characters; four categories would lose the last one
+  // to an ellipsis, and the cards below name every one of them anyway.
+  assert.equal(recommendTitle('missing', ['armchair', 'lamp', 'side table']), 'Your room has no armchair, lamp or side table');
+  assert.equal(recommendTitle('missing', ['armchair', 'lamp', 'side table', 'rug']), 'Your room has no armchair, lamp or side table and more');
+  for (const title of [recommendTitle('missing', ['armchair', 'lamp', 'side table'])]) assert.ok(title.length <= 45, title);
+  // findpanel.ts's rule: the body line is "Pick one to add it", so no title may contain "pick".
+  for (const r of ['emptyRoom', 'missing', 'alongside', 'nothingFound'] as const) {
+    assert.ok(!/\bpick\b/i.test(recommendTitle(r, ['lamp'])));
+  }
+});
+
+test('categories are spoken as English', () => {
+  assert.equal(listCategories(['lamp']), 'a lamp');
+  assert.equal(listCategories(['lamp', 'armchair']), 'a lamp and an armchair');
+  assert.equal(listCategories(['lamp', 'armchair', 'rug']), 'a lamp, an armchair and a rug');
+});
+
+test('the starter set is furniture this app can actually place', () => {
+  for (const c of STARTER_CATEGORIES) assert.ok((KNOWN_CATEGORIES as readonly string[]).includes(c), c);
+  assert.ok(STARTER_CATEGORIES.every((c) => rowsForCategory(LIBRARY, c).length || c === 'shelf' || c === 'coffee table'));
 });

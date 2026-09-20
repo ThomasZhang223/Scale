@@ -653,3 +653,189 @@ export function clearScanWinner(hits: { score: number; object: ObjectV1 }[]): Ob
   const [top, second] = hits;
   return top.score >= second.score * SCAN_CLEAR_LEAD ? top.object : null;
 }
+
+
+/*
+ * What the room is missing, and what to offer for it.
+ *
+ * The designer agent refuses a request it has no furniture for, and the refusal is prose: the
+ * planner's prompt tells it to "write no rules and say in the summary what is missing", so the
+ * wording is model output and came back three different ways in three runs against the deployed
+ * service. Nothing here reads that sentence. The categories come from the USER'S sentence
+ * (POST /v1/intent `needs`), and the room's own contents are subtracted from them here, on the
+ * headset, where both are already known.
+ */
+
+/**
+ * The app's furniture vocabulary. `categoryOf()` in main.ts matches a name against this list,
+ * POST /v1/intent validates `needs` against its own copy of it, and this module decides what is
+ * missing in it — so a word outside it can neither create a need nor satisfy one.
+ */
+export const KNOWN_CATEGORIES = [
+  'coffee table', 'side table', 'sofa', 'couch', 'armchair', 'chair', 'stool', 'bench', 'dining',
+  'table', 'desk', 'bed', 'storage', 'shelf', 'bookcase', 'cabinet', 'dresser', 'wardrobe',
+  'lamp', 'television', 'tv', 'plant', 'rug',
+] as const;
+
+const KNOWN = new Set<string>(KNOWN_CATEGORIES);
+
+/**
+ * Which categories answer a need. The first entry is the need itself, so a lookup prefers the
+ * exact thing and settles for a relative: a room with an armchair in it already has somewhere to
+ * sit, and a request for an armchair is not answered by a stool.
+ *
+ * ceiling: seven hand-written entries, not a taxonomy. A category with no entry stands for
+ * itself, which is the safe way to be wrong — it offers furniture that is exactly what was
+ * named. The upgrade is a parent field on the catalogue row.
+ */
+const ALIASES: Record<string, string[]> = {
+  couch: ['couch', 'sofa'],
+  sofa: ['sofa', 'couch'],
+  tv: ['tv', 'television'],
+  television: ['television', 'tv'],
+  storage: ['storage', 'cabinet', 'shelf', 'bookcase', 'dresser', 'wardrobe'],
+  table: ['table', 'dining', 'coffee table', 'side table'],
+  chair: ['chair', 'armchair', 'stool'],
+};
+
+/** A category the rest of this module will act on, or null. Never a guess: an unknown word is dropped. */
+export function canonicalCategory(raw: string | null | undefined): string | null {
+  const word = (raw ?? '').trim().toLowerCase();
+  return KNOWN.has(word) ? word : null;
+}
+
+/** The categories a need accepts, most exact first. */
+export function categoryAliases(need: string): string[] {
+  return ALIASES[need] ?? [need];
+}
+
+/**
+ * The needed categories the room cannot answer, in the order they were asked for. `have` is what
+ * is PLACED in the room right now — a category the library merely stocks satisfies nothing.
+ */
+export function missingCategories(needs: readonly string[] | null | undefined, have: readonly string[]): string[] {
+  const inRoom = new Set(have.map(canonicalCategory).filter((c): c is string => !!c));
+  const out: string[] = [];
+  for (const raw of needs ?? []) {
+    const need = canonicalCategory(raw);
+    if (!need || out.includes(need)) continue;
+    if (!categoryAliases(need).some((c) => inRoom.has(c))) out.push(need);
+  }
+  return out;
+}
+
+/**
+ * What to offer when the sentence named nothing and the room holds nothing — the empty-room
+ * refusal, which has no needs to derive. OURS, not the model's: a seat, a surface, a light and
+ * somewhere to put things is the smallest set that makes a room arrangeable at all.
+ */
+export const STARTER_CATEGORIES = ['sofa', 'coffee table', 'lamp', 'shelf'];
+
+/** A light that has to be screwed to something is furniture nobody can place in a room scan. */
+const NEEDS_A_MOUNT = /\b(?:pendant|ceiling|chandelier|sconce|wall[- ]light|flush[- ]mount)\b/i;
+/** A lamp that stands on the floor or on a table, which is the only kind that can be placed. */
+const STANDS_BY_ITSELF = /\b(?:floor|desk|table|standing|tripod)\b/i;
+
+/** The category a row IS, from the server's own field first and its name second. */
+export function rowCategory(row: Listing): string | null {
+  const direct = canonicalCategory(row.category);
+  if (direct) return direct;
+  const name = (row.name ?? '').toLowerCase();
+  return KNOWN_CATEGORIES.find((c) => name.includes(c)) ?? null;
+}
+
+/** Rows that are the kind of thing a need asks for, exact matches first, mounted lights never. */
+export function rowsForCategory(rows: readonly Listing[], need: string): Listing[] {
+  const wanted = categoryAliases(need);
+  const usable = rows.filter((r) => !NEEDS_A_MOUNT.test(r.name ?? ''));
+  const matched = usable.filter((r) => {
+    const c = rowCategory(r);
+    return c ? wanted.includes(c) : false;
+  });
+  // Exactly what was asked for, then a relative; within a tie, a lamp that stands by itself, and
+  // then the taller of two lights.
+  //
+  // ceiling: height is a stand-in for "a light you could read by". The library holds six lamps
+  // between 29 cm and 89 cm, and the short ones are lanterns and ornaments — recommending one of
+  // those for a reading nook is not wrong, it is just useless. A real fix is a field on the row
+  // saying what a piece is FOR, which nothing in the catalogue carries today.
+  return matched.sort((a, b) => rank(a) - rank(b) || (need === 'lamp' ? b.bboxMeters.h - a.bboxMeters.h : 0));
+
+  function rank(r: Listing): number {
+    const c = rowCategory(r);
+    const byAlias = c ? wanted.indexOf(c) : wanted.length;
+    const byName = need === 'lamp' && STANDS_BY_ITSELF.test(r.name ?? '') ? 0 : 1;
+    return byAlias * 2 + byName;
+  }
+}
+
+export interface RecommendSet {
+  rows: Recommendation[];
+  /** Categories nothing could be found for. Said out loud rather than quietly dropped. */
+  unfilled: string[];
+}
+
+/**
+ * A handful per missing category, round robin so no category is pushed off the panel by the one
+ * before it. `reasons[0]` is the category the row fills, which is what the card's third line
+ * shows — a mixed list then reads as grouped without needing section headers.
+ */
+export function recommendationsFor(
+  missing: readonly string[],
+  rowsByCategory: (need: string) => readonly Listing[],
+  limit = 6,
+  perCategory = 2,
+): RecommendSet {
+  const queues = missing.map((need) => ({ need, rows: [...rowsByCategory(need)] }));
+  const unfilled = queues.filter((q) => !q.rows.length).map((q) => q.need);
+  const rows: Recommendation[] = [];
+  const taken = new Set<string>();
+  for (let round = 0; round < perCategory && rows.length < limit; round++) {
+    for (const q of queues) {
+      if (rows.length >= limit) break;
+      const row = q.rows.find((r) => !taken.has(r.objectId));
+      if (!row) continue;
+      taken.add(row.objectId);
+      rows.push({ listing: row, score: 0, reasons: [`${article(q.need)} ${q.need}`] });
+    }
+  }
+  return { rows, unfilled };
+}
+
+function article(word: string): string {
+  return /^[aeiou]/i.test(word) ? 'an' : 'a';
+}
+
+/** "a lamp and an armchair", "a lamp, an armchair and a rug". For speech and for the note line. */
+export function listCategories(categories: readonly string[]): string {
+  const words = categories.map((c) => `${article(c)} ${c}`);
+  if (words.length <= 1) return words[0] ?? '';
+  return `${words.slice(0, -1).join(', ')} and ${words[words.length - 1]}`;
+}
+
+/**
+ * The same list for a TITLE, which has about 45 characters before the panel ellipsis eats it:
+ * no articles, and at most three named. The cards below name every category one by one, so a
+ * fourth in the heading buys nothing and costs the whole line.
+ */
+function briefly(categories: readonly string[]): string {
+  const named = categories.slice(0, 3);
+  const tail = categories.length > named.length ? ' and more' : '';
+  if (named.length <= 1) return `${named[0] ?? ''}${tail}`;
+  return `${named.slice(0, -1).join(', ')} or ${named[named.length - 1]}${tail}`;
+}
+
+export type RecommendReason = 'emptyRoom' | 'missing' | 'alongside' | 'nothingFound';
+
+/**
+ * The popout's heading: what happened, in plain words, and true whether or not the agent has
+ * answered yet — 'missing' states a fact about the room, not a verdict from the service. The
+ * body line says what to do about it ("Pick one to add it"), so this never tells anyone to pick
+ * anything: the two lines share no significant word, which is findpanel.ts's rule.
+ */
+export function recommendTitle(reason: RecommendReason, missing: readonly string[]): string {
+  if (reason === 'emptyRoom') return 'Nothing in the room to arrange';
+  const none = briefly(missing);
+  if (reason === 'nothingFound') return `Nothing found for ${none}`;
+  return reason === 'alongside' ? `Still no ${none}` : `Your room has no ${none}`;
+}

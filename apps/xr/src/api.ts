@@ -111,6 +111,14 @@ export interface ParsedIntent {
   query: string | null;
   category: string | null;
   fit: { maxW?: number; maxH?: number; maxD?: number } | null;
+  /**
+   * Design requests only: the furniture CATEGORIES the request would need in the room ("a
+   * reading nook" -> armchair, lamp, side table), in this app's own vocabulary. Never a product
+   * and never a position (standing rule 3). Optional, because a Worker deployed before this
+   * existed answers without it — an absent field means "we do not know", which is the same
+   * thing the rules router says, and both leave the design request untouched.
+   */
+  needs?: string[] | null;
 }
 
 /**
@@ -179,7 +187,10 @@ export async function listScans(): Promise<ObjectV1[]> {
  * with a glbUrl is skipped by name; a failed list call throws, with no bundled fallback.
  */
 export async function listBuiltIns(): Promise<ObjectV1[]> {
-  const res = await fetch(`${API_BASE}/objects?source=primitive&limit=50`);
+  // 200, not 50: the library passed 50 rows the night P-PAUL's CC0 models landed (102 now), and
+  // a short page is invisible — it reads as "the library has no armchair" rather than "you asked
+  // for the first fifty". The route caps at 500.
+  const res = await fetch(`${API_BASE}/objects?source=primitive&limit=200`);
   if (!res.ok) throw new Error(`${res.status} ${res.statusText} from GET ${API_BASE}/objects?source=primitive`);
   const list = (await res.json()) as ObjectV1[];
   if (!Array.isArray(list)) throw new Error('GET /objects?source=primitive did not return a list — ask Thomas');

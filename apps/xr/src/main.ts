@@ -20,7 +20,7 @@ import { Thumbnails } from './thumbs';
 import { matchDetected } from './placement';
 import { measuredBox } from './objects';
 import { Voice, type VoiceState } from './voice';
-import { findListings, matchLibraryByWord, needFromDetected, needFromText, classifyUtterance, clearScanWinner, normalizeTranscript, productQuery, SIMILAR_ENOUGH, STOREFRONTS, type Command, type Listing, type ListingsResult, type Need, type Recommendation, type StageInfo } from './listings';
+import { findListings, matchLibraryByWord, needFromDetected, needFromText, classifyUtterance, clearScanWinner, normalizeTranscript, productQuery, SIMILAR_ENOUGH, STOREFRONTS, KNOWN_CATEGORIES, missingCategories, recommendationsFor, recommendTitle, rowsForCategory, listCategories, STARTER_CATEGORIES, type Command, type Listing, type ListingsResult, type Need, type Recommendation, type RecommendReason, type StageInfo } from './listings';
 import { FindPanel, type FindKind } from './findpanel';
 import { RoomPicker } from './roompicker';
 import { Outdoors } from './outdoors';
@@ -508,6 +508,10 @@ async function start() {
     // Already has a real mesh — addListing loaded it, there's nothing left to generate.
     if (l.state === 'ready' && l.glbUrl) {
       findPanel.setProgress(objectId, 'Mesh placed at true scale');
+      // Picked from the missing-furniture panel: the room can now answer the request that was
+      // refused. The offer is a sentence and the tile already on the Designer page — the agent
+      // is never fired by an add, because the person may want to place a second thing first.
+      if (lastResultKind === 'recommend') sayAloud(`${l.name} is in the room. Say rearrange when you are ready.`);
       return;
     }
     findPanel.setProgress(objectId, 'Queued for Baseten…');
@@ -843,10 +847,37 @@ async function start() {
     } else if (s.state === 'failed' && s.error && spokenFor !== `failed:${s.error}`) {
       spokenFor = `failed:${s.error}`;
       tell(s.error);
-      speak(`That didn't work. ${concise(s.error)}`);
+      // A refusal the popout already answers does not also need reading out: the panel is up, it
+      // names what is missing, and two sentences for one event is the clunkiness Thomas means.
+      if (!(designContext?.missing.length && designContext.rows.length)) speak(`That didn't work. ${concise(s.error)}`);
+      onDesignSettled('failed');
     }
+    if (s.state === 'proposed' && s.proposal) onDesignSettled('proposed');
     if (s.state === 'proposed' && s.proposal) previewProposal(s.proposal);
     else if (s.state !== 'applying') ghosts.clear();
+  }
+
+  /**
+   * The agent has answered. Two things follow, and only ever once per request.
+   *
+   * A refusal on an EMPTY room has no sentence to derive needs from — "make it cozy" names no
+   * furniture, and the room names none either — so the starter set is OURS: somewhere to sit, a
+   * surface, a light and somewhere to put things. Said to be ours in the report, because it is
+   * the one list in this feature that nobody asked for.
+   *
+   * A PROPOSAL, with the panel already up, only softens the heading: the layout is the answer to
+   * what was asked, and the missing furniture is a suggestion rather than the reason.
+   */
+  function onDesignSettled(state: 'failed' | 'proposed') {
+    const ctx = designContext;
+    if (!ctx || ctx.settled) return;
+    ctx.settled = true;
+    if (state === 'failed' && !ctx.missing.length && !roomCategories().length) {
+      return void showRecommendations('emptyRoom', STARTER_CATEGORIES);
+    }
+    if (state === 'proposed' && ctx.rows.length && lastResultKind === 'recommend') {
+      presentResults({ mode: 'recommend', query: ctx.request, rows: ctx.rows, note: 'Pick one to add it.', title: recommendTitle('alongside', ctx.missing) });
+    }
   }
 
   function renderAgentPanel(s: AgentSnapshot) {
@@ -945,6 +976,12 @@ async function start() {
   type PlacedMove = { id: string; x: number; z: number; rotY: number };
   type BoxPose = { box: ScannedObject; position: ScannedObject['position']; rotationY: number };
   let previewedRequest: string | null = null; // onAgentChange fires on every status change; preview once per proposal
+  /**
+   * The design request in flight, and what the room was missing for it. Computed from the user's
+   * sentence before the request goes out, so the agent's answer is never parsed for it.
+   */
+  let designContext: { request: string; missing: string[]; rows: Recommendation[]; settled: boolean } | null = null;
+  let lastResultKind: FindKind = 'shop';
   let previewBefore: { placed: PlacedMove[]; boxes: BoxPose[] } | null = null;
 
   /** A detected box has no body: it simply moves, and its solid collider with it. */
@@ -1124,11 +1161,17 @@ async function start() {
     // regex router answers instead — both are deterministic about what they do with the result.
     let kind = rules.kind;
     let query: string | null = null;
+    let needs: string[] | null = null;
     let router: 'llm' | 'rules' = 'rules';
     try {
       const parsed = await askIntent(text);
       kind = parsed.intent === 'scans' ? 'mine' : parsed.intent;
       query = parsed.query;
+      // The furniture kinds this request would need in the room. Categories only, from the
+      // user's own sentence — never a product, never a position (standing rule 3). The rules
+      // router has no equivalent, so a model failure means we simply do not know, and the
+      // design request goes to the agent exactly as it did before.
+      needs = parsed.needs ?? null;
       router = 'llm';
     } catch (err) {
       console.info('intent: rules (', (err as Error).message, ')');
@@ -1147,7 +1190,84 @@ async function start() {
       const words = query ? productQuery(query) : productQuery(text);
       return findFor({ ...need, query: words || undefined, browse: !words }, { autoAdd: VOICE_AUTO_ADD_TOP });
     }
-    return askAgent({ text });
+    return askDesign(text, needs);
+  }
+
+  /**
+   * Intent (e): the layout agent — and, when the request names furniture the room does not have,
+   * a popout offering some of it.
+   *
+   * Nothing here reads the agent's refusal. Measured against the deployed service, a refusal for
+   * want of furniture is the PLANNER'S OWN SENTENCE ("The request is missing a floor lamp
+   * object." / "...no office furniture items mentioned in the room." / "...specific details
+   * about the desired furniture are missing.") — three wordings in three runs, because its
+   * prompt asks it to say in prose what is missing. So the categories come from the user's
+   * sentence and the room's own contents, both of which are known here before the request is
+   * even sent.
+   *
+   * The panel opens BEFORE the agent answers, because "your room has no lamp" is true whichever
+   * way the agent goes, and because the wait is 1.5 s for a refusal and 5.6 s for a proposal
+   * with nothing drawn in between. A proposal only softens the heading afterwards.
+   */
+  async function askDesign(text: string, needs: string[] | null) {
+    const missing = missingCategories(needs, roomCategories());
+    designContext = { request: text, missing, rows: [], settled: false };
+    // Nothing opens for a request that needs nothing new, or for a room that already has it all:
+    // a design request in a furnished room behaves exactly as it did before this existed.
+    if (missing.length) void showRecommendations('missing', missing);
+    await askAgent({ text });
+  }
+
+  /** What the room holds right now, by category — the same rule roomStateUpload sends upstream. */
+  function roomCategories(): string[] {
+    const placed = [...objects.values()].map((o) => o.replaces?.category ?? o.category ?? categoryOf(o.name));
+    const taken = new Set([...objects.values()].map((o) => o.replaces?.identifier));
+    const boxes = (currentRoom?.objects ?? []).filter((d) => !taken.has(d.identifier)).map((d) => d.category);
+    return [...placed, ...boxes];
+  }
+
+  /**
+   * Furniture for the categories the room is missing: the library first — authored meshes, one
+   * request, no merchant round trip — and the meshed catalogue only for a category the library
+   * cannot fill. A category nothing was found for is said out loud rather than quietly dropped,
+   * because an empty panel and a panel that found nothing look identical.
+   */
+  async function showRecommendations(reason: RecommendReason, missing: string[]) {
+    const request = designContext?.request ?? '';
+    let library: Listing[];
+    try {
+      library = (await listBuiltIns()) as Listing[];
+    } catch (err) {
+      // Same reason as findLibrary: an unreachable library must never look like an empty one.
+      return failedResults('recommend', request, `Couldn't reach the library: ${(err as Error).message}`);
+    }
+    const found = new Map(missing.map((need) => [need, rowsForCategory(library, need)]));
+    // Only a category the library cannot fill costs a network search. Today that is rug, tv and
+    // wardrobe; the other twenty are authored meshes that are already on their way.
+    for (const need of missing.filter((n) => !found.get(n)!.length)) {
+      try {
+        const hits = await searchObjects({ text: need, source: 'catalog', limit: 6 });
+        // Only rows that already have a mesh: a recommendation you cannot place is not one.
+        const meshed = hits.map((h) => h.object as Listing).filter((o) => o.state === 'ready' && o.glbUrl);
+        found.set(need, rowsForCategory(meshed, need));
+      } catch (err) {
+        console.info(`no catalogue rows for ${need}:`, (err as Error).message);
+      }
+    }
+    const { rows, unfilled } = recommendationsFor(missing, (need) => found.get(need) ?? []);
+    if (designContext) designContext.rows = rows;
+    // Nothing at all: the heading says so and the note is left off, rather than printing the
+    // same absence twice, one line under the other. Some but not all: the note names the gap,
+    // because a panel that quietly showed two categories out of three would look complete.
+    const title = recommendTitle(rows.length ? reason : 'nothingFound', missing);
+    presentResults({
+      mode: 'recommend',
+      query: request,
+      rows,
+      note: !rows.length ? null : unfilled.length ? `Nothing for ${listCategories(unfilled)}.` : 'Pick one to add it.',
+      title,
+    });
+    sayAloud(rows.length ? `${title}. Pick one to add it.` : title);
   }
 
   /**
@@ -1325,9 +1445,12 @@ async function start() {
    * how they look. Today it drives the existing FindPanel, so nothing regresses before the popout
    * lands. `mode` says which library the rows came from: merchants, or the user's own scans.
    */
-  function presentResults(res: { mode: FindKind; query: string; rows: Recommendation[]; note: string | null }) {
+  function presentResults(res: { mode: FindKind; query: string; rows: Recommendation[]; note: string | null; title?: string }) {
     listings = { recommendations: res.rows, source: 'live', note: res.note };
-    findPanel.showResults(res.rows, res.note, res.mode, res.query);
+    lastResultKind = res.mode;
+    // `title` is only ever set by the recommendations path: a heading that says which request
+    // went unmet is the one thing the panel cannot work out from the rows it was handed.
+    findPanel.showResults(res.rows, res.note, res.mode, res.query, res.title);
     showPalette();
     renderListings();
   }
@@ -1695,11 +1818,15 @@ async function start() {
     }, 800);
   }
 
-  /** A category the agent and the detected boxes will recognise, from a file or manifest name. */
+  /**
+   * A category the agent and the detected boxes will recognise, from a file or manifest name.
+   * The vocabulary lives in listings.ts because three places now read it: this, the missing-
+   * furniture arithmetic, and POST /v1/intent's own copy, which validates what the model may
+   * name. A word outside it is neither a need nor an answer to one.
+   */
   function categoryOf(name: string): string {
-    const known = ['coffee table', 'side table', 'sofa', 'couch', 'armchair', 'chair', 'stool', 'bench', 'dining', 'table', 'desk', 'bed', 'storage', 'shelf', 'bookcase', 'cabinet', 'dresser', 'wardrobe', 'lamp', 'television', 'tv', 'plant', 'rug'];
     const lower = name.toLowerCase();
-    return known.find((k) => lower.includes(k)) ?? name.replace(/\.(glb|gltf)$/i, '');
+    return KNOWN_CATEGORIES.find((k) => lower.includes(k)) ?? name.replace(/\.(glb|gltf)$/i, '');
   }
 
   // ---------- loading ----------
