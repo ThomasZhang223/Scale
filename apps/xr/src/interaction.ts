@@ -57,6 +57,8 @@ export interface DraggableWindow {
   placeInFront(eye: THREE.Vector3, forward: THREE.Vector3): void;
   /** True when the ray is anywhere on the window, tile or not. See rayOnUi(). */
   hitSurface?(raycaster: THREE.Raycaster): boolean;
+  /** Puts the window ahead of the eyes, facing them. See reseatWindows(). */
+  placeInFront(eye: THREE.Vector3, forward: THREE.Vector3): void;
 }
 
 /** A hand dragging a window: which one, at what distance along the ray, offset as grabbed. */
@@ -163,6 +165,19 @@ export class Interaction {
    */
   addWindow(window: DraggableWindow) {
     if (!this.windows.includes(window)) this.windows.push(window);
+  }
+
+  /**
+   * Puts every window back in front of the user. Called after a room switch: the rooms are
+   * different sizes, so a window left where it stood can end up inside the new room's wall.
+   *
+   * It goes through each window's own placeInFront rather than setting group.position from
+   * outside, because a window may keep bookkeeping about its pose — the popout does, including
+   * a saved one — and a position set behind its back leaves that describing a pose that no
+   * longer exists.
+   */
+  reseatWindows(eye: THREE.Vector3, forward: THREE.Vector3) {
+    for (const window of this.windows) window.placeInFront(eye, forward);
   }
 
   /** The nearest window handle under the ray, so a window in front of another takes the grab. */
