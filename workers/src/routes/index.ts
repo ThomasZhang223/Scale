@@ -166,6 +166,9 @@ export async function postUpload(req: Request, env: Env, origin: string): Promis
     case "objectThumb":
       key = R2Keys.objectThumb(required(body.objectId, "objectId"));
       break;
+    case "scanMesh":
+      key = R2Keys.scanMesh(required(body.objectId, "objectId"));
+      break;
     case "catalogSource":
       key = R2Keys.catalogSource(
         required(body.merchant, "merchant"),
@@ -178,7 +181,7 @@ export async function postUpload(req: Request, env: Env, origin: string): Promis
       throw new HttpError(
         400,
         "unknown_upload_kind",
-        `kind "${kind}" is not one of roomCapture, objectFrame, objectMesh, objectThumb, catalogSource.`,
+        `kind "${kind}" is not one of roomCapture, objectFrame, objectMesh, objectThumb, scanMesh, catalogSource.`,
       );
   }
 
@@ -332,7 +335,7 @@ export async function postGenerate(
 //
 // The phone's Object Capture path (apps/mobile/modules/object-capture) reconstructs the mesh
 // on-device with Apple's PhotogrammetrySession and uploads the GLB itself through POST /uploads
-// (kind objectMesh). This is how it then flips the object to ready. Not in contracts.md yet —
+// (kind scanMesh, stored under scans/). This is how it then flips the object to ready. Not in contracts.md yet —
 // same standing as GET /v1/objects, see workers/DEPLOY.md "Schema proposals".
 //
 // Standing rule 2 ("the scale binding happens exactly once, in C") is honoured, not skipped:
@@ -347,13 +350,30 @@ export async function postObjectMesh(
 ): Promise<Response> {
   const body = await readJson<{ key: string; roomId?: string | null }>(req);
   const key = required(body.key, "key");
-  if (key !== R2Keys.objectMesh(objectId)) {
-    throw new HttpError(400, "bad_mesh_key", `key must be ${R2Keys.objectMesh(objectId)}, got ${key}.`);
+  if (key !== R2Keys.scanMesh(objectId)) {
+    throw new HttpError(400, "bad_mesh_key", `key must be ${R2Keys.scanMesh(objectId)}, got ${key}.`);
   }
   // 404 before touching the row, and a loud error if the client marks ready before its PUT landed.
   await getObject(env, objectId, origin);
   const head = await env.BUCKET.head(key);
   if (!head) throw new HttpError(409, "mesh_not_uploaded", `Nothing is stored at ${key} yet. PUT it first.`);
+  // A truncated upload or an HTML error page must not flip a row to ready. Same check
+  // generate-mesh.ts makes on Ani's path (assertGlb); this route had none.
+  const probe = await env.BUCKET.get(key, { range: { offset: 0, length: 12 } });
+  const bytes = probe ? new Uint8Array(await probe.arrayBuffer()) : new Uint8Array(0);
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  if (
+    bytes.length < 12 ||
+    view.getUint32(0, true) !== 0x46546c67 ||
+    view.getUint32(4, true) !== 2 ||
+    view.getUint32(8, true) !== head.size
+  ) {
+    throw new HttpError(
+      422,
+      "not_a_glb",
+      `${key} is ${head.size} bytes but is not a binary glTF (bad magic, version or declared length).`,
+    );
+  }
 
   await markObjectReady(env, objectId, { glbKey: key });
   const object = await getObject(env, objectId, origin);

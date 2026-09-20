@@ -16,7 +16,7 @@ registerHooks({ resolve(specifier, context, next) {
 const { embedInput } = await import("../src/lib/embedding.ts");
 const { consumeMeshJobs } = await import("../src/lib/queue.ts");
 const { GenerateMeshWorkflow } = await import("../src/workflows/generate-mesh.ts");
-const { postSearch, postGenerate } = await import("../src/routes/index.ts");
+const { postSearch, postGenerate, postObjectMesh, postUpload } = await import("../src/routes/index.ts");
 const fingerprint = "a".repeat(64);
 const vector = { values: Array(768).fill(1 / Math.sqrt(768)), dimension: 768,
   fingerprint, inputHash: "b".repeat(64), modality: "text" };
@@ -272,4 +272,62 @@ test("missing stored GLB cannot publish ready or start indexing", async t => {
   } }, { do: async (...args) => args.at(-1)() }), /nothing is stored/);
   assert.equal(calls, 1);
   assert.equal(writes.some(w => w.sql.includes("state = 'ready'")), false);
+});
+
+// --- Phone-scanned GLB: scans/ key and the magic check -----------------------------------------
+
+function glbBytes(length = 20, declared = length) {
+  const bytes = new Uint8Array(length), view = new DataView(bytes.buffer);
+  view.setUint32(0, 0x46546c67, true); view.setUint32(4, 2, true); view.setUint32(8, declared, true);
+  return bytes;
+}
+
+function scanEnvironment(stored) {
+  const { env, row, writes } = pipelineEnvironment();
+  Object.assign(row, { id: "scan-1", source: "scan", state: "measured", name: "walnut side table", category: "table" });
+  env.BUCKET = {
+    head: async () => stored ? { size: stored.length } : null,
+    get: async (_key, options) => ({ arrayBuffer: async () =>
+      stored.slice(options.range.offset, options.range.offset + options.range.length).buffer }),
+  };
+  return { env, writes };
+}
+
+const scanRequest = key => new Request("https://api.example/v1/objects/scan-1/mesh", {
+  method: "POST", body: JSON.stringify({ key }),
+});
+
+test("scanMesh upload kind grants a scans/ key and the error names it", async () => {
+  const env = { CONFIG: { put: async () => {} } };
+  const grant = await (await postUpload(new Request("https://api.example/v1/uploads", {
+    method: "POST", body: JSON.stringify({ kind: "scanMesh", objectId: "scan-1" }),
+  }), env, "https://api.example")).json();
+  assert.equal(grant.key, "scans/scan-1/mesh.glb");
+  await assert.rejects(postUpload(new Request("https://api.example/v1/uploads", {
+    method: "POST", body: JSON.stringify({ kind: "nope" }),
+  }), env, "https://api.example"), /scanMesh/);
+});
+
+test("postObjectMesh accepts only the scans/ key", async () => {
+  const { env, writes } = scanEnvironment(glbBytes());
+  await assert.rejects(postObjectMesh(scanRequest("objects/scan-1/mesh.glb"), env, "scan-1", "https://api.example"),
+    error => error.code === "bad_mesh_key");
+  assert.equal(writes.some(w => w.sql.includes("state = 'ready'")), false);
+});
+
+test("garbage bytes at the scan key return not_a_glb and never flip the row to ready", async () => {
+  for (const stored of [new TextEncoder().encode("<html>error page</html>"), glbBytes(20, 99), new Uint8Array(8)]) {
+    const { env, writes } = scanEnvironment(stored);
+    await assert.rejects(postObjectMesh(scanRequest("scans/scan-1/mesh.glb"), env, "scan-1", "https://api.example"),
+      error => error.code === "not_a_glb" && error.status === 422);
+    assert.equal(writes.some(w => w.sql.includes("state = 'ready'")), false);
+  }
+});
+
+test("a valid GLB at the scan key flips the row to ready with that glb_key", async () => {
+  const { env, writes } = scanEnvironment(glbBytes());
+  const response = await postObjectMesh(scanRequest("scans/scan-1/mesh.glb"), env, "scan-1", "https://api.example");
+  assert.equal(response.status, 200);
+  const ready = writes.find(w => w.sql.includes("state = 'ready'"));
+  assert.equal(ready.args[0], "scans/scan-1/mesh.glb");
 });
