@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 """Load a measured catalogue into D1 and R2.
 
+SUPERSEDED by the Worker intake (workers/scripts/catalog-queue.mjs -> POST /v1/catalog/ingest).
+This path writes D1 directly and creates no job row and no mesh_outbox row, so nothing it loads
+can ever get a mesh. Kept only because services/ingest/Dockerfile COPYs this file. Paul: remove
+it together with that Dockerfile line and tests/test_load_catalog.py.
+
 The extraction pipeline produces rows; this puts them where the demo reads them from. It is a
 separate step on purpose — extraction needs merchant storefronts, loading needs Cloudflare
 credentials, and those are rarely the same machine at the same moment. Splitting them means a

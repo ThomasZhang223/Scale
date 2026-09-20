@@ -239,7 +239,7 @@ async def find_products(request: Request):
 
 
 def _object_v1(merchant: str, storefront: str, p: dict, bbox: dict, verdict, method_src: str,
-               via: str) -> dict:
+               via: str, currency: str | None = None) -> dict:
     """One row in the contracts.md Object v1 shape, state "measured"."""
     images = [i.get("src") for i in (p.get("images") or []) if i.get("src")]
     price_cents = None
@@ -266,13 +266,18 @@ def _object_v1(merchant: str, storefront: str, p: dict, bbox: dict, verdict, met
         "measure": {"method": "extracted", "confidence": verdict.confidence},
         "caption": None,          # Ani writes this on state:"ready"
         "palette": [],            # likewise
-        "price": {"cents": price_cents, "currency": "USD"} if price_cents is not None else None,
+        # The storefront's own currency, when the caller supplied it. Shopify's /products.json
+        # carries no currency, and some verified merchants are Canadian — guessing USD prices a
+        # CAD sofa 35% low, silently. Standing rule 4: no value rather than a wrong one.
+        "price": ({"cents": price_cents, "currency": currency}
+                  if price_cents is not None and currency else None),
         "productUrl": product_url,
         "merchant": merchant,
         "createdAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         # Beyond the contract, for the caller's benefit — a low score has to be explainable
         # or "unverified fit" is just a shrug.
         "extraction": {
+            "productId": str(p["id"]) if p.get("id") is not None else None,
             "via": via,
             "sourceField": method_src,
             "imageUrl": images[0] if images else None,
@@ -303,6 +308,8 @@ async def extract_products(request: Request):
     use_llm = bool(body.get("llm")) and cfg.configured
     use_vlm = bool(body.get("vlm")) and cfg.configured
     ai_limit = int(body.get("aiLimit") or 40)
+    # Absent means price is omitted, never guessed; see _object_v1.
+    currency = (body.get("currency") or "").strip().upper() or None
 
     # Optional, and only meaningful here — /find has no sizes yet, so a fit filter can only be
     # applied once something has been measured. Two callers want different things: a person
@@ -344,7 +351,7 @@ async def extract_products(request: Request):
             return False
         stats[counter] += 1
         stats["unverified"] += int(v.unverified)
-        obj = _object_v1(merchant, storefront, p, bbox, v, hit.source_field, via)
+        obj = _object_v1(merchant, storefront, p, bbox, v, hit.source_field, via, currency)
         # Flagged, not dropped. The caller knows whether it is placing or browsing, and an
         # object that misses by a centimetre is worth showing with that said out loud rather
         # than vanishing with no explanation.
