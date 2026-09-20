@@ -21,6 +21,11 @@ import type { Recommendation, StageInfo, FindStage } from './listings.ts';
  *           primitive. There is no searching phase, because the library is already on the
  *           server. Every row is called "Captured object", so the picture is a render of
  *           the mesh itself and is the only thing that tells two rows apart.
+ *   library the built-in furniture: real names, real categories, no merchant and no price.
+ *   recommend  what to add when a design request cannot be met with what is in the room. The
+ *           rows are MIXED — library pieces and merchant listings together — so each card is
+ *           drawn from its own row rather than from the kind, and the caller supplies the
+ *           title, because only it knows which request went unmet.
  */
 
 /**
@@ -28,7 +33,7 @@ import type { Recommendation, StageInfo, FindStage } from './listings.ts';
  * each name — never the layout, the anchoring or the drag, which belong to the panel itself,
  * so a fourth kind is a case in three switches and nothing else.
  */
-export type FindKind = 'shop' | 'scans' | 'library';
+export type FindKind = 'shop' | 'scans' | 'library' | 'recommend';
 
 export type PanelHit = { kind: 'card'; objectId: string } | { kind: 'close' } | null;
 
@@ -96,6 +101,9 @@ export function resultsTitle(kind: FindKind, count: number, query: string): stri
   // would be a wrong answer as well as a repetitive one.
   if (kind === 'scans') return count ? `${count} of your scans for ${q}` : 'No scans yet';
   if (kind === 'library') return count ? `${count} from the library for ${q}` : `Nothing in the library for ${q}`;
+  // 'recommend' normally arrives with a title of its own: only the caller knows which request
+  // went unmet. This is the fallback when it sends none.
+  if (kind === 'recommend') return count ? `${count} that would fit` : 'Nothing to suggest yet';
   return count ? `${count} listings for ${q}` : `No listings for ${q}`;
 }
 
@@ -103,6 +111,7 @@ export function resultsTitle(kind: FindKind, count: number, query: string): stri
 export function emptyAdvice(kind: FindKind): string {
   if (kind === 'scans') return 'Capture something on the phone first.';
   if (kind === 'library') return 'Try another word, or ask to search the shops.';
+  if (kind === 'recommend') return 'Say what to add, or open the Furniture page.';
   return 'Try a wider gap, or another kind of thing.';
 }
 
@@ -123,6 +132,12 @@ export class FindPanel {
   private mode: 'hidden' | 'searching' | 'results' = 'hidden';
   private kind: FindKind = 'shop';
   private query = '';
+  /**
+   * A title from the caller, for a panel whose heading cannot be computed from the rows —
+   * 'recommend' has to name the request that went unmet. Cleared by any showResults that does
+   * not pass one, so a later shop or scans search never inherits it.
+   */
+  private title: string | null = null;
   /**
    * A render of a row's own mesh, for a row that has no product photo — which is every scan.
    * Set once by main.ts and shared with the tablet, so a mesh is drawn once for both.
@@ -300,6 +315,7 @@ export class FindPanel {
 
   showSearching(query: string, merchants: readonly string[]) {
     this.mode = 'searching';
+    this.title = null;
     this.kind = 'shop'; // only the merchants have a search worth watching happen
     this.dismissed = false;
     this.checkPose = true;
@@ -327,10 +343,11 @@ export class FindPanel {
    * the title, the picture and what the second line of a card says. `query` is what was asked
    * — a scans search has no searching phase to have set it already.
    */
-  showResults(recs: Recommendation[], note: string | null, kind: FindKind = 'shop', query = this.query) {
+  showResults(recs: Recommendation[], note: string | null, kind: FindKind = 'shop', query = this.query, title?: string) {
     this.mode = 'results';
     this.kind = kind;
     this.query = query;
+    this.title = title ?? null;
     this.dismissed = false;
     this.checkPose = true;
     // ceiling: six cards, no paging; the upgrade is a scroll or a "+N more" row.
@@ -338,6 +355,11 @@ export class FindPanel {
     this.note = note;
     this.loadThumbs();
     this.redraw();
+  }
+
+  /** The heading now on the panel: the caller's title when it gave one, else the computed one. */
+  heading(): string {
+    return this.mode === 'searching' ? `Searching Shopify via Browserbase — “${this.query}”` : this.title ?? resultsTitle(this.kind, this.recs.length, this.query);
   }
 
   /** Redraws what is already showing, for a picture that has only now been rendered. */
@@ -365,7 +387,11 @@ export class FindPanel {
    */
   private loadThumbs() {
     for (const { listing } of this.recs) {
-      if (listing.imageUrl && this.kind === 'shop') this.loadThumb(listing.objectId, listing.imageUrl);
+      // A scan's imageUrl is never trusted: listings.ts fills a fallback URL in for any row
+      // without one, so a scan row looks like it has a photo when nothing exists. Every other
+      // kind uses a real photo when the row carries one, and its mesh when it does not —
+      // which is what lets a 'recommend' list mix merchant rows and library rows.
+      if (listing.imageUrl && this.kind !== 'scans') this.loadThumb(listing.objectId, listing.imageUrl);
       else this.thumbFor?.(listing.objectId, listing.glbUrl ?? null);
     }
   }
@@ -447,7 +473,7 @@ export class FindPanel {
     // Title
     ctx.fillStyle = TEXT;
     ctx.font = FONT(0.022, 600);
-    const title = this.mode === 'searching' ? `Searching Shopify via Browserbase — “${this.query}”` : resultsTitle(this.kind, this.recs.length, this.query);
+    const title = this.heading();
     ctx.fillText(ellipsis(ctx, title, (WIDTH - 2 * PAD - 0.06) * PX), (PAD + 0.05) * PX, (PAD + TITLE_H / 2) * PX);
 
     if (this.mode === 'searching') {
@@ -529,8 +555,10 @@ export class FindPanel {
         const tx = x0 + 0.01 * PX, ty = y0 + (r.h - THUMB) / 2 * PX, ts = THUMB * PX;
         ctx.fillStyle = 'rgba(120,120,128,0.35)';
         ctx.fillRect(tx, ty, ts, ts);
-        const img = this.thumbs.get(l.objectId);
-        const mesh = this.kind !== 'shop' || !img ? this.thumbFor?.(l.objectId, l.glbUrl ?? null) ?? null : null;
+        // Per ROW, not per kind, so a mixed list draws each card from what that row has.
+        const img = this.kind === 'scans' ? undefined : this.thumbs.get(l.objectId);
+        const loaded = img?.complete && img.naturalWidth ? img : null;
+        const mesh = loaded ? null : this.thumbFor?.(l.objectId, l.glbUrl ?? null) ?? null;
         if (mesh) {
           // "Contain": a mesh is framed to its own bounding box, and cropping it would make a
           // tall piece and a wide one look alike.
@@ -538,10 +566,10 @@ export class FindPanel {
           const mh = Number((mesh as { height: number }).height) || ts;
           const s = Math.min(ts / mw, ts / mh);
           ctx.drawImage(mesh, tx + (ts - mw * s) / 2, ty + (ts - mh * s) / 2, mw * s, mh * s);
-        } else if (img?.complete && img.naturalWidth) {
-          const s = Math.max(ts / img.naturalWidth, ts / img.naturalHeight);
+        } else if (loaded) {
+          const s = Math.max(ts / loaded.naturalWidth, ts / loaded.naturalHeight);
           ctx.save(); ctx.beginPath(); ctx.rect(tx, ty, ts, ts); ctx.clip();
-          ctx.drawImage(img, tx + (ts - img.naturalWidth * s) / 2, ty + (ts - img.naturalHeight * s) / 2, img.naturalWidth * s, img.naturalHeight * s);
+          ctx.drawImage(loaded, tx + (ts - loaded.naturalWidth * s) / 2, ty + (ts - loaded.naturalHeight * s) / 2, loaded.naturalWidth * s, loaded.naturalHeight * s);
           ctx.restore();
         }
         // Text column
@@ -558,9 +586,11 @@ export class FindPanel {
         ctx.font = FONT(0.016);
         // A scan has no merchant and no price, so it says where it came from instead of
         // printing "catalogue" over something the user captured themselves.
+        // 'recommend' decides per row, because its list mixes the two: a row with a merchant
+        // is a listing and shows its price, a row without one came from the library.
         const meta =
           this.kind === 'scans' ? `Scanned on your phone · ${size}`
-          : this.kind === 'library' ? `From the library · ${size}`
+          : this.kind === 'library' || (this.kind === 'recommend' && !l.merchant) ? `From the library · ${size}`
           : `${l.merchant ?? 'catalogue'} · ${size}${price}`;
         ctx.fillText(ellipsis(ctx, meta, cw), cx, y0 + 0.05 * PX);
         const conf = l.measure?.confidence ?? 0.5;
@@ -569,7 +599,9 @@ export class FindPanel {
         // A scan is already measured and already has its mesh, so it has no third line to
         // write: "fits" is a merchant's claim about a size it declared, and the reason a scan
         // came back is already the line above it. Only real progress gets written.
-        const line = status ?? (this.kind === 'shop' ? `${badge.text} · ${reasons[0] ?? ''}` : null);
+        // 'recommend' says which missing category this row answers ("a lamp"), which is what
+        // lets a mixed list read as grouped without section headers.
+        const line = status ?? (this.kind === 'shop' ? `${badge.text} · ${reasons[0] ?? ''}` : this.kind === 'recommend' ? reasons[0] ?? null : null);
         if (line) {
           ctx.fillStyle = status ? ACCENT : badge.color;
           ctx.font = FONT(0.016, 500);

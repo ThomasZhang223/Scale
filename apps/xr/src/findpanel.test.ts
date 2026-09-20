@@ -245,3 +245,66 @@ test('a result that found something counts it, per kind', () => {
   assert.equal(resultsTitle('library', 7, 'a couch'), '7 from the library for “a couch”');
   assert.equal(resultsTitle('shop', 5, 'a lamp'), '5 listings for “a lamp”');
 });
+
+// ---------- 'recommend': a mixed list, and a title only the caller knows ----------
+
+/** A library piece: real name, no merchant, no price, a mesh of its own. */
+const libraryRow = (id: string, category: string): Recommendation => ({
+  score: 0.7, reasons: [category],
+  listing: { schemaVersion: 1, objectId: id, source: 'primitive', state: 'ready', name: 'Tall open shelf', category: 'shelf', glbUrl: `/v1/assets/objects/${id}/mesh.glb`, bboxMeters: { w: 1, h: 2.08, d: 0.26 }, imageUrl: null },
+});
+
+/** A merchant listing in the same list: a photo, a merchant and a price. */
+const shopRow = (id: string, category: string): Recommendation => ({
+  score: 0.6, reasons: [category],
+  listing: { schemaVersion: 1, objectId: id, source: 'catalog', state: 'ready', name: 'Nina Wall Sconce', category: 'lighting', glbUrl: null, bboxMeters: { w: 0.14, h: 0.61, d: 0.12 }, merchant: 'Poly & Bark', imageUrl: 'https://example.test/sconce.jpg', price: { cents: 12900, currency: 'CAD' } },
+});
+
+test('a caller title is used, and any later search without one clears it', () => {
+  const panel = new FindPanel();
+  panel.setPresenting(true);
+  // The heading names the request that went unmet; the rows cannot say that.
+  panel.showResults([libraryRow('l1', 'a lamp')], null, 'recommend', 'make a reading nook', 'A reading nook needs a lamp and a chair');
+  assert.equal(panel.heading(), 'A reading nook needs a lamp and a chair');
+
+  // A shop search afterwards must not inherit it.
+  panel.showResults([rec('m1')], null, 'shop', 'a lamp');
+  assert.equal(panel.heading(), '1 listings for “a lamp”');
+
+  // Nor may a searching state keep it.
+  panel.showResults([libraryRow('l1', 'a lamp')], null, 'recommend', 'x', 'A held title');
+  panel.showSearching('lamp', ['Poly & Bark']);
+  assert.doesNotMatch(panel.heading(), /A held title/);
+});
+
+test('with no title of its own, recommend still reads as a sentence when empty', () => {
+  assert.equal(resultsTitle('recommend', 0, 'x'), 'Nothing to suggest yet');
+  assert.equal(resultsTitle('recommend', 3, 'x'), '3 that would fit');
+  // The rule that caught the duplication twice already: the title tells, the body advises.
+  const words = (s: string) => new Set(s.toLowerCase().replace(/[“”".,]/g, '').split(/\s+/).filter((w) => w.length > 3));
+  const shared = [...words(resultsTitle('recommend', 0, 'x'))].filter((w) => words(emptyAdvice('recommend')).has(w));
+  assert.deepEqual(shared, []);
+});
+
+test('a mixed list asks for a photo per row, not per kind', () => {
+  const panel = new FindPanel();
+  const asked: string[] = [];
+  panel.thumbFor = (objectId) => { asked.push(objectId); return null; };
+  panel.setPresenting(true);
+  // The library row has no photo and must fall back to its mesh; the shop row has one and
+  // must not. Deciding by kind would have got one of the two wrong in every mixed list.
+  panel.showResults([libraryRow('l1', 'a lamp'), shopRow('s1', 'a chair')], null, 'recommend', 'nook', 'A nook needs things');
+  assert.deepEqual(asked, ['l1'], 'only the row without a photo wants a mesh render');
+});
+
+test('picking a recommended row is the same card path as any other', () => {
+  const panel = new FindPanel();
+  panel.setPresenting(true);
+  panel.showResults([libraryRow('l1', 'a lamp'), shopRow('s1', 'a chair')], null, 'recommend', 'nook', 'A nook needs things');
+  panel.group.position.set(0, 0, 0);
+  panel.group.updateMatrixWorld(true);
+  const rects = cardRects(2);
+  const ray = (y: number) => { const r = new THREE.Raycaster(); r.set(new THREE.Vector3(0, y, 1), new THREE.Vector3(0, 0, -1)); return r; };
+  assert.deepEqual(panel.hitTest(ray(-(rects[0].y + rects[0].h / 2))), { kind: 'card', objectId: 'l1' });
+  assert.deepEqual(panel.hitTest(ray(-(rects[1].y + rects[1].h / 2))), { kind: 'card', objectId: 's1' });
+});
