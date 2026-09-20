@@ -1203,7 +1203,12 @@ async function start() {
 
     if (!scans.length) {
       // Nothing to show and nothing to guess. Never hand this to the agent.
-      presentResults({ mode: 'scans', query: text, rows: [], note: 'No finished scans yet.' });
+      //
+      // No note: an empty scans panel already says "No finished scans. Capture something on
+      // the phone first.", which is the same thing and also says what to do about it. A note
+      // as well printed both, one under the other. This is the first thing a new user sees —
+      // there are no scans until they make one — so it has to look deliberate.
+      presentResults({ mode: 'scans', query: text, rows: [], note: null });
       return sayAloud('You have no finished scans yet. Capture something on the phone first.');
     }
 

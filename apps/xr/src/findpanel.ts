@@ -82,6 +82,21 @@ function windowHeight(row: StageRow): number {
   return WIN_TAB_H + WIN_STATUS_H + (row.photos?.length ? WIN_STRIP + WIN_PAD : 0) + WIN_PAD;
 }
 
+/**
+ * The line over the rows. Written out per kind, with the empty case a sentence of its own,
+ * because a count read as a word only works for some of them: "No listings for X" is English
+ * and "No of your scans for X" is not. An empty scans panel is the FIRST thing a new user sees
+ * — there are no scans until they make one — so it is not a corner to be clever in.
+ *
+ * Pure and exported so it can be tested without a canvas.
+ */
+export function resultsTitle(kind: FindKind, count: number, query: string): string {
+  const q = `“${query}”`;
+  if (kind === 'scans') return count ? `${count} of your scans for ${q}` : `None of your scans match ${q}`;
+  if (kind === 'library') return count ? `${count} from the library for ${q}` : `Nothing in the library for ${q}`;
+  return count ? `${count} listings for ${q}` : `No listings for ${q}`;
+}
+
 /** Card i occupies [y, y+h) metres below the panel's top edge. Pure, so hit tests are testable. */
 export function cardRects(count: number): { y: number; h: number }[] {
   const out: { y: number; h: number }[] = [];
@@ -423,15 +438,7 @@ export class FindPanel {
     // Title
     ctx.fillStyle = TEXT;
     ctx.font = FONT(0.022, 600);
-    const count = this.recs.length ? String(this.recs.length) : 'No';
-    const title =
-      this.mode === 'searching'
-        ? `Searching Shopify via Browserbase — “${this.query}”`
-        : this.kind === 'scans'
-          ? `${count} of your scans for “${this.query}”`
-          : this.kind === 'library'
-            ? `${count} from the library for “${this.query}”`
-            : `${count} listings for “${this.query}”`;
+    const title = this.mode === 'searching' ? `Searching Shopify via Browserbase — “${this.query}”` : resultsTitle(this.kind, this.recs.length, this.query);
     ctx.fillText(ellipsis(ctx, title, (WIDTH - 2 * PAD - 0.06) * PX), (PAD + 0.05) * PX, (PAD + TITLE_H / 2) * PX);
 
     if (this.mode === 'searching') {

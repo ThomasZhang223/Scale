@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { FindPanel, cardRects } from './findpanel.ts';
+import { FindPanel, cardRects, resultsTitle } from './findpanel.ts';
 import type { Recommendation } from './listings.ts';
 
 const rec = (id: string): Recommendation => ({
@@ -205,4 +205,23 @@ test('a hidden panel offers no handle: a ray through where it was grabs nothing'
   assert.ok(panel.hitGrab(r));
   panel.dismiss();
   assert.equal(panel.hitGrab(r), null);
+});
+
+// ---------- the line over the rows ----------
+
+test('an empty result reads as a sentence in every mode, not as a counted one', () => {
+  // "No listings for X" is English. "No of your scans for X" is not, and an empty scans panel
+  // is the first thing a new user sees, because there are no scans until they make one.
+  assert.equal(resultsTitle('scans', 0, 'my stuff'), 'None of your scans match “my stuff”');
+  assert.equal(resultsTitle('library', 0, 'a couch'), 'Nothing in the library for “a couch”');
+  assert.equal(resultsTitle('shop', 0, 'a lamp'), 'No listings for “a lamp”');
+  for (const kind of ['scans', 'library', 'shop'] as const) {
+    assert.doesNotMatch(resultsTitle(kind, 0, 'x'), /\bNo of\b|\b0 \b/, `${kind} reads badly when empty`);
+  }
+});
+
+test('a result that found something counts it, per kind', () => {
+  assert.equal(resultsTitle('scans', 4, 'my stuff'), '4 of your scans for “my stuff”');
+  assert.equal(resultsTitle('library', 7, 'a couch'), '7 from the library for “a couch”');
+  assert.equal(resultsTitle('shop', 5, 'a lamp'), '5 listings for “a lamp”');
 });
