@@ -1,552 +1,429 @@
 #!/usr/bin/env python3
-"""Emit docs/architecture/index.html — one hand-authored inline SVG, no auto-layout.
+"""Emit docs/architecture/index.html — a wiring diagram, hand-authored inline SVG.
 
-Every coordinate below is chosen by hand; this script only saves re-typing them. Nothing
-here lays out a graph: the bands, the columns and the gutters are a fixed grid.
+The poster is one SVG of fixed hand-placed coordinates: nodes are an icon plus a one or two
+word name, wires are orthogonal, and nothing on it is a sentence. Everything a judge might
+want to check in prose lives in the HTML below the poster, which the PNG never sees.
 """
 from __future__ import annotations
 
 import html
 import pathlib
 
-OUT = pathlib.Path(__file__).resolve().parents[0] / "index.html"
+HERE = pathlib.Path(__file__).resolve().parent
+OUT = HERE / "index.html"
 
-W = 1920
+W, H = 1920, 1640
 
-# ---------------------------------------------------------------------------------------
-# palette
-# ---------------------------------------------------------------------------------------
 BG = "#FAF7F2"
 INK = "#1B1B1F"
-MUTED = "#54514C"          # 7.4:1 on BG
+MUTED = "#54514C"
 HAIR = "#D9D3C7"
 CF_FILL = "#FFF1E3"
 CF_EDGE = "#F6821F"
-CF_RULE = "#F6821F"
-CF_DEEP = "#8A4405"        # orange dark enough for text
+CF_DEEP = "#8A4405"
 LAPTOP = "#EEF1F4"
+LAP_EDGE = "#94A5B4"
 VENDOR = "#F1F4EE"
+VEN_EDGE = "#8FAA82"
 DEVICE = "#F4F1EA"
 WHITE = "#FFFFFF"
 
-FLOWS = [
-    # n, title, line colour, text colour, badge numeral colour
-    (1, "Scan an object that is for sale nowhere", "#D1495B", "#A63347", "#FFFFFF"),
-    (2, "Catalogue a live storefront", "#00798C", "#005F6E", "#FFFFFF"),
-    (3, "Find something that fits the 80 cm gap", "#EDAE49", "#8A5E00", "#2B1D00"),
-    (4, "Rearrange my room", "#30638E", "#2A567D", "#FFFFFF"),
-]
-FLOW_LINE = {n: c for n, _, c, _, _ in FLOWS}
-FLOW_TEXT = {n: c for n, _, _, c, _ in FLOWS}
-FLOW_NUM = {n: c for n, _, _, _, c in FLOWS}
+F1, F2, F3, F4 = "#D1495B", "#00798C", "#EDAE49", "#30638E"
+F3T = "#8A5E00"                      # amber is a fill colour, never a text colour
 
 SANS = "'Space Grotesk', 'Avenir Next', 'Segoe UI', sans-serif"
 MONO = "'IBM Plex Mono', 'SFMono-Regular', Menlo, monospace"
 
-parts: list[str] = []
-def add(s: str) -> None:
-    parts.append(s)
+P: list[str] = []
+add = P.append
+esc = lambda s: html.escape(str(s), quote=True)
 
-def esc(s: str) -> str:
-    return html.escape(s, quote=True)
 
-def text(x, y, s, size=13, fill=INK, weight=400, font=SANS, anchor="start", ls="0"):
-    return (f'<text x="{x}" y="{y}" font-family="{font}" font-size="{size}" '
-            f'font-weight="{weight}" fill="{fill}" text-anchor="{anchor}" '
-            f'letter-spacing="{ls}">{esc(s)}</text>')
+def txt(x, y, s, size=13, fill=INK, weight=600, font=SANS, anchor="middle", ls="0"):
+    return (f'<text x="{x}" y="{y}" font-family="{font}" font-size="{size}" font-weight="{weight}"'
+            f' fill="{fill}" text-anchor="{anchor}" letter-spacing="{ls}">{esc(s)}</text>')
 
-def rect(x, y, w, h, fill, stroke=None, sw=1, r=10, extra=""):
+
+def box(x, y, w, h, fill, stroke=None, sw=1.5, r=14, dash=None):
     st = f' stroke="{stroke}" stroke-width="{sw}"' if stroke else ""
-    return f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="{r}" fill="{fill}"{st}{extra}/>'
+    dd = f' stroke-dasharray="{dash}"' if dash else ""
+    return f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="{r}" fill="{fill}"{st}{dd}/>'
 
-# crude but stable width estimates, used only to wrap chip rows
-def wsans(s, size):
-    return len(s) * size * 0.545
-def wmono(s, size):
-    return len(s) * size * 0.60
 
-# ---------------------------------------------------------------------------------------
-# vertical grid
-# ---------------------------------------------------------------------------------------
-M = 40
-IW = W - 2 * M                      # 1840
+# =======================================================================================
+# icons — every one draws inside a 40x40 box, 2px stroke, rounded joins, one line style
+# =======================================================================================
+def _g(cx, cy, body, colour, scale=1.0):
+    return (f'<g transform="translate({cx - 20 * scale} {cy - 20 * scale}) scale({scale})" '
+            f'fill="none" stroke="{colour}" stroke-width="2" stroke-linecap="round" '
+            f'stroke-linejoin="round">{body}</g>')
 
-HEAD_H = 108
-DEV_Y, DEV_H = 118, 176             # 118 .. 294
-CF_Y, CF_H = 344, 1000              # 344 .. 1344   (gutter A 294..344)
-BOT_Y, BOT_H = 1394, 262            # 1394 .. 1656  (gutter B 1344..1394)
-SEC_Y, SEC_H = 1684, 452            # 1684 .. 2136
-TAB_Y, TAB_H = 2164, 300            # 2164 .. 2464
-H = 2500
 
-# ---------------------------------------------------------------------------------------
+ICONS = {
+ "phone":    '<rect x="11" y="4" width="18" height="32" rx="3"/><path d="M17 32h6"/><path d="M16 9h8"/>',
+ "headset":  '<rect x="4" y="13" width="32" height="15" rx="6"/><circle cx="13" cy="20.5" r="3.4"/>'
+             '<circle cx="27" cy="20.5" r="3.4"/><path d="M17 28l3 3 3-3"/>',
+ "worker":   '<path d="M20 4l13 7.5v17L20 36 7 28.5v-17z"/><path d="M21.5 12.5l-5.5 9h4.5l-1.5 6 5.5-9h-4.5z"/>',
+ "do":       '<path d="M20 5l14 7v16l-14 7-14-7V12z"/><path d="M6 12l14 7 14-7"/><path d="M20 19v16"/>'
+             '<circle cx="20" cy="19" r="2.4" fill="currentColor"/>',
+ "bot":      '<rect x="9" y="13" width="22" height="18" rx="5"/><path d="M20 13V7"/><circle cx="20" cy="5.5" r="2"/>'
+             '<path d="M15.5 21.5v2M24.5 21.5v2"/>',
+ "chip":     '<rect x="11" y="11" width="18" height="18" rx="3"/><path d="M15 11V6M20 11V6M25 11V6'
+             'M15 29v5M20 29v5M25 29v5M11 15H6M11 20H6M11 25H6M29 15h5M29 20h5M29 25h5"/>'
+             '<path d="M20 15l1.6 3.4 3.4 1.6-3.4 1.6L20 25l-1.6-3.4-3.4-1.6 3.4-1.6z"/>',
+ "workflow": '<rect x="4" y="6" width="12" height="9" rx="2.5"/><rect x="14" y="16" width="12" height="9" rx="2.5"/>'
+             '<rect x="24" y="26" width="12" height="9" rx="2.5"/><path d="M10 15v4.5h4M20 25v4.5h4"/>',
+ "queue":    '<path d="M12 7h16"/><path d="M9 11h22"/><rect x="6" y="15" width="28" height="18" rx="2.5"/>'
+             '<path d="M6 17.5l14 9 14-9"/>',
+ "clock":    '<circle cx="20" cy="20" r="14"/><path d="M20 11v9.5l6.5 4"/>',
+ "db":       '<ellipse cx="20" cy="10" rx="12" ry="4.6"/><path d="M8 10v20a12 4.6 0 0 0 24 0V10"/>'
+             '<path d="M8 20a12 4.6 0 0 0 24 0"/>',
+ "bucket":   '<ellipse cx="20" cy="12" rx="13" ry="4.4"/><path d="M7 12l2.6 20.2a2 2 0 0 0 2 1.8h16.8'
+             'a2 2 0 0 0 2-1.8L33 12"/><path d="M9.6 23a13 4 0 0 0 20.8 0"/>',
+ "vector":   '<circle cx="20" cy="20" r="3" fill="currentColor"/><circle cx="8" cy="11" r="2.4"/>'
+             '<circle cx="32" cy="13" r="2.4"/><circle cx="11" cy="32" r="2.4"/><circle cx="31" cy="30" r="2.4"/>'
+             '<circle cx="21" cy="5" r="2.4"/><path d="M20 20l-9.6-7.2M20 20l11.2-6M20 20l-8 10.4M20 20l10.2 8.4"/>',
+ "key":      '<circle cx="13" cy="20" r="7.5"/><path d="M20.5 20H36"/><path d="M30 20v5.5M35 20v4.5"/>',
+ "file":     '<path d="M11 5h12l8 8v22a1.5 1.5 0 0 1-1.5 1.5h-18A1.5 1.5 0 0 1 10 35V6.5A1.5 1.5 0 0 1 11.5 5z"/>'
+             '<path d="M23 5v8h8"/>',
+ "window":   '<rect x="4" y="8" width="32" height="25" rx="3"/><path d="M4 16h32"/>'
+             '<circle cx="9" cy="12" r="1.4" fill="currentColor"/><circle cx="14" cy="12" r="1.4" fill="currentColor"/>'
+             '<circle cx="19" cy="12" r="1.4" fill="currentColor"/>',
+ "tunnel":   '<path d="M4 33h32"/><path d="M8 33V21a12 12 0 0 1 24 0v12"/><path d="M15 33V21a5 5 0 0 1 10 0v12"/>'
+             '<path d="M20 26v-4"/>',
+ "container":'<rect x="5" y="17" width="30" height="16" rx="2.5"/><rect x="9" y="9" width="7" height="7" rx="1.5"/>'
+             '<rect x="18" y="9" width="7" height="7" rx="1.5"/><rect x="27" y="9" width="7" height="7" rx="1.5"/>',
+ "solver":   '<rect x="5" y="5" width="30" height="30" rx="3"/><path d="M15 5v30M25 5v30M5 15h30M5 25h30"/>'
+             '<rect x="15" y="15" width="10" height="10" fill="currentColor" stroke="none"/>',
+ "funnel":   '<path d="M5 7h30L23 22v11l-6-4V22z"/>',
+ "mesh":     '<path d="M20 5l13 6.6v14L20 32 7 25.6v-14z"/><path d="M7 11.6l13 6.6 13-6.6M20 18.2V32"/>'
+             '<path d="M12 36h16"/><path d="M14 34l-2 2 2 2M26 34l2 2-2 2"/>',
+ "gpu":      '<rect x="4" y="12" width="32" height="17" rx="2.5"/><rect x="8" y="16" width="11" height="9" rx="1.5"/>'
+             '<circle cx="28" cy="20.5" r="4.4"/><path d="M12 29v5M24 29v5"/>',
+ "bag":      '<path d="M9 13h22l2.4 21H6.6z"/><path d="M15 13v-2.5a5 5 0 0 1 10 0V13"/>',
+ "mic":      '<rect x="15" y="5" width="10" height="17" rx="5"/><path d="M10 19a10 10 0 0 0 20 0"/>'
+             '<path d="M20 29v6M14 35h12"/>',
+ "spark":    '<path d="M20 4l3.2 12.8L36 20l-12.8 3.2L20 36l-3.2-12.8L4 20l12.8-3.2z"/>'
+             '<path d="M32 5l1.2 4.3L37.5 10l-4.3 1.2L32 15l-1.2-3.8L26.5 10l4.3-.7z"/>',
+ "ruler":    '<rect x="4" y="13" width="32" height="14" rx="2.5"/><path d="M11 13v6M17 13v6M23 13v6M29 13v6"/>',
+ "plan":     '<rect x="7" y="5" width="26" height="30" rx="3"/><path d="M13 14h14M13 21h14M13 28h8"/>',
+ "sse":      '<circle cx="14" cy="20" r="3" fill="currentColor"/><path d="M21 13a10 10 0 0 1 0 14"/>'
+             '<path d="M26 8a17 17 0 0 1 0 24"/><path d="M31 3.5a24 24 0 0 1 0 33"/>',
+}
+
+
+def icon(name, cx, cy, colour=INK, scale=1.0):
+    body = ICONS[name].replace("currentColor", colour)
+    return _g(cx, cy, body, colour, scale)
+
+
+def both_icon(cx, cy, colour=INK):
+    return (icon("phone", cx - 10, cy, colour, 0.62) + icon("headset", cx + 11, cy, colour, 0.62))
+
+
+# =======================================================================================
+# nodes
+# =======================================================================================
+def node(x, y, w, h, ico, label, fill=WHITE, stroke=HAIR, ink=INK, mono=None, pill=None,
+         sw=1.5, icon_colour=None):
+    out = [box(x, y, w, h, fill, stroke, sw, 12)]
+    cx = x + w / 2
+    ic = icon_colour or ink
+    top = y + (26 if mono or pill else 30)
+    out.append(icon(ico, cx, top + 8, ic, 1.0))
+    out.append(txt(cx, top + 42, label, 16, ink, 700))
+    if mono:
+        out.append(txt(cx, top + 60, mono, 11.5, CF_DEEP, 500, font=MONO))
+    if pill:
+        pw = len(pill) * 7.4 + 20
+        out.append(box(cx - pw / 2, y + h - 26, pw, 20, BG, ink, 1.2, 10))
+        out.append(txt(cx, y + h - 12, pill, 11.5, ink, 700))
+    return "".join(out)
+
+
+def wire(d, colour=MUTED, sw=2.4, head=True, dash=None, marker="end"):
+    m = ""
+    if head:
+        mid = "arrow-" + colour.lstrip("#")
+        m = f' marker-{marker}="url(#{mid})"'
+    dd = f' stroke-dasharray="{dash}"' if dash else ""
+    return f'<path d="{d}" fill="none" stroke="{colour}" stroke-width="{sw}"{m}{dd}/>'
+
+
+def dot(x, y, colour=CF_EDGE, r=4.5):
+    return f'<circle cx="{x}" cy="{y}" r="{r}" fill="{colour}"/>'
+
+
+def wlabel(x, y, s, colour):
+    w = len(s) * 7.6 + 16
+    return (box(x - w / 2, y - 11, w, 21, BG, None, 0, 10) +
+            txt(x, y + 4, s, 12, colour, 700, font=MONO))
+
+
+# =======================================================================================
 # defs
-# ---------------------------------------------------------------------------------------
+# =======================================================================================
 add(f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" width="{W}" height="{H}" '
-    f'role="img" aria-label="Full Scale system architecture">')
-add('<defs>')
-for n, _, line, _, _ in FLOWS:
-    add(f'<marker id="ah{n}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" '
-        f'markerHeight="7" orient="auto-start-reverse">'
-        f'<path d="M 0 0 L 10 5 L 0 10 z" fill="{line}"/></marker>')
-add('<marker id="ahg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" '
-    f'orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="{MUTED}"/></marker>')
-add('<marker id="ahc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" '
-    f'orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="{CF_DEEP}"/></marker>')
-add('</defs>')
-add(rect(0, 0, W, H, BG, r=0))
+    f'role="img" aria-label="Full Scale architecture wiring diagram">')
+add("<defs>")
+for c in {MUTED, CF_EDGE, CF_DEEP, F1, F2, F3, F4, INK}:
+    add(f'<marker id="arrow-{c.lstrip("#")}" viewBox="0 0 10 10" refX="8.5" refY="5" '
+        f'markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">'
+        f'<path d="M0 0L10 5L0 10z" fill="{c}"/></marker>')
+add("</defs>")
+add(box(0, 0, W, H, BG, r=0))
 
-# ---------------------------------------------------------------------------------------
-# header
-# ---------------------------------------------------------------------------------------
-add(text(M, 52, "Full Scale — system architecture", 34, INK, 700, ls="-0.6"))
-add(text(M, 80, "Scan your room and any real object, then place it at true measured scale.", 15, MUTED, 500))
-add(text(M, 100, "Hack the North 2026 · verified against the deployed system, 2026-09-20 06:25 UTC",
-         12, MUTED, 400, font=MONO))
+# =======================================================================================
+# title
+# =======================================================================================
+add(txt(60, 56, "Full Scale — system architecture", 36, INK, 700, anchor="start", ls="-0.6"))
 
-pills = [
-    ("16", "Cloudflare products", "in use, each proved by a config line"),
-    ("3", "Workers · 4 Durable Objects", "2 Workflows · 1 Queue · 1 cron"),
-    ("0", "device bytes that skip Cloudflare", "no vendor key ever reaches a client"),
-]
-px = W - M
-for num, l1, l2 in reversed(pills):
-    pw = 22 + wsans(num, 28) + 12 + max(wsans(l1, 12.5), wsans(l2, 11.5)) + 20
-    px -= pw
-    add(rect(px, 26, pw, 62, WHITE, HAIR, 1, 12))
-    add(text(px + 18, 68, num, 28, CF_DEEP, 700))
-    tx = px + 18 + wsans(num, 28) + 12
-    add(text(tx, 52, l1, 12.5, INK, 700))
-    add(text(tx, 70, l2, 11.5, MUTED, 500))
-    px -= 14
+# =======================================================================================
+# geometry
+# =======================================================================================
+LX, LW = 60, 1380                       # left column
+VX, VW = 1490, 370                      # vendor column
+DEV_Y, DEV_H = 86, 152
+CF_Y, CF_H = 276, 580
+LAP_Y, LAP_H = 886, 150
 
-# ---------------------------------------------------------------------------------------
-# helpers: node + badge
-# ---------------------------------------------------------------------------------------
-def badges(x, y, nums, r=11, gap=5):
-    """Numbered flow badges, drawn right-to-left from x (their right edge)."""
-    out = []
-    cx = x - r
-    for n in reversed(nums):
-        out.append(f'<circle cx="{cx}" cy="{y}" r="{r}" fill="{FLOW_LINE[n]}"/>')
-        out.append(f'<text x="{cx}" y="{y + 4.5}" font-family="{SANS}" font-size="13" '
-                   f'font-weight="700" fill="{FLOW_NUM[n]}" text-anchor="middle">{n}</text>')
-        cx -= 2 * r + gap
-    return "".join(out)
+WK_Y, WK_H = 350, 90                    # worker row
+RAIL = 470                              # service-binding rail
+BUSA = 505
+T2_Y, T2_H = 545, 110                   # compute / async tier
+BUSB = 685
+T3_Y, T3_H = 715, 110                   # data / edge tier
 
-def cf_node(x, y, w, h, name, resource, role, nums=(), note=None):
-    """A white Cloudflare product card with the orange left rule."""
-    out = [rect(x, y, w, h, WHITE, HAIR, 1, 10)]
-    out.append(f'<path d="M {x + 0.5} {y + 10} a 10 10 0 0 1 10 -10 l 0 0 l 0 {h} '
-               f'a 10 10 0 0 1 -10 -10 z" fill="{CF_RULE}"/>')
-    out.append(f'<rect x="{x}" y="{y}" width="4" height="{h}" fill="{CF_RULE}"/>')
-    out.append(text(x + 16, y + 26, name, 15.5, INK, 700))
-    res_lines = resource if isinstance(resource, (list, tuple)) else [resource]
-    ry_ = y + 46
-    for rl in res_lines:
-        out.append(text(x + 16, ry_, rl, 11.5, CF_DEEP, 500, font=MONO))
-        ry_ += 15
-    ty = ry_ + 6
-    for line in role:
-        out.append(text(x + 16, ty, line, 12.5, MUTED, 500))
-        ty += 17
-    if note:
-        out.append(text(x + 16, y + h - 12, note, 11, CF_DEEP, 500, font=MONO))
-    if nums:
-        out.append(badges(x + w - 12, y + 22, nums))
-    return "".join(out)
+FD_X, FD_W = 130, 300                   # front-door worker
+XR_X, XR_W = 1070, 300                  # xr worker
+FD_C, XR_C = FD_X + FD_W / 2, XR_X + XR_W / 2
+DROP = 160                              # the front door's bus drop, left of every tier node
 
-# ---------------------------------------------------------------------------------------
-# devices band
-# ---------------------------------------------------------------------------------------
-add(rect(M, DEV_Y, IW, DEV_H, DEVICE, HAIR, 1.5, 16))
-add(text(M + 24, DEV_Y + 30, "DEVICES", 13, MUTED, 700, ls="1.6"))
-add(text(M + 24 + 88, DEV_Y + 30,
-         "— the only two clients. Neither holds a vendor key, and neither talks to anything "
-         "but Cloudflare.", 12.5, MUTED, 500))
+AG_X, AG_W = 1150, 200                  # designer-agent, in the compute tier
+AG_C = AG_X + AG_W / 2
 
-def device_card(x, y, w, h, title, sub, chips, bullets, nums):
-    out = [rect(x, y, w, h, WHITE, HAIR, 1, 10)]
-    out.append(text(x + 18, y + 30, title, 17, INK, 700))
-    out.append(text(x + 18, y + 50, sub, 12, MUTED, 500, font=MONO))
-    by = y + 74
-    for b in bullets:
-        out.append(f'<circle cx="{x + 22}" cy="{by - 4}" r="2.5" fill="{MUTED}"/>')
-        out.append(text(x + 32, by, b, 12.5, INK, 500))
-        by += 18
-    cx = x + w - 18
-    for label in reversed(chips):
-        cw = wsans(label, 12) + 26
-        cx -= cw
-        out.append(rect(cx, y + h - 40, cw, 26, BG, INK, 1.2, 13))
-        out.append(text(cx + cw / 2, y + h - 22, label, 12, INK, 700, anchor="middle"))
-        cx -= 8
-    if nums:
-        out.append(badges(x + w - 18, y + 26, nums))
-    return "".join(out)
+# =======================================================================================
+# devices
+# =======================================================================================
+add(box(LX, DEV_Y, LW, DEV_H, DEVICE, HAIR, 1.5, 16))
+add(txt(LX + 22, DEV_Y + 26, "Devices", 15, MUTED, 700, anchor="start", ls="1.2"))
+add(node(FD_X, DEV_Y + 36, FD_W, DEV_H - 48, "phone", "iPhone", pill="Expo"))
+add(node(XR_X, DEV_Y + 36, XR_W, DEV_H - 48, "headset", "Quest 3", pill="WebXR"))
 
-dev_w = (IW - 48 - 32) // 2
-add(device_card(M + 24, DEV_Y + 42, dev_w, DEV_H - 66,
-                "Expo iOS app", "apps/mobile · Expo SDK 57 · 4 Swift modules",
-                ["Expo"],
-                ["RoomPlan LiDAR room scan · Object Capture → GLBExporter.swift",
-                 "Apple Speech on device · AR place-at-scale"],
-                (1, 3)))
-add(device_card(M + 24 + dev_w + 32, DEV_Y + 42, dev_w, DEV_H - 66,
-                "Quest 3 — WebXR page", "apps/xr · three.js + rapier3d · 1:1 immersive-ar",
-                ["WebXR"],
-                ["Ships no model files. Lists and streams everything live.",
-                 "Voice in, voice out; stands inside the room at true scale."],
-                (3, 4)))
+# =======================================================================================
+# Cloudflare
+# =======================================================================================
+add(box(LX, CF_Y, LW, CF_H, CF_FILL, CF_EDGE, 2.5, 16))
+add(f'<rect x="{LX + 22}" y="{CF_Y + 20}" width="7" height="40" rx="3.5" fill="{CF_EDGE}"/>')
+add(txt(LX + 42, CF_Y + 52, "Cloudflare", 30, INK, 700, anchor="start", ls="-0.3"))
+add(box(940, CF_Y + 14, 204, 54, WHITE, CF_EDGE, 2, 14))
+add(txt(958, CF_Y + 55, "16", 42, CF_EDGE, 700, anchor="start"))
+add(txt(1012, CF_Y + 38, "Cloudflare", 15, INK, 700, anchor="start"))
+add(txt(1012, CF_Y + 58, "products", 15, INK, 700, anchor="start"))
 
-# ---------------------------------------------------------------------------------------
-# gutter A — structural arrows + the headline claim
-# ---------------------------------------------------------------------------------------
-GA = (DEV_Y + DEV_H, CF_Y)
-for cx in (M + 24 + dev_w * 0.42, M + 24 + dev_w + 32 + dev_w * 0.42):
-    add(f'<path d="M {cx:.0f} {GA[0]} L {cx:.0f} {GA[1]}" stroke="{CF_DEEP}" stroke-width="2.5" '
-        f'fill="none" marker-end="url(#ahc)" marker-start="url(#ahc)"/>')
-add(text(W / 2, GA[0] + 32, "every byte, both directions — HTTPS + SSE, one origin",
-         13, CF_DEEP, 700, anchor="middle"))
+add(node(FD_X, WK_Y, FD_W, WK_H, "worker", "Worker", CF_FILL, CF_EDGE, INK,
+         mono="front-door", sw=2.5))
+add(node(XR_X, WK_Y, XR_W, WK_H, "worker", "Worker", CF_FILL, CF_EDGE, INK,
+         mono="xr", sw=2.5))
 
-# ---------------------------------------------------------------------------------------
-# Cloudflare band
-# ---------------------------------------------------------------------------------------
-add(rect(M, CF_Y, IW, CF_H, CF_FILL, CF_EDGE, 2, 16))
-add(f'<rect x="{M + 24}" y="{CF_Y + 26}" width="6" height="42" rx="3" fill="{CF_EDGE}"/>')
-add(text(M + 42, CF_Y + 48, "CLOUDFLARE — the only front door", 25, INK, 700, ls="-0.3"))
-add(text(M + 42, CF_Y + 68,
-         "State, storage, search, orchestration and both agents run here. The laptop and every "
-         "vendor are tools that Cloudflare calls — never a relay, never a second origin.",
-         13, CF_DEEP, 500))
+T2 = [("do", "Durable Objects", None), ("bot", "Agents SDK", None), ("chip", "Workers AI", None),
+      ("workflow", "Workflows", None), ("queue", "Queues", None), ("clock", "Cron", None)]
+T3 = [("db", "D1", None), ("bucket", "R2", None), ("vector", "Vectorize", None),
+      ("key", "KV", None), ("file", "Assets", None), ("window", "Browser", None),
+      ("tunnel", "Tunnel", None)]
 
-IX, IW2 = M + 24, IW - 48           # 64 .. 1856
+NW, NG = 130, 18
+T2X = [230 + i * (NW + NG) for i in range(len(T2))]
+T3X = [230 + i * (NW + NG) for i in range(len(T3))]
 
-# -- the three Workers -------------------------------------------------------------------
-WK_Y, WK_H = CF_Y + 92, 140
-wk_w = (IW2 - 2 * 28) // 3
+for (ic, lb, mn), x in zip(T2, T2X):
+    add(node(x, T2_Y, NW, T2_H, ic, lb, WHITE, HAIR, INK, mono=mn, icon_colour=CF_DEEP))
+add(node(AG_X, T2_Y, AG_W, T2_H, "worker", "Worker", CF_FILL, CF_EDGE, INK,
+         mono="agent", sw=2.5))
+for (ic, lb, mn), x in zip(T3, T3X):
+    add(node(x, T3_Y, NW, T3_H, ic, lb, WHITE, HAIR, INK, mono=mn, icon_colour=CF_DEEP))
 
-def worker_card(x, name, url, lines, tag, nums):
-    out = [rect(x, WK_Y, wk_w, WK_H, WHITE, CF_EDGE, 2, 10)]
-    out.append(text(x + 18, WK_Y + 30, name, 18, INK, 700))
-    out.append(text(x + 18, WK_Y + 50, url, 11.5, CF_DEEP, 500, font=MONO))
-    ty = WK_Y + 74
-    for ln in lines:
-        out.append(text(x + 18, ty, ln, 12.5, MUTED, 500))
-        ty += 17
-    tw = wsans(tag, 11.5) + 22
-    out.append(rect(x + 18, WK_Y + WK_H - 34, tw, 24, CF_FILL, CF_EDGE, 1, 12))
-    out.append(text(x + 18 + tw / 2, WK_Y + WK_H - 18, tag, 11.5, CF_DEEP, 700, anchor="middle"))
-    out.append(badges(x + wk_w - 14, WK_Y + 26, nums))
-    return "".join(out)
+TUN_C = T3X[-1] + NW / 2
 
-add(worker_card(IX, "full-scale-workers", "workers/ · the only /v1 front door",
-                ["30 routes: rooms, objects, uploads, search, fit,",
-                 "find, catalogue intake, jobs, SSE, R2 assets."],
-                "Worker #1", (1, 2, 3)))
-add(worker_card(IX + wk_w + 28, "designer-agent", "services/agent/ · Agents SDK",
-                ["One Durable Object per room. Turns a sentence",
-                 "into a plan with no coordinates in it."],
-                "Worker #2", (4,)))
-add(worker_card(IX + 2 * (wk_w + 28), "full-scale-xr", "apps/xr/ · static assets + voice",
-                ["Serves the WebXR page and proxies /v1 over",
-                 "service bindings. Holds the ElevenLabs key."],
-                "Worker #3", (3, 4)))
+# ---- wires inside and into Cloudflare -------------------------------------------------
+add(wire(f"M{FD_C} {DEV_Y + DEV_H - 12} L{FD_C} {WK_Y}", F1, 3))
+add(wlabel(FD_C + 40, 258, "GLB", F1))
+add(wire(f"M{XR_C} {DEV_Y + DEV_H - 12} L{XR_C} {WK_Y}", F4, 3))
+add(wlabel(XR_C + 44, 258, "voice", F4))
 
-# service-binding arrows between worker 3 and the other two
-sb_y = WK_Y + WK_H + 30
-x3 = IX + 2 * (wk_w + 28) + wk_w * 0.28
-x1 = IX + wk_w * 0.72
-x2 = IX + wk_w + 28 + wk_w * 0.72
-add(f'<path d="M {x3:.0f} {WK_Y + WK_H} L {x3:.0f} {sb_y} L {x1:.0f} {sb_y} L {x1:.0f} {WK_Y + WK_H}" '
-    f'stroke="{CF_DEEP}" stroke-width="2" fill="none" marker-end="url(#ahc)"/>')
-add(f'<path d="M {x3:.0f} {sb_y} L {x2:.0f} {sb_y} L {x2:.0f} {WK_Y + WK_H}" '
-    f'stroke="{CF_DEEP}" stroke-width="2" fill="none" marker-end="url(#ahc)"/>')
-_sbl = "service bindings  API · AGENT"
-_sbw = wmono(_sbl, 11.5) + 20
-add(rect((x2 + x3) / 2 - _sbw / 2, sb_y - 22, _sbw, 22, CF_FILL, None, 0, 11))
-add(text((x2 + x3) / 2, sb_y - 7, _sbl, 11.5, CF_DEEP, 700, font=MONO, anchor="middle"))
-add(text(IX, sb_y + 20,
-         "A Worker cannot fetch another Worker of the same account by URL — so it binds to it. "
-         "The Quest therefore sees exactly one origin.", 12, MUTED, 500))
+# xr binds to the front door and to the agent
+add(wire(f"M{XR_X + 90} {WK_Y + WK_H} L{XR_X + 90} {RAIL} L{FD_C} {RAIL} L{FD_C} {WK_Y + WK_H}",
+         CF_DEEP, 2.4))
+add(wlabel(700, RAIL, "bind", CF_DEEP))
+add(wire(f"M{AG_C} {WK_Y + WK_H} L{AG_C} {T2_Y}", CF_DEEP, 2.4))
 
-# -- the four product groups -------------------------------------------------------------
-GP_Y = sb_y + 42
-GP_H = CF_Y + CF_H - 28 - GP_Y
-gp_w = (IW2 - 3 * 20) // 4
+# the front door owns every binding: one drop, two buses, one stub per product
+add(wire(f"M{DROP} {WK_Y + WK_H} L{DROP} {BUSB}", CF_EDGE, 2.8, head=False))
+add(wire(f"M{DROP} {BUSA} L{T2X[-1] + NW} {BUSA}", CF_EDGE, 2.8, head=False))
+add(wire(f"M{DROP} {BUSB} L{T3X[-1] + NW} {BUSB}", CF_EDGE, 2.8, head=False))
+add(dot(DROP, BUSA))
+add(dot(DROP, BUSB))
+for x in T2X:
+    add(wire(f"M{x + NW / 2} {BUSA} L{x + NW / 2} {T2_Y}", CF_EDGE, 2.2))
+    add(dot(x + NW / 2, BUSA, CF_EDGE, 3.4))
+for x in T3X:
+    add(wire(f"M{x + NW / 2} {BUSB} L{x + NW / 2} {T3_Y}", CF_EDGE, 2.2))
+    add(dot(x + NW / 2, BUSB, CF_EDGE, 3.4))
 
-GROUPS = [
-    ("COMPUTE", [
-        ("Workers", "full-scale-workers · designer-agent · full-scale-xr",
-         ["Three deployed Workers. All logic,", "all routing, all auth."], (1, 2, 3, 4), None),
-        ("Durable Objects", ["RoomAgent · ScoutAgent · MeshDispatcher",
-          "DesignerAgent (in Worker #2)"],
-         ["Per-room memory and the SSE fan-out;", "one mesh admission slot at a time."], (2, 4), None),
-        ("Workers AI", "@cf/openai/gpt-oss-120b · llama-3.2-11b-vision",
-         ["The brain inside RoomAgent. Emits a", "ConstraintPlan — never a coordinate."], (4,),
-         "built; the headset uses designer-agent today"),
-        ("Agents SDK", "agents@0.24 — Agent, getAgentByName",
-         ["Memory, tool loop and per-agent SQL,", "in four agent classes."], (2, 4), None),
-    ]),
-    ("DATA", [
-        ("D1", "full-scale-db",
-         ["rooms · versions · objects · jobs ·", "mesh_outbox. Every write is a row here."], (1, 2, 3, 4), None),
-        ("R2", "full-scale-objects  (private)",
-         ["GLB meshes, LiDAR frames, product", "photos. Served via GET /v1/assets/{key}."], (1, 2), None),
-        ("Vectorize", "objects-v1 · 768-dim SigLIP 2 · cosine",
-         ["Style by vector, fit by integer-millimetre", "filter: w_mm/h_mm/d_mm $lte."], (1, 3), None),
-        ("Workers KV", "CONFIG",
-         ["Tunnel origins, encoder fingerprint,", "90-second upload grants."], (1, 4), None),
-    ]),
-    ("ASYNC", [
-        ("Workflows", "generate-mesh · ingest-merchant",
-         ["Each step.do() retries on its own —", "what a flaky GPU actually needs."], (2,),
-         "BASETEN_URL names the adapter, not Baseten"),
-        ("Queues", "full-scale-jobs · 1 consumer · 3 retries",
-         ["Delivery and back-off for every", "mesh generation job."], (2,), None),
-        ("Cron Triggers", "crons = [\"* * * * *\"]",
-         ["Drains the outbox once a minute.", "Nothing is lost to a crash."], (2,), None),
-        ("D1 transactional outbox", "mesh_outbox",
-         ["The job row and its message commit", "together, or neither commits."], (2,), None),
-    ]),
-    ("EDGE", [
-        ("Workers Static Assets", "apps/xr/dist · run_worker_first = [\"/v1/*\"]",
-         ["The WebXR page itself, on a secure", "origin the Quest already trusts."], (3, 4), None),
-        ("Service Bindings", "API → full-scale-workers · AGENT → designer-agent",
-         ["Worker to Worker with no public hop", "and no CORS."], (3, 4), None),
-        ("Cloudflare Tunnel", "cloudflared · upstream:solver|search|ingest|embedding",
-         ["The only route to the laptop. The laptop", "has no open port and no inbound DNS."], (1, 2, 3, 4), None),
-        ("Browser Rendering", "[browser] binding · quickAction(\"markdown\")",
-         ["Reads a storefront that serves no", "product JSON, from inside the agent."], (2,),
-         "ScoutAgent tool path"),
-    ]),
+# =======================================================================================
+# laptop
+# =======================================================================================
+add(box(LX, LAP_Y, LW, LAP_H, LAPTOP, LAP_EDGE, 1.5, 16))
+add(txt(LX + 22, LAP_Y + 26, "Laptop", 15, MUTED, 700, anchor="start", ls="1.2"))
+
+LAP = [("solver", "fit", 180), ("vector", "SigLIP 2", 480), ("mesh", "gen", 800),
+       ("funnel", "ingest", 1120)]
+LN_W, LN_H = 150, 108
+for ic, lb, x in LAP:
+    add(node(x, LAP_Y + 38, LN_W, LN_H, ic, lb, WHITE, HAIR, INK, icon_colour=MUTED))
+LC = {lb: x + LN_W / 2 for _, lb, x in LAP}
+
+RAIL_L = LAP_Y - 18
+add(wire(f"M{TUN_C} {T3_Y + T3_H} L{TUN_C} {RAIL_L}", CF_EDGE, 2.8, head=False))
+add(wire(f"M{LC['fit']} {RAIL_L} L{LC['ingest']} {RAIL_L}", CF_EDGE, 2.8, head=False))
+add(dot(TUN_C, RAIL_L))
+for lb in ("fit", "SigLIP 2", "gen", "ingest"):
+    add(wire(f"M{LC[lb]} {RAIL_L} L{LC[lb]} {LAP_Y + 38}", CF_EDGE, 2.2))
+    add(dot(LC[lb], RAIL_L, CF_EDGE, 3.4))
+add(wlabel(700, RAIL_L, "tools", CF_DEEP))
+
+# =======================================================================================
+# vendors
+# =======================================================================================
+add(box(VX, DEV_Y, VW, 1034, VENDOR, VEN_EDGE, 1.5, 16))
+add(txt(VX + 22, DEV_Y + 26, "Vendors", 15, MUTED, 700, anchor="start", ls="1.2"))
+
+VEN = [("mic", "ElevenLabs", 357), ("spark", "OpenAI", 562), ("bag", "Shopify", 860),
+       ("window", "Browserbase", 946), ("gpu", "Baseten", 1032)]
+VN_W, VN_H = 300, 76
+for ic, lb, y in VEN:
+    add(box(VX + 35, y, VN_W, VN_H, WHITE, HAIR, 1.5, 12))
+    add(icon(ic, VX + 35 + 44, y + VN_H / 2, MUTED, 1.0))
+    add(txt(VX + 35 + 82, y + VN_H / 2 + 6, lb, 18, INK, 700, anchor="start"))
+VC = {lb: y + VN_H / 2 for _, lb, y in VEN}
+
+add(wire(f"M{XR_X + XR_W} {VC['ElevenLabs']} L{VX + 35} {VC['ElevenLabs']}", F4, 2.4))
+add(wire(f"M{AG_X + AG_W} {VC['OpenAI']} L{VX + 35} {VC['OpenAI']}", F4, 2.4))
+add(wire(f"M{VX + 35} {VC['Shopify']} L{1420} {VC['Shopify']} L{1420} {LAP_Y + 50} "
+         f"L{LC['ingest'] + LN_W / 2} {LAP_Y + 50}", F2, 2.4))
+add(wire(f"M{VX + 35} {VC['Browserbase']} L{1450} {VC['Browserbase']} L{1450} {LAP_Y + 96} "
+         f"L{LC['ingest'] + LN_W / 2} {LAP_Y + 96}", F2, 2.4))
+add(wire(f"M{LC['gen']} {LAP_Y + 146} L{LC['gen']} {LAP_Y + 168} L{1400} {LAP_Y + 168} "
+         f"L{1400} {VC['Baseten']} L{VX + 35} {VC['Baseten']}", F2, 2.4))
+
+# =======================================================================================
+# pipelines — four swimlanes, icons only
+# =======================================================================================
+PIPE_Y = 1160
+LANE_H, LANE_G = 100, 8
+CFS, LAPS, VENS, DEVS = (CF_FILL, CF_EDGE), (LAPTOP, LAP_EDGE), (VENDOR, VEN_EDGE), (WHITE, HAIR)
+
+LANES = [
+    ("Scan an object", F1, [
+        ("phone", "Scan", DEVS), ("worker", "Worker", CFS), ("bucket", "R2", CFS),
+        ("vector", "SigLIP 2", LAPS), ("vector", "Vectorize", CFS)]),
+    ("Catalogue a store", F2, [
+        ("bag", "Shopify", VENS), ("window", "Browserbase", VENS), ("funnel", "ingest", LAPS),
+        ("db", "D1", CFS), ("workflow", "Workflow", CFS), ("gpu", "Baseten", VENS),
+        ("bucket", "R2", CFS)]),
+    ("Find what fits", F3, [
+        ("mic", "Voice", DEVS), ("worker", "Worker", CFS), ("vector", "Vectorize", CFS),
+        ("ruler", "mm filter", CFS), ("headset", "Results", DEVS)]),
+    ("Rearrange room", F4, [
+        ("mic", "Voice", DEVS), ("bot", "Agent", CFS), ("plan", "Plan", CFS),
+        ("solver", "OR-Tools", LAPS), ("db", "Version", CFS), ("sse", "SSE", CFS),
+        ("both", "Devices", DEVS)]),
 ]
 
-for gi, (gname, nodes) in enumerate(GROUPS):
-    gx = IX + gi * (gp_w + 20)
-    add(rect(gx, GP_Y, gp_w, GP_H, "#FFFAF4", CF_EDGE, 1, 12,
-             extra=' stroke-dasharray="5 4" stroke-opacity="0.55"'))
-    add(text(gx + 14, GP_Y + 26, gname, 12.5, CF_DEEP, 700, ls="1.8"))
-    n_h = (GP_H - 44 - 3 * 10) // 4
-    for ni, (name, res, role, nums, note) in enumerate(nodes):
-        ny = GP_Y + 40 + ni * (n_h + 10)
-        add(cf_node(gx + 12, ny, gp_w - 24, n_h, name, res, role, nums, note))
+SW_W, SW_H, SW_G = 150, 76, 34
+TITLE_W = 250
+for li, (title, colour, steps) in enumerate(LANES):
+    ly = PIPE_Y + li * (LANE_H + LANE_G)
+    add(box(LX, ly, W - 2 * LX, LANE_H, WHITE, HAIR, 1.5, 14))
+    add(f'<rect x="{LX}" y="{ly}" width="7" height="{LANE_H}" rx="3.5" fill="{colour}"/>')
+    tc = F3T if colour == F3 else colour
+    add(txt(LX + 26, ly + LANE_H / 2 + 7, title, 19, tc, 700, anchor="start"))
+    sx = LX + TITLE_W
+    sy = ly + (LANE_H - SW_H) / 2
+    for si, (ic, lb, (fill, stroke)) in enumerate(steps):
+        add(box(sx, sy, SW_W, SW_H, fill, stroke, 1.5, 11))
+        icol = CF_DEEP if fill == CF_FILL else MUTED
+        add(both_icon(sx + 32, sy + SW_H / 2, icol) if ic == "both"
+            else icon(ic, sx + 32, sy + SW_H / 2, icol, 0.86))
+        add(txt(sx + 58, sy + SW_H / 2 + 5, lb, 14.5, INK, 700, anchor="start"))
+        if si < len(steps) - 1:
+            add(wire(f"M{sx + SW_W + 6} {sy + SW_H / 2} L{sx + SW_W + SW_G - 6} {sy + SW_H / 2}",
+                     colour, 3))
+        sx += SW_W + SW_G
 
-# ---------------------------------------------------------------------------------------
-# gutter B — down to the laptop and the vendors
-# ---------------------------------------------------------------------------------------
-lap_x, lap_w = M, 920
-ven_x, ven_w = M + 940, IW - 940
-add(f'<path d="M {lap_x + lap_w * 0.42:.0f} {CF_Y + CF_H} L {lap_x + lap_w * 0.42:.0f} {BOT_Y}" '
-    f'stroke="{CF_DEEP}" stroke-width="2.5" fill="none" marker-end="url(#ahc)" marker-start="url(#ahc)"/>')
-add(f'<path d="M {ven_x + ven_w * 0.5:.0f} {CF_Y + CF_H} L {ven_x + ven_w * 0.5:.0f} {BOT_Y}" '
-    f'stroke="{CF_DEEP}" stroke-width="2.5" fill="none" marker-end="url(#ahc)"/>')
-add(text(lap_x + lap_w * 0.42 + 14, CF_Y + CF_H + 30,
-         "Cloudflare Tunnel — outbound only", 12.5, CF_DEEP, 700))
-add(text(ven_x + ven_w * 0.5 + 14, CF_Y + CF_H + 30,
-         "Cloudflare calls the vendor; the device never does", 12.5, CF_DEEP, 700))
+add("</svg>")
+svg = "\n".join(P)
 
-# ---------------------------------------------------------------------------------------
-# bottom split — laptop edge / vendors
-# ---------------------------------------------------------------------------------------
-add(rect(lap_x, BOT_Y, lap_w, BOT_H, LAPTOP, HAIR, 1.5, 16))
-add(text(lap_x + 22, BOT_Y + 28, "LAPTOP EDGE", 13, MUTED, 700, ls="1.6"))
-add(text(lap_x + 22 + 108, BOT_Y + 28,
-         "— stateless tools, no database, reached only through Cloudflare Tunnel",
-         12.5, MUTED, 500))
-add(f'<circle cx="{lap_x + lap_w - 216}" cy="{BOT_Y + 24}" r="5" fill="#2E7D4F"/>')
-add(text(lap_x + lap_w - 204, BOT_Y + 28, "live", 11.5, MUTED, 600))
-add(f'<circle cx="{lap_x + lap_w - 170}" cy="{BOT_Y + 24}" r="5" fill="{WHITE}" '
-    f'stroke="{MUTED}" stroke-width="1.5"/>')
-add(text(lap_x + lap_w - 158, BOT_Y + 28, "built, off the path today", 11.5, MUTED, 600))
-
-LAP = [
-    ("fit", ":8001", "OR-Tools CP-SAT — /fit and /solve", "C++ extension; Workers Python is Pyodide", (4,), True),
-    ("embedding", ":8004", "SigLIP 2 — embeds queries and photos", "2 GB of pinned weights", (1, 3), True),
-    ("ingest", ":8003", "Crawl, /find, dimension extraction", "long crawls, Python scraping stack", (2,), True),
-    ("search", ":8005", "Standby ranker (Vectorize path is live)", "fallback only, not on the path", (), False),
-    ("gen adapter", ":8006", "SF3D + the scale binding, exactly once", "live; Worker BASETEN_URL unset", (2,), False),
+# =======================================================================================
+# below the fold: everything the poster deliberately does not say
+# =======================================================================================
+PRODUCTS = [
+    ("Workers", "3 deployed: front door, designer-agent, xr", "workers/wrangler.toml:14 · apps/xr/wrangler.toml:12 · services/agent/wrangler.toml:4"),
+    ("Durable Objects", "RoomAgent, ScoutAgent, MeshDispatcher, DesignerAgent", "workers/wrangler.toml:120,128 new_sqlite_classes"),
+    ("Workflows", "generate-mesh, ingest-merchant — per-step durable retry", "workers/wrangler.toml:95-103"),
+    ("Queues", "full-scale-jobs, 1 consumer, 3 retries", "workers/wrangler.toml:83-92"),
+    ("Cron Triggers", "drains the D1 outbox every 60 s", "workers/wrangler.toml:28 crons = [\"* * * * *\"]"),
+    ("Workers AI", "@cf/openai/gpt-oss-120b — emits a plan, never a coordinate", "workers/wrangler.toml:69 · workers/src/lib/ai.ts:12,15"),
+    ("Agents SDK", "four agent classes: memory, tool loop, per-agent SQL", "workers/package.json:24 agents ^0.24.0"),
+    ("Browser Rendering", "reads a storefront that serves no product JSON", "workers/wrangler.toml:75 · src/agents/scout-agent.ts:393"),
+    ("D1", "full-scale-db — rooms, versions, objects, jobs, mesh_outbox", "workers/wrangler.toml:44-46"),
+    ("R2", "full-scale-objects — private, served via GET /v1/assets/{key}", "workers/wrangler.toml:39-41"),
+    ("Workers KV", "CONFIG — tunnel origins, encoder fingerprint, upload grants", "workers/wrangler.toml:52-53"),
+    ("Vectorize", "objects-v1, 768-dim SigLIP 2 — style vector + w/h/d_mm $lte", "workers/wrangler.toml:59-61"),
+    ("Static Assets", "the WebXR page itself, on a secure origin", "apps/xr/wrangler.toml [assets]"),
+    ("Service Bindings", "API, AGENT — worker to worker, no public hop", "apps/xr/wrangler.toml [[services]]"),
+    ("Cloudflare Tunnel", "the only route to the laptop; no open port, no inbound DNS", "infra/up.sh · infra/gen-up.sh"),
+    ("Workers Observability", "logs for all three Workers", "[observability] in all 3 wrangler files"),
 ]
-ly = BOT_Y + 48
-for name, port, role, why, nums, live in LAP:
-    add(rect(lap_x + 18, ly, lap_w - 36, 38, WHITE, HAIR, 1, 8))
-    add(f'<circle cx="{lap_x + 34}" cy="{ly + 19}" r="5" fill="{"#2E7D4F" if live else "#FFFFFF"}" '
-        f'stroke="{"#2E7D4F" if live else MUTED}" stroke-width="1.5"/>')
-    add(text(lap_x + 48, ly + 24, name, 14, INK, 700, font=MONO))
-    add(text(lap_x + 48 + 106, ly + 24, port, 12, MUTED, 500, font=MONO))
-    add(text(lap_x + 48 + 164, ly + 24, role, 12.5, INK, 500))
-    add(text(lap_x + lap_w - 88, ly + 24, why, 11.5, MUTED, 500, anchor="end"))
-    if nums:
-        add(badges(lap_x + lap_w - 22, ly + 19, nums, r=9, gap=4))
-    ly += 42
-
-add(rect(ven_x, BOT_Y, ven_w, BOT_H, VENDOR, HAIR, 1.5, 16))
-add(text(ven_x + 22, BOT_Y + 28, "VENDORS", 13, MUTED, 700, ls="1.6"))
-add(text(ven_x + 22 + 78, BOT_Y + 28,
-         "— each attached to the one component that calls it", 12.5, MUTED, 500))
-
-VEN = [
-    ("Baseten", "SF3D image-to-3D · L4 · model 3mzlyd6w", "reached only via the gen adapter", (2,)),
-    ("Browserbase", "Headless storefront sessions", "called by services/ingest", (2,)),
-    ("Shopify storefronts", "Public /products.json + collections", "read by services/ingest", (2,)),
-    ("OpenAI", "Layout planner · dimension extraction", "designer-agent + services/ingest", (2, 4)),
-    ("ElevenLabs", "Headset voice: STT in, TTS out", "called by full-scale-xr", (4,)),
+SPONSORS = [
+    ("Cloudflare", "workers/ · apps/xr/ · services/agent/", "16 products: the whole runtime, state, storage, search, orchestration and both agents"),
+    ("Expo", "apps/mobile/app.json — SDK 57, 3 config plugins", "The iOS app and four Swift modules: RoomPlan, Object Capture, depth measure, Speech"),
+    ("Shopify", "services/ingest/verify_merchants.py · README.md:128", "Public /products.json and /collections/&lt;handle&gt;/products.json are the catalogue source"),
+    ("Browserbase", "services/ingest/app/browserbase.py · page_extract.py", "Renders the product pages whose dimensions live in metafields that JSON never serves"),
+    ("Baseten", "services/gen/app/generate_server.py · Dockerfile.adapter", "SF3D image-to-3D on an L4, behind the adapter that binds metric scale exactly once"),
+    ("OpenAI", "services/agent/src/agent.ts · services/ingest/app/ai_extract.py", "The layout planner in designer-agent, and the LLM/VLM dimension passes in extraction"),
+    ("ElevenLabs", "apps/xr/worker/index.ts — /v1/voice/stt, /v1/voice/tts", "Headset speech in and speech out; the API key never leaves the Worker"),
 ]
-vy = BOT_Y + 48
-for name, role, who, nums in VEN:
-    add(rect(ven_x + 18, vy, ven_w - 36, 38, WHITE, HAIR, 1, 8))
-    nw = wsans(name, 12.5) + 24
-    add(rect(ven_x + 30, vy + 8, nw, 22, BG, INK, 1.2, 11))
-    add(text(ven_x + 30 + nw / 2, vy + 23, name, 12.5, INK, 700, anchor="middle"))
-    add(text(ven_x + 30 + nw + 16, vy + 24, role, 12.5, INK, 500))
-    add(text(ven_x + ven_w - 88, vy + 24, who, 11.5, MUTED, 500, anchor="end", font=MONO))
-    add(badges(ven_x + ven_w - 22, vy + 19, nums, r=9, gap=4))
-    vy += 42
-
-# ---------------------------------------------------------------------------------------
-# section: flows (left) + product checklist (right)
-# ---------------------------------------------------------------------------------------
-fl_x, fl_w = M, 1124
-ck_x, ck_w = M + 1144, IW - 1144
-
-add(rect(fl_x, SEC_Y, fl_w, SEC_H, WHITE, HAIR, 1.5, 16))
-add(text(fl_x + 22, SEC_Y + 30, "THE FOUR FLOWS", 13, MUTED, 700, ls="1.6"))
-add(text(fl_x + 22 + 132, SEC_Y + 30,
-         "— the numbered badges above mark every component each one touches",
-         12.5, MUTED, 500))
-
-CHAINS = [
-    (1, [("mono", "Object Capture"), ("mono", "GLBExporter.swift"), ("mono", "POST /v1/objects"),
-         ("mono", "POST /v1/uploads"), ("cf", "Worker streams the PUT"), ("cf", "R2 scans/{id}/mesh.glb"),
-         ("lap", "SigLIP 2 over Tunnel"), ("cf", "Vectorize objects-v1")]),
-    (2, [("ven", "Shopify /products.json"), ("ven", "Browserbase renders the page"),
-         ("lap", "ingest /crawl + /extract"), ("mono", "POST /v1/catalog/ingest"),
-         ("cf", "D1 objects + mesh_outbox"), ("cf", "cron every 60 s"), ("cf", "Queue"),
-         ("cf", "MeshDispatcher"), ("cf", "GenerateMeshWorkflow"), ("lap", "gen adapter binds the scale"),
-         ("ven", "Baseten SF3D"),
-         ("cf", "R2 objects/{id}/mesh.glb")]),
-    (3, [("mono", "POST /v1/search"), ("lap", "SigLIP 2 embeds the sentence"),
-         ("cf", "Vectorize: cosine style"), ("cf", "+ w_mm/h_mm/d_mm $lte fit filter"),
-         ("cf", "D1 hydrates the rows"), ("mono", "phone or headset")]),
-    (4, [("mono", "a sentence in the Quest"), ("ven", "ElevenLabs STT"),
-         ("cf", "designer-agent Durable Object"), ("cf", "plan, never coordinates"),
-         ("lap", "OR-Tools CP-SAT over Tunnel"), ("cf", "new Version in D1"),
-         ("cf", "RoomAgent SSE"), ("mono", "both devices update")]),
+CAVEATS = [
+    ("POST /v1/solve", "RoomAgent + Workers AI, the front door's own agent. Built; the headset uses designer-agent today."),
+    ("services/search :8005", "Standby ranker. workers/src/routes/index.ts:551 only calls it when upstream:embedding is unset — live search runs on Vectorize inside the Worker."),
+    ("gen adapter :8006", "Live on the laptop with its own tunnel. The Worker secret BASETEN_URL is unset, so mesh jobs park durably in the Queue. BASETEN_URL names the adapter, never Baseten."),
 ]
-CHIP = {"cf": (CF_FILL, CF_EDGE, INK), "lap": (LAPTOP, "#9FAEBC", INK),
-        "ven": (VENDOR, "#A7BC9F", INK), "mono": (BG, HAIR, INK)}
 
-fy = SEC_Y + 50
-for n, chain in CHAINS:
-    title = [t for num, t, *_ in FLOWS if num == n][0]
-    add(f'<circle cx="{fl_x + 34}" cy="{fy + 10}" r="13" fill="{FLOW_LINE[n]}"/>')
-    add(f'<text x="{fl_x + 34}" y="{fy + 15}" font-family="{SANS}" font-size="15" '
-        f'font-weight="700" fill="{FLOW_NUM[n]}" text-anchor="middle">{n}</text>')
-    add(text(fl_x + 56, fy + 15, title, 15, FLOW_TEXT[n], 700))
-    # chips, greedily wrapped to two lines
-    max_w = fl_w - 72
-    lines, cur, cur_w = [], [], 0.0
-    for kind, label in chain:
-        cw = wsans(label, 11.5) + 22
-        if cur and cur_w + cw + 18 > max_w:
-            lines.append(cur); cur, cur_w = [], 0.0
-        cur.append((kind, label, cw)); cur_w += cw + 18
-    if cur:
-        lines.append(cur)
-    cy = fy + 32
-    for li, line in enumerate(lines):
-        cx = fl_x + 56
-        for ci, (kind, label, cw) in enumerate(line):
-            fill, stroke, tc = CHIP[kind]
-            add(rect(cx, cy, cw, 24, fill, stroke, 1, 12))
-            add(text(cx + cw / 2, cy + 16, label, 11.5, tc, 600, anchor="middle"))
-            cx += cw
-            last = (ci == len(line) - 1)
-            if not last or li < len(lines) - 1:
-                add(f'<path d="M {cx + 3} {cy + 12} L {cx + 13} {cy + 12}" stroke="{FLOW_LINE[n]}" '
-                    f'stroke-width="2" marker-end="url(#ah{n})"/>')
-            cx += 18
-        cy += 30
-    fy = cy + 12
+rows = lambda xs: "\n".join(
+    f"<tr><td class='k'>{a}</td><td>{b}</td><td class='m'>{c}</td></tr>" for a, b, c in xs)
 
-# checklist
-add(rect(ck_x, SEC_Y, ck_w, SEC_H, WHITE, CF_EDGE, 1.5, 16))
-add(text(ck_x + 22, SEC_Y + 32, "Cloudflare products in use: 16", 17, INK, 700))
-add(text(ck_x + 22, SEC_Y + 52, "every line below is proved by a config line in this repo",
-         11.5, CF_DEEP, 500, font=MONO))
+DETAILS = f"""
+<section class="details">
+  <h2>Cloudflare products in use: 16</h2>
+  <table><thead><tr><th>Product</th><th>What it does here</th><th>Proof</th></tr></thead>
+  <tbody>{rows(PRODUCTS)}</tbody></table>
 
-CHECK = [
-    ("Workers", "3 × wrangler.toml"),
-    ("Durable Objects", "new_sqlite_classes × 4"),
-    ("Workflows", "[[workflows]] × 2"),
-    ("Queues", "producers + consumers"),
-    ("Cron Triggers", "crons = [\"* * * * *\"]"),
-    ("Workers AI", "[ai] binding = \"AI\""),
-    ("Agents SDK", "agents ^0.24.0"),
-    ("Browser Rendering", "[browser] binding"),
-    ("D1", "full-scale-db"),
-    ("R2", "full-scale-objects"),
-    ("Workers KV", "CONFIG"),
-    ("Vectorize", "objects-v1, 768-dim"),
-    ("Static Assets", "[assets] apps/xr/dist"),
-    ("Service Bindings", "[[services]] API, AGENT"),
-    ("Cloudflare Tunnel", "infra/up.sh cloudflared"),
-    ("Workers Observability", "[observability] × 3"),
-]
-col_w = (ck_w - 44) / 2
-for i, (name, proof) in enumerate(CHECK):
-    col, row = i // 8, i % 8
-    cx = ck_x + 22 + col * col_w
-    cy = SEC_Y + 78 + row * 45
-    add(f'<path d="M {cx + 2} {cy + 12} l 5 6 l 10 -13" stroke="{CF_EDGE}" stroke-width="2.6" '
-        f'fill="none" stroke-linecap="round" stroke-linejoin="round"/>')
-    add(text(cx + 26, cy + 16, name, 13.5, INK, 700))
-    add(text(cx + 26, cy + 33, proof, 11.5, CF_DEEP, 500, font=MONO))
+  <h2>Sponsors</h2>
+  <p class="note">Nothing is listed that the code does not call. Sponsors whose technology this
+  project does not use are deliberately absent.</p>
+  <table><thead><tr><th>Sponsor</th><th>Where in the repo</th><th>What it does</th></tr></thead>
+  <tbody>{rows([(a, c, b) for a, b, c in SPONSORS])}</tbody></table>
 
-# ---------------------------------------------------------------------------------------
-# sponsor table
-# ---------------------------------------------------------------------------------------
-add(rect(M, TAB_Y, IW, TAB_H, WHITE, HAIR, 1.5, 16))
-add(text(M + 22, TAB_Y + 32, "Sponsor → where it is in the repo → what it does for the product",
-         17, INK, 700))
-add(text(M + 22, TAB_Y + 52,
-         "Nothing is listed that the code does not call. Sponsors whose technology this project "
-         "does not use are deliberately absent.", 12, MUTED, 500))
+  <h2>Built, but not on the demo path</h2>
+  <table><thead><tr><th>Thing</th><th>Status</th><th></th></tr></thead>
+  <tbody>{"".join(f"<tr><td class='k'>{a}</td><td colspan='2'>{b}</td></tr>" for a, b in CAVEATS)}</tbody></table>
 
-COLS = [(M + 22, 260), (M + 292, 470), (M + 782, 1078)]
-hy = TAB_Y + 82
-for (cx, _), label in zip(COLS, ["SPONSOR", "WHERE IN THE REPO", "WHAT IT DOES"]):
-    add(text(cx, hy, label, 11.5, MUTED, 700, ls="1.4"))
-add(f'<path d="M {M + 22} {hy + 10} L {W - M - 22} {hy + 10}" stroke="{HAIR}" stroke-width="1.5"/>')
-
-ROWS = [
-    ("Cloudflare", "workers/ · apps/xr/ · services/agent/ — 3 wrangler.toml",
-     "16 products: the entire runtime, state, storage, search, orchestration and both agents"),
-    ("Expo", "apps/mobile/app.json — SDK 57, 3 config plugins",
-     "The iOS app and 4 Swift modules: RoomPlan, Object Capture, depth measure, Speech"),
-    ("Shopify", "services/ingest/verify_merchants.py · build_prebake.py",
-     "Public /products.json and /collections/<handle>/products.json are the catalogue source"),
-    ("Browserbase", "services/ingest/app/browserbase.py · page_extract.py",
-     "Renders the product pages whose dimensions live in metafields that JSON never serves"),
-    ("Baseten", "services/gen/app/generate_server.py · Dockerfile.adapter",
-     "SF3D image-to-3D on an L4, behind the adapter that binds metric scale exactly once"),
-    ("OpenAI", "services/agent/src/agent.ts · services/ingest/app/ai_extract.py",
-     "The layout planner in designer-agent, and the LLM/VLM dimension passes in extraction"),
-    ("ElevenLabs", "apps/xr/worker/index.ts — /v1/voice/stt and /v1/voice/tts",
-     "Headset speech in and speech out; the API key never leaves the Worker"),
-]
-ry = hy + 34
-for name, where, what in ROWS:
-    nw = wsans(name, 12.5) + 26
-    add(rect(COLS[0][0], ry - 15, nw, 23, BG, INK, 1.2, 11))
-    add(text(COLS[0][0] + nw / 2, ry, name, 12.5, INK, 700, anchor="middle"))
-    add(text(COLS[1][0], ry, where, 11.5, CF_DEEP if name == "Cloudflare" else MUTED, 500, font=MONO))
-    add(text(COLS[2][0], ry, what, 12.5, INK, 500))
-    ry += 29
-
-add('</svg>')
-
-svg = "\n".join(parts)
+  <p class="note">Verified against the deployed system, 2026-09-20 06:25 UTC. The front door
+  answers 30 routes (<code>workers/src/index.ts:201-257</code>).</p>
+</section>
+"""
 
 HTML = f"""<!doctype html>
 <html lang="en">
@@ -559,19 +436,27 @@ HTML = f"""<!doctype html>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root {{ color-scheme: light; }}
-  html, body {{ margin: 0; padding: 0; background: {BG}; }}
+  html, body {{ margin: 0; padding: 0; background: {BG}; color: {INK}; }}
   body {{ font-family: {SANS}; }}
-  .wrap {{ max-width: 1920px; margin: 0 auto; padding: 0; }}
   svg {{ display: block; width: 100%; height: auto; }}
+  .details {{ max-width: 1800px; margin: 0 auto; padding: 8px 60px 80px; }}
+  .details h2 {{ font-size: 22px; font-weight: 700; margin: 44px 0 12px; }}
+  .details h2:first-child {{ margin-top: 8px; }}
+  .note {{ font-size: 14px; color: {MUTED}; margin: 0 0 14px; max-width: 900px; }}
+  table {{ border-collapse: collapse; width: 100%; font-size: 14px; }}
+  th {{ text-align: left; font-size: 11.5px; letter-spacing: 1.2px; text-transform: uppercase;
+        color: {MUTED}; border-bottom: 1.5px solid {HAIR}; padding: 0 16px 8px 0; }}
+  td {{ padding: 9px 16px 9px 0; border-bottom: 1px solid {HAIR}; vertical-align: top; }}
+  td.k {{ font-weight: 700; white-space: nowrap; }}
+  td.m, code {{ font-family: {MONO}; font-size: 12.5px; color: {CF_DEEP}; }}
 </style>
 </head>
 <body>
-<div class="wrap">
 {svg}
-</div>
+{DETAILS}
 </body>
 </html>
 """
 
 OUT.write_text(HTML, encoding="utf-8")
-print(f"wrote {OUT}  ({len(HTML)} bytes)  canvas {W}x{H}")
+print(f"wrote {OUT} ({len(HTML)} bytes) poster {W}x{H}")
