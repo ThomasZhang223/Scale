@@ -23,14 +23,14 @@ import { Voice, type VoiceState } from './voice';
 import { findListings, needFromDetected, needFromText, isShoppingRequest, productQuery, STOREFRONTS, type Listing, type ListingsResult, type Need, type StageInfo } from './listings';
 import { FindPanel } from './findpanel';
 import { Outdoors } from './outdoors';
-import roomDemo from '../../../fixtures/room-demo.json';
+import roomH from '../../../fixtures/room-h.json';
 import roomLarge from '../public/room-large.json';
 
 /*
  * Stand inside a RoomPlan room scan, with scanned objects (GLBs) in it.
  *
  * Room: GET /v1/rooms/{id} from the team's server (RoomCapture v1; ?room=<id> picks one),
- *   falling back to the committed fixtures/room-demo.json when the server is unreachable.
+ *   falling back to the committed fixtures/room-h.json when the server is unreachable.
  *   ?scan=<url> loads a file instead; raw RoomPlan CapturedRoom JSON works too.
  *   Built at true size, floor at y = 0.
  * Objects: from the server (?object=<id>, and every `object` event on the room's live
@@ -1310,7 +1310,7 @@ async function start() {
       setConnection(STUB ? 'stub' : 'server');
     } catch (err) {
       console.warn('The server did not answer; showing the committed fixture instead.', err);
-      showScan(roomDemo, 'room-demo.json (fixture)');
+      showScan(roomH, 'room-h.json (the demo room, offline)');
       setConnection('offline');
     }
   }

@@ -150,7 +150,7 @@ test('a photographed room is its measured box, with the photo on the face that l
   const walls = roomMeshes(built).filter((m) => m.userData.collider === 'wall');
   assert.equal(walls.length, 4);
   for (const wall of walls) {
-    const faces = wall.material as THREE.MeshStandardMaterial[];
+    const faces = wall.material as THREE.MeshBasicMaterial[];
     assert.ok(Array.isArray(faces), 'a photographed wall carries one material per face');
     const textured = faces.map((m, i) => (m.map ? i : -1)).filter((i) => i >= 0);
     assert.deepEqual(textured.length, 1, 'exactly one face carries the photo');
@@ -169,7 +169,7 @@ test('the ceiling is drawn at the wall height, facing down, turned as the captur
   const ceiling = roomMeshes(built).find((m) => Math.abs(worldPosition(m).y - 2.96) < 1e-6);
   assert.ok(ceiling, 'a ceiling mesh sits at the wall height');
   near(ceiling.geometry.attributes.normal.getY(0), -1, 'it faces the floor');
-  const map = (ceiling.material as THREE.MeshStandardMaterial).map!;
+  const map = (ceiling.material as THREE.MeshBasicMaterial).map!;
   near(map.rotation, Math.PI, 'the ceiling photo is turned 180°, per appearance.rotationDeg');
   assert.equal(map.repeat.x, 1, 'not mirrored');
 });

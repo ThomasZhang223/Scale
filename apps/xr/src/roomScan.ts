@@ -296,10 +296,19 @@ function surfaceTexture(look: SurfaceAppearance | undefined): THREE.Texture | nu
   return texture;
 }
 
-/** A whole surface: its photo when it has one, its sampled colour when it does not. */
-function surfaceMaterial(look: SurfaceAppearance | undefined, fallback: string): THREE.MeshStandardMaterial {
+/**
+ * A whole surface: its photo when it has one, its sampled colour when it does not.
+ *
+ * A photographed surface is UNLIT. The photo already contains the room's own light — the
+ * fluorescent tubes, the shadow the whiteboard casts — so lighting it again shades it twice.
+ * It came out dim and green, because a HemisphereLight blends sky and ground by the normal's
+ * y and a vertical wall sits exactly halfway. A flat colour still needs the scene's lights.
+ */
+function surfaceMaterial(look: SurfaceAppearance | undefined, fallback: string): THREE.Material {
   const map = surfaceTexture(look);
-  return new THREE.MeshStandardMaterial(map ? { map } : { color: look?.hex ?? fallback });
+  return map
+    ? new THREE.MeshBasicMaterial({ map })
+    : new THREE.MeshStandardMaterial({ color: look?.hex ?? fallback });
 }
 
 /**
@@ -328,7 +337,7 @@ function wallSlab(
   let material: THREE.Material | THREE.Material[] = plain;
   if (photo) {
     const faces: THREE.Material[] = [plain, plain, plain, plain, plain, plain];
-    faces[inwardFace(s, roomCenter)] = new THREE.MeshStandardMaterial({ map: photo });
+    faces[inwardFace(s, roomCenter)] = new THREE.MeshBasicMaterial({ map: photo }); // unlit: see surfaceMaterial
     material = faces;
   }
   const mesh = new THREE.Mesh(new THREE.BoxGeometry(s.dims[0], s.dims[1], thickness), material);
