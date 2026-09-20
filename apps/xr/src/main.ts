@@ -1563,14 +1563,15 @@ async function start() {
       // the layout quietly differ from the one that was saved.
       if (layout.position[1] > 0.01 && !physics.supportUnder(obj.id)) unsupported.push(obj.name);
     }
-    if (missing.length) {
-      tell(`${missing.length} object${missing.length > 1 ? 's are' : ' is'} no longer available and ${missing.length > 1 ? 'were' : 'was'} left out: ${missing.join(', ')}.`);
-    }
     if (unsupported.length) {
       console.warn(`Version ${version.versionId}: nothing to rest on for ${unsupported.join(', ')}; they fall to the floor.`);
       tell(`${unsupported.join(', ')} had nothing to rest on and fell to the floor.`);
     }
-    say(`Layout "${version.label}" applied: ${version.placements.length - missing.length} of ${version.placements.length} placements.`);
+    // One line, because #note holds one line: a separate message for the missing objects was
+    // overwritten by this one the same frame, which made the naming useless.
+    if (missing.length) console.warn(`Version ${version.versionId}: left out ${missing.join(', ')}`);
+    const left = missing.length ? ` ${missing.length} no longer available: ${missing.join(', ')}.` : '';
+    say(`Layout "${version.label}" applied: ${version.placements.length - missing.length} of ${version.placements.length} placements.${left}`);
   }
 
   let pushTimer: number | undefined;
