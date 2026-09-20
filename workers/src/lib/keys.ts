@@ -11,12 +11,18 @@ export const R2Keys = {
   objectFrame: (objectId: string, n: number) => `objects/${objectId}/frames/${n}.jpg`,
   objectMesh: (objectId: string) => `objects/${objectId}/mesh.glb`,
   objectThumb: (objectId: string) => `objects/${objectId}/thumb.jpg`,
+  // Phone scans live in their own prefix. `objectMesh` above is Ani's generated-mesh key and
+  // services/gen asserts it byte for byte (generation.py:193, generation_io.py:113) — which is
+  // why this is a new key rather than a change to that one.
+  // ceiling: scans get a mesh key only — no frames, no thumb. Add them here if the phone ever uploads one.
+  scanMesh: (objectId: string) => `scans/${objectId}/mesh.glb`,
   catalogSource: (merchant: string, productId: string) =>
     `catalog/${merchant}/${productId}/source.jpg`,
 } as const;
 
 /** Upload kinds the client may ask for, mapped to the key layout above. */
-export type UploadKind = "roomCapture" | "objectFrame" | "objectMesh" | "objectThumb" | "catalogSource";
+export type UploadKind =
+  | "roomCapture" | "objectFrame" | "objectMesh" | "objectThumb" | "scanMesh" | "catalogSource";
 
 /**
  * The one conversion. An R2 key becomes a URL the client can GET directly.

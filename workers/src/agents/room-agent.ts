@@ -32,7 +32,7 @@ import type {
   SolveResponse,
   VersionV1,
 } from "../lib/contracts";
-import { infeasibleReason, toPlacements, toSolveRequest } from "../lib/solveframe";
+import { describeRoom, infeasibleReason, toPlacements, toSolveRequest } from "../lib/solveframe";
 import { SCHEMA_VERSION } from "../lib/contracts";
 
 export interface RoomAgentState {
@@ -306,9 +306,13 @@ export class RoomAgent extends Agent<Env, RoomAgentState> {
         : "";
 
     const floorArea = room?.floor?.areaM2 ?? 0;
+    // Real ids, not counts: a rule can only point at a wall, door or window the model can name.
+    const layout = describeRoom(room);
     const context =
-      `Room ${body.roomId}, floor area ${floorArea} m2, ${(room?.walls ?? []).length} walls, ` +
-      `${(room?.openings ?? []).length} openings.` +
+      `Room ${body.roomId}, floor area ${floorArea} m2. ` +
+      `Walls (id, side): ${layout.walls.map((w) => `${w.id} (${w.side})`).join(", ") || "none"}. ` +
+      `Openings (id, kind, side): ${layout.openings.map((o) => `${o.id} (${o.kind}, ${o.side})`).join(", ") || "none"}. ` +
+      `In rules write them as wall:{id}, door:{id} or window:{id}.` +
       (body.budgetCents ? ` Budget ${body.budgetCents} cents.` : "") +
       history;
 
@@ -329,7 +333,7 @@ export class RoomAgent extends Agent<Env, RoomAgentState> {
             return out.summary;
           }
           case "check_fit":
-            return await this.toolFit(room);
+            return await this.toolFit(room, origin);
           case "commit_version": {
             committed = await this.toolCommit(body.roomId, String(args.label ?? "agent layout"));
             return { versionId: committed.versionId, placements: committed.placements.length };
@@ -436,7 +440,7 @@ export class RoomAgent extends Agent<Env, RoomAgentState> {
       walkwayCm: args.walkwayCm as number | undefined,
     });
 
-    const solved = await callUpstream<SolveResponse>(this.env, "layout", "/solve", request);
+    const solved = await callUpstream<SolveResponse>(this.env, "solver", "/solve", request);
 
     const reason = infeasibleReason(solved, plan.rules);
     if (reason) return { plan, summary: { infeasible: reason, status: solved.status } };
@@ -460,12 +464,20 @@ export class RoomAgent extends Agent<Env, RoomAgentState> {
     };
   }
 
-  private async toolFit(room: RoomCaptureV1): Promise<FitReportV1> {
+  private async toolFit(room: RoomCaptureV1, origin: string): Promise<FitReportV1> {
     if (this.proposed.length === 0) throw new Error("Nothing is placed yet. Call plan_layout first.");
+    // services/fit is stateless: it needs each placed object's box inlined, or it 422s.
+    const objects = Object.fromEntries(
+      (await getObjects(this.env, this.proposed.map((p) => p.objectId), origin)).map((o) => [
+        o.objectId,
+        o.bboxMeters,
+      ]),
+    );
     const report = await callUpstream<FitReportV1>(this.env, "solver", "/fit", {
       schemaVersion: SCHEMA_VERSION,
       room,
       placements: this.proposed,
+      objects,
     });
     await this.emit("fit", report);
     return report;

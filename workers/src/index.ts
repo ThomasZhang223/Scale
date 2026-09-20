@@ -149,6 +149,11 @@ const routes: Route[] = [
   route("GET", "/v1/objects/{id}", () => objectMacbook),
   route("POST", "/v1/objects/{id}/generate", () => ({ jobId: STUB_JOB_ID })),
   route("POST", "/v1/objects/{id}/mesh", () => objectMacbook),
+  route("POST", "/v1/objects/{id}/index", () => ({
+    objectId: objectMacbook.objectId,
+    fingerprint: "0".repeat(64),
+    modality: "image",
+  })),
   route("GET", "/v1/jobs/{id}", () => ({
     state: "running",
     progressPct: 42,
@@ -176,7 +181,13 @@ const routes: Route[] = [
 // layer keeps first refusal on anything carrying `X-Stub: 1` so that a teammate building
 // against a fixture is never affected by whatever the real implementation is doing today.
 
-async function dispatch(req: Request, env: Env, pathname: string, origin: string): Promise<Response> {
+async function dispatch(
+  req: Request,
+  env: Env,
+  ctx: ExecutionContext,
+  pathname: string,
+  origin: string,
+): Promise<Response> {
   const m = (method: string, re: RegExp) => (req.method === method ? pathname.match(re) : null);
   let hit: RegExpMatchArray | null;
 
@@ -187,6 +198,7 @@ async function dispatch(req: Request, env: Env, pathname: string, origin: string
 
   if (m("GET", /^\/v1\/health$/)) return real.getHealth(env);
   if (m("POST", /^\/v1\/catalog\/ingest$/)) return postCatalogIngest(req, env, origin);
+  if (m("POST", /^\/v1\/ingest$/)) return real.postIngestMerchant(req, env);
   if (m("GET", /^\/v1\/health\/upstream$/)) return real.getUpstreamHealth(env);
 
   if (m("POST", /^\/v1\/rooms$/)) return real.postRoom(req, env);
@@ -201,7 +213,9 @@ async function dispatch(req: Request, env: Env, pathname: string, origin: string
   if (m("GET", /^\/v1\/objects$/)) return real.getObjectList(req, env, origin);
   if ((hit = m("GET", /^\/v1\/objects\/([^/]+)$/))) return real.getObjectById(env, hit[1], origin);
   if ((hit = m("POST", /^\/v1\/objects\/([^/]+)\/mesh$/)))
-    return real.postObjectMesh(req, env, hit[1], origin);
+    return real.postObjectMesh(req, env, hit[1], origin, ctx);
+  if ((hit = m("POST", /^\/v1\/objects\/([^/]+)\/index$/)))
+    return real.postObjectIndex(req, env, hit[1], origin);
   if ((hit = m("POST", /^\/v1\/objects\/([^/]+)\/generate$/)))
     return real.postGenerate(req, env, hit[1], origin);
   if ((hit = m("GET", /^\/v1\/jobs\/([^/]+)$/))) return real.getJobById(env, hit[1]);
@@ -225,7 +239,7 @@ async function dispatch(req: Request, env: Env, pathname: string, origin: string
 }
 
 export default {
-  async fetch(req: Request, env: Env): Promise<Response> {
+  async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     // ceiling: answers every OPTIONS request the same way, without checking the path against
     // a real route. A preflight check does not need to know if the resource exists.
     if (req.method === "OPTIONS") return preflight();
@@ -242,7 +256,7 @@ export default {
     }
 
     try {
-      return withCors(await dispatch(req, env, pathname, origin));
+      return withCors(await dispatch(req, env, ctx, pathname, origin));
     } catch (err) {
       // Every failure in this codebase arrives here as an HttpError with a code and, where
       // one exists, the exact command that fixes it. Standing rule 4: never a silent default.

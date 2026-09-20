@@ -12,6 +12,8 @@
 
 import { Agent } from "agents";
 import { runToolLoop, type ToolDef } from "../lib/ai";
+import { callUpstream } from "../lib/config";
+import { normalizeCatalogItem, enqueueCatalogItem } from "../lib/catalog-ingest";
 import { nowIso, uuid } from "../lib/ids";
 import type { ObjectV1 } from "../lib/contracts";
 
@@ -48,7 +50,8 @@ All lengths are metres. All money is integer cents.`;
 const TOOLS: ToolDef[] = [
   {
     name: "list_merchants",
-    description: "List the storefronts this session knows about and whether each is ingested.",
+    description:
+      "List the storefronts this session knows about and whether each has FINISHED ingesting (ingested_at non-null).",
     parameters: { type: "object", properties: {}, required: [] },
   },
   {
@@ -87,13 +90,38 @@ const TOOLS: ToolDef[] = [
           type: "string",
           description: "Storefront base URL, e.g. https://example-furniture.com",
         },
-        name: { type: "string", description: "Short merchant name used as the R2 key prefix" },
+        name: {
+          type: "string",
+          description:
+            "Merchant slug, exactly as list_merchants reports it (e.g. Poly___Bark). It becomes the R2 key prefix and the D1 merchant column; never invent a new spelling for a merchant already listed.",
+        },
         collection: {
           type: "string",
           description: "Optional collection handle, e.g. 'side-tables', to narrow the pull",
         },
       },
       required: ["storefront", "name"],
+    },
+  },
+  {
+    name: "find_products",
+    description:
+      "Search ONE merchant's own store search for a product description, measure what comes " +
+      "back, and add the measurable ones to the catalog. Use when the indexed catalog has " +
+      "nothing and you do not want to pull a whole storefront. Needs Browserbase on the ingest " +
+      "service; it will say so if it is not configured.",
+    parameters: {
+      type: "object",
+      properties: {
+        storefront: { type: "string", description: "Storefront base URL, https://…" },
+        merchant: { type: "string", description: "Merchant slug exactly as list_merchants reports it" },
+        query: { type: "string", description: "A PRODUCT description, e.g. 'red lounge chair'. Not a placement." },
+        maxW: { type: "number", description: "Maximum width in METRES" },
+        maxH: { type: "number", description: "Maximum height in METRES" },
+        maxD: { type: "number", description: "Maximum depth in METRES" },
+        limit: { type: "number", description: "How many candidates, default 8, max 24" },
+      },
+      required: ["storefront", "merchant", "query"],
     },
   },
   {
@@ -185,6 +213,8 @@ export class ScoutAgent extends Agent<Env, ScoutAgentState> {
             return await this.toolSearch(args, origin);
           case "ingest_merchant":
             return await this.toolIngest(args);
+          case "find_products":
+            return await this.toolFind(args);
           case "read_listing":
             return await this.toolReadListing(args);
           default:
@@ -244,17 +274,41 @@ export class ScoutAgent extends Agent<Env, ScoutAgentState> {
       };
     }
 
+    // `ingested_at` is written only once the workflow has finished, so a started-but-unfinished
+    // run is visible here as a "workflow <id>" note with no timestamp. Reconcile it before
+    // starting a second run.
+    // ceiling: a workflow instance purged by retention makes .get() throw, which surfaces to the
+    // model as a tool error for that merchant until its row is reseeded.
+    if (already[0]?.note?.startsWith("workflow ") && !already[0].ingested_at) {
+      const priorId = already[0].note.slice("workflow ".length).split(" ")[0];
+      const status = await (await this.env.INGEST_MERCHANT.get(priorId)).status();
+      if (!["complete", "errored", "terminated"].includes(status.status)) {
+        return { pending: true, workflowId: priorId, note: "An ingest for this merchant is still running." };
+      }
+      if (status.status === "complete") {
+        const written = Number((status.output as { written?: number } | undefined)?.written ?? 0);
+        this.sql`UPDATE merchants SET ingested_at = ${nowIso()}, product_count = ${written},
+                 note = ${`workflow ${priorId} complete`} WHERE name = ${name}`;
+        return { skipped: true, reason: `${name} finished with ${written} products.` };
+      }
+      // errored or terminated: fall through and start a new instance. A failed ingest must not
+      // be remembered as a success.
+    }
+
     const instance = await this.env.INGEST_MERCHANT.create({
       params: {
         merchant: name,
         storefront,
         collection: (args.collection as string | undefined) ?? null,
+        browserbase: Boolean(args.browserbase),
+        llm: Boolean(args.llm),
+        vlm: false,
       },
     });
 
     this.sql`INSERT INTO merchants (name, storefront, ingested_at, product_count, note)
-      VALUES (${name}, ${storefront}, ${nowIso()}, 0, ${`workflow ${instance.id}`})
-      ON CONFLICT(name) DO UPDATE SET ingested_at = excluded.ingested_at, note = excluded.note`;
+      VALUES (${name}, ${storefront}, NULL, 0, ${`workflow ${instance.id} started ${nowIso()}`})
+      ON CONFLICT(name) DO UPDATE SET storefront = excluded.storefront, note = excluded.note`;
 
     const known = this.sql<{ n: number }>`SELECT COUNT(*) AS n FROM merchants`;
     this.setState({ ...this.state, merchantsKnown: known[0]?.n ?? 0 });
@@ -263,6 +317,54 @@ export class ScoutAgent extends Agent<Env, ScoutAgentState> {
       started: true,
       workflowId: instance.id,
       note: "Ingest runs in the background. Call search_objects again in a few seconds.",
+    };
+  }
+
+  /**
+   * POST /find on services/ingest, then POST /extract over what it returned, then the normal
+   * catalogue intake. /find returns raw products with no sizes on purpose — measuring is
+   * /extract's job — so the two are always called together from here.
+   *
+   * browserbase/llm are false on this path: /find already paid for one rendered page, and a live
+   * tool call inside an agent turn cannot afford a 60-page pass.
+   */
+  private async toolFind(args: Record<string, unknown>): Promise<unknown> {
+    const storefront = String(args.storefront ?? "");
+    const merchant = String(args.merchant ?? "");
+    const query = String(args.query ?? "");
+    if (!storefront || !merchant || !query) {
+      throw new Error("find_products needs storefront, merchant and query.");
+    }
+    const found = await callUpstream<{
+      count: number; products: unknown[]; searchUrl?: string;
+      fallbackSuspected?: boolean; warning?: string | null;
+    }>(this.env, "ingest", "/find",
+      { storefront, merchant, query, limit: Math.min(Number(args.limit ?? 8) || 8, 24) }, 90_000);
+
+    if (!found.count) {
+      return { count: 0, searchUrl: found.searchUrl,
+               note: "The merchant's own search returned nothing for that query." };
+    }
+    const fit = { maxW: args.maxW ?? null, maxH: args.maxH ?? null, maxD: args.maxD ?? null };
+    const measured = await callUpstream<{ count: number; stats: Record<string, unknown>; objects: any[] }>(
+      this.env, "ingest", "/extract",
+      { merchant, storefront, products: found.products, browserbase: false, llm: false, vlm: false, fit },
+      120_000);
+
+    const landed: unknown[] = [];
+    for (const o of measured.objects) {
+      if (!o.extraction?.imageUrl) continue; // a mesh needs a picture
+      const item = await normalizeCatalogItem(o);
+      await enqueueCatalogItem(this.env, item, this.env.API_ORIGIN);
+      landed.push({ objectId: item.objectId, name: item.name, bboxMeters: item.bboxMeters,
+                    fits: o.extraction.fits, unverified: o.extraction.unverified,
+                    priceCents: item.price?.cents ?? null, productUrl: item.productUrl });
+    }
+    return {
+      searchUrl: found.searchUrl,
+      fallbackSuspected: found.fallbackSuspected ?? false,
+      warning: found.warning ?? null, // "served popular products instead" — never hide this
+      candidates: found.count, measured: measured.count, landed: landed.length, products: landed,
     };
   }
 

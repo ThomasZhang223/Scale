@@ -1,3 +1,4 @@
+import { Buffer } from "node:buffer";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -63,8 +64,10 @@ if (mode === "verify") {
   const h = await health();
   if (!h.meshPipeline.providerConfigured && !flag("--enqueue-only")) throw Error("Provider is unconfigured. Set the secrets or explicitly use --enqueue-only to park jobs.");
   const filename = option("--file", path.join(root, "../services/ingest/prebake/manifest.json"));
-  const doc = JSON.parse(await readFile(filename, "utf8"));
-  const all = Array.isArray(doc) ? doc : doc.products ?? doc.objects ?? doc.items;
+  const text = await readFile(filename, "utf8");
+  const all = filename.endsWith(".ndjson") || filename.endsWith(".jsonl")
+    ? text.split("\n").filter(l => l.trim()).map(l => JSON.parse(l))
+    : (d => Array.isArray(d) ? d : d.products ?? d.objects ?? d.items)(JSON.parse(text));
   if (!Array.isArray(all)) throw Error("Expected an array, products, objects, or items");
   const limit = Number(option("--limit", "1"));
   if (!Number.isInteger(limit) || limit < 1) throw Error("--limit must be a positive integer");
@@ -83,4 +86,68 @@ if (mode === "verify") {
   const receipt = JSON.parse(await readFile(receiptPath, "utf8"));
   if (receipt.base !== base) throw Error("Receipt belongs to another Worker; pass its --base explicitly.");
   await status(receipt.jobs, flag("--wait"));
-} else throw Error("Use verify, submit, or status");
+} else if (mode === "backfill") {
+  // Vectorize the catalogue rows already in D1, from their source PHOTOS. No Baseten, no mesh, no
+  // paid inference. Run `images` first (the photos must be in R2) and `submit` first (the rows
+  // must be in D1).
+  // Object ids come from GET /v1/objects?source=catalog, never from the manifest: the manifest has
+  // no objectId, and the id of record is the Worker's stableId(productUrl). The manifest supplies
+  // only the R2 key of each row's photo, joined on productUrl.
+  const filename = option("--file", path.join(root, "../services/ingest/prebake/manifest.json"));
+  const doc = JSON.parse(await readFile(filename, "utf8"));
+  const all = Array.isArray(doc) ? doc : doc.products ?? doc.objects ?? doc.items;
+  if (!Array.isArray(all)) throw Error("Expected an array, products, objects, or items");
+  const keyByUrl = new Map(all.filter(row => row.productUrl && row.r2Key).map(row => [row.productUrl, row.r2Key]));
+  // ceiling: one listing page, capped at 500 by GET /v1/objects. A larger catalogue needs paging on that route.
+  const listed = await (await request(`${base}/v1/objects?source=catalog&limit=500`)).json();
+  const credential = await token();
+  let ok = 0, unmatched = 0, failed = 0;
+  for (const object of listed.slice(0, Number(option("--limit", "500")))) {
+    const imageKey = keyByUrl.get(object.productUrl);
+    // A D1 row with no manifest row (a smoke-test row, or a scan) has no photo to embed. Say so.
+    if (!imageKey) { unmatched++; console.error(`SKIP  ${object.objectId}: no manifest row for ${object.productUrl}`); continue; }
+    try {
+      const res = await request(`${base}/v1/objects/${object.objectId}/index`, {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-upstream-token": credential },
+        body: JSON.stringify({ imageKey }),
+      });
+      const { modality } = await res.json();
+      if (modality !== "image") throw Error(`expected an image embedding, got ${modality}`);
+      ok++;
+    } catch (e) { failed++; console.error(`FAIL  ${object.objectId} ${imageKey}: ${String(e).slice(0, 200)}`); }
+  }
+  console.log(`Indexed ${ok} of ${listed.length} (unmatched ${unmatched}, failed ${failed}).`);
+  if (failed) process.exitCode = 1;
+} else if (mode === "images") {
+  // Uploads catalogue source images to catalog/{merchant}/{productId}/source.jpg, the key
+  // services/gen/app/embedding/catalog_manifest.py asserts. No new route: POST /v1/uploads has
+  // implemented kind "catalogSource" and had no caller.
+  const filename = option("--file", path.join(root, "../services/ingest/prebake/manifest.json"));
+  const doc = JSON.parse(await readFile(filename, "utf8"));
+  const rows = (Array.isArray(doc) ? doc : doc.products ?? []).slice(0, Number(option("--limit", "100")));
+  const dir = option("--images", path.join(root, "../services/ingest/prebake"));
+  let ok = 0, missing = 0, failed = 0;
+  for (const row of rows) {
+    const merchant = row.merchant, productId = row.productId != null ? String(row.productId) : null;
+    if (!merchant || !productId) { missing++; console.error(`SKIP  no merchant/productId: ${row.title}`); continue; }
+    const local = row.r2Key ? path.join(dir, row.r2Key) : null;
+    let bytes;
+    try { bytes = local ? await readFile(local) : null; } catch { bytes = null; }
+    if (!bytes && row.imageUrl) {
+      const r = await fetch(row.imageUrl, { signal: AbortSignal.timeout(60_000) });
+      if (r.ok) bytes = Buffer.from(await r.arrayBuffer());
+    }
+    if (!bytes) { missing++; console.error(`MISS  ${merchant}/${productId}`); continue; }
+    const grant = await (await request(`${base}/v1/uploads`, {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ kind: "catalogSource", merchant, productId }),
+    })).json();
+    try {
+      await request(grant.putUrl, { method: "PUT", headers: { "content-type": "image/jpeg" }, body: bytes });
+      ok++; console.log(`ok    ${grant.key}`);
+    } catch (e) { failed++; console.error(`FAIL  ${grant.key}: ${String(e).slice(0, 120)}`); }
+  }
+  console.log(`uploaded ${ok}, missing ${missing}, failed ${failed}`);
+  if (failed || missing) process.exitCode = 1;
+} else throw Error("Use verify, submit, images, backfill, or status");

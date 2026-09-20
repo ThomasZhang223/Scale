@@ -8,7 +8,7 @@ import { HttpError, json, noContent, readJson } from "../lib/http";
 import { contentHash, nowIso, token, uuid } from "../lib/ids";
 import { R2Keys, contentTypeFor, keyFromAssetPath } from "../lib/keys";
 import { callUpstream, callUpstreamRaw, upstreamOrigin } from "../lib/config";
-import { embedInput, type Embedding } from "../lib/embedding";
+import { embedInput, indexObject, type Embedding } from "../lib/embedding";
 import { enqueueMesh } from "../lib/mesh-dispatch";
 import { emitToRoom, roomAgent, scoutAgent } from "../lib/notify";
 import {
@@ -166,6 +166,9 @@ export async function postUpload(req: Request, env: Env, origin: string): Promis
     case "objectThumb":
       key = R2Keys.objectThumb(required(body.objectId, "objectId"));
       break;
+    case "scanMesh":
+      key = R2Keys.scanMesh(required(body.objectId, "objectId"));
+      break;
     case "catalogSource":
       key = R2Keys.catalogSource(
         required(body.merchant, "merchant"),
@@ -178,7 +181,7 @@ export async function postUpload(req: Request, env: Env, origin: string): Promis
       throw new HttpError(
         400,
         "unknown_upload_kind",
-        `kind "${kind}" is not one of roomCapture, objectFrame, objectMesh, objectThumb, catalogSource.`,
+        `kind "${kind}" is not one of roomCapture, objectFrame, objectMesh, objectThumb, scanMesh, catalogSource.`,
       );
   }
 
@@ -332,7 +335,7 @@ export async function postGenerate(
 //
 // The phone's Object Capture path (apps/mobile/modules/object-capture) reconstructs the mesh
 // on-device with Apple's PhotogrammetrySession and uploads the GLB itself through POST /uploads
-// (kind objectMesh). This is how it then flips the object to ready. Not in contracts.md yet —
+// (kind scanMesh, stored under scans/). This is how it then flips the object to ready. Not in contracts.md yet —
 // same standing as GET /v1/objects, see workers/DEPLOY.md "Schema proposals".
 //
 // Standing rule 2 ("the scale binding happens exactly once, in C") is honoured, not skipped:
@@ -344,21 +347,113 @@ export async function postObjectMesh(
   env: Env,
   objectId: string,
   origin: string,
+  ctx: ExecutionContext,
 ): Promise<Response> {
   const body = await readJson<{ key: string; roomId?: string | null }>(req);
   const key = required(body.key, "key");
-  if (key !== R2Keys.objectMesh(objectId)) {
-    throw new HttpError(400, "bad_mesh_key", `key must be ${R2Keys.objectMesh(objectId)}, got ${key}.`);
+  if (key !== R2Keys.scanMesh(objectId)) {
+    throw new HttpError(400, "bad_mesh_key", `key must be ${R2Keys.scanMesh(objectId)}, got ${key}.`);
   }
   // 404 before touching the row, and a loud error if the client marks ready before its PUT landed.
-  await getObject(env, objectId, origin);
+  const object0 = await getObject(env, objectId, origin);
   const head = await env.BUCKET.head(key);
   if (!head) throw new HttpError(409, "mesh_not_uploaded", `Nothing is stored at ${key} yet. PUT it first.`);
+  // A truncated upload or an HTML error page must not flip a row to ready. Same check
+  // generate-mesh.ts makes on Ani's path (assertGlb); this route had none.
+  const probe = await env.BUCKET.get(key, { range: { offset: 0, length: 12 } });
+  const bytes = probe ? new Uint8Array(await probe.arrayBuffer()) : new Uint8Array(0);
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  if (
+    bytes.length < 12 ||
+    view.getUint32(0, true) !== 0x46546c67 ||
+    view.getUint32(4, true) !== 2 ||
+    view.getUint32(8, true) !== head.size
+  ) {
+    throw new HttpError(
+      422,
+      "not_a_glb",
+      `${key} is ${head.size} bytes but is not a binary glTF (bad magic, version or declared length).`,
+    );
+  }
 
   await markObjectReady(env, objectId, { glbKey: key });
+
+  // A phone-uploaded GLB never passes through the mesh Workflow, so this is the only place a
+  // scanned object can reach Vectorize. Same indexer as the Workflow — there is not a second one.
+  // Object Capture uploads no photo (modules/object-capture exposes only imageCount), so the only
+  // embeddable content is the name the user gave it. SigLIP 2's text tower shares the vision
+  // tower's space, which is why a text vector is comparable with the catalogue's image vectors.
+  // ceiling: a named scan is indexed from text, which is weaker than an image. The upgrade path is
+  // for the capture module to export one frame and for this to pass imageKey instead.
+  const text = [object0.name, object0.category]
+    .filter((part) => part && part !== "unknown")
+    .join(" ")
+    .trim();
+  let indexed: Record<string, string>;
+  if (!text) {
+    // Standing rule 4: do not invent a caption. Say the object is unsearchable and why.
+    indexed = { "x-indexed": "false", "x-index-skipped": "no-embeddable-text" };
+  } else {
+    // Not awaited: the embed can take up to 25 s (embedInput's timeout) and this is the phone's
+    // Save button. The mesh is stored and the object IS ready; only search is affected, so a
+    // failure is logged and never reaches the phone.
+    // ceiling: the outcome cannot be reported in this response. The retry path is
+    // POST /v1/objects/{id}/index { text }.
+    ctx.waitUntil(
+      indexObject(env, {
+        objectId,
+        source: "scan",
+        category: object0.category,
+        bboxMeters: object0.bboxMeters,
+        dominantHex: object0.palette?.[0] ?? null,
+        text,
+      }).catch((err: unknown) => console.error(`scan_index_failed ${objectId}: ${String(err).slice(0, 300)}`)),
+    );
+    indexed = { "x-indexed": "pending" };
+  }
+
   const object = await getObject(env, objectId, origin);
   if (body.roomId) await emitToRoom(env, body.roomId, "object", object);
-  return json(object);
+  return json(object, 200, indexed);
+}
+
+/**
+ * POST /v1/objects/{id}/index   { imageKey } | { text }   ->  { objectId, fingerprint, modality }
+ *
+ * Index an object into Vectorize without generating a mesh. Two jobs, one route:
+ *  - backfill: catalogue rows loaded straight into D1 have real photos in R2 but no vectors,
+ *    because the only other writer sits behind a Baseten call that may not be running.
+ *  - retry: the mesh Workflow's index step records an embed failure and moves on (the job still
+ *    ends `done`), and a phone scan is indexed in the background. This retries either without
+ *    regenerating a paid mesh.
+ *
+ * Same X-Upstream-Token gate as POST /v1/catalog/ingest — this writes to a shared index and is
+ * not a public route. Not in contracts.md yet; see workers/DEPLOY.md "Schema proposals".
+ */
+export async function postObjectIndex(
+  req: Request,
+  env: Env,
+  objectId: string,
+  origin: string,
+): Promise<Response> {
+  if (!env.UPSTREAM_TOKEN || req.headers.get("x-upstream-token") !== env.UPSTREAM_TOKEN) {
+    throw new HttpError(401, "unauthorized", "A valid X-Upstream-Token is required.");
+  }
+  const body = await readJson<{ imageKey?: string; text?: string }>(req);
+  if ((body.imageKey == null) === (body.text == null)) {
+    throw new HttpError(400, "bad_index_input", "Supply exactly one of imageKey or text.");
+  }
+  const object = await getObject(env, objectId, origin); // 404s before touching Vectorize
+  const r = await indexObject(env, {
+    objectId,
+    source: object.source,
+    category: object.category,
+    bboxMeters: object.bboxMeters,
+    dominantHex: object.palette?.[0] ?? null,
+    imageKey: body.imageKey,
+    text: body.text,
+  });
+  return json({ objectId, fingerprint: r.fingerprint, modality: r.modality });
 }
 
 export async function getJobById(env: Env, jobId: string): Promise<Response> {
@@ -511,7 +606,9 @@ async function queryEmbedding(env: Env, body: SearchBody): Promise<Embedding | n
 }
 
 async function d1Search(env: Env, body: SearchBody, limit: number, origin: string) {
-  const where: string[] = ["state IN ('measured','ready')"];
+  // Same filter as listObjects (store.ts), so the phone's fallback path returns the same rows as
+  // its primary one.
+  const where: string[] = ["state != 'failed'"];
   const binds: (string | number)[] = [];
 
   if (body.text) {
@@ -563,18 +660,24 @@ export async function postFit(req: Request, env: Env, origin: string): Promise<R
   const room = (await loadRoomCapture(env, roomId)) as RoomCaptureV1;
 
   let placements = body.placements;
-  if (!placements) {
-    const versionId = required(body.versionId, "versionId or placements");
-    placements = (await getVersion(env, versionId)).placements;
+  if (!placements && body.versionId) {
+    placements = (await getVersion(env, body.versionId)).placements;
   }
+  // The headset sends `{roomId}` alone. ceiling: "the current layout" means the newest version;
+  // a room with no versions checks an empty layout, which is correctly ok:true.
+  placements ??= (await latestVersion(env, roomId))?.placements ?? [];
+
+  // services/fit is stateless: it needs each placed object's box inlined, or it 422s.
+  const objs = await getObjects(env, [...new Set(placements.map((p) => p.objectId))], origin);
+  const objects = Object.fromEntries(objs.map((o) => [o.objectId, o.bboxMeters]));
 
   const report = await callUpstream<FitReportV1>(env, "solver", "/fit", {
     schemaVersion: SCHEMA_VERSION,
     room,
     placements,
+    objects,
   });
   await emitToRoom(env, roomId, "fit", report);
-  void origin;
   return json(report);
 }
 
@@ -638,6 +741,37 @@ export async function postScoutSeed(req: Request, env: Env): Promise<Response> {
   return json({ sessionId, ...((await res.json()) as Record<string, unknown>) }, res.status);
 }
 
+/**
+ * POST /v1/ingest  { merchant, storefront, collection?, browserbase?, llm?, vlm? }
+ *   -> 202 { workflowId, merchant, storefront }
+ *
+ * The deterministic ingest trigger. IngestMerchantWorkflow's only other caller is
+ * ScoutAgent.toolIngest, i.e. an LLM tool loop, so an unattended multi-merchant run had no entry
+ * point in the Worker at all. Token-gated like /v1/catalog/ingest: this spends someone else's
+ * bandwidth. Not in contracts.md yet; see workers/DEPLOY.md "Schema proposals".
+ */
+export async function postIngestMerchant(req: Request, env: Env): Promise<Response> {
+  if (!env.UPSTREAM_TOKEN || req.headers.get("x-upstream-token") !== env.UPSTREAM_TOKEN) {
+    throw new HttpError(401, "unauthorized", "A valid X-Upstream-Token is required.");
+  }
+  const body = await readJson<{
+    merchant: string; storefront: string; collection?: string | null;
+    browserbase?: boolean; llm?: boolean; vlm?: boolean;
+  }>(req);
+  const merchant = required(body.merchant, "merchant");
+  const storefront = required(body.storefront, "storefront");
+  if (!storefront.startsWith("https://")) {
+    throw new HttpError(422, "bad_storefront", `storefront must be an https URL, got ${storefront}.`);
+  }
+  const instance = await env.INGEST_MERCHANT.create({
+    params: {
+      merchant, storefront, collection: body.collection ?? null,
+      browserbase: body.browserbase ?? false, llm: body.llm ?? false, vlm: body.vlm ?? false,
+    },
+  });
+  return json({ workflowId: instance.id, merchant, storefront }, 202);
+}
+
 export async function getAgentMemory(env: Env, kind: "room" | "scout", id: string): Promise<Response> {
   const agent = kind === "room" ? await roomAgent(env, id) : await scoutAgent(env, id);
   const res = await agent.fetch("https://agent/memory");
@@ -670,11 +804,10 @@ export async function getSync(env: Env, roomId: string): Promise<Response> {
  * configuration. One GET answers which.
  */
 export async function getHealth(env: Env): Promise<Response> {
-  const [solver, search, ingest, layout, embedding, fingerprint] = await Promise.all([
+  const [solver, search, ingest, embedding, fingerprint] = await Promise.all([
     env.CONFIG.get("upstream:solver"),
     env.CONFIG.get("upstream:search"),
     env.CONFIG.get("upstream:ingest"),
-    env.CONFIG.get("upstream:layout"),
     env.CONFIG.get("upstream:embedding"),
     env.CONFIG.get("embedding:fingerprint"),
   ]);
@@ -695,7 +828,6 @@ export async function getHealth(env: Env): Promise<Response> {
       solver: solver ?? null,
       search: search ?? null,
       ingest: ingest ?? null,
-      layout: layout ?? null,
       embedding: embedding ?? null,
     },
     embeddingFingerprint: fingerprint ?? null,
@@ -713,7 +845,7 @@ export async function getHealth(env: Env): Promise<Response> {
       EMBEDDING_API_KEY: Boolean(env.EMBEDDING_API_KEY),
     },
     notes: [
-      "upstream:solver unset -> POST /v1/fit returns 503. upstream:layout unset -> POST /v1/solve returns 503.",
+      "upstream:solver unset -> POST /v1/fit AND POST /v1/solve both return 503 (one service answers both).",
       "Missing Baseten secrets -> accepted mesh jobs wait durably. A configured URL must serve the dimension-binding adapter, not raw SF3D.",
       "Vector search requires upstream:embedding, embedding:fingerprint, and EMBEDDING_API_KEY.",
     ],
