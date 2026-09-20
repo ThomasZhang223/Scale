@@ -3,8 +3,12 @@
  * static asset from dist/ and never reaches this code (`run_worker_first = ["/v1/*"]`).
  *
  * /v1/voice/*  → handled HERE: ElevenLabs speech-to-text / text-to-speech, key stays server-side
- * /v1/agent/*  → AGENT_ORIGIN (services/agent), or API_ORIGIN when AGENT_ORIGIN is empty
- * /v1/*        → API_ORIGIN   (Thomas's Worker, the one front door)
+ * /v1/agent/*  → env.AGENT (service binding to designer-agent, services/agent)
+ * /v1/*        → env.API   (service binding to full-scale-workers, the one front door)
+ *
+ * Service bindings, not fetch(URL): a Worker cannot fetch() another Worker of the same account
+ * through its *.workers.dev URL — Cloudflare answers that subrequest with its own generic 404
+ * ("There is nothing here yet") without ever reaching the target. The bindings are in wrangler.toml.
  *
  * Same rule the Vite dev proxy applies (vite.config.ts): longer prefix first. The request is
  * forwarded as-is — method, headers (X-Stub included), body — and the upstream response is
@@ -13,8 +17,9 @@
 
 interface Env {
   ASSETS: { fetch(request: Request): Promise<Response> };
-  API_ORIGIN: string;
-  AGENT_ORIGIN: string;
+  /** Service bindings (wrangler.toml [[services]]). Optional in the type so a missing one fails loud. */
+  API?: { fetch(request: Request): Promise<Response> };
+  AGENT?: { fetch(request: Request): Promise<Response> };
   /** Secret: `wrangler secret put ELEVENLABS_API_KEY`. Never a [vars] entry, never in the page. */
   ELEVENLABS_API_KEY?: string;
   /** [vars] in wrangler.toml. */
@@ -29,11 +34,9 @@ const STT_MODEL = 'scribe_v2';
 const TTS_MODEL = 'eleven_flash_v2_5';
 const TTS_OUTPUT_FORMAT = 'mp3_44100_64';
 
-function originFor(pathname: string, env: Env): string {
-  const agent = env.AGENT_ORIGIN.trim();
-  if (pathname.startsWith('/v1/agent') && agent) return agent;
-  if (!env.API_ORIGIN) throw new Error('API_ORIGIN is not set (apps/xr/wrangler.toml [vars])');
-  return env.API_ORIGIN;
+function targetFor(pathname: string, env: Env): { name: 'API' | 'AGENT'; service: Env['API'] } {
+  const name = pathname.startsWith('/v1/agent') ? 'AGENT' : 'API';
+  return { name, service: env[name] };
 }
 
 function fail(status: number, error: string): Response {
@@ -109,14 +112,13 @@ export default {
     if (!url.pathname.startsWith('/v1')) return env.ASSETS.fetch(request);
     if (url.pathname.startsWith('/v1/voice')) return voice(request, url, env);
 
-    const upstream = new URL(originFor(url.pathname, env));
-    upstream.pathname = url.pathname;
-    upstream.search = url.search;
-
-    const headers = new Headers(request.headers);
-    headers.delete('host');
-    const init: RequestInit = { method: request.method, headers, redirect: 'manual' };
-    if (request.method !== 'GET' && request.method !== 'HEAD') init.body = request.body;
-    return fetch(upstream.toString(), init);
+    const { name, service } = targetFor(url.pathname, env);
+    if (!service) {
+      const target = name === 'AGENT' ? 'designer-agent' : 'full-scale-workers';
+      return fail(500, `service binding ${name} is missing: add [[services]] binding = "${name}" service = "${target}" to apps/xr/wrangler.toml`);
+    }
+    // The request goes through as-is (method, headers, body) and the upstream Response is returned
+    // untouched, so SSE (GET /v1/sync/{roomId}, the agent's event stream) still streams.
+    return service.fetch(request);
   },
 };

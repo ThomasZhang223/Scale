@@ -24,12 +24,16 @@ not_found_handling = "single-page-application"
 # Only /v1 goes through the Worker; every other path is served straight from the asset store.
 run_worker_first = ["/v1/*"]
 
+# Where /v1 goes: service bindings, not URLs. A Worker cannot fetch() another Worker of the same
+# account through its *.workers.dev URL (Cloudflare answers that subrequest with its own 404).
+[[services]]
+binding = "API"
+service = "full-scale-workers"   # Thomas's Worker, the only front door
+[[services]]
+binding = "AGENT"
+service = "designer-agent"       # services/agent, /v1/agent/*
+
 [vars]
-# Where /v1 goes. The only front door — never a tunnel URL (infra/README.md).
-API_ORIGIN = "https://full-scale-workers.thomaszhangdev.workers.dev"
-# Where /v1/agent goes: services/agent, deployed as its own Worker. Empty means "send it to
-# API_ORIGIN too" (Thomas's Worker can forward /v1/agent/* in one line).
-AGENT_ORIGIN = "https://designer-agent.thomaszhangdev.workers.dev"
 # Voice (worker/index.ts, /v1/voice/*): ElevenLabs. The API KEY IS A SECRET, never a var:
 #   npx wrangler secret put ELEVENLABS_API_KEY
 # Without it the routes answer 501 with that exact instruction. The voice id is a premade
