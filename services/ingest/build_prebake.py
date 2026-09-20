@@ -470,7 +470,14 @@ def main() -> int:
                     sample = next(e for e in llm_errors if e.startswith(reason))
                     print(f"      {n} x {sample[:160]}", file=sys.stderr)
 
-            if fetcher is not None and needs_page:
+            # Some merchants have no dimensions on their rendered pages either, and paying 60
+            # browser renders a run to rediscover that is the most expensive no-op here. A
+            # measured 0/60 is the evidence; the flag records it so the next run does not
+            # repeat it. Narrower than `excluded`: these merchants are still crawled and still
+            # contribute through /products.json — Kohara gives 81 products and Color Cord 19.
+            if m.get("skipPageFetch") and needs_page:
+                print(f"  step 2.5: skipped — {m['skipPageFetch']}", file=sys.stderr)
+            elif fetcher is not None and needs_page:
                 print(f"  step 2.5: {len(needs_page)} have an image but no dimensions; "
                       f"fetching up to {args.browserbase_limit} pages", file=sys.stderr)
                 rescued, needs_page, stats = enrich_from_pages(
