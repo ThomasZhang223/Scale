@@ -20,7 +20,7 @@ import { Thumbnails } from './thumbs';
 import { matchDetected } from './placement';
 import { measuredBox } from './objects';
 import { Voice, type VoiceState } from './voice';
-import { findListings, matchLibraryByWord, needFromDetected, needFromText, classifyUtterance, productQuery, SIMILAR_ENOUGH, STOREFRONTS, type Command, type Listing, type ListingsResult, type Need, type Recommendation, type StageInfo } from './listings';
+import { findListings, matchLibraryByWord, needFromDetected, needFromText, classifyUtterance, normalizeTranscript, productQuery, SIMILAR_ENOUGH, STOREFRONTS, type Command, type Listing, type ListingsResult, type Need, type Recommendation, type StageInfo } from './listings';
 import { FindPanel, type FindKind } from './findpanel';
 import { Outdoors } from './outdoors';
 import roomH from '../../../fixtures/room-h.json';
@@ -1036,7 +1036,9 @@ async function start() {
    * productQuery could parse, so ordinary speech ("show me some lamps") fell through here to the
    * agent — which is why voice appeared to do nothing but rearrange.
    */
-  async function routeRequest(text: string) {
+  async function routeRequest(said: string) {
+    // One known speech-to-text homophone, repaired before either router sees it, so both agree.
+    const text = normalizeTranscript(said);
     // A command is decided here, instantly and with no network: it is a button press, and a
     // button press must not wait on a model.
     const rules = classifyUtterance(text);

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { needFromText, needFromDetected, rank, findListings, isShoppingRequest, classifyUtterance, commandOf, SHOP_VERBS, SHOP_LEAD_INS, parseLengthMetres, productQuery, findLive, STOREFRONTS, type Listing } from './listings.ts';
+import { needFromText, needFromDetected, rank, findListings, isShoppingRequest, classifyUtterance, commandOf, normalizeTranscript, SHOP_VERBS, SHOP_LEAD_INS, parseLengthMetres, productQuery, findLive, STOREFRONTS, type Listing } from './listings.ts';
 
 const catalog: Listing[] = JSON.parse(readFileSync(new URL('../public/catalog.json', import.meta.url), 'utf-8'));
 
@@ -365,4 +365,20 @@ test('findLive returns one row per objectId when every store was topped up from 
 test('findLive throws when every store failed, so findListings can fall back and say so', async () => {
   const fetchFn = (async () => new Response('nope', { status: 503, statusText: 'Service Unavailable' })) as unknown as typeof fetch;
   await assert.rejects(findLive({ text: 'lamp' }, 8, undefined, fetchFn), /every store failed/);
+});
+
+test('the one STT homophone is repaired, and nothing else is touched', () => {
+  // Measured in the speech run: "Add a desk" comes back as "At a desk".
+  assert.equal(normalizeTranscript('At a desk'), 'add a desk');
+  assert.equal(normalizeTranscript('at an armchair'), 'add an armchair');
+  assert.equal(classifyUtterance(normalizeTranscript('At a desk')).kind, 'library');
+  // A real locative must survive untouched, whichever shape it takes.
+  for (const t of ['at the window, put the sofa by it', 'At the desk, turn the chair', 'look at a lamp',
+    'at an angle, turn it', 'at a glance it is fine', 'at a time when the room was empty']) {
+    assert.equal(normalizeTranscript(t), t, t);
+  }
+  // Known and harmless: a bare "At an angle" becomes "add an angle", which finds nothing in the
+  // library, falls through to the shops and finds nothing there either. Nothing is placed.
+  assert.equal(normalizeTranscript('At an angle'), 'add an angle');
+  assert.equal(classifyUtterance(normalizeTranscript('at the window, put the sofa by it')).kind, 'design');
 });

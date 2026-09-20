@@ -461,6 +461,31 @@ function bareUtterance(text: string): string {
     .trim();
 }
 
+/**
+ * One speech-to-text homophone, fixed before anything routes.
+ *
+ * "Add a desk" comes back from STT as "At a desk" — measured, in the 50-utterance run. The rule
+ * is deliberately the narrowest one that fixes it: only at the very start of the utterance, only
+ * "at a"/"at an" (never "at the", which is how a real locative starts — "at the window, put the
+ * sofa by it"), and only when no verb follows, because "at an angle, turn it" is an instruction.
+ *
+ * ceiling: one homophone, hand-written. "Listings" heard as "settings" has no safe rule — the
+ * words share no stem and the tablet has a Show listings control — so it is left alone.
+ */
+export function normalizeTranscript(text: string): string {
+  const m = text.match(/^(\s*)at (an?)\s+([^,.!?]*)$/i);
+  if (!m) return text; // a comma or a full stop means a clause follows, not a noun
+  const [, lead, article, rest] = m;
+  const words = rest.trim().split(/\s+/).filter(Boolean);
+  // A bare noun phrase and nothing else: "at a desk" but not "at a glance it is fine".
+  if (!words.length || words.length > 3) return text;
+  if (words.some((w) => VERBISH.test(w))) return text;
+  return `${lead}add ${article} ${words.join(' ')}`;
+}
+
+/** Any of these after "at a/an" means a sentence is being spoken, not a thing being named. */
+const VERBISH = /^(?:is|are|was|were|be|will|would|should|can|could|do|does|did|put|move|turn|place|go|goes|look|looks|seems|feels|fits|sits|stands|hangs|it|that|this|there)$/i;
+
 /** The command this utterance IS, or null when it is a sentence rather than a button press. */
 export function commandOf(text: string): Command | null {
   const bare = bareUtterance(text);
