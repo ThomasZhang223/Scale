@@ -119,6 +119,11 @@ export class FindPanel {
   private savedAt = 0;
   /** The band across the title that a controller grabs to move the window. */
   private readonly grab: THREE.Mesh;
+  /**
+   * The whole panel as one plane, behind everything on it. Read only by hitSurface: it is not
+   * a card, not the ×, not the handle, and it never competes for a press.
+   */
+  private body: THREE.Mesh | null = null;
 
   constructor() {
     this.group.name = 'find-panel';
@@ -134,6 +139,18 @@ export class FindPanel {
     );
     this.grab.name = 'find-grab';
     this.group.add(this.grab);
+  }
+
+  /**
+   * Is the ray anywhere on this panel at all — not on a card, just on it?
+   *
+   * The panel is opaque and stands between the user and the room, but its body has its raycast
+   * turned off so a ray can reach the furniture behind. That is right for choosing what to
+   * point at and wrong for deciding whether the user is aiming at the interface, which is what
+   * the delete button has to know (controls.ts objectButtonsActive).
+   */
+  hitSurface(raycaster: THREE.Raycaster): boolean {
+    return this.group.visible && !!this.body && raycaster.intersectObject(this.body, false).length > 0;
   }
 
   /**
@@ -366,6 +383,7 @@ export class FindPanel {
     }
     for (const m of this.cardMeshes) { m.geometry.dispose(); (m.material as THREE.MeshBasicMaterial).dispose(); m.removeFromParent(); }
     this.cardMeshes = [];
+    if (this.body) { this.body.geometry.dispose(); (this.body.material as THREE.MeshBasicMaterial).dispose(); this.body.removeFromParent(); this.body = null; }
     if (this.mode === 'hidden') { this.group.visible = false; return; }
 
     const height = this.height();
@@ -567,6 +585,14 @@ export class FindPanel {
     this.mesh.raycast = () => {};
     this.mesh.position.y = -height / 2;
     this.group.add(this.mesh);
+    // One plane over the whole panel, behind it, hit by nothing but hitSurface.
+    this.body = new THREE.Mesh(
+      new THREE.PlaneGeometry(WIDTH, height),
+      new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false }),
+    );
+    this.body.position.set(0, -height / 2, -0.002);
+    this.body.name = 'find-body';
+    this.group.add(this.body);
     this.group.visible = this.presenting && !this.dismissed;
   }
 }

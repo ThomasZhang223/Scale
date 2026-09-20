@@ -179,3 +179,45 @@ test('a short page has no pager at all, and changing tab returns to the top', ()
   mixed.showPage('Furniture');
   assert.deepEqual(hittableNames(mixed).filter((n) => n === '‹' || n === '›'), ['›'], 'back at the top');
 });
+
+// ---------- the window is opaque to the delete button, not just to a tile ----------
+
+test('every point down the window body reads as interface, tile or not', () => {
+  const palette = new Palette();
+  palette.setItems([
+    { url: '', name: 'Hold to talk', action: 'hold:talk', accent: true, section: 'Designer' },
+    { url: '', name: 'Fit: 2 red, 1 amber', label: true, section: 'Designer' },
+    { url: '', name: 'Clear objects', action: 'clear', destructive: true, section: 'Room' },
+  ]);
+  const grip = new THREE.Group();
+  palette.attachTo(grip);
+  grip.updateMatrixWorld(true);
+
+  // The frame, the screen, the section headers and the label rows all have their raycast off,
+  // so hitTest answers for only a fraction of an opaque window. A ray anywhere on it has to
+  // count as aiming at the interface, or the delete button acts on the room behind it.
+  const box = new THREE.Box3().setFromObject(palette.group);
+  const missed: string[] = [];
+  for (let i = 1; i < 10; i++) {
+    const y = box.min.y + (box.max.y - box.min.y) * (i / 10);
+    const r = new THREE.Raycaster(new THREE.Vector3(0, y, 1), new THREE.Vector3(0, 0, -1));
+    if (!palette.hitSurface(r)) missed.push(y.toFixed(3));
+  }
+  assert.deepEqual(missed, [], 'these heights let a ray through the window');
+
+  // A ray well beside the window is the room, and must stay the room.
+  const beside = new THREE.Raycaster(new THREE.Vector3(3, 0, 1), new THREE.Vector3(0, 0, -1));
+  assert.equal(palette.hitSurface(beside), false);
+});
+
+test('a hidden window is not a surface: nothing is aimed at a window that is not there', () => {
+  const palette = new Palette();
+  palette.setItems([{ url: '', name: 'Clear objects', action: 'clear', section: 'Room' }]);
+  const grip = new THREE.Group();
+  palette.attachTo(grip);
+  grip.updateMatrixWorld(true);
+  const r = new THREE.Raycaster(new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, 0, -1));
+  assert.equal(palette.hitSurface(r), true);
+  palette.setItems([]); // nothing to show: the window goes away
+  assert.equal(palette.hitSurface(r), false);
+});

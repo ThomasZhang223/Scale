@@ -124,6 +124,11 @@ export class Palette {
   private tiles: THREE.Mesh[] = [];
   private grabTargets: THREE.Object3D[] = [];
   private hovered: THREE.Mesh | null = null;
+  /**
+   * The whole window as one plane, behind everything else on it. Nothing reads it but
+   * hitSurface: it is not a tile, not a drag handle, and it never competes for a press.
+   */
+  private body: THREE.Mesh | null = null;
   private items: PaletteItem[] = [];
   private page: string | null = null;
   private sub = 0; // which slice of a page too long to show at once
@@ -152,6 +157,19 @@ export class Palette {
     this.group.position.copy(eye).addScaledVector(forward, WINDOW_DISTANCE);
     this.group.position.y = eye.y - WINDOW_DROP;
     this.group.lookAt(eye);
+  }
+
+  /**
+   * Is the ray anywhere on this window at all — not on a tile, just on it?
+   *
+   * The window is opaque and stands between the user and the room, but almost none of it is
+   * raycastable: the frame, the screen, the section headers and every label row have their
+   * raycast turned off, so a ray through them reaches the furniture behind. That is right for
+   * choosing what to point at and wrong for deciding whether the user is aiming at the
+   * interface, which is what the delete button has to know (controls.ts objectButtonsActive).
+   */
+  hitSurface(raycaster: THREE.Raycaster): boolean {
+    return this.group.visible && !!this.body && raycaster.intersectObject(this.body, false).length > 0;
   }
 
   /** The bar or frame under the ray: the handle for dragging the window. */
@@ -195,6 +213,7 @@ export class Palette {
     const items = this.items;
     this.group.clear();
     this.tiles = [];
+    this.body = null;
     this.hovered = null;
     this.group.visible = items.length > 0;
     if (!items.length) return;
@@ -218,6 +237,15 @@ export class Palette {
     const screenH = Math.max(contentH, MIN_CONTENT_H) + pagerH + MARGIN + TAB_H + TAB_GAP + stripH;
     const frameW = SCREEN_W + 2 * BEZEL;
     const frameH = screenH + 2 * BEZEL;
+
+    // One plane covering the whole window, behind the frame, hit by nothing but hitSurface.
+    this.body = new THREE.Mesh(
+      new THREE.PlaneGeometry(frameW, frameH),
+      new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false }),
+    );
+    this.body.position.z = -0.004;
+    this.body.name = 'palette-body';
+    this.group.add(this.body);
 
     // The window: a thin frame, the screen, a title bar along the top, and the drag bar below.
     const frame = plate(frameW, frameH, RADIUS_FRAME, C.frame, -0.0025);

@@ -53,6 +53,8 @@ interface Lift {
 export interface DraggableWindow {
   readonly group: THREE.Group;
   hitGrab(raycaster: THREE.Raycaster): THREE.Intersection | null;
+  /** True when the ray is anywhere on the window, tile or not. See rayOnUi(). */
+  hitSurface?(raycaster: THREE.Raycaster): boolean;
 }
 
 /** A hand dragging a window: which one, at what distance along the ray, offset as grabbed. */
@@ -463,7 +465,12 @@ export class Interaction {
   private rayOnUi(): boolean {
     return this.panelHit(this.raycaster) !== null
       || this.hitWindow() !== null
-      || this.palette.hitTest(this.raycaster) !== null;
+      || this.palette.hitTest(this.raycaster) !== null
+      // A tile is not the whole window. Most of a panel's own body — the frame, the screen,
+      // the section headers, every label row — has its raycast off so the ray can reach the
+      // room, so asking only about tiles leaves the greater part of an opaque panel
+      // transparent to this question.
+      || this.windows.some((w) => w.hitSurface?.(this.raycaster) ?? false);
   }
 
   /**
