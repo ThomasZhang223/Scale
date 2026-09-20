@@ -733,6 +733,37 @@ export async function postScoutSeed(req: Request, env: Env): Promise<Response> {
   return json({ sessionId, ...((await res.json()) as Record<string, unknown>) }, res.status);
 }
 
+/**
+ * POST /v1/ingest  { merchant, storefront, collection?, browserbase?, llm?, vlm? }
+ *   -> 202 { workflowId, merchant, storefront }
+ *
+ * The deterministic ingest trigger. IngestMerchantWorkflow's only other caller is
+ * ScoutAgent.toolIngest, i.e. an LLM tool loop, so an unattended multi-merchant run had no entry
+ * point in the Worker at all. Token-gated like /v1/catalog/ingest: this spends someone else's
+ * bandwidth. Not in contracts.md yet; see workers/DEPLOY.md "Schema proposals".
+ */
+export async function postIngestMerchant(req: Request, env: Env): Promise<Response> {
+  if (!env.UPSTREAM_TOKEN || req.headers.get("x-upstream-token") !== env.UPSTREAM_TOKEN) {
+    throw new HttpError(401, "unauthorized", "A valid X-Upstream-Token is required.");
+  }
+  const body = await readJson<{
+    merchant: string; storefront: string; collection?: string | null;
+    browserbase?: boolean; llm?: boolean; vlm?: boolean;
+  }>(req);
+  const merchant = required(body.merchant, "merchant");
+  const storefront = required(body.storefront, "storefront");
+  if (!storefront.startsWith("https://")) {
+    throw new HttpError(422, "bad_storefront", `storefront must be an https URL, got ${storefront}.`);
+  }
+  const instance = await env.INGEST_MERCHANT.create({
+    params: {
+      merchant, storefront, collection: body.collection ?? null,
+      browserbase: body.browserbase ?? false, llm: body.llm ?? false, vlm: body.vlm ?? false,
+    },
+  });
+  return json({ workflowId: instance.id, merchant, storefront }, 202);
+}
+
 export async function getAgentMemory(env: Env, kind: "room" | "scout", id: string): Promise<Response> {
   const agent = kind === "room" ? await roomAgent(env, id) : await scoutAgent(env, id);
   const res = await agent.fetch("https://agent/memory");

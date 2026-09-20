@@ -27,13 +27,23 @@ import { NonRetryableError } from "cloudflare:workflows";
 import { callUpstream } from "../lib/config";
 import { nowIso } from "../lib/ids";
 import { insertObject } from "../lib/store";
-import { normalizeCatalogItem, enqueueCatalogItem } from "../lib/catalog-ingest";
+import { catalogObjectId, normalizeCatalogItem, enqueueCatalogItem } from "../lib/catalog-ingest";
 
 export interface IngestMerchantParams {
   merchant: string;
   storefront: string;
   collection: string | null;
   apiOrigin?: string;
+  /**
+   * Extraction passes. Default false on purpose: services/ingest returns 503
+   * browserbase_unconfigured when browserbase:true and the key is unset, which failed the whole
+   * merchant rather than losing one pass. The caller states what it is paying for.
+   * ceiling: no probe of the service's GET /health — a caller that asks for a pass the container
+   * cannot run still gets the 503, now with the fix named in the message.
+   */
+  browserbase?: boolean;
+  llm?: boolean;
+  vlm?: boolean;
 }
 
 /** Object v1 as services/ingest returns it (.claude/contracts.md), plus its extraction notes. */
@@ -113,9 +123,9 @@ export class IngestMerchantWorkflow extends WorkflowEntrypoint<Env, IngestMercha
             merchant: p.merchant,
             storefront,
             products: JSON.parse(crawled.productsJson),
-            browserbase: true,
-            llm: true,
-            vlm: false, // the most expensive pass; turn it on per merchant, not by default
+            browserbase: p.browserbase ?? false,
+            llm: p.llm ?? false,
+            vlm: p.vlm ?? false, // the most expensive pass; turn it on per merchant, not by default
           },
           240_000,
         ),
@@ -125,7 +135,8 @@ export class IngestMerchantWorkflow extends WorkflowEntrypoint<Env, IngestMercha
       const at = nowIso();
       let count = 0;
       for (const o of extracted.objects) {
-        const objectId = o.extraction?.imageUrl ? (await normalizeCatalogItem(o)).objectId : o.objectId;
+        // One id rule for every row, with or without an image. See catalogObjectId.
+        const objectId = await catalogObjectId(o);
         // A replay must not demote a previously ready mesh back to measured.
         if (await this.env.DB.prepare("SELECT id FROM objects WHERE id = ?").bind(objectId).first()) {
           count++;

@@ -198,6 +198,7 @@ async function dispatch(
 
   if (m("GET", /^\/v1\/health$/)) return real.getHealth(env);
   if (m("POST", /^\/v1\/catalog\/ingest$/)) return postCatalogIngest(req, env, origin);
+  if (m("POST", /^\/v1\/ingest$/)) return real.postIngestMerchant(req, env);
   if (m("GET", /^\/v1\/health\/upstream$/)) return real.getUpstreamHealth(env);
 
   if (m("POST", /^\/v1\/rooms$/)) return real.postRoom(req, env);

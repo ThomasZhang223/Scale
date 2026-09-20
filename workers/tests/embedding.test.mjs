@@ -16,7 +16,8 @@ registerHooks({ resolve(specifier, context, next) {
 const { embedInput, indexObject } = await import("../src/lib/embedding.ts");
 const { consumeMeshJobs } = await import("../src/lib/queue.ts");
 const { GenerateMeshWorkflow } = await import("../src/workflows/generate-mesh.ts");
-const { postSearch, postGenerate, postObjectMesh, postObjectIndex, postUpload } = await import("../src/routes/index.ts");
+const { postSearch, postGenerate, postObjectMesh, postObjectIndex, postUpload, postIngestMerchant } = await import("../src/routes/index.ts");
+const { catalogObjectId, normalizeCatalogItem } = await import("../src/lib/catalog-ingest.ts");
 const fingerprint = "a".repeat(64);
 const vector = { values: Array(768).fill(1 / Math.sqrt(768)), dimension: 768,
   fingerprint, inputHash: "b".repeat(64), modality: "text" };
@@ -437,4 +438,37 @@ test("postObjectIndex needs the upstream token, then indexes the image at the gi
   assert.deepEqual(await response.json(), { objectId: "object", fingerprint, modality: "image" });
   assert.equal(upserts[0].id, "object");
   assert.equal(upserts[0].metadata.source, "catalog");
+});
+
+// --- Ingest wiring -----------------------------------------------------------------------------
+
+test("one catalogue id rule: productUrl wins, then merchant + productId, then objectId, else 422", async () => {
+  const url = "https://shop.example/products/chair";
+  const fromUrl = await catalogObjectId({ productUrl: url, objectId: "python-uuid5" });
+  assert.match(fromUrl, /^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-a[0-9a-f]{3}-[0-9a-f]{12}$/);
+  assert.notEqual(fromUrl, "python-uuid5");
+  assert.equal(await catalogObjectId({ productUrl: url }), fromUrl);
+  assert.equal(await catalogObjectId({ merchant: "M", productId: 0 }), await catalogObjectId({ merchant: "M", productId: "0" }));
+  assert.notEqual(await catalogObjectId({ merchant: "M", productId: 1 }), await catalogObjectId({ merchant: "M", productId: 2 }));
+  await assert.rejects(catalogObjectId({}), error => error.code === "missing_identity" && error.status === 422);
+  const item = await normalizeCatalogItem({ productUrl: url, merchant: "M", productId: 42, name: "Chair",
+    imageUrl: "https://cdn.example/a.jpg", bboxMeters: { w: 0.5, h: 0.9, d: 0.5 } });
+  assert.equal(item.objectId, fromUrl);
+  assert.equal(item.productId, "42");
+});
+
+test("POST /v1/ingest is token-gated, needs an https storefront and defaults every paid pass to off", async () => {
+  const created = [];
+  const env = { UPSTREAM_TOKEN: "secret", INGEST_MERCHANT: { create: async args => { created.push(args); return { id: "wf-1" }; } } };
+  const call = (headers, body) => postIngestMerchant(new Request("https://api.example/v1/ingest", {
+    method: "POST", headers, body: JSON.stringify(body) }), env);
+  await assert.rejects(call({}, { merchant: "M", storefront: "https://shop.example" }), error => error.status === 401);
+  await assert.rejects(call({ "x-upstream-token": "secret" }, { merchant: "M", storefront: "http://shop.example" }),
+    error => error.code === "bad_storefront");
+  assert.equal(created.length, 0);
+  const response = await call({ "x-upstream-token": "secret" }, { merchant: "M", storefront: "https://shop.example" });
+  assert.equal(response.status, 202);
+  assert.deepEqual(await response.json(), { workflowId: "wf-1", merchant: "M", storefront: "https://shop.example" });
+  assert.deepEqual(created[0].params, { merchant: "M", storefront: "https://shop.example", collection: null,
+    browserbase: false, llm: false, vlm: false });
 });

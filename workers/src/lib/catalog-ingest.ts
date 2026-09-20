@@ -9,8 +9,27 @@ async function stableId(value: unknown): Promise<string> {
   return `${h.slice(0, 8)}-${h.slice(8, 12)}-5${h.slice(13, 16)}-a${h.slice(17, 20)}-${h.slice(20, 32)}`;
 }
 
+/**
+ * The one catalogue identity rule. `stableId` is later than services/ingest/app/identity.py's
+ * uuid5, so it is the id of record and the Python objectId is advisory — the Worker recomputes
+ * the id of every row on arrival, whichever intake path it came through.
+ */
+export async function catalogObjectId(row: {
+  productUrl?: string | null; merchant?: string | null;
+  productId?: string | number | null; objectId?: string | null;
+}): Promise<string> {
+  const identity = row.productUrl
+    || (row.merchant && row.productId != null ? `${row.merchant}:${row.productId}` : row.objectId);
+  if (typeof identity !== "string" || !identity) {
+    throw new HttpError(422, "missing_identity", "Supply productUrl, merchant + productId, or objectId.");
+  }
+  return stableId(identity);
+}
+
 export interface CatalogItem {
   objectId: string;
+  /** With `merchant`, names the R2 key catalog/{merchant}/{productId}/source.jpg. */
+  productId: string | null;
   name: string;
   description: string;
   imageUrl: string;
@@ -32,9 +51,7 @@ export async function normalizeCatalogItem(value: unknown): Promise<CatalogItem>
   if (image.protocol !== "https:" || image.username || image.password) {
     throw new HttpError(422, "bad_image", "imageUrl must be HTTPS without credentials.");
   }
-  const identity = row.productUrl || (row.merchant && row.productId ? `${row.merchant}:${row.productId}` : row.objectId);
-  if (typeof identity !== "string" || !identity) throw new HttpError(422, "missing_identity", "Supply productUrl, merchant + productId, or objectId.");
-  const objectId = await stableId(identity);
+  const objectId = await catalogObjectId(row);
   const name = row.name ?? row.title;
   if (typeof name !== "string" || !name.trim()) throw new HttpError(422, "missing_name", "Supply name or title.");
   const description = row.description ?? row.body_html ?? "";
@@ -42,6 +59,8 @@ export async function normalizeCatalogItem(value: unknown): Promise<CatalogItem>
     throw new HttpError(422, "item_too_large", "Name/image URL/description exceeds its limit.");
   }
   return { objectId, name, description, imageUrl, bboxMeters: row.bboxMeters,
+    productId: row.productId != null ? String(row.productId)
+      : row.extraction?.productId != null ? String(row.extraction.productId) : null,
     category: typeof row.category === "string" ? row.category : "unknown",
     measure: row.measure ?? { method: "extracted", confidence: 0 },
     merchant: row.merchant ?? null, productUrl: row.productUrl ?? null,

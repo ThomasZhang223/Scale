@@ -1,3 +1,4 @@
+import { Buffer } from "node:buffer";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -63,8 +64,10 @@ if (mode === "verify") {
   const h = await health();
   if (!h.meshPipeline.providerConfigured && !flag("--enqueue-only")) throw Error("Provider is unconfigured. Set the secrets or explicitly use --enqueue-only to park jobs.");
   const filename = option("--file", path.join(root, "../services/ingest/prebake/manifest.json"));
-  const doc = JSON.parse(await readFile(filename, "utf8"));
-  const all = Array.isArray(doc) ? doc : doc.products ?? doc.objects ?? doc.items;
+  const text = await readFile(filename, "utf8");
+  const all = filename.endsWith(".ndjson") || filename.endsWith(".jsonl")
+    ? text.split("\n").filter(l => l.trim()).map(l => JSON.parse(l))
+    : (d => Array.isArray(d) ? d : d.products ?? d.objects ?? d.items)(JSON.parse(text));
   if (!Array.isArray(all)) throw Error("Expected an array, products, objects, or items");
   const limit = Number(option("--limit", "1"));
   if (!Number.isInteger(limit) || limit < 1) throw Error("--limit must be a positive integer");
@@ -116,4 +119,35 @@ if (mode === "verify") {
   }
   console.log(`Indexed ${ok} of ${listed.length} (unmatched ${unmatched}, failed ${failed}).`);
   if (failed) process.exitCode = 1;
-} else throw Error("Use verify, submit, or status");
+} else if (mode === "images") {
+  // Uploads catalogue source images to catalog/{merchant}/{productId}/source.jpg, the key
+  // services/gen/app/embedding/catalog_manifest.py asserts. No new route: POST /v1/uploads has
+  // implemented kind "catalogSource" and had no caller.
+  const filename = option("--file", path.join(root, "../services/ingest/prebake/manifest.json"));
+  const doc = JSON.parse(await readFile(filename, "utf8"));
+  const rows = (Array.isArray(doc) ? doc : doc.products ?? []).slice(0, Number(option("--limit", "100")));
+  const dir = option("--images", path.join(root, "../services/ingest/prebake"));
+  let ok = 0, missing = 0, failed = 0;
+  for (const row of rows) {
+    const merchant = row.merchant, productId = row.productId != null ? String(row.productId) : null;
+    if (!merchant || !productId) { missing++; console.error(`SKIP  no merchant/productId: ${row.title}`); continue; }
+    const local = row.r2Key ? path.join(dir, row.r2Key) : null;
+    let bytes;
+    try { bytes = local ? await readFile(local) : null; } catch { bytes = null; }
+    if (!bytes && row.imageUrl) {
+      const r = await fetch(row.imageUrl, { signal: AbortSignal.timeout(60_000) });
+      if (r.ok) bytes = Buffer.from(await r.arrayBuffer());
+    }
+    if (!bytes) { missing++; console.error(`MISS  ${merchant}/${productId}`); continue; }
+    const grant = await (await request(`${base}/v1/uploads`, {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ kind: "catalogSource", merchant, productId }),
+    })).json();
+    try {
+      await request(grant.putUrl, { method: "PUT", headers: { "content-type": "image/jpeg" }, body: bytes });
+      ok++; console.log(`ok    ${grant.key}`);
+    } catch (e) { failed++; console.error(`FAIL  ${grant.key}: ${String(e).slice(0, 120)}`); }
+  }
+  console.log(`uploaded ${ok}, missing ${missing}, failed ${failed}`);
+  if (failed || missing) process.exitCode = 1;
+} else throw Error("Use verify, submit, images, backfill, or status");
