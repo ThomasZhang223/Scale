@@ -291,7 +291,12 @@ async function start() {
       // A preset goes only when a person actually picked one on the laptop panel. With none
       // picked the button's own meaning travels as free text, down the same route a spoken
       // sentence takes — never a stand-in preset, which would be a style nobody asked for.
-      void askAgent(selectedStyle ? { preset: selectedStyle } : { text: 'Rearrange the room.' });
+      //
+      // sampleOnSolverOutage marks this as the BUTTON's request, here at the one place the
+      // button is pressed, rather than by recognising its words later — someone saying
+      // "rearrange the room" out loud is free text and must still fail in view. The spoken
+      // command "rearrange" arrives as this same action, so it is the button and inherits it.
+      void askAgent(selectedStyle ? { preset: selectedStyle } : { text: 'Rearrange the room.' }, { sampleOnSolverOutage: true });
     }
     if (action.startsWith('preset:')) void askAgent({ preset: action.slice(7) });
     if (action === 'turn:left') turnLast(Math.PI / 2);
@@ -836,12 +841,12 @@ async function start() {
     await agent.syncState(state);
   }
 
-  async function askAgent(req: { preset?: string; text?: string }) {
+  async function askAgent(req: { preset?: string; text?: string }, options: { sampleOnSolverOutage?: boolean } = {}) {
     if (!currentRoom) return say('Load a room first.');
     await syncAgentState();
     // The agent pins by objectId (services/agent clean.ts); what the hands hold are placement ids.
     const pins = interaction.heldIds().map((id) => objects.get(id)?.objectId ?? id);
-    await agent.request({ ...req, pins });
+    await agent.request({ ...req, pins }, options);
   }
 
   /** The object (placed or detected) a proposal talks about; the offline fixture uses obj_<category>. */

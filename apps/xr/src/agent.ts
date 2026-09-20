@@ -43,6 +43,19 @@ export interface AgentRequest {
   pins: string[];
 }
 
+/**
+ * The one failure that the Rearrange button answers with the sample instead of an error.
+ * The sentence is thrown by services/agent/src/pipeline/loop.ts:154 ("The layout solver isn't
+ * reachable right now.") and reaches us as prose, so this is a coupling to another service's
+ * wording: reword it there and this fallback stops firing, silently.
+ * ceiling: the sample is a stage fallback for a solver behind a laptop tunnel. The upgrade is
+ * a machine-readable failure code on agent.failed, or widening the `body.preset` condition at
+ * services/agent/src/agent.ts:230 so the service covers a text request as it does a preset.
+ * Both apostrophes are matched on purpose — loop.ts writes "isn't" and the fixture in
+ * agent.test.ts writes "isn’t", and either can arrive.
+ */
+const SOLVER_UNREACHABLE = /solver isn['’]t reachable/i;
+
 export const PRESETS: { id: string; label: string }[] = [
   { id: 'tidy_room', label: 'Rearrange' },
   { id: 'cozy', label: 'Cozy' },
@@ -84,6 +97,12 @@ export class AgentClient {
   private snap: AgentSnapshot = { state: 'idle', status: '', log: [], proposal: null, error: null, currentVersionId: null, offline: false, solver: 'unknown' };
   private requestId: string | null = null;
   private lastRequest: AgentRequest | null = null;
+  /**
+   * Whether the request in flight may fall back to the built-in sample when the layout solver
+   * is unreachable. Deliberately beside `lastRequest` and not inside it: request() serialises
+   * the request record onto the wire, and services/agent has no such field to read.
+   */
+  private sampleOnSolverOutage = false;
   private closeEvents: (() => void) | null = null;
   private seen = new Set<string>();
   private pollTimer: ReturnType<typeof setTimeout> | undefined;
@@ -138,9 +157,16 @@ export class AgentClient {
 
   // ---------- a request ----------
 
-  async request(req: AgentRequest): Promise<void> {
+  /**
+   * @param options.sampleOnSolverOutage the caller is the Rearrange BUTTON, which asks for no
+   *   layout in particular, so the built-in sample is an honest answer to it when the solver
+   *   is down. Never set for a spoken or typed sentence: a canned layout offered as the answer
+   *   to a specific request is a wrong answer dressed as a right one.
+   */
+  async request(req: AgentRequest, options: { sampleOnSolverOutage?: boolean } = {}): Promise<void> {
     if (this.snap.state === 'working' || this.snap.state === 'applying') return;
     this.lastRequest = req;
+    this.sampleOnSolverOutage = options.sampleOnSolverOutage ?? false;
     this.seen.clear();
     this.set({ state: 'working', status: 'Sending…', log: [], proposal: null, error: null });
     try {
@@ -165,14 +191,25 @@ export class AgentClient {
     }
   }
 
-  private offlineFallback() {
+  /**
+   * The committed sample proposal, always announced as a sample. Two things reach here: the
+   * agent worker being unreachable at all ("Offline"), and the worker answering but its layout
+   * solver being down under a Rearrange button press ("Solver offline").
+   */
+  private offlineFallback(reason = 'Offline') {
     const proposal = this.opts.offlineProposal;
     if (!proposal) {
-      this.set({ state: 'failed', status: 'Offline', error: 'The agent isn’t reachable.', offline: true });
+      this.set({ state: 'failed', status: reason, error: 'The agent isn’t reachable.', offline: true });
       return;
     }
     this.requestId = proposal.requestId;
-    this.set({ state: 'proposed', status: 'Offline: showing the sample proposal', proposal, offline: true, log: [{ at: new Date().toISOString(), kind: 'decision', message: 'Offline: showing the sample proposal.', severity: 'warn' }] });
+    this.set({
+      state: 'proposed',
+      status: `${reason}: showing the sample proposal`,
+      proposal,
+      offline: true,
+      log: [{ at: new Date().toISOString(), kind: 'decision', message: `${reason}: showing the sample proposal.`, severity: 'warn' }],
+    });
   }
 
   private listen() {
@@ -219,7 +256,13 @@ export class AgentClient {
     }
     if (event === 'agent.failed' && this.snap.state === 'working') {
       this.stopWaiting();
-      this.set({ state: 'failed', status: 'Failed', error: d.message ?? 'The request failed.' });
+      const message = d.message ?? 'The request failed.';
+      // The Rearrange button used to send a preset, and services/agent answers a preset whose
+      // solve failed with its own built-in sample. The button now sends free text, which that
+      // fallback does not cover, so the same safety net is kept here for the same press. Only
+      // for the button, and only for this one failure: everything else still fails in view.
+      if (this.sampleOnSolverOutage && SOLVER_UNREACHABLE.test(message)) return this.offlineFallback('Solver offline');
+      this.set({ state: 'failed', status: 'Failed', error: message });
     }
   }
 
