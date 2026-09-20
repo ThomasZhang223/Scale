@@ -36,7 +36,7 @@ function mean(values: number[]): number | null {
 }
 
 export function roomFromPhotos(faces: PhotoFaces, heightMeters: number): PhotoRoom {
-  if (!(heightMeters > 1 && heightMeters < 10)) throw new Error("Enter the ceiling height in metres, between 1 and 10.");
+  if (!(heightMeters >= 1 && heightMeters <= 10)) throw new Error("Ceiling height must be between 100 and 1000 cm.");
   // A face whose rectangle was found with a metric aspect is exact; the rest are approximate.
   // Exact faces win the axis when present; approximate ones are used only when nothing better
   // exists, and reported.

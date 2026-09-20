@@ -4,6 +4,8 @@ import { List, Button, Text, Image, HStack, Spacer } from "@expo/ui/swift-ui";
 import { withTabFade } from "../../src/ui/TabFade";
 
 import { GlassHost, GlassSection, glassList } from "../../src/ui/glass";
+import { View } from "react-native";
+import { PageHeading } from "../../src/ui/Logo";
 
 import { API_BASE, getJSON, postJSON } from "../../src/lib/api";
 import { subscribeRoomSync } from "../../src/lib/sse";
@@ -83,7 +85,11 @@ function HeadsetScreen() {
   }
 
   return (
-    <GlassHost>
+    <View style={{ flex: 1, backgroundColor: "#e8edf4" }}>
+      <View style={{ paddingHorizontal: 16, paddingTop: 56 }}>
+        <PageHeading title="Headset" />
+      </View>
+      <GlassHost>
       <List modifiers={glassList}>
         <GlassSection title="Headset" divided={false}>
           <HStack>
@@ -104,7 +110,8 @@ function HeadsetScreen() {
           <Metric label="Sync (SSE)" value={sse} />
         </GlassSection>
       </List>
-    </GlassHost>
+      </GlassHost>
+    </View>
   );
 }
 

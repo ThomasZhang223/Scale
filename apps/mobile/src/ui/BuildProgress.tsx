@@ -9,6 +9,7 @@ import { useEffect, useRef } from "react";
 import { Animated, Easing, StyleSheet, Text, View } from "react-native";
 
 import { colors, spacing } from "../theme/tokens";
+import { LogoAnimated } from "./LogoAnimated";
 
 type BuildProgressProps = {
   fraction: number; // 0..1
@@ -20,27 +21,7 @@ const RING = 148;
 const STROKE = 10;
 
 export function BuildProgress({ fraction, title, detail }: BuildProgressProps) {
-  const spin = useRef(new Animated.Value(0)).current;
-  const pulse = useRef(new Animated.Value(0)).current;
   const width = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.timing(spin, { toValue: 1, duration: 1400, easing: Easing.linear, useNativeDriver: true })
-    );
-    const breathe = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulse, { toValue: 1, duration: 900, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
-        Animated.timing(pulse, { toValue: 0, duration: 900, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
-      ])
-    );
-    loop.start();
-    breathe.start();
-    return () => {
-      loop.stop();
-      breathe.stop();
-    };
-  }, [spin, pulse]);
 
   useEffect(() => {
     Animated.timing(width, {
@@ -51,21 +32,14 @@ export function BuildProgress({ fraction, title, detail }: BuildProgressProps) {
     }).start();
   }, [fraction, width]);
 
-  const rotate = spin.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "360deg"] });
-  const scale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.06] });
   const pct = Math.round(fraction * 100);
 
   return (
     <View style={styles.screen}>
       <View style={styles.center}>
-        {/* A spinning arc around a breathing disc: motion that says "working",
-            with the number inside so the eye has one place to rest. */}
-        <View style={styles.ringWrap}>
-          <Animated.View style={[styles.arc, { transform: [{ rotate }] }]} />
-          <Animated.View style={[styles.disc, { transform: [{ scale }] }]}>
-            <Text style={styles.pct}>{pct}%</Text>
-          </Animated.View>
-        </View>
+        {/* The mark assembling and breathing: the app's own "working" motion. */}
+        <LogoAnimated size={RING} />
+        <Text style={styles.pct}>{pct}%</Text>
 
         <Text style={styles.title}>{title}</Text>
         <Text style={styles.detail}>{detail}</Text>
@@ -92,30 +66,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     gap: spacing.sm,
   },
-  ringWrap: { width: RING, height: RING, alignItems: "center", justifyContent: "center", marginBottom: spacing.md },
-  arc: {
-    position: "absolute",
-    width: RING,
-    height: RING,
-    borderRadius: RING / 2,
-    borderWidth: STROKE,
-    borderColor: "rgba(90,200,250,0.18)",
-    borderTopColor: colors.lidar,
-    borderRightColor: colors.accent,
-  },
-  disc: {
-    width: RING - STROKE * 2 - 14,
-    height: RING - STROKE * 2 - 14,
-    borderRadius: RING,
-    backgroundColor: "white",
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#1c1c1e",
-    shadowOpacity: 0.08,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 6 },
-  },
-  pct: { fontSize: 32, fontWeight: "600", color: "#1c1c1e", fontVariant: ["tabular-nums"], letterSpacing: -0.5 },
+  pct: { fontSize: 32, fontWeight: "600", color: "#1c1c1e", fontVariant: ["tabular-nums"], letterSpacing: -0.5, marginTop: spacing.sm },
   title: { fontSize: 20, fontWeight: "600", color: "#1c1c1e", textAlign: "center" },
   detail: { fontSize: 15, color: "rgba(60,60,67,0.6)", textAlign: "center", lineHeight: 21 },
   track: {

@@ -11,6 +11,7 @@ import { CameraGlass, GlassButton, GlassCloseButton } from "../../src/theme/Glas
 import { colors, spacing } from "../../src/theme/tokens";
 import { BuildProgress } from "../../src/ui/BuildProgress";
 import { saveObjectPhoto, saveObjectUsdz } from "../../src/ui/objectFiles";
+import { Logo } from "../../src/ui/Logo";
 import { Readout, ReadoutHint } from "../../src/ui/Readout";
 
 type Phase = ObjectCaptureState | "reconstructing" | "done" | "saving";
@@ -187,6 +188,7 @@ export default function CaptureObject3DScreen() {
       <SafeAreaView style={styles.chrome} pointerEvents="box-none">
         <View style={styles.top} pointerEvents="box-none">
           <GlassCloseButton dark={light} onPress={() => router.back()} />
+          <Logo size={26} mono={!light} style={styles.mark} />
           {phase === "capturing" && shots.max > 0 ? (
             <CameraGlass style={styles.shotsPill}>
               <Text style={styles.shotsText}>
@@ -270,6 +272,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "black" },
   screenLight: { backgroundColor: "#f6f8fb" },
   chrome: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, justifyContent: "space-between" },
+  mark: { position: "absolute", left: 0, right: 0, top: spacing.sm + 7, alignSelf: "center", marginHorizontal: "auto" },
   top: {
     flexDirection: "row",
     justifyContent: "space-between",

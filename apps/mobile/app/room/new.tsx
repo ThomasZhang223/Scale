@@ -46,7 +46,8 @@ export default function NewRoomFromPhotosScreen() {
   // A width (front or back) AND a depth (left or right); any two walls is not enough.
   const hasWidth = Boolean(faces.front || faces.back);
   const hasDepth = Boolean(faces.left || faces.right);
-  const ready = hasWidth && hasDepth && heightM > 1 && !saving;
+  const heightOk = heightM >= 1 && heightM <= 10; // 100–1000 cm; typical rooms are 240–300
+  const ready = hasWidth && hasDepth && heightOk && !saving;
 
   const build = useCallback(async () => {
     setSaving(true);
@@ -110,7 +111,7 @@ export default function NewRoomFromPhotosScreen() {
           <TextInput
             value={heightCm}
             onChangeText={setHeightCm}
-            placeholder="e.g. 260"
+            placeholder="typically 240–300"
             placeholderTextColor="rgba(60,60,67,0.4)"
             keyboardType="decimal-pad"
             style={styles.input}
@@ -124,7 +125,7 @@ export default function NewRoomFromPhotosScreen() {
         <Text style={styles.status}>{wallCount} of 4 walls{faces.floor ? " · floor" : ""}{faces.ceiling ? " · ceiling" : ""}</Text>
         <Pressable disabled={!ready} onPress={build} style={({ pressed }) => [styles.build, !ready && styles.buildDisabled, pressed && styles.pressed]}>
           <Text style={styles.buildText}>
-            {saving ? "Building…" : !(hasWidth && hasDepth) ? "Add two adjacent walls to start" : !(heightM > 1) ? "Enter the ceiling height" : "Build the room"}
+            {saving ? "Building…" : !(hasWidth && hasDepth) ? "Add two adjacent walls to start" : !heightOk ? "Enter the ceiling height (100–1000 cm)" : "Build the room"}
           </Text>
         </Pressable>
       </Card>

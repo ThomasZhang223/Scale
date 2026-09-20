@@ -3,6 +3,9 @@ import { StatusBar } from "expo-status-bar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
+import { HeaderTitle } from "../src/ui/Logo";
+import { Splash } from "../src/ui/Splash";
+
 // ceiling: no SSE provider wired here yet. The route tree in the plan (section
 // 8) puts one at this level, but it lives in src/lib/sse.ts, which is Panel
 // B's file and does not exist until Panel B's first commit. Wrap <Stack> with
@@ -27,15 +30,16 @@ export default function RootLayout() {
           }}
         >
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="room/[id]" options={{ title: "Room" }} />
-          <Stack.Screen name="room/new" options={{ title: "New room from photos" }} />
-          <Stack.Screen name="object/[id]" options={{ title: "Object" }} />
-          <Stack.Screen name="ar/[objectId]" options={{ title: "View at 1:1" }} />
+          <Stack.Screen name="room/[id]" options={{ headerTitle: () => <HeaderTitle title="Room" /> }} />
+          <Stack.Screen name="room/new" options={{ headerTitle: () => <HeaderTitle title="New room from photos" /> }} />
+          <Stack.Screen name="object/[id]" options={{ headerTitle: () => <HeaderTitle title="Object" /> }} />
+          <Stack.Screen name="ar/[objectId]" options={{ headerTitle: () => <HeaderTitle title="View at 1:1" /> }} />
           <Stack.Screen name="capture/room" options={{ headerShown: false }} />
           <Stack.Screen name="capture/object" options={{ headerShown: false }} />
           <Stack.Screen name="capture/object3d" options={{ headerShown: false }} />
           <Stack.Screen name="capture/box" options={{ headerShown: false }} />
         </Stack>
+        <Splash />
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

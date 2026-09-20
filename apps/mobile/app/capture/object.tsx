@@ -16,6 +16,7 @@ import { postJSON, putUpload } from "../../src/lib/api";
 import { GlassButton, GlassCloseButton } from "../../src/theme/Glass";
 import { spacing } from "../../src/theme/tokens";
 import { saveObjectPhoto } from "../../src/ui/objectFiles";
+import { Logo } from "../../src/ui/Logo";
 import { Readout, ReadoutHint } from "../../src/ui/Readout";
 
 type Phase = "idle" | "measuring" | "measured" | "uploading";
@@ -148,6 +149,7 @@ export default function CaptureObjectScreen() {
       <SafeAreaView style={styles.chrome} pointerEvents="box-none">
         <View style={styles.top} pointerEvents="box-none">
           <GlassCloseButton onPress={() => router.back()} />
+          <Logo size={26} mono style={styles.mark} />
         </View>
 
         <View style={styles.footer} pointerEvents="box-none">
@@ -171,6 +173,7 @@ export default function CaptureObjectScreen() {
 
 const styles = StyleSheet.create({
   chrome: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, justifyContent: "space-between" },
+  mark: { position: "absolute", left: 0, right: 0, top: spacing.sm + 7, alignSelf: "center", marginHorizontal: "auto" },
   top: { flexDirection: "row", justifyContent: "flex-start", paddingHorizontal: spacing.md, paddingTop: spacing.sm },
   footer: {
     alignItems: "center",

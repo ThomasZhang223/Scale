@@ -1,29 +1,17 @@
-// A centred native spinner, for the brief window between a screen mounting
-// and its fixture-backed fetch resolving. Shared by both library screens
-// and both detail screens — four call sites.
-import { ProgressView, Spacer, VStack } from "@expo/ui/swift-ui";
+// The wait between a screen mounting and its fetch resolving: the mark assembling on the
+// app's backdrop. Shared by every screen that fetches.
+import { StyleSheet, View } from "react-native";
 
-import { GlassHost } from "./glass";
-import { StyleSheet } from "react-native";
+import { LogoAnimated } from "./LogoAnimated";
 
 export function LoadingView() {
   return (
-    <GlassHost style={styles.host}>
-      {/* SwiftUI centres a VStack's children on the cross axis by default;
-          a leading and trailing Spacer is the standard way to also centre
-          on the main axis, without guessing at a frame(maxHeight: .infinity)
-          binding from the JS side. */}
-      <VStack>
-        <Spacer />
-        <ProgressView />
-        <Spacer />
-      </VStack>
-    </GlassHost>
+    <View style={styles.screen}>
+      <LogoAnimated size={140} />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  host: {
-    flex: 1,
-  },
+  screen: { flex: 1, backgroundColor: "#e8edf4", alignItems: "center", justifyContent: "center" },
 });

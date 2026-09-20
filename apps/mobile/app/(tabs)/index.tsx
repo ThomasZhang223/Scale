@@ -7,15 +7,16 @@ import { withTabFade } from "../../src/ui/TabFade";
 import { getJSON } from "../../src/lib/api";
 import { Card } from "../../src/ui/Card";
 import { colors, radius, spacing } from "../../src/theme/tokens";
-import { DEMO_ROOM_ID } from "../../src/ui/demoIds";
+import { DEMO_ROOM_ID, SEED_ROOM_IDS } from "../../src/ui/demoIds";
 import { EmptyState } from "../../src/ui/EmptyState";
 import { ErrorView } from "../../src/ui/ErrorView";
 import { RoomInsideView } from "../../src/ui/RoomInsideView";
 import { GlassHost } from "../../src/ui/glass";
 import { LoadingView } from "../../src/ui/LoadingView";
-import { activeRoomId, localRoomIds, roomPhotoUri, setActiveRoomId } from "../../src/ui/roomPhotos";
+import { activeRoomId, localRoomIds, roomPhotoSource, setActiveRoomId } from "../../src/ui/roomPhotos";
 import { setActiveRoomOnHeadset } from "../../src/lib/devServer";
 import { SymbolView as Symbol } from "expo-symbols";
+import { PageHeading } from "../../src/ui/Logo";
 import type { RoomCaptureV1, VersionSummary } from "../../src/ui/types";
 import { useFetchState } from "../../src/ui/useFetchState";
 
@@ -49,7 +50,7 @@ async function fetchRoomsPayload(): Promise<RoomsPayload> {
   // Rooms built on this phone (photo upload, wall capture): live reads, newest first. One
   // failing id does not hide the rest, but it is reported, not dropped (CLAUDE.md "Fail loud").
   const local = await Promise.all(
-    localRoomIds().map((id) =>
+    [...localRoomIds(), ...SEED_ROOM_IDS.filter((id) => !localRoomIds().includes(id))].map((id) =>
       getJSON<RoomCaptureV1>(`/v1/rooms/${id}`, { schemaLabel: "RoomCapture v1" }).then(
         (r) => ({ room: r }),
         (err: unknown) => ({ id, error: err instanceof Error ? err.message : String(err) })
@@ -129,18 +130,20 @@ function RoomsScreen() {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content} contentInsetAdjustmentBehavior="automatic">
-      <View style={styles.headingRow}>
-        <Text style={styles.heading}>Rooms</Text>
-        <Pressable onPress={() => router.push("/room/new")} style={({ pressed }) => [styles.newButton, pressed && styles.pressed]}>
-          <Symbol name="photo.on.rectangle.angled" size={15} tintColor="white" weight="semibold" />
-          <Text style={styles.newButtonText}>New from photos</Text>
-        </Pressable>
-      </View>
+      <PageHeading
+        title="Rooms"
+        right={
+          <Pressable onPress={() => router.push("/room/new")} style={({ pressed }) => [styles.newButton, pressed && styles.pressed]}>
+            <Symbol name="photo.on.rectangle.angled" size={15} tintColor="white" weight="semibold" />
+            <Text style={styles.newButtonText}>New from photos</Text>
+          </Pressable>
+        }
+      />
       {failed.length > 0 ? (
         <Text style={styles.warn}>{`${failed.length} room${failed.length === 1 ? "" : "s"} on this phone could not be loaded: ${failed[0].error}`}</Text>
       ) : null}
       {rooms.map((r) => {
-        const photo = roomPhotoUri(r.roomId);
+        const photo = roomPhotoSource(r.roomId);
         const isSelected = selected === r.roomId;
         return (
           <Pressable
@@ -152,7 +155,7 @@ function RoomsScreen() {
             <Card style={[styles.card, isSelected && styles.cardSelected]}>
               <View style={styles.header}>
                 {photo ? (
-                  <Image source={{ uri: photo }} style={styles.photo} resizeMode="cover" />
+                  <Image source={photo} style={styles.photo} resizeMode="cover" />
                 ) : (
                   <RoomInsideView room={r} width={cardWidth} />
                 )}

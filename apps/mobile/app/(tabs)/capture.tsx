@@ -5,6 +5,7 @@ import { SymbolView, type SFSymbol } from "expo-symbols";
 import { withTabFade } from "../../src/ui/TabFade";
 
 import { colors, radius, spacing } from "../../src/theme/tokens";
+import { PageHeading } from "../../src/ui/Logo";
 
 // Three equal white tiles, centred on the page, no favourite among them.
 function CaptureHubScreen() {
@@ -17,6 +18,7 @@ function CaptureHubScreen() {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content} contentInsetAdjustmentBehavior="automatic">
+      <PageHeading title="Capture" />
       <View style={styles.tiles}>
         <Tile
           title="Photograph the walls"
@@ -56,8 +58,8 @@ function Tile({ title, detail, icon, onPress }: { title: string; detail: string;
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#e8edf4" },
-  content: { flexGrow: 1, padding: spacing.md, paddingTop: spacing.xl * 2, paddingBottom: spacing.xl * 3, justifyContent: "center" },
-  tiles: { gap: spacing.md },
+  content: { flexGrow: 1, padding: spacing.md, paddingTop: spacing.sm, paddingBottom: spacing.xl * 3, gap: spacing.xl },
+  tiles: { gap: spacing.md, marginTop: spacing.xl },
   // Solid white, rounded, a whisper of edge: the glass wrapper was invisible
   // on this backdrop (Liquid Glass with nothing behind it to refract).
   tile: {

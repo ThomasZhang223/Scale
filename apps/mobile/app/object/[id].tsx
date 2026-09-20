@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { View, StyleSheet } from "react-native";
+import { Image, View, StyleSheet } from "react-native";
 import { Host, List, Button, Gauge, Text, Link, ZStack } from "@expo/ui/swift-ui";
 
 import { GlassSection, backdrop, glassList } from "../../src/ui/glass";
@@ -24,6 +24,7 @@ import { formatLengthCm } from "../../src/lib/units";
 import { StaticThumbnail } from "../../src/three/StaticThumbnail";
 import { ModelPreviewView } from "../../modules/object-capture";
 import { objectUsdzUri } from "../../src/ui/objectFiles";
+import { catalogImage, catalogImageSync, merchantName } from "../../src/ui/catalogImages";
 
 // ceiling: Object v1 has no live progressPct — that lives on GET
 // /jobs/{id}, keyed by a jobId that POST /objects/{id}/generate mints per
@@ -49,6 +50,19 @@ export default function ObjectDetailScreen() {
   const router = useRouter();
   const [state, retry] = useFetchState(() => getObject(id), [id]);
   const [job, setJob] = useState<{ jobId: string; progressPct: number; error: string | null } | null>(null);
+  // A catalog listing's own product photo, from the manifest at once or the store's product
+  // JSON shortly after (src/ui/catalogImages.ts). Scans have no listing and skip this.
+  const [photo, setPhoto] = useState<string | null>(null);
+  const productUrl = state.status === "ready" ? state.data.productUrl : null;
+  const source = state.status === "ready" ? state.data.source : null;
+  useEffect(() => {
+    if (source !== "catalog" || !productUrl) return;
+    const quick = catalogImageSync(productUrl, 1000);
+    if (quick) { setPhoto(quick); return; }
+    let live = true;
+    catalogImage(productUrl, 1000).then((u) => { if (live) setPhoto(u); });
+    return () => { live = false; };
+  }, [productUrl, source]);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Generate → poll GET /jobs/{id} every 2 s → refetch the object when the job finishes so the
@@ -105,6 +119,8 @@ export default function ObjectDetailScreen() {
       <View style={styles.previewWrap}>
         {usdz ? (
           <ModelPreviewView url={usdz} style={styles.model} />
+        ) : photo ? (
+          <Image source={{ uri: photo }} style={styles.photo} resizeMode="contain" />
         ) : (
           <StaticThumbnail bboxMeters={object.bboxMeters} />
         )}
@@ -122,7 +138,7 @@ export default function ObjectDetailScreen() {
 
           {object.source === "catalog" ? (
             <GlassSection title="Listing">
-              {object.merchant ? <Metric label="Merchant" value={object.merchant} /> : null}
+              {object.merchant ? <Metric label="Merchant" value={merchantName(object.merchant)} /> : null}
               {price ? <Metric label="Price" value={price} /> : null}
               <Metric label="Category" value={object.category} />
               {object.productUrl ? (
@@ -187,6 +203,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
   },
   model: { width: "100%", aspectRatio: 1.15 },
+  photo: { width: "88%", aspectRatio: 1, borderRadius: 24, backgroundColor: "white" },
   host: {
     flex: 1,
   },

@@ -3,6 +3,8 @@
     "name": "Full Scale",
     "slug": "full-scale",
     "scheme": "fullscale",
+    "icon": "./assets/icon.png",
+    "splash": { "image": "./assets/scale-logo.png", "resizeMode": "contain", "backgroundColor": "#e8edf4", "imageWidth": 200 },
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",

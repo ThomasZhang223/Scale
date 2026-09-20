@@ -9,6 +9,7 @@ import { postJSON } from "../../src/lib/api";
 import { CameraGlass, GlassButton, GlassCloseButton } from "../../src/theme/Glass";
 import { colors, radius, spacing } from "../../src/theme/tokens";
 import { Card } from "../../src/ui/Card";
+import { Logo } from "../../src/ui/Logo";
 import { FaceNet, FACES as NET } from "../../src/ui/FaceNet";
 import { ReadoutHint } from "../../src/ui/Readout";
 import { roomFromFaces } from "../../src/ui/roomFromFaces";
@@ -132,7 +133,10 @@ export default function CaptureBoxScreen() {
       <SafeAreaView style={styles.safe}>
         <View style={styles.header}>
           <GlassCloseButton dark onPress={() => router.back()} />
-          <Text style={styles.title}>Photograph the walls</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <Logo size={24} />
+            <Text style={styles.title}>Photograph the walls</Text>
+          </View>
           <View style={{ width: 40 }} />
         </View>
         <Text style={styles.lead}>Tap a face, fit the whole of it in the frame, capture. Four walls make a room.</Text>

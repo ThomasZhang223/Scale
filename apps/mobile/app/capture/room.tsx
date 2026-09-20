@@ -8,6 +8,7 @@ import type { RoomCaptureProgressEvent, RoomCaptureResult } from "../../modules/
 import { postJSON } from "../../src/lib/api";
 import { CameraGlass, GlassButton, GlassCloseButton } from "../../src/theme/Glass";
 import { spacing } from "../../src/theme/tokens";
+import { Logo } from "../../src/ui/Logo";
 import { saveRoomPhoto } from "../../src/ui/roomPhotos";
 
 // Full-screen RoomPlan sweep. The camera feed and the instruction text are
@@ -94,6 +95,7 @@ export default function CaptureRoomScreen() {
       <SafeAreaView style={styles.chrome} pointerEvents="box-none">
         <View style={styles.top} pointerEvents="box-none">
           <GlassCloseButton onPress={() => router.back()} />
+          <Logo size={26} mono style={styles.mark} />
         </View>
 
         <View style={styles.footer} pointerEvents="box-none">
@@ -130,6 +132,7 @@ function Count({ value, label }: { value: number; label: string }) {
 
 const styles = StyleSheet.create({
   chrome: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, justifyContent: "space-between" },
+  mark: { position: "absolute", left: 0, right: 0, top: spacing.sm + 7, alignSelf: "center", marginHorizontal: "auto" },
   top: { flexDirection: "row", justifyContent: "flex-start", paddingHorizontal: spacing.md, paddingTop: spacing.sm },
   footer: {
     alignItems: "center",

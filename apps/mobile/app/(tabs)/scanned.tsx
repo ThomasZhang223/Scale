@@ -12,6 +12,7 @@ import { colors, radius, spacing } from "../../src/theme/tokens";
 import { ErrorView } from "../../src/ui/ErrorView";
 import { LoadingView } from "../../src/ui/LoadingView";
 import { ObjectCard } from "../../src/ui/ObjectCard";
+import { Logo, PageHeading } from "../../src/ui/Logo";
 import { listObjects } from "../../src/ui/objectsApi";
 import { useFetchState } from "../../src/ui/useFetchState";
 
@@ -42,7 +43,7 @@ function ScannedScreen() {
     // Flat on the backdrop, centred: an invitation, not a card.
     return (
       <View style={styles.empty}>
-        <SymbolView name="cube.transparent" size={56} tintColor="rgba(60,60,67,0.45)" weight="light" />
+        <Logo size={64} />
         <Text style={styles.emptyTitle}>No scans yet</Text>
         <Text style={styles.emptyText}>Capture an object in 3D or measure one with a tap. It appears here right away.</Text>
         <Pressable onPress={() => router.push("/capture/object3d")} style={({ pressed }) => [styles.emptyButton, pressed && styles.pressed]}>
@@ -60,7 +61,7 @@ function ScannedScreen() {
       contentInsetAdjustmentBehavior="automatic"
       refreshControl={<RefreshControl refreshing={false} onRefresh={retry} />}
     >
-      <Text style={styles.heading}>Scanned</Text>
+      <PageHeading title="Scanned" />
       <Card style={styles.card}>
         {objects.map((object, i) => (
           <View key={object.objectId} style={i > 0 && styles.divider}>

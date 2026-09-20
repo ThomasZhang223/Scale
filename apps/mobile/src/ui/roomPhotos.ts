@@ -6,6 +6,8 @@
 // and a `photoUrl` on RoomCapture v1 via the schema-change protocol.
 import { Directory, File, Paths } from "expo-file-system";
 
+import { DEMO_ROOM_ID } from "./demoIds";
+
 function roomsDir(): Directory {
   return new Directory(Paths.document, "rooms");
 }
@@ -29,6 +31,20 @@ export function roomPhotoUri(roomId: string): string | null {
   } catch {
     return null;
   }
+}
+
+// The demo room was scanned before this phone kept photos; its photo ships with the app.
+// ceiling: one bundled image for one fixture id. A real photo field on RoomCapture v1 is the
+// upgrade path (schema-change protocol, Thomas).
+const BUNDLED_ROOM_PHOTOS: Record<string, number> = {
+  [DEMO_ROOM_ID]: require("../../assets/room-demo-hero.png"),
+  // The seeded studio (3.2 × 4.5 × 2.6 m), see SEED_ROOM_IDS in demoIds.ts.
+  "d1f43c52-23b2-4f2c-afb7-721d50b798cc": require("../../assets/room-seed-studio.png"),
+};
+export function roomPhotoSource(roomId: string): { uri: string } | number | null {
+  const local = roomPhotoUri(roomId);
+  if (local) return { uri: local };
+  return BUNDLED_ROOM_PHOTOS[roomId] ?? null;
 }
 
 // --- Rooms made on this phone -------------------------------------------------------------

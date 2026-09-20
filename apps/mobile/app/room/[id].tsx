@@ -11,7 +11,7 @@ import { ErrorView } from "../../src/ui/ErrorView";
 import { FloorPlan } from "../../src/ui/FloorPlan";
 import { LoadingView } from "../../src/ui/LoadingView";
 import { Metric } from "../../src/ui/Metric";
-import { roomFaces, roomPhotoUri } from "../../src/ui/roomPhotos";
+import { roomFaces, roomPhotoSource } from "../../src/ui/roomPhotos";
 import { StitchedRoom } from "../../src/ui/StitchedRoom";
 import { RoomInsideView } from "../../src/ui/RoomInsideView";
 import { ApiError } from "../../src/lib/api";
@@ -59,7 +59,7 @@ export default function RoomDetailScreen() {
   const doors = room.openings.filter((o) => o.kind === "door");
   const windows = room.openings.filter((o) => o.kind === "window");
   const planWidth = width - spacing.md * 2;
-  const photo = roomPhotoUri(room.roomId);
+  const photo = roomPhotoSource(room.roomId);
   const faces = roomFaces(room.roomId);
   const stitched = ["left", "front", "right", "back"].some((f) => faces.uris[f]);
 
@@ -68,7 +68,7 @@ export default function RoomDetailScreen() {
       {stitched ? (
         <StitchedRoom uris={faces.uris} meta={faces.meta} />
       ) : photo ? (
-        <Image source={{ uri: photo }} style={styles.photo} resizeMode="cover" />
+        <Image source={photo} style={styles.photo} resizeMode="cover" />
       ) : (
         <View style={styles.inside}>
           <RoomInsideView room={room} width={planWidth} />

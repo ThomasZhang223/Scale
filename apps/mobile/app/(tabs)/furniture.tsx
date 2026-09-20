@@ -15,6 +15,8 @@ import { ErrorView } from "../../src/ui/ErrorView";
 import { LoadingView } from "../../src/ui/LoadingView";
 import { ObjectCard } from "../../src/ui/ObjectCard";
 import { formatPrice, listObjects, merchantsOf, UNLABELLED_MERCHANT } from "../../src/ui/objectsApi";
+import { merchantName } from "../../src/ui/catalogImages";
+import { PageHeading } from "../../src/ui/Logo";
 import type { ObjectV1 } from "../../src/ui/types";
 import { useFetchState } from "../../src/ui/useFetchState";
 
@@ -24,7 +26,7 @@ function matches(o: ObjectV1, query: string): boolean {
   return (
     o.name.toLowerCase().includes(q) ||
     o.category.toLowerCase().includes(q) ||
-    (o.merchant ?? UNLABELLED_MERCHANT).toLowerCase().includes(q) ||
+    merchantName(o.merchant ?? UNLABELLED_MERCHANT).toLowerCase().includes(q) ||
     (o.caption ?? "").toLowerCase().includes(q)
   );
 }
@@ -59,7 +61,7 @@ function FurnitureScreen() {
       stickyHeaderIndices={[1]}
       refreshControl={<RefreshControl refreshing={false} onRefresh={retry} />}
     >
-      <Text style={styles.heading}>Furniture</Text>
+      <PageHeading title="Furniture" />
 
       {/* Glass works here because the list scrolls under it. Merchant filtering
           is by text now: type a merchant's name and its rows match. */}
@@ -96,7 +98,7 @@ function FurnitureScreen() {
             <View key={object.objectId} style={i > 0 && styles.divider}>
               <ObjectCard
                 object={object}
-                subtitle={`${object.merchant ?? UNLABELLED_MERCHANT} · ${object.category}`}
+                subtitle={`${merchantName(object.merchant ?? UNLABELLED_MERCHANT)} · ${object.category}`}
                 trailing={formatPrice(object.price)}
                 onPress={() => router.push({ pathname: "/object/[id]", params: { id: object.objectId } })}
               />

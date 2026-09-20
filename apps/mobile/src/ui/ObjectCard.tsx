@@ -2,11 +2,13 @@
 // price or size on the right, and the state capsule. Replaces the SwiftUI
 // ObjectRow for the Scanned and Furniture tabs, because the SwiftUI Image in
 // @expo/ui draws only SF Symbols — a product photo needs RN's Image.
+import { useEffect, useState } from "react";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { SymbolView, type SFSymbol } from "expo-symbols";
 
 import { formatDimensionsCm } from "../lib/units";
 import { colors } from "../theme/tokens";
+import { catalogImage, catalogImageSync } from "./catalogImages";
 import { objectPhotoUri } from "./objectFiles";
 import type { ObjectV1 } from "./types";
 
@@ -43,8 +45,17 @@ function iconFor(category: string): SFSymbol {
 export function ObjectCard({ object, subtitle, trailing, onPress }: ObjectCardProps) {
   const { w, h, d } = object.bboxMeters;
   const tone = STATE[object.state] ?? STATE.measured;
-  // This phone's own photo of the object first, then anything the server sends.
-  const imageUrl = objectPhotoUri(object.objectId) ?? (object as ObjectV1 & { imageUrl?: string | null }).imageUrl ?? null;
+  // This phone's own photo first, then the server's, then the Shopify product photo found
+  // through the manifest or the store's own product JSON (src/ui/catalogImages.ts).
+  const serverUrl = (object as ObjectV1 & { imageUrl?: string | null }).imageUrl ?? null;
+  const [resolved, setResolved] = useState<string | null>(() => objectPhotoUri(object.objectId) ?? serverUrl ?? catalogImageSync(object.productUrl));
+  useEffect(() => {
+    if (resolved || object.source !== "catalog") return;
+    let live = true;
+    catalogImage(object.productUrl).then((u) => { if (live && u) setResolved(u); });
+    return () => { live = false; };
+  }, [object.objectId, object.productUrl, object.source, resolved]);
+  const imageUrl = resolved;
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
       <View style={styles.thumb}>
