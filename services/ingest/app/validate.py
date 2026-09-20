@@ -25,6 +25,13 @@ CATEGORY_PRIORS: dict[str, dict[str, tuple[float, float]]] = {
     "chair":     {"w": (0.30, 0.95), "h": (0.55, 1.40), "d": (0.30, 1.00)},
     "stool":     {"w": (0.25, 0.70), "h": (0.35, 0.90), "d": (0.25, 0.70)},
     "sofa":      {"w": (1.10, 4.00), "h": (0.55, 1.30), "d": (0.60, 1.30)},
+    # An L-shape's bounding box has to contain the arm that sticks out, so its "depth" is the
+    # length of that arm and not the seat depth — a real Aspen 157" 6-piece measures
+    # 3.96 x 2.97 x 0.86 m. Judged against the sofa prior, every correctly measured sectional
+    # Poly & Bark sells came back flagged at confidence 0.488, just under the 0.5 threshold,
+    # so accurate rows ranked below worse-measured ones. Height stays a sofa's: an L-shape is
+    # wider and deeper than a sofa, never taller.
+    "sectional": {"w": (1.50, 4.60), "h": (0.55, 1.30), "d": (0.60, 3.60)},
     "bench":     {"w": (0.60, 2.40), "h": (0.30, 0.70), "d": (0.25, 0.70)},
     "table":     {"w": (0.30, 3.20), "h": (0.25, 1.25), "d": (0.30, 1.60)},
     "desk":      {"w": (0.60, 2.40), "h": (0.55, 1.30), "d": (0.35, 1.00)},
@@ -43,7 +50,11 @@ CATEGORY_PRIORS: dict[str, dict[str, tuple[float, float]]] = {
 _PRIOR_ALIASES = {
     "chair": "chair", "armchair": "chair", "seating": "chair", "recliner": "chair",
     "stool": "stool", "counter stool": "stool",
-    "sofa": "sofa", "couch": "sofa", "loveseat": "sofa", "sectional": "sofa", "settee": "sofa",
+    "sofa": "sofa", "couch": "sofa", "loveseat": "sofa", "settee": "sofa",
+    # Longest alias wins, so "sectional sofa" and "l-shaped sectional" reach the sectional
+    # prior rather than the sofa one.
+    "sectional": "sectional", "chaise": "sectional", "corner sofa": "sectional",
+    "pit lounge": "sectional", "l-shaped": "sectional", "u-shaped": "sectional",
     "bench": "bench",
     "table": "table", "console": "table", "nightstand": "table", "night stand": "table",
     "desk": "desk",
@@ -86,13 +97,40 @@ class Verdict:
         return self.confidence < 0.5
 
 
-def prior_for(category: str | None, title: str = "") -> tuple[str, dict] | tuple[None, None]:
-    text = (category or "").lower() or (title or "").lower()
+def _best_alias(text: str) -> str | None:
+    """Longest matching alias in one string, or None. Longest so "bookcase" beats a stray
+    substring and "sectional" beats "sofa"."""
     best, best_len = None, 0
     for alias, prior_key in _PRIOR_ALIASES.items():
         if alias in text and len(alias) > best_len:
             best, best_len = prior_key, len(alias)
-    return (best, CATEGORY_PRIORS[best]) if best else (None, None)
+    return best
+
+
+def prior_for(category: str | None, title: str = "") -> tuple[str, dict] | tuple[None, None]:
+    """Which prior to judge a product by, from its product_type and its title.
+
+    The title wins when both match, because a product_type is frequently a COLLECTION name
+    covering several kinds of thing while a title names one product. Two real cases from Poly
+    & Bark, both of which flagged correct measurements before this:
+
+      "Modular Sofas" + "Aspen 157\" 6-Piece L-Shaped Sectional"
+          -> sectional, not sofa. An L-shape is 2.97 m deep and a sofa prior stops at 1.30.
+      "Benches, Stools & Ottomans" + "Este Bench"
+          -> bench, not ottoman. That product_type holds three categories and the longest
+             alias in it is "ottoman", whose 1.40 m width ceiling a 1.41 m bench just misses.
+
+    This was an `or` before, so a non-empty product_type meant the title was never read at
+    all. The fallback direction still holds — 101 products on a real run had an empty
+    product_type and the title is all there is.
+    """
+    from_title = _best_alias((title or "").lower())
+    if from_title:
+        return from_title, CATEGORY_PRIORS[from_title]
+    from_category = _best_alias((category or "").lower())
+    if from_category:
+        return from_category, CATEGORY_PRIORS[from_category]
+    return None, None
 
 
 def validate(bbox: dict, *, category: str | None = None, title: str = "",
