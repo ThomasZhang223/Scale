@@ -195,7 +195,6 @@ let currentVersionId: string | null = null; // parent for the next version we pu
 let lastFitReport: FitReport | null = null;
 let undoAvailable = false;
 let lastTouchedId: string | null = null; // what the turn buttons act on when nothing is held
-let selectedStyle: string | null = null; // the whole-room style Rearrange will use; none picked → Rearrange is disabled
 let listings: ListingsResult | null = null; // the last recommendation set, shown on the wrist and the laptop
 let listingsNeed: Need | null = null;
 let listingsBusy = false;
@@ -215,13 +214,6 @@ const PAGE_OF: Record<string, string> = {
   Scanned: 'Room',
 };
 
-/** Whole-room styles: [button label, agent preset]. Each is a different set of rules in services/agent STYLES. */
-const STYLES: [string, string][] = [
-  ['Cozy', 'cozy'],
-  ['Spacious', 'spacious'],
-  ['Modern', 'modern'],
-  ['Social', 'social'],
-];
 /**
  * Scans the server has no picture of. The tablet's render is the only image of them that
  * exists, so it is sent to the search index the first time it is drawn. Scans only: a
@@ -303,21 +295,20 @@ async function start() {
     if (action.startsWith('find:pick:')) void pickListing(action.slice(10));
     if (action === 'reset' && lastScan) showScan(lastScan, 'Room reset');
     if (action === 'clear') clearObjects();
-    if (action.startsWith('style:')) {
-      selectedStyle = selectedStyle === action.slice(6) ? null : action.slice(6); // tap again to clear
-      showPalette();
-      renderAgentPanel(agent.snapshot);
-    }
     if (action === 'rearrange') {
-      // A preset goes only when a person actually picked one on the laptop panel. With none
-      // picked the button's own meaning travels as free text, down the same route a spoken
-      // sentence takes — never a stand-in preset, which would be a style nobody asked for.
+      // No presets anywhere now: a style arrives inside the sentence ("make it cozy") and
+      // reaches the agent as free text. Tablet and laptop both come through this one line.
       //
       // sampleOnSolverOutage marks this as the BUTTON's request, here at the one place the
       // button is pressed, rather than by recognising its words later — someone saying
       // "rearrange the room" out loud is free text and must still fail in view. The spoken
       // command "rearrange" arrives as this same action, so it is the button and inherits it.
-      void askAgent(selectedStyle ? { preset: selectedStyle } : { text: 'Rearrange the room.' }, { sampleOnSolverOutage: true });
+      //
+      // KEEP IT. It is not decoration. services/agent serves its own sample proposal only for
+      // a request carrying a preset, so with presets gone that fallback can never fire, and the
+      // client-side one this flag selects is all that stands between a solver outage and a dead
+      // button in front of the judges.
+      void askAgent({ text: 'Rearrange the room.' }, { sampleOnSolverOutage: true });
     }
     if (action.startsWith('preset:')) void askAgent({ preset: action.slice(7) });
     if (action === 'turn:left') turnLast(Math.PI / 2);
@@ -1024,13 +1015,12 @@ async function start() {
       g.append(...children);
       return g;
     };
-    const rearrange = button('Rearrange', 'rearrange', 'filled');
-    rearrange.disabled = !selectedStyle;
-    rearrange.title = selectedStyle ? '' : 'Pick a style first';
+    // This row is built ONCE, here: renderAgentPanel never writes agentPresets. So nothing in
+    // it may depend on state that changes — the style buttons did, which is why they could be
+    // clicked and never became selected, and why Rearrange stayed disabled for good.
     agentPresets.replaceChildren(
       group('segmented', button('Turn 90° left', 'turn:left', ''), button('Turn 90° right', 'turn:right', ''), button('Remove', 'remove', '')),
-      group('styles', ...STYLES.map(([text, preset]) => button(text, `style:${preset}`, selectedStyle === preset ? 'filled' : 'tinted'))),
-      rearrange,
+      button('Rearrange', 'rearrange', 'filled'),
     );
   }
   document.getElementById('agent-ask')!.addEventListener('click', () => {
