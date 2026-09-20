@@ -141,14 +141,6 @@ cd services/agent && npm run dev   # designer agent on :8789
 Every `/v1` route answers a committed fixture when the request carries `X-Stub: 1`, so each app
 runs against stubs with none of the above.
 
-## Standing rules
-
-1. Metres everywhere. Convert at the UI edge only.
-2. The scale binding happens exactly once.
-3. Never let a language model emit coordinates. It turns intent into constraints; a solver places.
-4. Fail loud. No silent defaults.
-5. Build against stubs, not against people.
-
 ## Team
 
 **Thomas** — iOS native capture modules (RoomPlan room scanning, object measurement) and the
@@ -172,18 +164,5 @@ that connects generation output back into the Worker.
 Browserbase-rendered pages, and the prebaked catalogue (images and manifest) handed to Ani's
 pipeline; `services/search`'s ranking service; and the phone's voice loop
 (`apps/mobile/src/voice`) — intent parsing, the tool schema, and the transport to the agent.
-
-## Credits and licences
-
-The built-in furniture library (100 models) is mostly [Poly Haven](https://polyhaven.com) — 99
-models, each published under **CC0 1.0** (public domain — no attribution required, credited
-anyway) — plus one model under a licence that does require attribution:
-
-- **Arc floor lamp** — [LightsPunctualLamp](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/LightsPunctualLamp),
-  Khronos glTF-Sample-Assets. © 2021, DGG. Author: Teresa González Viegas. Licence:
-  [CC-BY-4.0](https://creativecommons.org/licenses/by/4.0/legalcode). Changes made: repacked to a
-  single GLB with 1k textures; geometry unchanged, never rescaled.
-
-`fixtures/library-models.ATTRIBUTION.md` is the authoritative per-model list.
 
 The full design doc and its reasoning are in `BUILD_DOC.md`.
