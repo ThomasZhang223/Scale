@@ -251,6 +251,13 @@ export interface SurfaceAppearance {
   rotationDeg?: number;
   /** Mirrors the photo across its own vertical axis. The escape hatch, not the normal case. */
   mirrored?: boolean;
+  /**
+   * How many times the photo repeats across the surface, [u, v]. Absent means once, which is
+   * the normal case: a rectified photo IS the whole surface. It is present only when the photo
+   * turned out to cover a sub-region — the floor, whose carpet the camera could not take in
+   * whole — and then the factor comes from a measured physical size, never from taste.
+   */
+  repeat?: [number, number];
 }
 
 const QUARTER_TURNS = [0, 90, 180, 270];
@@ -271,6 +278,17 @@ function readAppearance(scan: Json, walls: Surface[]): Map<string, SurfaceAppear
     if (!QUARTER_TURNS.includes(turn)) {
       throw new Error(`appearance.surfaces["${key}"].rotationDeg is ${turn}; a surface photo turns by 0, 90, 180 or 270 only`);
     }
+    const repeat = surface.repeat;
+    if (repeat !== undefined) {
+      if (!Array.isArray(repeat) || repeat.length !== 2 || repeat.some((n) => !(typeof n === 'number' && n > 0 && Number.isFinite(n)))) {
+        throw new Error(`appearance.surfaces["${key}"].repeat is ${JSON.stringify(repeat)}; it is [u, v], two numbers above zero`);
+      }
+      // A quarter turn swaps u and v, so a non-square repeat under one would stretch the photo
+      // along the wrong axis — silently, and only visibly as furniture at the wrong scale.
+      if ((turn === 90 || turn === 270) && repeat[0] !== repeat[1]) {
+        throw new Error(`appearance.surfaces["${key}"] turns ${turn}° and repeats ${repeat[0]} x ${repeat[1]}; a quarter turn needs a square repeat`);
+      }
+    }
     out.set(key, surface);
   }
   return out;
@@ -287,11 +305,16 @@ function surfaceTexture(look: SurfaceAppearance | undefined): THREE.Texture | nu
   if (!look?.textureUrl) return null;
   const texture = textureLoader.load(look.textureUrl);
   texture.colorSpace = THREE.SRGBColorSpace; // a photo is sRGB; without this the room goes pale
-  texture.wrapS = THREE.ClampToEdgeWrapping;
-  texture.wrapT = THREE.ClampToEdgeWrapping;
+  // A photo that is the whole surface must not wrap at all: clamping keeps a rounding error at
+  // the edge from pulling in the opposite edge. One that repeats mirrors instead, so that each
+  // copy meets its neighbour in its own reflection and there is no seam to see.
+  const [ru, rv] = look.repeat ?? [1, 1];
+  const wrap = look.repeat ? THREE.MirroredRepeatWrapping : THREE.ClampToEdgeWrapping;
+  texture.wrapS = wrap;
+  texture.wrapT = wrap;
   texture.center.set(0.5, 0.5); // turn about the middle, so the photo still covers the rectangle
   texture.rotation = THREE.MathUtils.degToRad(look.rotationDeg ?? 0);
-  if (look.mirrored) texture.repeat.x = -1;
+  texture.repeat.set(look.mirrored ? -ru : ru, rv);
   texture.anisotropy = 4; // the floor is seen at a grazing angle from standing height
   return texture;
 }

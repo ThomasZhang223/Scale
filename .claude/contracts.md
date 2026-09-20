@@ -67,7 +67,8 @@ Optional, added post-launch — absent renders exactly as today, boxes with no c
   "surfaces": {
     "<wallId>": { "hex": "#9a968e", "textureKey": "rooms/{roomId}/appearance/front.jpg",
                   "textureUrl": null, "rotationDeg": 0, "mirrored": false },
-    "floor":    { "hex": "#666560", "textureKey": null, "textureUrl": null },
+    "floor":    { "hex": "#666560", "textureKey": null, "textureUrl": null,
+                  "repeat": [2.2623, 2.5792] },
     "ceiling":  { "hex": "#80766e", "textureKey": null, "textureUrl": null, "rotationDeg": 180 }
   }
 }
@@ -89,10 +90,18 @@ Four fields, all optional, all additive — a surface with none of them renders 
 | `textureUrl` | The same photo as a URL. **`GET /rooms/{id}` fills this in from `textureKey`**; a stored capture leaves it `null`. Key in the database, URL in the API, as for `glb_key` → `glbUrl`. A client never resolves a key. |
 | `rotationDeg` | `0`, `90`, `180` or `270`. Which image edge meets which wall. Any other value is rejected. |
 | `mirrored` | Mirrors the photo across its own vertical axis. The escape hatch; `false` everywhere today. |
+| `repeat` | `[u, v]`. How many times the photo covers the surface. **Absent means once, and once is the normal case.** Present only when the photo turned out to cover a sub-region, and then the factor comes from a measured physical size. A repeating photo wraps `MirroredRepeatWrapping`, so each copy meets its neighbour in its own reflection; a non-repeating one clamps. A quarter turn of 90° or 270° needs `u === v`, or the photo stretches along the wrong axis. |
 
 The photo is a four-point transform of the surface rectangle onto the WHOLE image, so **the image
 aspect is not the surface aspect**. It fills the surface's true metre rectangle exactly once —
-UV 0..1, never tiled, never aspect-fitted. That stretch is what undoes the transform.
+UV 0..1, never aspect-fitted. That stretch is what undoes the transform.
+
+`repeat` is the one exception, and it is a measurement, not a preference. The demo room's floor
+photo covers 2 × 3 carpet tiles rather than the whole floor, so stretched once the tiles rendered
+1.38 × 1.57 m. Taking the tile as **0.61 m square (24 in, the North American standard — nobody has
+put a tape on it)**, `repeat = [2.76 / (2 × 0.61), 4.72 / (3 × 0.61)]` puts it back at 0.61 m
+square. The two factors differ because the tiles are not square in the rectified photo; that is
+the warp, and separate u and v is what undoes it. **`repeat` is appearance, never a dimension.**
 
 A wall that carries a photo is drawn whole: its door and window are in the picture already, so
 nothing is cut out of it. A wall with no photo still gets its openings cut, as before.
