@@ -13,6 +13,7 @@ import { LoadingView } from "../../src/ui/LoadingView";
 import { Metric } from "../../src/ui/Metric";
 import { roomFaces, roomPhotoUri } from "../../src/ui/roomPhotos";
 import { StitchedRoom } from "../../src/ui/StitchedRoom";
+import { RoomInsideView } from "../../src/ui/RoomInsideView";
 import { ApiError } from "../../src/lib/api";
 import type { RoomCaptureV1 } from "../../src/ui/types";
 import { useFetchState } from "../../src/ui/useFetchState";
@@ -54,7 +55,15 @@ export default function RoomDetailScreen() {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content} contentInsetAdjustmentBehavior="automatic">
-      {stitched ? <StitchedRoom uris={faces.uris} meta={faces.meta} /> : photo ? <Image source={{ uri: photo }} style={styles.photo} resizeMode="cover" /> : null}
+      {stitched ? (
+        <StitchedRoom uris={faces.uris} meta={faces.meta} />
+      ) : photo ? (
+        <Image source={{ uri: photo }} style={styles.photo} resizeMode="cover" />
+      ) : (
+        <View style={styles.inside}>
+          <RoomInsideView room={room} width={planWidth} />
+        </View>
+      )}
       {/* Plain RN: FloorPlan draws with absolute-positioned, rotated Views,
           which is not SwiftUI content and can't nest inside a Host's tree
           (see FloorPlan.tsx / PaletteSwatches.tsx for the same rule from
@@ -105,6 +114,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   photo: { width: "100%", aspectRatio: 4 / 3, borderRadius: spacing.lg, overflow: "hidden" },
+  inside: { borderRadius: spacing.lg, overflow: "hidden" },
   hostAuto: {
     width: "100%",
   },

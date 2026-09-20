@@ -10,7 +10,7 @@ import { colors, radius, spacing } from "../../src/theme/tokens";
 import { DEMO_ROOM_ID } from "../../src/ui/demoIds";
 import { EmptyState } from "../../src/ui/EmptyState";
 import { ErrorView } from "../../src/ui/ErrorView";
-import { FloorPlan } from "../../src/ui/FloorPlan";
+import { RoomInsideView } from "../../src/ui/RoomInsideView";
 import { GlassHost } from "../../src/ui/glass";
 import { LoadingView } from "../../src/ui/LoadingView";
 import { localRoomIds, roomPhotoUri } from "../../src/ui/roomPhotos";
@@ -120,9 +120,7 @@ function RoomsScreen() {
                 {photo ? (
                   <Image source={{ uri: photo }} style={styles.photo} resizeMode="cover" />
                 ) : (
-                  <View style={styles.planWrap}>
-                    <FloorPlan room={r} width={cardWidth - spacing.lg * 2} />
-                  </View>
+                  <RoomInsideView room={r} width={cardWidth} />
                 )}
               </View>
               <View style={styles.body}>
