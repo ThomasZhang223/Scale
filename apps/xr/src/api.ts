@@ -77,6 +77,60 @@ export function getJob(jobId: string): Promise<JobV1> {
 }
 
 /**
+ * POST /search, the contract route. Returns `[{objectId, score, object}]` in similarity order.
+ * `source` is always explicit here: an unscoped text query is narrowed to the catalogue by the
+ * Worker (X-Search-Scope), which is the wrong library for a scan or a built-in.
+ */
+export async function searchObjects(body: {
+  text?: string;
+  source: 'scan' | 'catalog' | 'primitive';
+  fit?: { maxW?: number; maxH?: number; maxD?: number };
+  limit?: number;
+}): Promise<{ objectId: string; score: number; object: ObjectV1 }[]> {
+  const res = await fetch(`${API_BASE}/search`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`${res.status} from POST ${API_BASE}/search`);
+  const hits = (await res.json()) as { objectId: string; score: number; object: ObjectV1 }[];
+  return Array.isArray(hits) ? hits : [];
+}
+
+/** What POST /v1/intent answers. `fit` is ignored by the caller: metres come from needFromText. */
+export interface ParsedIntent {
+  intent: 'shop' | 'scans' | 'library' | 'design';
+  query: string | null;
+  category: string | null;
+  fit: { maxW?: number; maxH?: number; maxD?: number } | null;
+}
+
+/**
+ * POST /intent: what the sentence means, decided by a small model on the Worker.
+ *
+ * Rejects rather than guessing. Every failure — a timeout, a 502 from a model that answered
+ * nothing, an offline headset — has one meaning for the caller: use the regex router instead.
+ * The budget is deliberately shorter than the Worker's own, so a slow answer never becomes a
+ * silent wait on a headset where nothing is drawn yet.
+ */
+export async function askIntent(text: string, budgetMs = 1200): Promise<ParsedIntent> {
+  const abort = new AbortController();
+  const timer = setTimeout(() => abort.abort(), budgetMs);
+  try {
+    const res = await fetch(`${API_BASE}/intent`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ text }),
+      signal: abort.signal,
+    });
+    if (!res.ok) throw new Error(`${res.status} from POST ${API_BASE}/intent`);
+    return (await res.json()) as ParsedIntent;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
  * POST /listings/generate: a picked /find row becomes an object and a mesh job. Not in
  * contracts.md yet. `jobId` is null when the object already had its mesh — the Worker starts no
  * second inference over a finished one, so there is nothing to poll and `glbUrl` is there now.

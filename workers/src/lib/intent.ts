@@ -30,7 +30,7 @@ export const INTENT_MODEL = "@cf/meta/llama-3.2-3b-instruct";
 export const INTENT_BUDGET_MS = 1_200;
 
 export interface ParsedIntent {
-  intent: "shop" | "scans" | "design";
+  intent: "shop" | "scans" | "library" | "design";
   /** The product words, or null for "just show me what there is". */
   query: string | null;
   category: string | null;
@@ -43,7 +43,10 @@ Answer with JSON only.
 intent:
 - "shop" — they want something that is for sale. Words like shopify, store, shop, buy, purchase, for sale, online, listings, or naming a kind of furniture they do not own.
 - "scans" — they want something THEY captured with their phone. Words like my scans, scanned, my phone, iphone, my objects, my stuff, my library, my captures.
+- "library" — the built-in furniture this app ships. Words like our furniture, the library, built-in, the catalogue. ALSO the default for a plain request for a piece of furniture with no source named at all: "add a couch", "bring in a chair", "I want a sofa".
 - "design" — anything about arranging, moving, style or mood of the room.
+
+A named source always wins over the default. "find me a couch on shopify" is shop, not library.
 
 query: the PRODUCT WORDS only, or null.
 The name of a source is never the product. "objects for shopify" means browse the shop: query is null.
@@ -55,6 +58,10 @@ fit: maximum size IN METRES, {"maxW":0.8} for "80 cm wide" or "fits the 80 cm ga
 
 const SHOTS: [string, ParsedIntent][] = [
   ["find me some objects for shopify", { intent: "shop", query: null, category: null, fit: null }],
+  ["add a couch", { intent: "library", query: "couch", category: "seating", fit: null }],
+  ["bring in a chair", { intent: "library", query: "chair", category: "seating", fit: null }],
+  ["give me a sofa from our furniture", { intent: "library", query: "sofa", category: "seating", fit: null }],
+  ["find me a couch on shopify", { intent: "shop", query: "couch", category: "seating", fit: null }],
   ["search my scanned objects", { intent: "scans", query: null, category: null, fit: null }],
   ["search my scans for a chair", { intent: "scans", query: "chair", category: "seating", fit: null }],
   ["show me some lamps that fit the 80 centimeter gap beside my desk", { intent: "shop", query: "lamps", category: "lighting", fit: { maxW: 0.8 } }],
@@ -73,7 +80,7 @@ const MAX_M = 10;
 /** Throws unless the model answered exactly the shape asked for. The caller then uses its rules. */
 export function validateIntent(value: unknown): ParsedIntent {
   const v = (value ?? {}) as Record<string, unknown>;
-  if (v.intent !== "shop" && v.intent !== "scans" && v.intent !== "design") {
+  if (v.intent !== "shop" && v.intent !== "scans" && v.intent !== "library" && v.intent !== "design") {
     throw new HttpError(502, "bad_intent", `intent was ${JSON.stringify(v.intent)}.`);
   }
   const str = (x: unknown) => (typeof x === "string" && x.trim() ? x.trim().slice(0, 120) : null);
@@ -120,7 +127,7 @@ export async function parseIntent(env: Env, text: string): Promise<ParsedIntent>
         json_schema: {
           type: "object",
           properties: {
-            intent: { type: "string", enum: ["shop", "scans", "design"] },
+            intent: { type: "string", enum: ["shop", "scans", "library", "design"] },
             query: { type: ["string", "null"] },
             category: { type: ["string", "null"] },
             fit: {

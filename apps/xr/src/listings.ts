@@ -29,6 +29,10 @@ export interface Need {
   maxD?: number;
   /** The scanned piece this would replace, when the need came from one. */
   replaces?: { identifier: string; category: string };
+  /** Product words from the intent parser, when it produced a cleaner set than productQuery. */
+  query?: string;
+  /** "show me what there is": nothing was named, so answer from the meshed catalogue. */
+  browse?: boolean;
 }
 
 export interface Recommendation {
@@ -132,6 +136,9 @@ export const STOREFRONTS: readonly { merchant: string; storefront: string }[] = 
 export const SHOP_VERBS = [
   'find', 'show', 'get', 'recommend', 'suggest', 'search for', 'search', 'look for',
   'looking for', 'buy', 'shop for', 'shop', 'purchase', 'order', 'browse',
+  // "Add a couch" is a request for a thing, not an instruction to move one. 'put' and 'place'
+  // are deliberately absent: those belong to the layout agent ("put the lamp in the corner").
+  'add', 'bring in', 'bring', 'give me', 'give',
 ] as const;
 
 /**
@@ -212,8 +219,8 @@ const MEASURING_AFTER_MS = 12_000;
  * Throws only when every store failed, so the caller can fall back and say why.
  */
 export async function findLive(need: Need, limit: number, onStage: OnStage = () => {}, fetchFn: typeof fetch = fetch): Promise<Listing[]> {
-  const query = productQuery(need.text ?? need.categoryWords?.[0] ?? '');
-  if (!query) throw new Error('nothing to search for');
+  const query = need.query ?? productQuery(need.text ?? need.categoryWords?.[0] ?? '');
+  if (!query && !need.browse) throw new Error('nothing to search for');
   const fit: Record<string, number> = {};
   if (need.maxW != null) fit.maxW = need.maxW;
   if (need.maxH != null) fit.maxH = need.maxH;
@@ -228,7 +235,7 @@ export async function findLive(need: Need, limit: number, onStage: OnStage = () 
       const res = await fetchFn(`${API_BASE}/find`, {
         method: 'POST',
         headers: { 'content-type': 'application/json', ...(STUB ? { 'X-Stub': '1' } : {}) },
-        body: JSON.stringify({ storefront, merchant, query, limit, ...(Object.keys(fit).length ? { fit } : {}) }),
+        body: JSON.stringify({ storefront, merchant, query, limit, ...(need.browse ? { browse: true } : {}), ...(Object.keys(fit).length ? { fit } : {}) }),
       });
       if (!res.ok) {
         let detail = `${res.status} ${res.statusText}`;
@@ -414,7 +421,7 @@ export async function findListings(
  * (standing rule 3) — an LLM turns an intent into an objective, it does not pick the handler.
  */
 
-export type IntentKind = 'command' | 'mine' | 'shop' | 'design';
+export type IntentKind = 'command' | 'mine' | 'shop' | 'library' | 'design';
 
 /**
  * A spoken button press. The value is an intent, not an action id: `putback` means "undo what
@@ -481,6 +488,12 @@ const MY = /\b(?:my|mine)\b/gi;
 const NEWEST = /\b(?:latest|newest|last|most recent|just (?:scanned|captured)|i just)\b/i;
 const LIST_ONLY = /\b(?:my scans|my captures|what have i scanned|what did i scan|everything i(?:'ve|\s+have) scanned|all my|list my|which .{0,20}(?:have i|did i) scan)\b/i;
 
+/**
+ * Names a place to shop. Without one of these, a plain "add a couch" means the built-in
+ * library — those meshes are authored, already local, and need no network search.
+ */
+const NAMES_A_STORE = /\b(?:shopify|store|shop|shopping|buy|purchase|order|for sale|online|listings?|merchant|in stock)\b/i;
+
 /** A strong buy-word: nothing else it could mean, so it outranks a rearranging verb. */
 const SHOP_STRONG = /\b(?:find|buy|purchase|order|shop|shopping|browse|for sale|listings?|in stock|to buy)\b/i;
 /** A weak one: it means shopping only when nothing is being moved. */
@@ -510,9 +523,12 @@ export function classifyUtterance(text: string): Intent {
   const newest = NEWEST.test(t);
   const listOnly = LIST_ONLY.test(t);
   if (MINE_STRONG.test(t) || ownsAnUnplacedMy(t)) return { kind: 'mine', command: null, newest, listOnly };
-  if (SHOP_STRONG.test(t)) return { kind: 'shop', ...plain };
+  // A request for a piece of furniture with no store named goes to the library first; the
+  // library handler falls through to the merchants when it has no match. Same default the
+  // model is told to use, so the two routers agree on this turn whichever one answered.
+  if (SHOP_STRONG.test(t)) return { kind: NAMES_A_STORE.test(t) ? 'shop' : 'library', ...plain };
   if (REARRANGE.test(t)) return { kind: 'design', ...plain };
-  if (SHOP_WEAK.test(t)) return { kind: 'shop', ...plain };
+  if (SHOP_WEAK.test(t)) return { kind: NAMES_A_STORE.test(t) ? 'shop' : 'library', ...plain };
   return { kind: 'design', ...plain };
 }
 
@@ -524,7 +540,58 @@ function ownsAnUnplacedMy(text: string): boolean {
   return false;
 }
 
-/** True when the sentence is a shopping request rather than a rearranging one. */
+/**
+ * True when the sentence asks for a PRODUCT — from the merchants or from the built-in library.
+ * Both are "something to put in the room that you do not already own"; which of the two answers
+ * is `classifyUtterance`'s business, not the caller's.
+ */
 export function isShoppingRequest(text: string): boolean {
-  return classifyUtterance(text).kind === 'shop';
+  const kind = classifyUtterance(text).kind;
+  return kind === 'shop' || kind === 'library';
+}
+
+
+/*
+ * Picking from the built-in library.
+ *
+ * Two signals, in order, because they fail differently. A word that appears in a row's name or
+ * category is exact and survives the model handing back a noisy query ("sofa from our
+ * furniture" still contains "sofa"). A vector score handles the synonyms a word match cannot —
+ * measured on the deployed index: couch -> sofa 0.9695, armchair -> chair 0.9646, settee ->
+ * sofa 0.9287, while lamp's best is 0.8907 and desk's is 0.8890 with nothing of either kind in
+ * the library.
+ *
+ * ceiling: SIMILAR_ENOUGH is calibrated against a library of three rows, where everything is
+ * near "sofa" or "chair". P-PAUL is adding 20-30 authored pieces; re-measure it against the
+ * grown library (the same probe: POST /v1/search {text, source:"primitive"}) before trusting
+ * the vector half. The word half needs no calibration and gets better as names get real.
+ */
+
+/** Below this, the nearest row is not what was asked for — measured, see above. */
+export const SIMILAR_ENOUGH = 0.93;
+
+const STOP = new Set(['a', 'an', 'the', 'some', 'any', 'me', 'my', 'our', 'your', 'from', 'for', 'in', 'into',
+  'of', 'on', 'to', 'and', 'or', 'is', 'are', 'it', 'this', 'that', 'please', 'new', 'one', 'like', 'want',
+  'need', 'add', 'put', 'bring', 'give', 'get', 'show', 'find', 'already', 'here', 'room', 'furniture']);
+
+/** The words worth matching a row against: what was asked for, minus the scaffolding. */
+export function queryWords(query: string | null | undefined): string[] {
+  return (query ?? '')
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((w) => w.length > 2 && !STOP.has(w));
+}
+
+/** Rows whose own name or category carries one of those words, best overlap first. */
+export function matchLibraryByWord(rows: Listing[], query: string | null | undefined): Listing[] {
+  const words = queryWords(query);
+  if (!words.length) return [];
+  const scored = rows
+    .map((row) => {
+      const hay = `${row.name ?? ''} ${row.category ?? ''}`.toLowerCase();
+      return { row, hits: words.filter((w) => hay.includes(w)).length };
+    })
+    .filter((s) => s.hits > 0)
+    .sort((a, b) => b.hits - a.hits);
+  return scored.filter((s) => s.hits === scored[0].hits).map((s) => s.row);
 }

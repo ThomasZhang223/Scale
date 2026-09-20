@@ -6,7 +6,7 @@ import { ObjectLoader, type LoadedObject } from './objects';
 import { createPhysics } from './physics';
 import { Interaction } from './interaction';
 import {
-  getRoom, getObject, listObjects, getVersion, postVersion, objectToItem, boundsMismatch, watchRoom, postFit, STUB, listScans, listBuiltIns, sameOrigin, getJob, postListingsGenerate,
+  getRoom, getObject, listObjects, getVersion, postVersion, objectToItem, boundsMismatch, watchRoom, postFit, STUB, askIntent, listScans, listBuiltIns, searchObjects, sameOrigin, getJob, postListingsGenerate,
   type ObjectV1, type VersionV1, type PlacementV1, getActiveRoom, getRoomLive
 } from './api';
 import { FitOverlay, type FitReport } from './fit';
@@ -20,7 +20,7 @@ import { Thumbnails } from './thumbs';
 import { matchDetected } from './placement';
 import { measuredBox } from './objects';
 import { Voice, type VoiceState } from './voice';
-import { findListings, needFromDetected, needFromText, classifyUtterance, productQuery, STOREFRONTS, type Command, type Listing, type ListingsResult, type Need, type Recommendation, type StageInfo } from './listings';
+import { findListings, matchLibraryByWord, needFromDetected, needFromText, classifyUtterance, productQuery, SIMILAR_ENOUGH, STOREFRONTS, type Command, type Listing, type ListingsResult, type Need, type Recommendation, type StageInfo } from './listings';
 import { FindPanel } from './findpanel';
 import { Outdoors } from './outdoors';
 import roomH from '../../../fixtures/room-h.json';
@@ -1014,15 +1014,98 @@ async function start() {
    * productQuery could parse, so ordinary speech ("show me some lamps") fell through here to the
    * agent — which is why voice appeared to do nothing but rearrange.
    */
-  function routeRequest(text: string) {
-    const intent = classifyUtterance(text);
-    if (intent.kind === 'command') return runCommand(intent.command!);
-    if (intent.kind === 'mine') return findMine(text, intent);
-    if (intent.kind === 'shop') {
+  async function routeRequest(text: string) {
+    // A command is decided here, instantly and with no network: it is a button press, and a
+    // button press must not wait on a model.
+    const rules = classifyUtterance(text);
+    if (rules.kind === 'command') return runCommand(rules.command!);
+
+    // Everything else asks the Worker's intent parser what the sentence MEANS. Thomas names the
+    // SOURCE he wants searched ("find me some objects for shopify", "search my scanned
+    // objects"), and no verb list can learn that a source is not a product. On any failure the
+    // regex router answers instead — both are deterministic about what they do with the result.
+    let kind = rules.kind;
+    let query: string | null = null;
+    let router: 'llm' | 'rules' = 'rules';
+    try {
+      const parsed = await askIntent(text);
+      kind = parsed.intent === 'scans' ? 'mine' : parsed.intent;
+      query = parsed.query;
+      router = 'llm';
+    } catch (err) {
+      console.info('intent: rules (', (err as Error).message, ')');
+    }
+    // METRES COME FROM ONE PLACE. needFromText is tested and the model is not: it returned a
+    // null fit for "the 80 centimeter gap" that the parser reads as 0.8 exactly.
+    const need = needFromText(text);
+    console.info(`intent: ${kind} via ${router}`, query ?? '(browse)');
+
+    if (kind === 'mine') return findMine(text, rules, query);
+    if (kind === 'library') return findLibrary(text, query ?? productQuery(text));
+    if (kind === 'shop') {
       listingText.value = text;
-      return findFor(needFromText(text), { autoAdd: VOICE_AUTO_ADD_TOP });
+      // A clean query from the model beats productQuery's strip, but it is still run through
+      // the strip: the model sometimes hands back the whole clause.
+      const words = query ? productQuery(query) : productQuery(text);
+      return findFor({ ...need, query: words || undefined, browse: !words }, { autoAdd: VOICE_AUTO_ADD_TOP });
     }
     return askAgent({ text });
+  }
+
+  /**
+   * Intent (d): the furniture this app ships — `source:"primitive"` rows, the Furniture page.
+   *
+   * Two signals, because they fail differently. A word that appears in a row's own name or
+   * category is exact and survives a noisy query. A vector score catches the synonyms a word
+   * match cannot: measured on the deployed index, couch -> sofa 0.9695 and armchair -> chair
+   * 0.9646, while lamp's best is 0.8907 with no lamp in the library at all. One clear match is
+   * placed; several are listed; none falls through to the merchants, which is the whole point of
+   * trying the library first.
+   */
+  async function findLibrary(text: string, query: string) {
+    listingsBusy = true;
+    showPalette();
+    let rows: ObjectV1[];
+    try {
+      rows = await listBuiltIns();
+    } catch (err) {
+      listingsBusy = false;
+      return sayAloud(`Couldn't reach the library: ${(err as Error).message}`);
+    } finally {
+      listingsBusy = false;
+    }
+
+    let matches = matchLibraryByWord(rows as Listing[], query) as ObjectV1[];
+    if (!matches.length && query) {
+      // Nothing carried the word, so ask the index whether anything MEANS it.
+      try {
+        const hits = await searchObjects({ text: query, source: 'primitive', limit: 5 });
+        const top = hits[0];
+        if (top && top.score >= SIMILAR_ENOUGH) matches = [top.object];
+      } catch (err) {
+        console.info('library vector search unavailable:', (err as Error).message);
+      }
+    }
+    if (!matches.length) {
+      // The library has nothing like it. The merchants might, so say so and go there.
+      sayAloud(`Nothing like that in the library — looking in the shops.`);
+      return findFor({ ...needFromText(text), query: query || undefined, browse: !query }, { autoAdd: VOICE_AUTO_ADD_TOP });
+    }
+
+    presentResults({
+      mode: 'library',
+      query,
+      rows: matches.map((o) => ({ listing: o as Listing, score: 0, reasons: ['from the library'] })),
+      note: null,
+    });
+    if (matches.length > 1) return sayAloud(`${matches.length} in the library. Pick one to place it.`);
+    const one = matches[0];
+    if ([...objects.values()].some((o) => o.objectId === one.objectId)) {
+      return sayAloud(`The ${one.name} is already in the room.`);
+    }
+    if (!VOICE_AUTO_ADD_TOP) return sayAloud(`${one.name} is in the list. Pick it to place it.`);
+    await addServerObject(one);
+    return sayAloud(`Placed the ${one.name}.`);
   }
 
   /**
@@ -1067,7 +1150,7 @@ async function start() {
    * the newest adds the newest, a library of exactly one adds that one, and anything else is
    * listed for a hand to choose from.
    */
-  async function findMine(text: string, intent: ReturnType<typeof classifyUtterance>) {
+  async function findMine(text: string, intent: ReturnType<typeof classifyUtterance>, query: string | null = null) {
     listingsNeed = null;
     listingsBusy = true;
     showPalette();
@@ -1090,9 +1173,10 @@ async function start() {
     // "unknown" for every row today, so this finds nothing and the count rules below decide
     // instead. It starts working by itself the day the phone names a capture — the real fix is
     // upstream, on the phone's Save screen, or a caption written at index time.
-    const need = needFromText(text);
-    const named = need.categoryWords
-      ? scans.filter((o) => need.categoryWords!.some((w) => `${o.name ?? ''} ${o.category ?? ''}`.toLowerCase().includes(w)))
+    // The parser's own product words first, then the category words the sentence implies.
+    const words = query ? [query.toLowerCase()] : needFromText(text).categoryWords ?? [];
+    const named = words.length
+      ? scans.filter((o) => words.some((w) => `${o.name ?? ''} ${o.category ?? ''}`.toLowerCase().includes(w)))
       : [];
     const shown = named.length ? named : scans;
 
@@ -1124,9 +1208,12 @@ async function start() {
    * how they look. Today it drives the existing FindPanel, so nothing regresses before the popout
    * lands. `mode` says which library the rows came from: merchants, or the user's own scans.
    */
-  function presentResults(res: { mode: 'shop' | 'scans'; query: string; rows: Recommendation[]; note: string | null }) {
+  function presentResults(res: { mode: 'shop' | 'scans' | 'library'; query: string; rows: Recommendation[]; note: string | null }) {
     listings = { recommendations: res.rows, source: 'live', note: res.note };
-    findPanel.showResults(res.rows, res.note, res.mode, res.query);
+    // 'library' is a kind P-UX is adding to findpanel.ts; until it lands the panel treats an
+    // unknown kind as a shop listing, which renders correctly and only labels the rows wrongly.
+    // The cast keeps this file out of theirs — remove it once their signature widens.
+    findPanel.showResults(res.rows, res.note, res.mode as 'shop' | 'scans', res.query);
     showPalette();
     renderListings();
   }

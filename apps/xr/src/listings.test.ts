@@ -103,7 +103,7 @@ test('productQuery strips the imperative and the length phrases, keeping the pro
  * The three marked LIVE are verbatim from a real TTS -> STT round trip against the deployed
  * proxy on 2026-09-20; the rest are written in the same shape.
  */
-const ROUTING: [string, 'command' | 'mine' | 'shop' | 'design'][] = [
+const ROUTING: [string, 'command' | 'mine' | 'shop' | 'library' | 'design'][] = [
   // (a) the user's own scans — "my" beats every shopping verb
   ['Show me the chair I scanned with my phone', 'mine'],                    // LIVE
   ['Show me my scans', 'mine'],
@@ -115,19 +115,25 @@ const ROUTING: [string, 'command' | 'mine' | 'shop' | 'design'][] = [
   ['Can you show me the stuff I captured on my phone?', 'mine'],
   ['What did I scan earlier?', 'mine'],
   ['Add my last scan', 'mine'],
-  // (b) shopping — the merchants
-  ['Hey, can you show me some lamps that fit the 80-centimeter gap beside my desk?', 'shop'], // LIVE
-  ['Find me a lamp', 'shop'],
-  ['Can you show me some chairs?', 'shop'],
-  ['I need a new side table', 'shop'],
-  ['Get me a coffee table under 1 meter', 'shop'],
-  ['Look for a floor lamp', 'shop'],
-  ['Do you have any lamps?', 'shop'],
-  ['Ok so, find something that fits the 80-centimeter gap beside my desk', 'shop'],
+  // (b) a product request. A named store means the merchants; without one the built-in
+  // library answers first and falls through to the merchants when it has no match.
+  ['Find me a couch on shopify', 'shop'],
+  ['Show me what the store has', 'shop'],
+  ['Add a couch', 'library'],
+  ['Bring in a chair', 'library'],
+  ['Give me a sofa from our furniture', 'library'],
+  ['Hey, can you show me some lamps that fit the 80-centimeter gap beside my desk?', 'library'], // LIVE
+  ['Find me a lamp', 'library'],
+  ['Can you show me some chairs?', 'library'],
+  ['I need a new side table', 'library'],
+  ['Get me a coffee table under 1 meter', 'library'],
+  ['Look for a floor lamp', 'library'],
+  ['Do you have any lamps?', 'library'],
+  ['Ok so, find something that fits the 80-centimeter gap beside my desk', 'library'],
   ['Show me what is for sale', 'shop'],
-  ['Um, I want a dresser', 'shop'],
-  ['Search for a walnut sideboard', 'shop'],
-  ['Browse nightstands', 'shop'],
+  ['Um, I want a dresser', 'library'],
+  ['Search for a walnut sideboard', 'library'],
+  ['Browse nightstands', 'library'],
   // (c) everything else — the layout agent, exactly as before
   ['Move the sofa to the window', 'design'],                                // LIVE
   ['Make it cozy', 'design'],
@@ -191,7 +197,7 @@ test('a near-miss command falls through to the handler it would have reached any
   // The danger of checking commands first is shadowing. These must be unchanged by it.
   assert.equal(classifyUtterance('keep the sofa by the window').kind, 'design');
   assert.equal(classifyUtterance('put the lamp back by the desk').kind, 'design');
-  assert.equal(classifyUtterance('show me the listings for a lamp').kind, 'shop');
+  assert.equal(classifyUtterance('show me the listings for a lamp').kind, 'shop');  // "listings" names a store
   assert.equal(classifyUtterance('open my scans folder on the phone').kind, 'mine');
 });
 
@@ -213,8 +219,8 @@ test('every routing-table sentence reaches the handler it belongs to', () => {
 
 test('"my" that says WHERE a thing goes is not a claim to own it', () => {
   // The positioning sentence in CLAUDE.md. It must reach the merchants, not the scan library.
-  assert.equal(classifyUtterance('find something that fits the 80 cm gap beside my desk').kind, 'shop');
-  assert.equal(classifyUtterance('what fits next to my sofa?').kind, 'shop');
+  assert.equal(classifyUtterance('find something that fits the 80 cm gap beside my desk').kind, 'library');
+  assert.equal(classifyUtterance('what fits next to my sofa?').kind, 'library');
   assert.equal(classifyUtterance('put a lamp beside my desk').kind, 'design');
   // ...but the same possessive naming the thing itself does.
   assert.equal(classifyUtterance('put my lamp beside the desk').kind, 'mine');
@@ -235,7 +241,10 @@ test('routing and productQuery read ONE list, so routing can never be the narrow
   // opener that only does one of the two is the defect this test exists to catch.
   for (const head of [...SHOP_VERBS, ...SHOP_LEAD_INS]) {
     const sentence = `${head} a walnut side table`;
-    assert.equal(classifyUtterance(sentence).kind, 'shop', sentence);
+    // A product request either way: the library answers first unless a store is named, and a
+    // head that is itself a commerce word ("buy", "order") names one on its own.
+    assert.ok(['shop', 'library'].includes(classifyUtterance(sentence).kind), sentence);
+    assert.equal(classifyUtterance(`${sentence} on shopify`).kind, 'shop', sentence);
     assert.equal(productQuery(sentence), 'walnut side table', sentence);
   }
 });

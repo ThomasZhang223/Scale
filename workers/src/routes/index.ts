@@ -739,10 +739,16 @@ export async function postFind(req: Request, env: Env, origin: string): Promise<
   // Ready-only: the storefront query still runs and is still the merchant's own search. What
   // changes is that a row nobody can render yet never reaches the wrist menu. See lib/find-ready.ts.
   let live: FindResult;
-  try {
-    live = await runFind(call, body);
-  } catch (err) {
-    live = failedFindResult(body, err);
+  if (body.browse) {
+    // Nothing was named, so there is nothing to ask a merchant. The top-up below answers from
+    // the meshed catalogue, ordered least-distorted first — "show me what there is".
+    live = { ...failedFindResult(body, null), warning: null };
+  } else {
+    try {
+      live = await runFind(call, body);
+    } catch (err) {
+      live = failedFindResult(body, err);
+    }
   }
   const { result, header } = await restrictFindToReady(env, origin, body, live, async (search) => {
     // In-process: a Worker cannot fetch its own *.workers.dev URL (SYSTEM_STATE.md). This is the
