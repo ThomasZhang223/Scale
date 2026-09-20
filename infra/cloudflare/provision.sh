@@ -104,6 +104,7 @@ PY
 echo
 echo "==> Applying the D1 schema (remote)"
 w d1 execute "${D1_NAME}" --remote --file=src/schema.sql
+w d1 execute "${D1_NAME}" --remote --file=src/mesh-schema.sql
 
 echo
 echo "==> Regenerating types"
@@ -122,7 +123,7 @@ Provisioning complete. Three things are still needed before the agents work:
        npm run deploy
 
   3. Tunnel origins. Start cloudflared (infra/up.sh, owned by the local-edge panel), then:
-       bash infra/cloudflare/set-upstreams.sh <solver-url> <search-url> <ingest-url>
+       bash infra/cloudflare/set-upstreams.sh <solver-url> <search-url> <ingest-url> <embedding-url>
 
   Verify with:  curl https://full-scale-workers.<subdomain>.workers.dev/v1/health
 NEXT

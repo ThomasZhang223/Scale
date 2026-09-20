@@ -399,13 +399,13 @@ req POST "/v1/search" '{"text":"chair","limit":5}'
 RANKER="$(header_value "$HDR_OUT" "x-ranker")"
 IS_LIST="$(jget "$BODY_OUT" "isinstance(obj, list)")"
 case "$RANKER" in
-  vectorize|upstream|d1-fallback|relaxed) RANKER_OK=1 ;;
+  vectorize|upstream|vectorize-ranker-unreachable|d1-fallback|relaxed) RANKER_OK=1 ;;
   *) RANKER_OK=0 ;;
 esac
 if [ "$STATUS" = "200" ] && [ "$IS_LIST" = "true" ] && [ "$RANKER_OK" = "1" ]; then
   pass "POST /v1/search -> array, X-Ranker: $RANKER"
 else
-  fail "POST /v1/search -> expected 200/array/X-Ranker in {vectorize,upstream,d1-fallback,relaxed}, got status=$STATUS ranker=$RANKER body=$(cat "$BODY_OUT" 2>/dev/null)"
+  fail "POST /v1/search -> expected 200/array/X-Ranker in {vectorize,upstream,vectorize-ranker-unreachable,d1-fallback,relaxed}, got status=$STATUS ranker=$RANKER body=$(cat "$BODY_OUT" 2>/dev/null)"
 fi
 
 # --- 16. The fit filter genuinely excludes --------------------------------------------------------
