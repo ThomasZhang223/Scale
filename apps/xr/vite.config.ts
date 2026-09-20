@@ -102,6 +102,7 @@ export default defineConfig(({ mode }) => {
         input: {
           index: resolve(__dirname, 'index.html'),
           thumb: resolve(__dirname, 'thumb.html'),
+          shopify: resolve(__dirname, 'shopify.html'),
         },
       },
     },

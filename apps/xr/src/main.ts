@@ -621,6 +621,12 @@ async function start() {
       add.textContent = l.glbUrl ? 'Add' : 'Add + generate mesh';
       add.addEventListener('click', () => void pickListing(l.objectId));
       actions.append(add);
+      const shopify = document.createElement('a');
+      shopify.href = `/shopify.html?${new URLSearchParams({ reference: l.productUrl ?? '', query: l.category || l.name, room: ROOM_ID })}`;
+      shopify.target = '_blank';
+      shopify.rel = 'noopener';
+      shopify.textContent = 'Find similar on Shopify';
+      actions.append(shopify);
       if (l.productUrl) {
         const open = document.createElement('a');
         open.href = l.productUrl;
