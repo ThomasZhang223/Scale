@@ -7,7 +7,7 @@ import { ObjectLoader, type LoadedObject } from './objects';
 import { createPhysics } from './physics';
 import { Interaction } from './interaction';
 import {
-  getRoom, getObject, getVersion, postVersion, objectToItem, boundsMismatch, watchRoom, postFit, STUB, listScans, sameOrigin,
+  getRoom, getObject, getVersion, postVersion, objectToItem, boundsMismatch, watchRoom, postFit, STUB, listScans, listBuiltIns, sameOrigin,
   type ObjectV1, type VersionV1, type PlacementV1,
 } from './api';
 import { FitOverlay, type FitReport } from './fit';
@@ -34,7 +34,8 @@ import roomLarge from '../public/room-large.json';
  *   Built at true size, floor at y = 0.
  * Objects: from the server (?object=<id>, and every `object` event on the room's live
  *   feed, GET /v1/sync/{id}) loaded by glbUrl at scale 1 — never rescaled; from
- *   /objects.json; or dropped onto the page as .glb files.
+ *   the cloud library's built-in furniture (source "primitive"), or the ?objects=<url> manifest
+ *   when given; or dropped onto the page as .glb files.
  *   - Kept at their real-world size (Object Capture exports in meters).
  *   - If its name contains a category RoomPlan detected ("chair.glb", "my-sofa.glb"),
  *     the object takes that piece's place and rotation at start, replacing its grey box.
@@ -49,7 +50,7 @@ import roomLarge from '../public/room-large.json';
 const params = new URLSearchParams(location.search);
 const SHOW_PANEL = params.get('panel') !== '0';
 const SCAN_URL = params.get('scan'); // null: the committed RoomCapture v1 fixture
-const OBJECTS_URL = params.get('objects') ?? '/objects.json';
+const OBJECTS_URL = params.get('objects'); // null: the built-in furniture comes from the server
 // Without ?room=<id> (or VITE_ROOM_ID) the page shows the local large room, empty of furniture:
 // every object comes from the palette. With one, the room is fetched from the server.
 const SERVER_ROOM_ID: string | null = params.get('room') ?? import.meta.env.VITE_ROOM_ID ?? null;
@@ -200,7 +201,7 @@ const STYLES: [string, string][] = [
   ['Social', 'social'],
 ];
 const objects = new Map<string, PlacedObject>();
-const catalog: PaletteItem[] = []; // everything in objects.json, placed or not
+const catalog: PaletteItem[] = []; // everything in the palette's furniture list, placed or not
 let rise = 1; // 0..1 while the walls rise; objects are placed once it reaches 1
 let placementPending = false;
 
@@ -1151,16 +1152,23 @@ async function start() {
   }
 
   async function loadManifest() {
-    let list: { url: string; name?: string; scale?: number }[];
+    let list: { url: string; name?: string; scale?: number; objectId?: string }[];
     try {
-      const res = await fetch(OBJECTS_URL);
-      if (!res.ok) return; // no manifest is fine
-      list = await res.json();
+      if (OBJECTS_URL) {
+        // An explicit ?objects=<url> is a choice, not a fallback.
+        const res = await fetch(OBJECTS_URL);
+        if (!res.ok) return; // no manifest is fine
+        list = await res.json();
+      } else {
+        // Scale 1: server meshes are already metres (standing rule 2), never re-guessed.
+        list = (await listBuiltIns()).map((o) => ({ url: sameOrigin(o.glbUrl!), name: o.name, scale: 1, objectId: o.objectId }));
+      }
     } catch (err) {
-      console.warn('objects.json could not be read:', err);
+      console.warn('The furniture list could not be read:', err);
+      tell(`Built-in furniture unavailable: ${(err as Error).message}`, 'warn');
       return;
     }
-    for (const o of list) catalog.push({ url: o.url, name: o.name ?? o.url.split('/').pop()!, scale: o.scale, section: 'Furniture' });
+    for (const o of list) catalog.push({ url: o.url, name: o.name ?? o.url.split('/').pop()!, scale: o.scale, objectId: o.objectId, section: 'Furniture' });
     showPalette();
     renderCatalog();
 

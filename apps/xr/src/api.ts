@@ -75,6 +75,23 @@ export async function listScans(): Promise<ObjectV1[]> {
 }
 
 /**
+ * The built-in furniture: source "primitive" objects served from the cloud library. Always the
+ * live table, never the stub (the stub layer only knows one MacBook). A row that is not ready
+ * with a glbUrl is skipped by name; a failed list call throws, with no bundled fallback.
+ */
+export async function listBuiltIns(): Promise<ObjectV1[]> {
+  const res = await fetch(`${API_BASE}/objects?source=primitive&limit=50`);
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText} from GET ${API_BASE}/objects?source=primitive`);
+  const list = (await res.json()) as ObjectV1[];
+  if (!Array.isArray(list)) throw new Error('GET /objects?source=primitive did not return a list — ask Thomas');
+  return list.filter((o) => {
+    if (o.state === 'ready' && o.glbUrl) return true;
+    console.warn(`skipping built-in ${o.objectId} (${o.name}): state ${o.state}, glbUrl ${o.glbUrl}`);
+    return false;
+  });
+}
+
+/**
  * An asset URL the page can actually fetch. The Worker sends no CORS headers, so a GLB at the
  * Worker's absolute origin is unreachable from this page's origin; its /v1/... path, through the
  * same proxy the API already uses (Vite in dev, worker/index.ts deployed), is reachable.

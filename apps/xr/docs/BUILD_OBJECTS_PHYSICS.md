@@ -41,8 +41,9 @@ on the Quest and on the laptop.
   - `ChairDamaskPurplegold` → save as `public/objects/chair.glb` (about 0.83 × 0.69 × 0.57 m, 2 MB)
   - `GlamVelvetSofa` → save as `public/objects/sofa.glb` (about 2.19 × 0.79 × 1.02 m, 3 MB)
   - Add `public/objects/ATTRIBUTION.md` crediting them.
-- `public/objects.json`: a list of `{ url, name, scale? }` loaded at startup.
-  `name` drives matching; `scale` overrides unit detection.
+- Superseded: the sample GLBs and `public/objects.json` are gone; the built-in furniture is served from
+  the cloud library (`GET /v1/objects?source=primitive`). `?objects=<url>` still loads a `{ url, name, scale? }`
+  list. `name` drives matching; `scale` overrides unit detection.
 
 ## File-by-file
 
@@ -136,7 +137,7 @@ Both inputs hand physics a target; neither moves objects directly.
 ### `src/main.ts` (change)
 
 - Start-up order: create physics, loader, interaction; load the room scan and wait for it;
-  load `objects.json`; start Supabase watching (unchanged).
+  load the built-in furniture list (server, or `?objects=`); start Supabase watching (unchanged).
 - **Placing objects waits for the room.** Objects that finish loading while the walls are
   still rising are placed when the rise completes.
 - **On a new or reset room:** first remove every object's body and take its node out of

@@ -19,8 +19,9 @@ enabled = true
 [assets]
 directory = "./dist"
 binding = "ASSETS"
-# The page is a single index.html; anything that isn't a file should still get it.
-not_found_handling = "single-page-application"
+# The page is a single index.html with no path routes, so a missing file must be a 404 (a
+# fallback answered 200 + HTML for /objects.json after the bundled models were removed).
+not_found_handling = "none"
 # Only /v1 goes through the Worker; every other path is served straight from the asset store.
 run_worker_first = ["/v1/*"]
 
