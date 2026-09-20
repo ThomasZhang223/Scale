@@ -24,6 +24,11 @@ import type { ObjectLoader } from './objects';
 // cell band and the popout card's square well. A square is fitted by height in the first and
 // exactly in the second, so the object is the same size in both; a landscape render would fill
 // the tablet a little better and then sit in the middle third of the card, looking tiny.
+//
+// Rendered at RENDER and kept at W for a tile. The larger size is what the search index wants
+// (publish below); downscaling into the tile cache is one render path rather than two, and a
+// tile drawn down from 512 is sharper than one drawn at 256.
+const RENDER = 512;
 const W = 256;
 const H = 256;
 const VIEW = new THREE.Vector3(1, 0.65, 1).normalize(); // three-quarter, slightly above
@@ -32,31 +37,50 @@ const FILL = 0.88; // how much of the frame the object's widest corner should re
 
 export class Thumbnails {
   private readonly cache = new Map<string, HTMLCanvasElement>();
-  private readonly queue: { key: string; url: string; scale?: number }[] = [];
+  private readonly queue: { key: string; url: string; scale?: number; publish?: boolean }[] = [];
   private readonly asked = new Set<string>();
   private readonly failed = new Set<string>();
+  /** Objects whose picture has already been sent to the index. One attempt each, ever. */
+  private readonly published = new Set<string>();
   private busy = false;
   private stage: Stage | null = null;
 
+  private readonly loader: ObjectLoader;
+  private readonly onReady: () => void;
   /**
+   * Where a freshly rendered picture goes when the object has none of its own. Object Capture
+   * uploads only the mesh, so for a phone scan this render is the only image of it that exists
+   * anywhere, and without one every scan embeds to the same point and "find my chair" cannot
+   * rank them. Fire-and-forget: it must never be awaited on the way to a frame.
+   */
+  private readonly publish: ((objectId: string, jpeg: Blob) => void) | null;
+
+  /**
+   * Written out rather than as constructor parameter properties on purpose: node's strip-only
+   * TypeScript loader refuses a file that uses those, and this module has logic worth testing —
+   * who gets published, how often, and that nothing waits on a frame. Same reason controls.ts
+   * exists as its own file.
+   *
    * @param loader the app's own GLB loader, so a mesh already in the room is not fetched twice
    * @param onReady called after a picture lands, to redraw whatever is showing it
+   * @param publish where a scan's picture goes; omit it and nothing is sent
    */
-  constructor(
-    private readonly loader: ObjectLoader,
-    private readonly onReady: () => void,
-  ) {}
+  constructor(loader: ObjectLoader, onReady: () => void, publish: ((objectId: string, jpeg: Blob) => void) | null = null) {
+    this.loader = loader;
+    this.onReady = onReady;
+    this.publish = publish;
+  }
 
   /**
    * The picture for one object, or null while there is none. A null is the tile's cue to
    * draw a placeholder; it is never a reason to invent a different picture.
    */
-  get(key: string, url: string, scale?: number): HTMLCanvasElement | null {
+  get(key: string, url: string, scale?: number, publish = false): HTMLCanvasElement | null {
     const done = this.cache.get(key);
     if (done) return done;
     if (!url || this.failed.has(key) || this.asked.has(key)) return null;
     this.asked.add(key);
-    this.queue.push({ key, url, scale });
+    this.queue.push({ key, url, scale, publish });
     return null;
   }
 
@@ -75,7 +99,7 @@ export class Thumbnails {
     this.stage = null;
   }
 
-  private async draw({ key, url, scale }: { key: string; url: string; scale?: number }) {
+  private async draw({ key, url, scale, publish }: { key: string; url: string; scale?: number; publish?: boolean }) {
     let node: THREE.Object3D;
     try {
       node = (await this.loader.load(url, scale)).node;
@@ -97,9 +121,40 @@ export class Thumbnails {
     const canvas = document.createElement('canvas');
     canvas.width = W;
     canvas.height = H;
-    canvas.getContext('2d')!.drawImage(stage.renderer.domElement, 0, 0);
+    canvas.getContext('2d')!.drawImage(stage.renderer.domElement, 0, 0, W, H);
     this.cache.set(key, canvas);
+    if (publish) this.send(key, stage.renderer.domElement);
     this.onReady();
+  }
+
+  /**
+   * Sends one picture to the index, once, and never waits for it.
+   *
+   * The bytes are copied to a canvas of their own FIRST, synchronously. toBlob is asynchronous
+   * and the renderer's own canvas is overwritten by the next object in the queue, so encoding
+   * straight from it would sooner or later file one object's picture under another's id.
+   */
+  private send(objectId: string, source: HTMLCanvasElement) {
+    if (!this.publish || this.published.has(objectId)) return;
+    this.published.add(objectId); // before the attempt: one try per object, success or not
+    const frozen = document.createElement('canvas');
+    frozen.width = frozen.height = RENDER;
+    const ctx = frozen.getContext('2d')!;
+    // The render has an alpha channel and JPEG has none, so the background is chosen here
+    // rather than left to the encoder, which would give black. White, because these vectors
+    // share a namespace with the catalogue's product photos — studio shots on white — and the
+    // closer the two sit in the same distribution, the better one text query ranks across both.
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, RENDER, RENDER);
+    ctx.drawImage(source, 0, 0);
+    frozen.toBlob(
+      (blob) => {
+        if (blob) this.publish!(objectId, blob);
+        else console.warn(`No thumbnail bytes for ${objectId}: the canvas would not encode.`);
+      },
+      'image/jpeg',
+      0.9,
+    );
   }
 }
 
@@ -112,12 +167,12 @@ interface Stage {
 /**
  * A second, tiny renderer rather than a render target on the headset's own. Reading pixels
  * back out of the XR renderer means a synchronous GPU stall inside the frame the headset is
- * presenting; a separate 256 px context costs a little memory once and stalls nothing.
+ * presenting; a separate 512 px context costs a little memory once and stalls nothing.
  */
 function makeStage(): Stage {
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setPixelRatio(1);
-  renderer.setSize(W, H, false);
+  renderer.setSize(RENDER, RENDER, false);
   renderer.setClearColor(0x000000, 0); // transparent: the tile's own cell colour shows through
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   const scene = new THREE.Scene();
@@ -125,7 +180,7 @@ function makeStage(): Stage {
   const key = new THREE.DirectionalLight(0xffffff, 1.6);
   key.position.set(2, 3, 2);
   scene.add(key);
-  return { renderer, scene, camera: new THREE.PerspectiveCamera(FOV, W / H, 0.01, 100) };
+  return { renderer, scene, camera: new THREE.PerspectiveCamera(FOV, 1, 0.01, 100) };
 }
 
 /**

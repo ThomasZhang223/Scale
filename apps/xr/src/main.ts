@@ -6,7 +6,7 @@ import { ObjectLoader, type LoadedObject } from './objects';
 import { createPhysics } from './physics';
 import { Interaction } from './interaction';
 import {
-  getRoom, getObject, listObjects, getVersion, postVersion, objectToItem, boundsMismatch, watchRoom, postFit, STUB, askIntent, listScans, listBuiltIns, searchObjects, sameOrigin, getJob, postListingsGenerate,
+  getRoom, getObject, listObjects, getVersion, postVersion, objectToItem, boundsMismatch, watchRoom, postFit, STUB, askIntent, listScans, listBuiltIns, searchObjects, sameOrigin, getJob, postListingsGenerate, postObjectThumbnail,
   type ObjectV1, type VersionV1, type PlacementV1, getActiveRoom, getRoomLive
 } from './api';
 import { FitOverlay, type FitReport } from './fit';
@@ -219,6 +219,12 @@ const STYLES: [string, string][] = [
   ['Modern', 'modern'],
   ['Social', 'social'],
 ];
+/**
+ * Scans the server has no picture of. The tablet's render is the only image of them that
+ * exists, so it is sent to the search index the first time it is drawn. Scans only: a
+ * primitive has a real name and vector already, and a catalogue row has the store's photo.
+ */
+const needsThumbnail = new Set<string>();
 const objects = new Map<string, PlacedObject>();
 const catalog: PaletteItem[] = []; // everything in the palette's furniture list, placed or not
 let rise = 1; // 0..1 while the walls rise; objects are placed once it reaches 1
@@ -230,13 +236,20 @@ async function start() {
   const palette = new Palette();
   // A tile's picture of the mesh it stands for. The palette pulls one per visible object
   // cell; thumbs.ts draws each mesh once, off to the side, and hands back a canvas.
-  const thumbs = new Thumbnails(loader, () => {
-    showPalette();
-    findPanel.refresh(); // a scan row in the popout is waiting on the same picture
-  });
-  palette.thumbFor = (item) => (item.url ? thumbs.get(item.objectId ?? item.url, item.url, item.scale) : null);
+  const thumbs = new Thumbnails(
+    loader,
+    () => {
+      showPalette();
+      findPanel.refresh(); // a scan row in the popout is waiting on the same picture
+    },
+    // Fire-and-forget, off the frame loop: the render goes to the search index so a scan can
+    // be found by what it looks like. Nothing on screen waits for it and it is never retried.
+    (objectId, jpeg) => void postObjectThumbnail(objectId, jpeg).catch((err) => console.warn(`Thumbnail not indexed for ${objectId}:`, err)),
+  );
+  palette.thumbFor = (item) =>
+    item.url ? thumbs.get(item.objectId ?? item.url, item.url, item.scale, !!item.objectId && needsThumbnail.has(item.objectId)) : null;
   // Scale 1: a server mesh is already metres, and a picture of it never re-guesses that.
-  findPanel.thumbFor = (objectId, glbUrl) => (glbUrl ? thumbs.get(objectId, sameOrigin(glbUrl), 1) : null);
+  findPanel.thumbFor = (objectId, glbUrl) => (glbUrl ? thumbs.get(objectId, sameOrigin(glbUrl), 1, needsThumbnail.has(objectId)) : null);
   const applier = new ProposalApplier(physics);
   // Built before the first showPalette(): the talk row reads voice.supported.
   const voice = new Voice({
@@ -1642,6 +1655,13 @@ async function start() {
     const fresh = scans.filter((o) => !knownScans.has(o.objectId));
     if (!fresh.length) return;
     for (const o of fresh) knownScans.add(o.objectId);
+    // A phone scan arrives with no picture of any kind: Object Capture uploads the mesh alone.
+    // The render the tablet makes is therefore the only image of it that exists, and the
+    // search index needs one — without it every scan is the same "Captured object" text,
+    // embeds to the same point, and no query can separate two of them. Decided here from the
+    // row the server actually sent, never from a Recommendation, which carries a fallback URL
+    // that makes an object with no image look like it has one (listings.ts).
+    for (const o of fresh) if (o.source === 'scan' && !o.imageUrl) needsThumbnail.add(o.objectId);
     const items: PaletteItem[] = fresh.map((o) => ({
       url: sameOrigin(o.glbUrl!),
       name: o.name || 'Captured object',
