@@ -36,6 +36,9 @@ from .auth import require_upstream_token
 from .browserbase import BrowserbaseFetch, CachedFetch, FetchError
 from .dimensions import extract
 from .page_extract import extract_from_page, product_url
+from .product_search import (
+    handles_from_search_page, normalise_query, products_by_handle, search_url,
+)
 from .validate import validate
 
 app = FastAPI(title="ingest")
@@ -124,6 +127,97 @@ async def crawl(request: Request):
                 break
 
     return {"storefront": storefront, "count": len(products), "products": products}
+
+
+@app.post("/find", dependencies=[Depends(require_upstream_token)])
+async def find_products(request: Request):
+    """Prompt -> candidate products from one storefront, best match first.
+
+      POST /find  { storefront, query, limit?, merchant? }
+                  -> { query, searchedFor, count, handles, products }
+
+    The front half the pipeline was missing. Everything else here is merchant-driven — crawl a
+    catalogue, extract all of it — which pre-generates assets fine but cannot answer "find me a
+    red chair" live.
+
+    Relevance is the merchant's, not ours. Their search already knows a "Cloud" is a chair and
+    that "sectional" means sofa, which title matching never will, so this renders their own
+    /search page through Browserbase and reads the order off it. Rendering rather than fetching
+    is what makes stores with client-side search work, the same reason step 2.5 exists.
+
+    Returns raw products, not Object v1: measuring them is /extract's job, and keeping the two
+    apart means a caller can cache this and re-extract without paying for the page again —
+    exactly the split /crawl and /extract already have.
+
+    `query` is expected to already describe a PRODUCT. Pulling the product out of an utterance
+    — "a bookshelf beside my desk" is a search for a bookshelf, not a desk — belongs to the
+    voice agent, which splits it into find_anchor and search_objects before anything reaches
+    here. This endpoint only strips leftover imperative and article noise; it does not parse
+    intent, because two places doing that is how they drift apart.
+    """
+    body = await request.json()
+    storefront = (body.get("storefront") or "").strip()
+    raw_query = (body.get("query") or "").strip()
+    if not storefront:
+        return _err(422, "missing_storefront", "storefront is required")  # standing rule 4
+    if not raw_query:
+        return _err(422, "missing_query", "query is required")            # standing rule 4
+
+    limit = min(int(body.get("limit") or 12), 50)
+    query = normalise_query(raw_query)
+
+    # Never a silent skip: without a key this endpoint cannot work at all, and returning an
+    # empty list would look exactly like a merchant having nothing that matches.
+    try:
+        fetcher = CachedFetch(PAGE_CACHE, upstream=BrowserbaseFetch())
+    except ValueError as e:
+        return _err(503, "browserbase_unconfigured", str(e))
+
+    url = search_url(storefront, query)
+    try:
+        res = await asyncio.to_thread(fetcher.fetch, url)
+    except FetchError as e:
+        return _err(502, "search_page_unreachable", f"{url}: {e}")
+
+    handles = handles_from_search_page(res.content, limit=limit)
+    if not handles:
+        # A real, reportable outcome — not an error. Say which URL was read so the caller can
+        # look at the same page rather than guess whether the search or the parse came up dry.
+        return {"query": raw_query, "searchedFor": query, "searchUrl": url,
+                "count": 0, "handles": [], "products": []}
+
+    # The search page gives a title, a thumbnail and a link. The catalogue gives variants,
+    # body_html and the full image list — which is what the extraction pipeline takes — so
+    # join back to it rather than fetching every product again.
+    catalogue: list[dict] = []
+    async with httpx.AsyncClient(headers={"User-Agent": USER_AGENT},
+                                 timeout=CRAWL_TIMEOUT_S, follow_redirects=True) as client:
+        for page in range(1, MAX_PAGES + 1):
+            try:
+                r = await client.get(
+                    f"{storefront.rstrip('/')}/products.json?limit=250&page={page}")
+                r.raise_for_status()
+            except httpx.HTTPError as e:
+                return _err(502, "storefront_unreachable", f"{type(e).__name__}: {e}")
+            batch = (r.json() or {}).get("products") or []
+            catalogue.extend(batch)
+            if len(batch) < 250 or len({h for h in handles} - {
+                    (x.get("handle") or "").lower() for x in catalogue}) == 0:
+                break
+
+    products = products_by_handle(catalogue, handles)
+    return {
+        "query": raw_query,
+        "searchedFor": query,
+        "searchUrl": url,
+        "count": len(products),
+        "handles": handles,
+        # Handles the catalogue does not serve cannot be measured, so they are reported rather
+        # than quietly dropped — a caller comparing count to handles should see why.
+        "missing": [h for h in handles if h not in {
+            (x.get("handle") or "").lower() for x in products}],
+        "products": products,
+    }
 
 
 def _object_v1(merchant: str, storefront: str, p: dict, bbox: dict, verdict, method_src: str,
