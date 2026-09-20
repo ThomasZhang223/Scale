@@ -1,167 +1,614 @@
 <p align="center">
-  <img src="docs/assets/scale-logo.png" alt="Scale" width="160">
+  <img src="docs/assets/scale-logo.png" alt="Scale" width="180">
 </p>
 
 <h1 align="center">Scale</h1>
 
 <p align="center">
-  Scale makes physical space searchable. Point at something you like, and Scale can find real products like it, determine what actually fits your room, reconstruct missing 3D geometry, and place it at true scale.
+  <strong>Make the physical world computable.</strong>
 </p>
 
-Built at Hack the North 2026.
+<p align="center">
+  Point at something you like. Scale finds real products like it, figures out what actually fits,
+  reconstructs missing 3D geometry, and places the result in your room at true scale.
+</p>
 
-## What it does
+<p align="center">
+  Built at <strong>Hack the North 2026</strong>.
+</p>
 
-Room planners already ship LiDAR scans, accurate dimensions, and place-at-scale. Scale does two
-things they structurally cannot:
+---
 
-- **Ingest an object that is for sale nowhere.** Walk around anything you own with an iPhone.
-  Photogrammetry runs on the phone, the mesh is exported to glTF on the phone, and a minute later
-  the object is in your headset at its real size.
-- **Retrieve over your own possessions and the open web.** Ask, out loud, for "a side table under
-  50 cm for the gap by the desk". The designer agent turns intent into constraints, an OR-Tools
-  solver places things, and live Shopify storefronts are searched for listings that fit, measured
-  in metres, dropped into the room as boxes and then as meshes.
+## The idea
 
-Every number in the system is metres. Scale is bound exactly once. No language model ever emits a
-coordinate. When a value cannot be determined, the system says so instead of guessing.
+Most spatial shopping tools start with a catalog.
 
-## The two apps
+Scale starts with **the physical world**.
 
-### Phone (Expo, iOS)
+A desk in your parents' basement, a chair at a café, something on Marketplace, or a product with photos but no 3D asset should still be usable spatially.
 
-- **Capture an object in 3D.** Apple Object Capture guided orbit, on-device photogrammetry, a
-  native USDZ to glTF exporter, the size read off the mesh. Preview in SceneKit, place in AR at 1:1
-  with QuickLook, save to the library.
-- **Measure an object.** One tap on a LiDAR frame: a measured box in under a second.
-- **Photograph the walls.** The fallback when a room scan cannot read a space: six faces of a box
-  room, each straightened with a four-point transform and measured from LiDAR at the corners.
-- **New room from photos.** Six photos from the camera roll, straightened the same way; the room's
-  size follows from each wall's proportions and one entered ceiling height. The faces are stitched
-  on the room page.
-- **Library.** Rooms with a photo hero and a view from inside, scanned objects with their own photos,
-  and the merchant catalogue with real Shopify product photos, prices, and sizes.
-- **Send a room to the headset.** Pick a room on the phone; the Quest rebuilds around you.
+We built Scale around one question:
 
-### Headset (WebXR, Meta Quest)
+> **"Find me something like this that actually fits here."**
 
-- The room at 1:1, furniture with physics, grab and carry, turn, lift with the other hand, and
-  set it down on whatever is under it.
-- A floating window for the library: four columns of tiles, drag it by its bar, push it away or
-  pull it closer with the stick. It never closes.
-- A dialogue card that floats where you look and dismisses itself when the reply is spoken, and a
-  second card for shop listings that you can bring back at any time.
-- Voice: hold to talk. Arrangement requests go to the designer agent; "find ..." requests go to
-  three live storefronts in parallel, each shown as a small browser window with the page it is
-  reading and the product photos as they arrive.
-- New captures from the phone appear in the palette within ten seconds. No page reload.
+Answering that requires more than recommendation.
+
+Scale has to understand:
+
+* what the user likes
+* what physically exists in the room
+* how much space is actually available
+* which product dimensions can be trusted
+* whether a candidate fits
+* how to reconstruct it in 3D if no model exists
+* how to preserve the exact product identity through checkout
+
+The result is one system that connects **perception, retrieval, geometry, optimization, XR, and commerce** around the same physical object.
+
+---
+
+## How it works
+
+```text
+room + object
+     ↓
+RoomPlan / LiDAR
+     ↓
+image or natural-language query
+     ↓
+multimodal retrieval + Shopify discovery
+     ↓
+verified physical dimensions
+     ↓
+deterministic fit check
+     ↓
+2D → 3D reconstruction if needed
+     ↓
+metric mesh binding + validation
+     ↓
+1:1 placement in Quest
+     ↓
+exact product / variant / checkout
+```
+
+### 1. Capture reality
+
+The iPhone app uses **Apple RoomPlan** to reconstruct the room in metres.
+
+For individual objects, we built a custom **LiDAR raycast-and-grow measurement path** that returns width, height, depth, position, and rotation.
+
+Physical size is measured deterministically.
+
+**We never ask a language model to guess it.**
+
+For objects you already own, Scale can also run **Apple Object Capture** and export a textured mesh into the same spatial system.
+
+### 2. Search by meaning
+
+Scale supports both text and image retrieval.
+
+You can type:
+
+> "soft beige reading chair"
+
+or use something you already own as the visual reference.
+
+We use **SigLIP2** so text and product images share the same 768-dimensional embedding space.
+
+Similarity answers:
+
+> *What looks right?*
+
+The room answers:
+
+> *What is physically possible?*
+
+### 3. Search real Shopify products
+
+Scale also connects to **Shopify Global Catalog** for real text, image, and multimodal product discovery.
+
+Shopify gives us:
+
+* the merchant
+* the real product
+* the exact variant
+* price
+* availability
+* checkout identity
+
+Scale adds the part commerce normally does not know:
+
+> **the customer's physical environment**
+
+A product only receives a verified fit result when Scale has dimensions with trustworthy provenance.
+
+Otherwise it stays:
+
+> **SIZE UNVERIFIED**
+
+In one live verification with a **50 cm width constraint**:
+
+| Product               | Result                         |
+| --------------------- | ------------------------------ |
+| Terrazzo Side Table   | **0.8 cm too wide**            |
+| Terrazzo Switch Table | **fits with 4.3 cm clearance** |
+
+The fitting result retained its real Shopify merchant, variant, price, and checkout destination.
+
+So Scale can move from:
+
+> **"This looks right."**
+
+to:
+
+> **"This looks right, fits here, and this is the exact one you can buy."**
+
+### 4. Reconstruct missing 3D
+
+Most products have photos.
+
+Far fewer have usable 3D assets.
+
+Scale sends a single product image through **Stable Fast 3D on Baseten**.
+
+But generated geometry has no trustworthy physical scale.
+
+That led to one of the main rules in the system:
+
+> **The generative model supplies shape. The measurement supplies size.**
+
+Our binding pipeline:
+
+1. parses the generated mesh
+2. computes the scale required to match the target physical dimensions
+3. transforms the geometry
+4. preserves UVs and materials
+5. preserves or reconstructs normal-map tangent data
+6. moves the origin to bottom-centre
+7. exports the GLB
+8. reloads the exported bytes
+9. verifies the final bounding box and origin
+
+**We do not even trust our own export step.**
+
+Scale is applied exactly once. Every downstream system treats that result as canonical.
+
+### 5. Put it in the room
+
+Captured objects, generated objects, and catalog products all use the same metre-based room coordinate system.
+
+On iPhone, Scale supports 3D and AR previews for captured objects.
+
+On Meta Quest, you can stand inside the room at **1:1 scale**, grab furniture, move it, rotate it, and understand the layout spatially rather than through a flat product page.
+
+When final geometry is not ready, Scale can represent the object's measured volume first instead of blocking the interaction on generation.
+
+### 6. Ask the room to change
+
+Scale also accepts natural-language spatial requests:
+
+> "Find me a lamp under 1.5 metres."
+
+> "Turn this bedroom into a six-person workspace."
+
+The language model interprets intent.
+
+It **does not place the furniture**.
+
+Scale converts the request into an objective and constraints, then **OR-Tools** solves the actual placement.
+
+> **The LLM never emits a coordinate.**
+
+Every measurement spoken by the voice assistant must also trace back to a real tool result.
+
+---
+
+## What we proved
+
+|                     |                                                                                                           |
+| ------------------- | --------------------------------------------------------------------------------------------------------- |
+| **1.19 s**          | fastest measured repeated warm 1024-texture 2D → 3D request                                               |
+| **2.62 s / 4.07 s** | two different new warm catalog-image requests                                                             |
+| **0.94 s / 1.74 s** | SF3D compute inside those two requests                                                                    |
+| **100 products**    | curated spatial catalog across five furniture categories                                                  |
+| **262 products**    | dimensions recovered from merchant pages when product APIs did not expose them                            |
+| **768 dimensions**  | shared SigLIP2 image/text embedding space                                                                 |
+| **0.8 cm → 4.3 cm** | real Shopify miss versus verified fitting alternative                                                     |
+| **< 3 × 10⁻⁸ m**    | measured numerical bounding-box error against supplied target dimensions in our real GLB binding artifact |
+
+The important part is not any one model.
+
+It is that **every representation eventually has to agree about the same physical object**.
+
+---
 
 ## Architecture
 
 <p align="center">
-  <img src="docs/architecture/full-scale-architecture.png" alt="Architecture" width="820">
+  <img src="docs/architecture/full-scale-architecture.png" alt="Scale architecture" width="900">
 </p>
 
-| Piece | Where | Role |
-| --- | --- | --- |
-| `workers` | Cloudflare Worker | The only front door. Rooms, objects, versions, uploads, search, jobs. |
-| D1, R2, Vectorize, KV | Cloudflare | Rows, meshes and photos, SigLIP 2 vectors, upstream config. |
-| `services/agent` | Cloudflare Worker | The designer agent the headset talks to. Intent to constraints, never coordinates. |
-| `services/fit` | Docker | OR-Tools CP-SAT solver. Answers `/fit` and `/solve`. |
-| `services/ingest` | Docker | Shopify crawl, Browserbase page reads, dimension extraction in metres. |
-| `services/search` | Docker | Ranking. |
-| `services/gen` | Docker + Baseten | 2D to 3D generation (SF3D) behind an adapter that performs the one scale binding. |
-| `apps/mobile` | iPhone | Capture, library, room selection. |
-| `apps/xr` | Meta Quest | The room at 1:1, the palette window, voice, listings. |
+Scale uses Cloudflare as the shared control plane between the iPhone, Quest, persistent room state, search, generation, and the external services behind them.
 
-`docs/SYSTEM_STATE.md` describes exactly what is deployed and how data flows today.
-`.claude/contracts.md` is the authority on every schema and route.
+| Piece              | Where             | Role                                                                         |
+| ------------------ | ----------------- | ---------------------------------------------------------------------------- |
+| `apps/mobile`      | iPhone            | Room capture, object measurement, Object Capture, library and room selection |
+| `apps/xr`          | Meta Quest        | 1:1 room runtime, physics, interaction, voice, products and placement        |
+| `workers`          | Cloudflare Worker | Main API and routing layer                                                   |
+| D1                 | Cloudflare        | Rooms, objects and application state                                         |
+| R2                 | Cloudflare        | Meshes, frames and generated assets                                          |
+| Vectorize          | Cloudflare        | 768-d SigLIP2 embeddings                                                     |
+| Queues + Workflows | Cloudflare        | Long-running ingestion and generation jobs                                   |
+| Durable Objects    | Cloudflare        | Per-room synchronization and live state                                      |
+| `services/agent`   | Cloudflare Worker | Intent → objectives and constraints                                          |
+| `services/fit`     | Docker            | Fit validation + OR-Tools CP-SAT arrangement                                 |
+| `services/ingest`  | Docker            | Merchant crawl, Browserbase reads, dimension extraction                      |
+| `services/search`  | Docker            | Retrieval and ranking                                                        |
+| `services/gen`     | Docker + Baseten  | Embeddings, SF3D generation, metric binding and validation                   |
 
-## Sponsor technologies
+`docs/SYSTEM_STATE.md` describes the current runtime state.
 
-| | |
-| --- | --- |
-| **Cloudflare** | The backbone, not a hosting choice: 3 Workers (front door API, the WebXR page proxied over service bindings, the designer agent), D1, R2, Vectorize, KV, Durable Objects, Workflows, Queues, Cron Triggers, Workers AI, Browser Rendering, Static Assets, the Agents SDK, Tunnel, and Observability — 16 products, each with the config line that proves it in `docs/architecture/index.html`. |
-| **Shopify** | Storefronts are crawled and extracted for real-world dimensions; the headset's live "find" requests browse three storefronts in parallel, and a listing is only offered once it has a reconstructed mesh. |
-| **Expo** | The iPhone app: native Swift modules (RoomPlan capture, Object Capture, wall and object measurement) wrapped in an Expo Router app. |
-| **Baseten** | SF3D image-to-3D generation for the catalogue, served through a dimension-binding adapter that performs the one scale binding. Currently switched off for the live demo: catalogue meshes were reconstructed ahead of time and are served from cache; live generation is supported by the pipeline but disabled. |
-| **Browserbase** | Drives headless browsing of merchant storefronts for `services/ingest`'s crawl, extract, and find pipeline. |
-| **ElevenLabs** | Voice in the headset: speech in and out for the hold-to-talk loop. |
-| **OpenAI** | The designer agent's planner (`services/agent`), and the catalogue dimension-extraction pass in `services/ingest`. |
+`.claude/contracts.md` defines the shared schemas and routes.
 
-## Repository layout
+---
 
+## Under the hood
+
+### Trustworthy dimensions
+
+**Shopify · Browserbase · regex · LLM/VLM extraction**
+
+Furniture dimensions are surprisingly messy.
+
+They can appear in:
+
+* `body_html`
+* variant names such as `60" x 30"`
+* JSON-LD
+* specification tables
+* Shopify metafields unavailable through storefront product endpoints
+* diagrams
+* mixed imperial and metric units
+* or nowhere at all
+
+Scale escalates through progressively more expensive sources:
+
+```text
+structured data / regex
+        ↓
+constrained LLM extraction
+        ↓
+rendered page through Browserbase
+        ↓
+VLM over specification imagery
+        ↓
+shared validator
 ```
-apps/mobile/       Expo app: capture modules (Swift), library, room selection
-apps/xr/           WebXR runtime for the Quest (three.js + Rapier)
-workers/           Cloudflare Worker: every HTTP route
-services/agent/    designer-agent Worker
-services/fit/      OR-Tools solver
-services/ingest/   Shopify scraper and extractor
-services/search/   ranking service
-services/gen/      Baseten generation, scale binding, embeddings
-fixtures/          committed fixtures every stub answers
-infra/             the laptop half of the stack: Docker, tunnels, publish
-docs/              system state, architecture, brand assets
+
+Every answer goes through the same validation layer.
+
+It checks:
+
+* stated units
+* plausible ranges
+* swapped axes
+* product-category consistency
+* source provenance
+* confidence
+
+Unknown means unknown.
+
+Rendering merchant pages recovered physical dimensions for **262 products** that the normal product API layer did not expose.
+
+---
+
+### Multimodal retrieval
+
+**SigLIP2 · Cloudflare Vectorize**
+
+Scale uses:
+
+```text
+google/siglip2-base-patch16-224
 ```
 
-## Running it
+for both images and text.
 
-Prerequisites: Xcode 26 or newer with an iPhone that has LiDAR (12 Pro or later), a Meta Quest
-with developer mode, Node, Docker Desktop, and `cloudflared`.
+Both produce normalized **768-dimensional embeddings**, allowing natural-language intent to be compared directly against product photography.
 
-**Phone**
+Physical dimensions remain separate hard constraints.
 
+---
+
+### Shopify spatial commerce
+
+**Shopify Global Catalog**
+
+Shopify discovery is isolated from Scale's existing retrieval path.
+
+Scale can search using:
+
+* text
+* an image
+* image + text
+* a related product
+
+A returned commerce result can carry its real seller, variant, price, availability, and checkout URL.
+
+Scale does not treat inferred product descriptions as dimensional truth.
+
+Only products joined to sufficiently trustworthy physical evidence receive a verified fit.
+
+If Shopify is unavailable, the original catalog, search, fit, generation, and XR paths continue independently.
+
+---
+
+### 2D → 3D
+
+**Stable Fast 3D · Baseten**
+
+SF3D produces geometry and textures from one image.
+
+Scale then binds the output to physical dimensions.
+
+The generation layer owns **appearance**.
+
+The binding layer owns **scale**.
+
+During profiling, we found that the expensive part of the path was not steady-state inference but startup and first-request initialization.
+
+Our controlled same-replica benchmark went from **28.71 s on the first request** to **1.19 s on the next 1024-texture request**.
+
+Reducing texture resolution barely improved total latency and visibly reduced detail, so we kept the higher-quality setting.
+
+For demo reliability, reviewed meshes can be served from cache without making the judged path depend on GPU cold-start behavior.
+
+---
+
+### Spatial reasoning
+
+**Deterministic fit checks · OR-Tools**
+
+The LLM is allowed to understand:
+
+> "make this corner a reading space"
+
+It is not allowed to decide that a 90 cm table fits inside an 80 cm gap.
+
+Deterministic systems answer:
+
+* does it fit?
+* which constraint failed?
+* by how much?
+* how much clearance remains?
+* where can it legally go?
+
+That is how Scale can produce:
+
+> **0.8 cm too wide**
+
+instead of asking a model whether something *looks* like it fits.
+
+---
+
+## The two apps
+
+### iPhone
+
+**Expo · Expo Router · four custom Swift modules · RoomPlan · ARKit**
+
+The phone handles:
+
+* RoomPlan room capture
+* LiDAR object measurement
+* Apple Object Capture
+* native USDZ → glTF export
+* SceneKit preview
+* QuickLook AR
+* room and object library
+* room handoff to Quest
+
+<details>
+<summary><strong>Additional room capture path</strong></summary>
+
+Scale can also reconstruct a box-room representation from six rectified surface photographs.
+
+Each face is straightened with a four-point transform. LiDAR corner measurements or an entered ceiling height establish the physical scale, and the surfaces are assembled into the room representation.
+
+</details>
+
+### Meta Quest
+
+**WebXR · three.js · Rapier · ElevenLabs**
+
+The Quest experience includes:
+
+* the scanned room at 1:1
+* physics-enabled furniture
+* grab, carry, rotate, lift and place
+* a persistent floating product/library window
+* live room updates over SSE
+* hold-to-talk voice interaction
+* live product results
+* true-scale catalog meshes
+* newly captured phone objects without a page reload
+
+---
+
+## Built with
+
+| Area                      | Technology                                                              |
+| ------------------------- | ----------------------------------------------------------------------- |
+| **Capture**               | Apple RoomPlan, ARKit/LiDAR, Object Capture, Swift, Expo                |
+| **Retrieval**             | SigLIP2, Cloudflare Vectorize                                           |
+| **Commerce**              | Shopify Global Catalog                                                  |
+| **Merchant intelligence** | Shopify storefronts, Browserbase, OpenAI                                |
+| **3D generation**         | Stable Fast 3D, Baseten                                                 |
+| **Spatial reasoning**     | OR-Tools, deterministic fit validation                                  |
+| **Edge + state**          | Cloudflare Workers, D1, R2, KV, Queues, Workflows, Durable Objects, SSE |
+| **XR**                    | three.js, WebXR, Rapier                                                 |
+| **Voice**                 | ElevenLabs                                                              |
+| **Services**              | FastAPI, Docker                                                         |
+
+---
+
+## Repository
+
+```text
+apps/
+  mobile/            Expo app + native Swift capture / measurement
+  xr/                Quest WebXR runtime
+
+workers/              Cloudflare API + orchestration
+
+services/
+  agent/              designer agent
+  fit/                deterministic fit + OR-Tools solver
+  ingest/             merchant crawl + dimension extraction
+  search/             retrieval / ranking
+  gen/                embeddings + SF3D + metric binding
+
+fixtures/             committed API fixtures
+infra/                Docker, tunnels, provisioning and publish tooling
+docs/                 architecture, system state and runbooks
 ```
+
+---
+
+<details>
+<summary><strong>Run Scale locally</strong></summary>
+
+### Prerequisites
+
+* Xcode 26+
+* LiDAR-equipped iPhone (12 Pro or newer)
+* Meta Quest with developer mode
+* Node
+* Docker Desktop
+* `cloudflared`
+
+### iPhone
+
+```bash
 cd apps/mobile
 npm install
 npx expo run:ios --device
 ```
 
-**Headset**
+### Quest
 
-```
+```bash
 cd apps/xr
 npm install
-npm run quest        # adb reverse, then Vite on http://localhost:5173
+npm run quest
 ```
 
-Open `http://localhost:5173` in the Quest browser over USB and press Enter VR. WebXR needs a
-secure context, which localhost over USB provides.
+`npm run quest` sets up ADB reverse and starts Vite at:
 
-**Edge and services**
-
-```
-cp infra/.env.example infra/.env   # fill in UPSTREAM_TOKEN
-bash infra/up.sh                   # containers, tunnels, publish to the Worker
-cd services/agent && npm run dev   # designer agent on :8789
+```text
+http://localhost:5173
 ```
 
-Every `/v1` route answers a committed fixture when the request carries `X-Stub: 1`, so each app
-runs against stubs with none of the above.
+Open the address in the Quest browser over USB and enter VR.
+
+### Edge + services
+
+```bash
+cp infra/.env.example infra/.env
+# Fill in the required upstream token.
+
+bash infra/up.sh
+
+cd services/agent
+npm run dev
+```
+
+Every `/v1` route can also return committed fixture responses when supplied:
+
+```text
+X-Stub: 1
+```
+
+so the clients can be developed independently of the complete live stack.
+
+</details>
+
+---
 
 ## Team
 
-**Thomas** — iOS native capture modules (RoomPlan room scanning, object measurement) and the
-Expo app around them; the Cloudflare Workers backend, including the mesh
-generation and merchant-ingest workflows, the catalogue and search routes, and the KV/D1/R2/
-Vectorize wiring; `infra/` (Docker, tunnels, deploy and provisioning scripts); WebXR interaction and
-palette work (room selection, window/panel handling, voice-driven library answers) alongside Justin.
+**Built at Hack the North by four engineers working in parallel against shared contracts and explicit component ownership.**
 
-**Justin** — the WebXR runtime for the Quest (`apps/xr/src`): scene setup, interaction, physics and
-stacking, the HUD, the voice/find panels, and ElevenLabs voice integration; the OR-Tools CP-SAT
-layout solver and its evolution into `services/fit`; the designer agent Worker (`services/agent`)
-and its planning pipeline; the wall-capture and object-capture native modules on the phone; and
-Expo app screens (tabs, capture flow, room detail).
+### Thomas
 
-**Ani** — the generation and retrieval pipeline in `services/gen`: the SigLIP 2 embedding service,
-the SF3D image-to-3D deployment on Baseten and its dimension-binding adapter, Shopify-aware
-discovery with verified dimensions, and the Cloudflare-side wiring (mesh job dispatch, indexing)
-that connects generation output back into the Worker.
+**iOS capture + backend infrastructure**
 
-**Paul** — `services/ingest`: the Shopify crawler and extractor, dimension extraction over
-Browserbase-rendered pages, and the prebaked catalogue (images and manifest) handed to Ani's
-pipeline; `services/search`'s ranking service; and the phone's voice loop
-(`apps/mobile/src/voice`) — intent parsing, the tool schema, and the transport to the agent.
+* RoomPlan room scanning
+* LiDAR object measurement
+* Expo integration
+* Cloudflare API
+* D1 / R2 / Vectorize / KV
+* generation and merchant-ingest workflows
+* catalog/search routes
+* Docker, tunnels and provisioning
+* WebXR room-selection and panel work alongside Justin
 
-The full design doc and its reasoning are in `BUILD_DOC.md`.
+### Justin
+
+**Spatial runtime + reasoning**
+
+* Quest WebXR runtime
+* three.js scene and interaction
+* Rapier physics
+* HUD, voice and product panels
+* ElevenLabs integration
+* OR-Tools CP-SAT solver
+* `services/fit`
+* designer agent and planning pipeline
+* native wall/object capture
+* Expo room flows
+
+### Ani
+
+**Multimodal ML + 3D generation + spatial commerce**
+
+* SigLIP2 text/image embedding service
+* Stable Fast 3D deployment on Baseten
+* generation profiling and latency instrumentation
+* metric GLB binding and validation
+* UV / material / normal-map / tangent preservation
+* Shopify Global Catalog discovery
+* exact-variant dimension verification
+* physical-fit explanations and checkout handoff
+* Cloudflare generation dispatch and indexing integration
+
+### Paul
+
+**Merchant intelligence + ranking + mobile voice**
+
+* Shopify crawling and extraction
+* Browserbase merchant-page processing
+* dimension extraction and validation
+* spatial catalog ingestion
+* 100-product prebaked catalog
+* `services/search`
+* mobile voice intent parsing
+* tool schema and agent transport
+
+---
+
+## The rules we kept coming back to
+
+> **Shape can be generated. Scale must be measured.**
+
+> **Similarity does not imply fit.**
+
+> **The LLM understands intent. Deterministic systems own geometry.**
+
+> **If we do not know a measurement, we say we do not know it.**
+
+> **Every representation eventually has to agree about the same physical object.**
+
+---
+
+For the full system design and the reasoning behind it, see [`BUILD_DOC.md`](BUILD_DOC.md).
