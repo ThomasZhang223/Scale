@@ -688,3 +688,28 @@ test("the d1 fallback narrows the same way, and reports it", async () => {
   assert.equal(response.headers.get("x-ranker"), "d1-fallback");
   assert.equal(response.headers.get("x-search-scope"), "catalog-default");
 });
+
+// --- F-8: a foreign image key is refused by name ----------------------------------------------------
+
+test("a foreign, missing or oversized image is a named 4xx, not an internal error", async t => {
+  t.mock.method(globalThis, "fetch", async () => { throw Error("must not fetch"); });
+  const env = environment();
+  env.BUCKET = { get: async () => null };
+  await assert.rejects(embedInput(env, { imageKey: "random/not/a/key.jpg" }),
+    error => error.status === 400 && error.code === "bad_image_key" && error.message.includes("random/not/a/key.jpg"));
+  await assert.rejects(embedInput(env, { imageKey: "catalog/M/1/source.jpg" }),
+    error => error.status === 404 && error.code === "image_not_found");
+  env.BUCKET.get = async () => ({ size: 11 * 1024 * 1024, body: { cancel: async () => {} } });
+  await assert.rejects(embedInput(env, { imageKey: "catalog/M/1/source.jpg" }),
+    error => error.status === 413 && error.code === "image_too_large");
+});
+
+test("POST /v1/objects/{id}/index answers 400 bad_image_key for a foreign key", async t => {
+  const { env } = pipelineEnvironment();
+  env.UPSTREAM_TOKEN = "secret";
+  env.OBJECTS_INDEX = { upsert: async () => { throw Error("must not index"); } };
+  t.mock.method(globalThis, "fetch", async () => { throw Error("must not fetch"); });
+  await assert.rejects(postObjectIndex(new Request("https://api.example/v1/objects/object/index", {
+    method: "POST", headers: { "x-upstream-token": "secret" }, body: JSON.stringify({ imageKey: "random/not/a/key.jpg" }) }),
+    env, "object", "https://api.example"), error => error.status === 400 && error.code === "bad_image_key");
+});

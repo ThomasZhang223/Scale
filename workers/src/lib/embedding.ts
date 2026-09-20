@@ -1,4 +1,5 @@
 import { upstreamOrigin } from "./config";
+import { HttpError } from "./http";
 
 export interface Embedding {
   values: number[];
@@ -30,13 +31,13 @@ export async function embedInput(
     // Exactly the two image key shapes R2Keys mints (objectFrame, catalogSource) — the guard
     // still refuses every other key.
     if (!OBJECT_FRAME.test(input.imageKey) && !CATALOG_SOURCE.test(input.imageKey)) {
-      throw new Error("Expected an object frame or catalogue source key");
+      throw new HttpError(400, "bad_image_key", `Expected an object frame or catalogue source key, got ${JSON.stringify(input.imageKey)}.`);
     }
     const image = await env.BUCKET.get(input.imageKey);
-    if (!image) throw new Error("Embedding image not found");
+    if (!image) throw new HttpError(404, "image_not_found", `Embedding image not found at ${input.imageKey}.`);
     if (image.size > 10 * 1024 * 1024) {
       await image.body.cancel();
-      throw new Error("Embedding image exceeds 10 MiB");
+      throw new HttpError(413, "image_too_large", `Embedding image exceeds 10 MiB at ${input.imageKey}.`);
     }
     const bytes = new Uint8Array(await image.arrayBuffer());
     const chunks: string[] = [];
