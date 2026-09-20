@@ -6,7 +6,7 @@ registerHooks({ resolve(specifier, context, next) {
   if (specifier.startsWith(".") && !/\.[a-z]+$/.test(specifier)) specifier += ".ts";
   return next(specifier, context);
 } });
-const { validateIntent, validateNeeds, FURNITURE_CATEGORIES } = await import("../src/lib/intent.ts");
+const { validateIntent, validateNeeds, productWords, FURNITURE_CATEGORIES } = await import("../src/lib/intent.ts");
 
 const design = (over = {}) => ({ intent: "design", query: null, category: null, fit: null, ...over });
 
@@ -45,4 +45,15 @@ test("every other field keeps its old meaning", () => {
   const out = validateIntent({ intent: "shop", query: "couch", category: "seating", fit: { maxW: 0.8 } });
   assert.deepEqual(out, { intent: "shop", query: "couch", category: "seating", fit: { maxW: 0.8 }, needs: null });
   assert.throws(() => validateIntent({ intent: "rearrange" }), /intent was/);
+});
+
+test("a query that is a comment about the schema is rejected, not sent to a storefront", () => {
+  // Verbatim from the deployed model on "Find me a side table on shopify".
+  assert.equal(productWords("side table on shopify is not valid, query is null, category is null, fit is null"), null);
+  assert.equal(productWords("couch is alre"), "couch is alre"); // short and useless, but the client's strip handles it
+  assert.equal(productWords("walnut 6 drawer dresser"), "walnut 6 drawer dresser");
+  assert.equal(productWords("a very long sentence that is plainly not a product name at all"), null);
+  assert.equal(productWords(null), null);
+  assert.equal(validateIntent({ intent: "shop", query: "sideboard" }).query, "sideboard");
+  assert.equal(validateIntent({ intent: "shop", query: "side table is null, query is null" }).query, null);
 });

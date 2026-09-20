@@ -121,7 +121,7 @@ export function validateIntent(value: unknown): ParsedIntent {
     throw new HttpError(502, "bad_intent", `intent was ${JSON.stringify(v.intent)}.`);
   }
   const str = (x: unknown) => (typeof x === "string" && x.trim() ? x.trim().slice(0, 120) : null);
-  const query = str(v.query);
+  const query = productWords(str(v.query));
   const category = str(v.category);
   let fit: ParsedIntent["fit"] = null;
   if (v.fit && typeof v.fit === "object") {
@@ -227,6 +227,25 @@ export async function parseIntent(env: Env, text: string): Promise<ParsedIntent>
     throw new HttpError(502, "bad_intent_json", `The model's JSON did not parse: ${(err as Error).message}`);
   }
   return validateIntent(parsed);
+}
+
+/**
+ * A query is PRODUCT WORDS. A 3B model sometimes answers with a comment about its own schema
+ * instead — measured on the deployed model, "Find me a side table on shopify" came back as
+ * `"side table on shopify is not valid, query is null, category is null, fit is null"`, and that
+ * whole string went to a storefront's search box and found nothing.
+ *
+ * Rejected, not repaired: an unusable value becomes null, and the headset then parses the words
+ * out of the sentence itself with `productQuery`, which is tested. Same rule as `fit`'s bounds
+ * above — a clamped guess is still a guess.
+ *
+ * Six words is the ceiling because a product phrase is short ("walnut 6 drawer dresser"); the
+ * phrases are the model's own words for "I have nothing to say here".
+ */
+export function productWords(query: string | null): string | null {
+  if (!query) return null;
+  if (/\bis null\b|\bnot valid\b|\bcategory is\b|\bquery is\b/i.test(query)) return null;
+  return query.split(/\s+/).length > 6 ? null : query;
 }
 
 /** Some models wrap JSON in a markdown fence even in JSON mode. */
