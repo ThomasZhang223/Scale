@@ -83,4 +83,37 @@ if (mode === "verify") {
   const receipt = JSON.parse(await readFile(receiptPath, "utf8"));
   if (receipt.base !== base) throw Error("Receipt belongs to another Worker; pass its --base explicitly.");
   await status(receipt.jobs, flag("--wait"));
+} else if (mode === "backfill") {
+  // Vectorize the catalogue rows already in D1, from their source PHOTOS. No Baseten, no mesh, no
+  // paid inference. Run `images` first (the photos must be in R2) and `submit` first (the rows
+  // must be in D1).
+  // Object ids come from GET /v1/objects?source=catalog, never from the manifest: the manifest has
+  // no objectId, and the id of record is the Worker's stableId(productUrl). The manifest supplies
+  // only the R2 key of each row's photo, joined on productUrl.
+  const filename = option("--file", path.join(root, "../services/ingest/prebake/manifest.json"));
+  const doc = JSON.parse(await readFile(filename, "utf8"));
+  const all = Array.isArray(doc) ? doc : doc.products ?? doc.objects ?? doc.items;
+  if (!Array.isArray(all)) throw Error("Expected an array, products, objects, or items");
+  const keyByUrl = new Map(all.filter(row => row.productUrl && row.r2Key).map(row => [row.productUrl, row.r2Key]));
+  // ceiling: one listing page, capped at 500 by GET /v1/objects. A larger catalogue needs paging on that route.
+  const listed = await (await request(`${base}/v1/objects?source=catalog&limit=500`)).json();
+  const credential = await token();
+  let ok = 0, unmatched = 0, failed = 0;
+  for (const object of listed.slice(0, Number(option("--limit", "500")))) {
+    const imageKey = keyByUrl.get(object.productUrl);
+    // A D1 row with no manifest row (a smoke-test row, or a scan) has no photo to embed. Say so.
+    if (!imageKey) { unmatched++; console.error(`SKIP  ${object.objectId}: no manifest row for ${object.productUrl}`); continue; }
+    try {
+      const res = await request(`${base}/v1/objects/${object.objectId}/index`, {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-upstream-token": credential },
+        body: JSON.stringify({ imageKey }),
+      });
+      const { modality } = await res.json();
+      if (modality !== "image") throw Error(`expected an image embedding, got ${modality}`);
+      ok++;
+    } catch (e) { failed++; console.error(`FAIL  ${object.objectId} ${imageKey}: ${String(e).slice(0, 200)}`); }
+  }
+  console.log(`Indexed ${ok} of ${listed.length} (unmatched ${unmatched}, failed ${failed}).`);
+  if (failed) process.exitCode = 1;
 } else throw Error("Use verify, submit, or status");

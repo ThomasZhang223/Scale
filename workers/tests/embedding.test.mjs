@@ -13,10 +13,10 @@ registerHooks({ resolve(specifier, context, next) {
   if (specifier.startsWith(".") && !/\.[a-z]+$/.test(specifier)) specifier += ".ts";
   return next(specifier, context);
 } });
-const { embedInput } = await import("../src/lib/embedding.ts");
+const { embedInput, indexObject } = await import("../src/lib/embedding.ts");
 const { consumeMeshJobs } = await import("../src/lib/queue.ts");
 const { GenerateMeshWorkflow } = await import("../src/workflows/generate-mesh.ts");
-const { postSearch, postGenerate, postObjectMesh, postUpload } = await import("../src/routes/index.ts");
+const { postSearch, postGenerate, postObjectMesh, postObjectIndex, postUpload } = await import("../src/routes/index.ts");
 const fingerprint = "a".repeat(64);
 const vector = { values: Array(768).fill(1 / Math.sqrt(768)), dimension: 768,
   fingerprint, inputHash: "b".repeat(64), modality: "text" };
@@ -293,6 +293,12 @@ function scanEnvironment(stored) {
   return { env, writes };
 }
 
+// ExecutionContext double: the background work waitUntil receives is kept so a test can await it.
+function context() {
+  const pending = [];
+  return { ctx: { waitUntil: promise => { pending.push(promise); } }, settle: () => Promise.all(pending) };
+}
+
 const scanRequest = key => new Request("https://api.example/v1/objects/scan-1/mesh", {
   method: "POST", body: JSON.stringify({ key }),
 });
@@ -310,7 +316,7 @@ test("scanMesh upload kind grants a scans/ key and the error names it", async ()
 
 test("postObjectMesh accepts only the scans/ key", async () => {
   const { env, writes } = scanEnvironment(glbBytes());
-  await assert.rejects(postObjectMesh(scanRequest("objects/scan-1/mesh.glb"), env, "scan-1", "https://api.example"),
+  await assert.rejects(postObjectMesh(scanRequest("objects/scan-1/mesh.glb"), env, "scan-1", "https://api.example", context().ctx),
     error => error.code === "bad_mesh_key");
   assert.equal(writes.some(w => w.sql.includes("state = 'ready'")), false);
 });
@@ -318,16 +324,117 @@ test("postObjectMesh accepts only the scans/ key", async () => {
 test("garbage bytes at the scan key return not_a_glb and never flip the row to ready", async () => {
   for (const stored of [new TextEncoder().encode("<html>error page</html>"), glbBytes(20, 99), new Uint8Array(8)]) {
     const { env, writes } = scanEnvironment(stored);
-    await assert.rejects(postObjectMesh(scanRequest("scans/scan-1/mesh.glb"), env, "scan-1", "https://api.example"),
+    await assert.rejects(postObjectMesh(scanRequest("scans/scan-1/mesh.glb"), env, "scan-1", "https://api.example", context().ctx),
       error => error.code === "not_a_glb" && error.status === 422);
     assert.equal(writes.some(w => w.sql.includes("state = 'ready'")), false);
   }
 });
 
-test("a valid GLB at the scan key flips the row to ready with that glb_key", async () => {
+test("a valid GLB at the scan key flips the row to ready with that glb_key", async t => {
   const { env, writes } = scanEnvironment(glbBytes());
-  const response = await postObjectMesh(scanRequest("scans/scan-1/mesh.glb"), env, "scan-1", "https://api.example");
+  env.OBJECTS_INDEX = { upsert: async () => {} };
+  t.mock.method(globalThis, "fetch", async () => Response.json(vector));
+  const { ctx, settle } = context();
+  const response = await postObjectMesh(scanRequest("scans/scan-1/mesh.glb"), env, "scan-1", "https://api.example", ctx);
   assert.equal(response.status, 200);
+  await settle();
   const ready = writes.find(w => w.sql.includes("state = 'ready'"));
   assert.equal(ready.args[0], "scans/scan-1/mesh.glb");
+});
+
+// --- One indexer -------------------------------------------------------------------------------
+
+test("embedInput admits catalogue source keys and still refuses every other key", async t => {
+  const env = environment();
+  env.BUCKET = { get: async () => ({ size: 3, arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer }) };
+  t.mock.method(globalThis, "fetch", async () => Response.json({ ...vector, modality: "image" }));
+  for (const good of ["catalog/Floyd_Home/9246282842274/source.jpg", "catalog/Poly___Bark/1/source.png",
+    "objects/id/frames/0.jpg"]) {
+    assert.equal((await embedInput(env, { imageKey: good })).modality, "image");
+  }
+  for (const bad of ["catalog/a/b/other.jpg", "catalog/a/source.jpg", "scans/id/mesh.glb", "objects/id/mesh.glb",
+    "rooms/id/capture.json", "catalog/a/b/c/source.jpg"]) {
+    await assert.rejects(embedInput(env, { imageKey: bad }), /Expected an object frame or catalogue source key/);
+  }
+});
+
+test("indexObject upserts one vector in millimetres under the fingerprint namespace", async t => {
+  const env = environment();
+  const upserts = [];
+  env.OBJECTS_INDEX = { upsert: async vectors => { upserts.push(...vectors); } };
+  t.mock.method(globalThis, "fetch", async () => Response.json(vector));
+  const result = await indexObject(env, { objectId: "o", source: "scan", category: "table",
+    bboxMeters: { w: 0.5, h: 0.75, d: 0.25 }, text: "walnut table" });
+  assert.deepEqual(result, { fingerprint, modality: "text" });
+  assert.equal(upserts.length, 1);
+  assert.equal(upserts[0].id, "o");
+  assert.equal(upserts[0].namespace, fingerprint);
+  assert.deepEqual(upserts[0].metadata, { objectId: "o", source: "scan", category: "table",
+    w_mm: 500, h_mm: 750, d_mm: 250, dominant_hex: "#000000" });
+});
+
+test("postObjectMesh answers x-indexed pending and indexes in the background, not in the request", async t => {
+  const { env } = scanEnvironment(glbBytes());
+  const upserts = [];
+  env.OBJECTS_INDEX = { upsert: async vectors => { upserts.push(...vectors); } };
+  let release;
+  const held = new Promise(resolve => { release = resolve; });
+  t.mock.method(globalThis, "fetch", async () => { await held; return Response.json(vector); });
+  const { ctx, settle } = context();
+  const response = await postObjectMesh(scanRequest("scans/scan-1/mesh.glb"), env, "scan-1", "https://api.example", ctx);
+  assert.equal(response.headers.get("x-indexed"), "pending");
+  assert.equal(upserts.length, 0, "the response must not wait for the embed");
+  release(); await settle();
+  assert.equal(upserts[0].id, "scan-1");
+  assert.equal(upserts[0].metadata.source, "scan");
+});
+
+test("a background embed failure never fails the scan save", async t => {
+  const { env, writes } = scanEnvironment(glbBytes());
+  env.OBJECTS_INDEX = { upsert: async () => {} };
+  t.mock.method(console, "error", () => {});
+  t.mock.method(globalThis, "fetch", async () => new Response("down", { status: 503 }));
+  const { ctx, settle } = context();
+  const response = await postObjectMesh(scanRequest("scans/scan-1/mesh.glb"), env, "scan-1", "https://api.example", ctx);
+  assert.equal(response.status, 200);
+  await settle();
+  assert.ok(writes.some(w => w.sql.includes("state = 'ready'")));
+});
+
+test("a scan with no embeddable text is saved and reports why it is not searchable", async t => {
+  for (const [name, category] of [["", ""], ["unknown", "unknown"], ["", "unknown"]]) {
+    const { env, writes } = scanEnvironment(glbBytes());
+    const row = (await env.DB.prepare("").bind().first());
+    Object.assign(row, { name, category });
+    t.mock.method(globalThis, "fetch", async () => { throw Error("must not embed"); });
+    const { ctx } = context();
+    const response = await postObjectMesh(scanRequest("scans/scan-1/mesh.glb"), env, "scan-1", "https://api.example", ctx);
+    assert.equal(response.headers.get("x-indexed"), "false");
+    assert.equal(response.headers.get("x-index-skipped"), "no-embeddable-text");
+    assert.ok(writes.some(w => w.sql.includes("state = 'ready'")));
+    t.mock.restoreAll();
+  }
+});
+
+test("postObjectIndex needs the upstream token, then indexes the image at the given key", async t => {
+  const { env } = pipelineEnvironment();
+  env.UPSTREAM_TOKEN = "secret";
+  const upserts = [];
+  env.OBJECTS_INDEX = { upsert: async vectors => { upserts.push(...vectors); } };
+  env.BUCKET.get = async key => {
+    assert.equal(key, "catalog/Floyd_Home/1/source.jpg");
+    return { size: 3, arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer };
+  };
+  t.mock.method(globalThis, "fetch", async () => Response.json({ ...vector, modality: "image" }));
+  const call = (headers, body) => postObjectIndex(new Request("https://api.example/v1/objects/object/index", {
+    method: "POST", headers, body: JSON.stringify(body) }), env, "object", "https://api.example");
+  await assert.rejects(call({}, { imageKey: "catalog/Floyd_Home/1/source.jpg" }), error => error.status === 401);
+  await assert.rejects(call({ "x-upstream-token": "wrong" }, { text: "x" }), error => error.status === 401);
+  await assert.rejects(call({ "x-upstream-token": "secret" }, { text: "x", imageKey: "y" }), error => error.code === "bad_index_input");
+  await assert.rejects(call({ "x-upstream-token": "secret" }, {}), error => error.code === "bad_index_input");
+  assert.equal(upserts.length, 0);
+  const response = await call({ "x-upstream-token": "secret" }, { imageKey: "catalog/Floyd_Home/1/source.jpg" });
+  assert.deepEqual(await response.json(), { objectId: "object", fingerprint, modality: "image" });
+  assert.equal(upserts[0].id, "object");
+  assert.equal(upserts[0].metadata.source, "catalog");
 });

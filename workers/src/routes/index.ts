@@ -8,7 +8,7 @@ import { HttpError, json, noContent, readJson } from "../lib/http";
 import { contentHash, nowIso, token, uuid } from "../lib/ids";
 import { R2Keys, contentTypeFor, keyFromAssetPath } from "../lib/keys";
 import { callUpstream, callUpstreamRaw, upstreamOrigin } from "../lib/config";
-import { embedInput, type Embedding } from "../lib/embedding";
+import { embedInput, indexObject, type Embedding } from "../lib/embedding";
 import { enqueueMesh } from "../lib/mesh-dispatch";
 import { emitToRoom, roomAgent, scoutAgent } from "../lib/notify";
 import {
@@ -347,6 +347,7 @@ export async function postObjectMesh(
   env: Env,
   objectId: string,
   origin: string,
+  ctx: ExecutionContext,
 ): Promise<Response> {
   const body = await readJson<{ key: string; roomId?: string | null }>(req);
   const key = required(body.key, "key");
@@ -354,7 +355,7 @@ export async function postObjectMesh(
     throw new HttpError(400, "bad_mesh_key", `key must be ${R2Keys.scanMesh(objectId)}, got ${key}.`);
   }
   // 404 before touching the row, and a loud error if the client marks ready before its PUT landed.
-  await getObject(env, objectId, origin);
+  const object0 = await getObject(env, objectId, origin);
   const head = await env.BUCKET.head(key);
   if (!head) throw new HttpError(409, "mesh_not_uploaded", `Nothing is stored at ${key} yet. PUT it first.`);
   // A truncated upload or an HTML error page must not flip a row to ready. Same check
@@ -376,9 +377,83 @@ export async function postObjectMesh(
   }
 
   await markObjectReady(env, objectId, { glbKey: key });
+
+  // A phone-uploaded GLB never passes through the mesh Workflow, so this is the only place a
+  // scanned object can reach Vectorize. Same indexer as the Workflow — there is not a second one.
+  // Object Capture uploads no photo (modules/object-capture exposes only imageCount), so the only
+  // embeddable content is the name the user gave it. SigLIP 2's text tower shares the vision
+  // tower's space, which is why a text vector is comparable with the catalogue's image vectors.
+  // ceiling: a named scan is indexed from text, which is weaker than an image. The upgrade path is
+  // for the capture module to export one frame and for this to pass imageKey instead.
+  const text = [object0.name, object0.category]
+    .filter((part) => part && part !== "unknown")
+    .join(" ")
+    .trim();
+  let indexed: Record<string, string>;
+  if (!text) {
+    // Standing rule 4: do not invent a caption. Say the object is unsearchable and why.
+    indexed = { "x-indexed": "false", "x-index-skipped": "no-embeddable-text" };
+  } else {
+    // Not awaited: the embed can take up to 25 s (embedInput's timeout) and this is the phone's
+    // Save button. The mesh is stored and the object IS ready; only search is affected, so a
+    // failure is logged and never reaches the phone.
+    // ceiling: the outcome cannot be reported in this response. The retry path is
+    // POST /v1/objects/{id}/index { text }.
+    ctx.waitUntil(
+      indexObject(env, {
+        objectId,
+        source: "scan",
+        category: object0.category,
+        bboxMeters: object0.bboxMeters,
+        dominantHex: object0.palette?.[0] ?? null,
+        text,
+      }).catch((err: unknown) => console.error(`scan_index_failed ${objectId}: ${String(err).slice(0, 300)}`)),
+    );
+    indexed = { "x-indexed": "pending" };
+  }
+
   const object = await getObject(env, objectId, origin);
   if (body.roomId) await emitToRoom(env, body.roomId, "object", object);
-  return json(object);
+  return json(object, 200, indexed);
+}
+
+/**
+ * POST /v1/objects/{id}/index   { imageKey } | { text }   ->  { objectId, fingerprint, modality }
+ *
+ * Index an object into Vectorize without generating a mesh. Two jobs, one route:
+ *  - backfill: catalogue rows loaded straight into D1 have real photos in R2 but no vectors,
+ *    because the only other writer sits behind a Baseten call that may not be running.
+ *  - retry: the mesh Workflow's index step records an embed failure and moves on (the job still
+ *    ends `done`), and a phone scan is indexed in the background. This retries either without
+ *    regenerating a paid mesh.
+ *
+ * Same X-Upstream-Token gate as POST /v1/catalog/ingest — this writes to a shared index and is
+ * not a public route. Not in contracts.md yet; see workers/DEPLOY.md "Schema proposals".
+ */
+export async function postObjectIndex(
+  req: Request,
+  env: Env,
+  objectId: string,
+  origin: string,
+): Promise<Response> {
+  if (!env.UPSTREAM_TOKEN || req.headers.get("x-upstream-token") !== env.UPSTREAM_TOKEN) {
+    throw new HttpError(401, "unauthorized", "A valid X-Upstream-Token is required.");
+  }
+  const body = await readJson<{ imageKey?: string; text?: string }>(req);
+  if ((body.imageKey == null) === (body.text == null)) {
+    throw new HttpError(400, "bad_index_input", "Supply exactly one of imageKey or text.");
+  }
+  const object = await getObject(env, objectId, origin); // 404s before touching Vectorize
+  const r = await indexObject(env, {
+    objectId,
+    source: object.source,
+    category: object.category,
+    bboxMeters: object.bboxMeters,
+    dominantHex: object.palette?.[0] ?? null,
+    imageKey: body.imageKey,
+    text: body.text,
+  });
+  return json({ objectId, fingerprint: r.fingerprint, modality: r.modality });
 }
 
 export async function getJobById(env: Env, jobId: string): Promise<Response> {

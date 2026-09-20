@@ -8,6 +8,9 @@ export interface Embedding {
   modality: "image" | "text";
 }
 
+const OBJECT_FRAME = /^objects\/[^/]+\/frames\/[^/]+\.(jpg|jpeg|png)$/;
+const CATALOG_SOURCE = /^catalog\/[^/]+\/[^/]+\/source\.(jpg|jpeg|png)$/;
+
 /** Both queries and indexed images use the same CPU encoder and fingerprint namespace. */
 export async function embedInput(
   env: Env, input: { text?: string; imageKey?: string },
@@ -24,8 +27,10 @@ export async function embedInput(
   if (input.imageKey != null) {
     // Read directly from the bound private bucket; the encoder needs no R2 credentials
     // or arbitrary URL-fetch capability. Never trust a caller-provided public image URL.
-    if (!/^objects\/[^/]+\/frames\/[^/]+\.(jpg|jpeg|png)$/.test(input.imageKey)) {
-      throw new Error("Expected an object frame key");
+    // Exactly the two image key shapes R2Keys mints (objectFrame, catalogSource) — the guard
+    // still refuses every other key.
+    if (!OBJECT_FRAME.test(input.imageKey) && !CATALOG_SOURCE.test(input.imageKey)) {
+      throw new Error("Expected an object frame or catalogue source key");
     }
     const image = await env.BUCKET.get(input.imageKey);
     if (!image) throw new Error("Embedding image not found");
@@ -58,4 +63,45 @@ export async function embedInput(
     throw new Error("Invalid embedding response or incompatible model fingerprint");
   }
   return result;
+}
+
+export interface IndexObjectInput {
+  objectId: string;
+  source: string;
+  category: string;
+  bboxMeters: { w: number; h: number; d: number };
+  dominantHex?: string | null;
+  /** Exactly one of these, same rule as embedInput. */
+  imageKey?: string;
+  text?: string;
+}
+
+/**
+ * The ONLY writer to Vectorize. The mesh Workflow, POST /v1/objects/{id}/mesh and
+ * POST /v1/objects/{id}/index all call this, so there is exactly one place that decides the
+ * namespace, the metadata and the millimetre rounding.
+ */
+export async function indexObject(
+  env: Env, input: IndexObjectInput,
+): Promise<{ fingerprint: string; modality: string }> {
+  const embedding = await embedInput(env, { text: input.text, imageKey: input.imageKey });
+  await env.OBJECTS_INDEX.upsert([
+    {
+      id: input.objectId,
+      values: embedding.values,
+      namespace: embedding.fingerprint,
+      metadata: {
+        objectId: input.objectId,
+        source: input.source,
+        category: input.category,
+        // Millimetres as integers, so Vectorize numeric range filters work on them.
+        // This matches the query's conversion from metres to millimetres.
+        w_mm: Math.round(input.bboxMeters.w * 1000),
+        h_mm: Math.round(input.bboxMeters.h * 1000),
+        d_mm: Math.round(input.bboxMeters.d * 1000),
+        dominant_hex: input.dominantHex ?? "#000000",
+      },
+    },
+  ]);
+  return { fingerprint: embedding.fingerprint, modality: embedding.modality };
 }

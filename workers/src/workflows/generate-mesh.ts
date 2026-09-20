@@ -18,7 +18,7 @@ import { nowIso } from "../lib/ids";
 import { advanceJob, markObjectFailed, markObjectReady, insertObject, getObject } from "../lib/store";
 import type { CatalogItem } from "../lib/catalog-ingest";
 import { emitToRoom } from "../lib/notify";
-import { embedInput } from "../lib/embedding";
+import { indexObject } from "../lib/embedding";
 import { notifyMeshFinished } from "../lib/mesh-dispatch";
 
 export interface GenerateMeshParams {
@@ -245,25 +245,14 @@ export class GenerateMeshWorkflow extends WorkflowEntrypoint<Env, GenerateMeshPa
       });
 
       const indexing = await step.do("index-embedding", { retries: { limit: 2, delay: "5 seconds" }, timeout: "45 seconds" }, async (): Promise<{ indexed: boolean; error: string | null }> => {
-        const embedding = await embedInput(this.env, { imageKey: meta.frameKeys[0] });
-        await this.env.OBJECTS_INDEX.upsert([
-          {
-            id: p.objectId,
-            values: embedding.values,
-            namespace: embedding.fingerprint,
-            metadata: {
-              objectId: p.objectId,
-              source: meta.source,
-              category: meta.category,
-              // Millimetres as integers, so Vectorize numeric range filters work on them.
-              // This matches the query's conversion from metres to millimetres.
-              w_mm: Math.round(meta.bboxMeters.w * 1000),
-              h_mm: Math.round(meta.bboxMeters.h * 1000),
-              d_mm: Math.round(meta.bboxMeters.d * 1000),
-              dominant_hex: generated.palette?.[0] ?? "#000000",
-            },
-          },
-        ]);
+        await indexObject(this.env, {
+          objectId: p.objectId,
+          source: meta.source,
+          category: meta.category,
+          bboxMeters: meta.bboxMeters,
+          dominantHex: generated.palette?.[0] ?? null,
+          imageKey: meta.frameKeys[0],
+        });
         return { indexed: true, error: null };
       }).catch((error: unknown) => ({ indexed: false, error: `Mesh saved; embedding failed: ${String(error).slice(0, 300)}` }));
 
