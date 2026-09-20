@@ -22,12 +22,16 @@ export default function TabsLayout() {
         <JobProgressAccessory />
       </NativeTabs.BottomAccessory>
       <NativeTabs.Trigger name="index">
-        <NativeTabs.Trigger.Label>Rooms</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Label>Room</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf="house" />
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="objects">
-        <NativeTabs.Trigger.Label>Objects</NativeTabs.Trigger.Label>
+      <NativeTabs.Trigger name="scanned">
+        <NativeTabs.Trigger.Label>Scanned</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf="cube" />
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="furniture">
+        <NativeTabs.Trigger.Label>Furniture</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon sf="sofa" />
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="capture">
         <NativeTabs.Trigger.Label>Capture</NativeTabs.Trigger.Label>

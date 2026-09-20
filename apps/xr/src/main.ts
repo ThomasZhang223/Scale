@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { VRButton } from 'three/examples/jsm/webxr/VRButton.js';
 import { buildRoomFromScan, type BuiltRoom, type ScannedObject } from './roomScan';
+import { Hud, type HudLine, type Tone } from './hud';
 import { ObjectLoader, type LoadedObject } from './objects';
 import { createPhysics } from './physics';
 import { Interaction } from './interaction';
@@ -17,6 +18,10 @@ import { Ghosts, type GhostTarget } from './ghosts';
 import offlineProposal from '../../../services/agent/fixtures/pipeline/proposal.json';
 import { Palette, type PaletteItem } from './palette';
 import { matchDetected } from './placement';
+import { measuredBox } from './objects';
+import { Voice, type VoiceState } from './voice';
+import { findListings, needFromDetected, needFromText, isShoppingRequest, type Listing, type ListingsResult, type Need } from './listings';
+import { Outdoors } from './outdoors';
 import roomDemo from '../../../fixtures/room-demo.json';
 import roomLarge from '../public/room-large.json';
 
@@ -65,18 +70,19 @@ document.body.appendChild(renderer.domElement);
 document.body.appendChild(VRButton.createButton(renderer));
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color('#1d2126');
-scene.add(new THREE.HemisphereLight(0xffffff, 0x3a3f45, 1.3));
+const outdoors = new Outdoors(); // sky, clouds and grass around the room
+scene.add(outdoors.group);
+scene.add(new THREE.HemisphereLight(0xdfefff, 0x4d7a35, 1.2)); // sky above, grass below
 const sun = new THREE.DirectionalLight(0xffffff, 1.4);
 sun.position.set(3, 6, 2);
 scene.add(sun);
 
-const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.05, 100);
-const SPECTATOR_POSITION = new THREE.Vector3(5.5, 6.5, 7.5); // far enough back for the 6.4 × 4.8 m room
+const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.05, 500);
+const SPECTATOR_POSITION = new THREE.Vector3(7.5, 3.6, 9.5); // back from the 6.4 × 4.8 m room, low enough to see the sky
 camera.position.copy(SPECTATOR_POSITION);
 
 const controls = new OrbitControls(camera, renderer.domElement);
-controls.target.set(0, 0.8, 0);
+controls.target.set(0, 1.2, 0);
 controls.enableDamping = true;
 controls.autoRotate = true;
 controls.autoRotateSpeed = 0.4;
@@ -95,6 +101,13 @@ const room = new THREE.Group();
 scene.add(room);
 const fitOverlay = new FitOverlay();
 scene.add(fitOverlay.group);
+// The transcript card follows the head: it hangs off the camera, which must be in the scene
+// for its children to render.
+scene.add(camera);
+const hud = new Hud();
+hud.attachTo(camera);
+renderer.xr.addEventListener('sessionstart', () => hud.setPresenting(true));
+renderer.xr.addEventListener('sessionend', () => hud.setPresenting(false));
 
 const PALETTE_ACTIONS: PaletteItem[] = [
   { url: '', name: 'Reset room', action: 'reset', section: 'Room' },
@@ -116,8 +129,31 @@ const panel = document.getElementById('panel')!;
 const connection = document.getElementById('connection')!;
 const note = document.getElementById('note')!;
 const catalogEl = document.getElementById('catalog')!;
+const scannedEl = document.getElementById('scanned')!;
+const listingText = document.getElementById('listing-text') as HTMLInputElement;
+const listingSearch = document.getElementById('listing-search')!;
+const listingNote = document.getElementById('listing-note')!;
+const listingCards = document.getElementById('listing-cards')!;
+const micButton = document.getElementById('agent-mic') as HTMLButtonElement;
 panel.hidden = !SHOW_PANEL;
 const say = (text: string) => (note.textContent = text);
+
+// The transcript: what was heard and what was answered, shown in full on the head-locked
+// card (hud.ts). The wrist keeps the buttons; the reasons live here, in front of the eyes.
+const TRANSCRIPT_KEEP = 8;
+const transcript: HudLine[] = [];
+function tell(text: string, tone: Tone = 'info') {
+  say(text);
+  transcript.push({ text, tone });
+  if (transcript.length > TRANSCRIPT_KEEP) transcript.splice(0, transcript.length - TRANSCRIPT_KEEP);
+  hud.set(transcript);
+}
+
+/** Spoken output is one sentence: the card carries the rest. */
+function concise(text: string, maxChars = 140): string {
+  const first = text.trim().split(/(?<=[.!?])\s+/)[0] ?? '';
+  return first.length > maxChars ? `${first.slice(0, maxChars - 1).replace(/\s+\S*$/, '')}…` : first;
+}
 
 // ---------- state ----------
 
@@ -127,9 +163,12 @@ interface PlacedObject {
   name: string;        // file or manifest name; matched against detected categories
   loaded: LoadedObject;
   replaces?: ScannedObject;
+  category?: string;   // when known (a listing, a replacement): matched against detected categories instead of the name
+  listing?: Listing;   // the merchant listing this stands for, when it came from one
 }
 
 const localId = (name: string) => `local:${name}`;
+import { instanceObjectId } from './ids';
 
 let currentRoom: BuiltRoom | null = null;
 let lastScan: Record<string, unknown> | null = null;
@@ -138,6 +177,13 @@ let lastFitReport: FitReport | null = null;
 let undoAvailable = false;
 let lastTouchedId: string | null = null; // what the turn buttons act on when nothing is held
 let showRules = false; // the Rearrange guidelines, expanded on the wrist
+let selectedStyle: string | null = null; // the whole-room style Rearrange will use; none picked → Rearrange is disabled
+let listings: ListingsResult | null = null; // the last recommendation set, shown on the wrist and the laptop
+let listingsNeed: Need | null = null;
+let listingsBusy = false;
+let voiceState: VoiceState = 'idle';
+let voiceDetail: string | undefined; // the last error or transcript shown on the wrist
+let lastHeard: string | null = null;
 
 /** What Rearrange does with each kind of object (mirrors services/agent generatedPlan). */
 const REARRANGE_RULES: [string, string][] = [
@@ -151,6 +197,13 @@ const REARRANGE_RULES: [string, string][] = [
   ['lamps / other', 'a wall, out of the way'],
   ['always', '90 cm walkways; doors and windows clear'],
 ];
+/** Whole-room styles: [button label, agent preset]. Each is a different set of rules in services/agent STYLES. */
+const STYLES: [string, string][] = [
+  ['Cozy', 'cozy'],
+  ['Spacious', 'spacious'],
+  ['Modern', 'modern'],
+  ['Social', 'social'],
+];
 const objects = new Map<string, PlacedObject>();
 const catalog: PaletteItem[] = []; // everything in objects.json, placed or not
 let rise = 1; // 0..1 while the walls rise; objects are placed once it reaches 1
@@ -161,6 +214,17 @@ async function start() {
   const loader = new ObjectLoader(renderer);
   const palette = new Palette();
   const applier = new ProposalApplier(physics);
+  // Built before the first showPalette(): the talk row reads voice.supported.
+  const voice = new Voice({
+    onState(state, detail) {
+      voiceState = state;
+      voiceDetail = detail;
+      micButton.dataset.state = state;
+      micButton.title = state === 'recording' ? 'Release to send' : state === 'error' ? detail ?? 'Voice error' : 'Hold to talk';
+      if (state === 'error' && detail) tell(`Voice: ${detail}`, 'error');
+      showPalette();
+    },
+  });
   const agent = new AgentClient({
     roomId: ROOM_ID,
     stub: AGENT_STUB,
@@ -170,16 +234,26 @@ async function start() {
   });
   const interaction = new Interaction(renderer, scene, camera, controls, physics, palette, spawn, onAction, layoutChanged, onGrab);
   // Designer tiles first (closest to the hand), then the catalogue, then Reset / Clear.
-  const showPalette = () => palette.setItems([...designerTiles(agent.snapshot), ...catalog, ...PALETTE_ACTIONS]);
+  const showPalette = () => palette.setItems([...designerTiles(agent.snapshot), ...scannedTiles(), ...listingTiles(), ...catalog, ...PALETTE_ACTIONS]);
   showPalette();
   renderAgentPanel(agent.snapshot);
 
   function onAction(action: string) {
     if (action === 'reset' && lastScan) showScan(lastScan, 'Room reset');
     if (action === 'clear') clearObjects();
+    if (action.startsWith('style:')) {
+      selectedStyle = selectedStyle === action.slice(6) ? null : action.slice(6); // tap again to clear
+      showPalette();
+      renderAgentPanel(agent.snapshot);
+    }
+    if (action === 'rearrange') {
+      if (!selectedStyle) return say('Pick a style first: Cozy, Spacious, Modern or Social.');
+      void askAgent({ preset: selectedStyle });
+    }
     if (action.startsWith('preset:')) void askAgent({ preset: action.slice(7) });
     if (action === 'turn:left') turnLast(Math.PI / 2);
     if (action === 'turn:right') turnLast(-Math.PI / 2);
+    if (action === 'remove') removeLast();
     if (action === 'rules') {
       showRules = !showRules;
       showPalette();
@@ -189,7 +263,203 @@ async function start() {
     if (action === 'ask_again') void agent.askAgain();
     if (action === 'try_again') agent.reset();
     if (action === 'undo') void undoLayout();
+    if (action === 'hold:talk:down') void talkDown();
+    if (action === 'hold:talk:up') void talkUp();
+    if (action.startsWith('scan:')) void findForScanned(action.slice(5));
+    if (action.startsWith('listing:')) void addListing(action.slice(8));
   }
+
+  // ---------- scanned pieces and merchant listings ----------
+
+  const fmtDims = (d: [number, number, number]) => d.map((m) => `${Math.round(m * 100)}`).join(' × ') + ' cm';
+
+  /** A scanned piece is "taken" when a placed object stands in its place. */
+  function replacedBy(identifier: string): PlacedObject | undefined {
+    return [...objects.values()].find((o) => o.replaces?.identifier === identifier);
+  }
+
+  /** Wrist rows for what LiDAR found: category and size; trigger finds listings that fit in its place. */
+  function scannedTiles(): PaletteItem[] {
+    if (!currentRoom?.objects.length) return [];
+    return currentRoom.objects.map((box) => {
+      const taken = replacedBy(box.identifier);
+      return {
+        url: '',
+        name: `${box.category} · ${fmtDims(box.dimensions)}${taken ? ' · replaced' : ''}`,
+        action: `scan:${box.identifier}`,
+        section: 'Scanned',
+        accent: listingsNeed?.replaces?.identifier === box.identifier,
+      };
+    });
+  }
+
+  /** Wrist rows for the current recommendations: name, merchant and width; trigger puts one in the room. */
+  function listingTiles(): PaletteItem[] {
+    const items: PaletteItem[] = [];
+    if (listingsBusy) return [{ url: '', name: 'Searching listings…', label: true, section: 'Listings' }];
+    if (!listings) return items;
+    if (listings.note) items.push({ url: '', name: listings.note, label: true, severity: 'warn', section: 'Listings' });
+    if (!listings.recommendations.length) items.push({ url: '', name: 'Nothing fits that. Try a wider gap or another kind.', label: true, section: 'Listings' });
+    for (const r of listings.recommendations.slice(0, 6)) {
+      const l = r.listing;
+      items.push({
+        url: '',
+        name: `${l.name.length > 26 ? l.name.slice(0, 25) + '…' : l.name} · ${Math.round(l.bboxMeters.w * 100)} cm`,
+        action: `listing:${l.objectId}`,
+        objectId: l.objectId,
+        section: 'Listings',
+      });
+    }
+    return items;
+  }
+
+  /** Listings that would fit in a scanned piece's place. */
+  async function findForScanned(identifier: string) {
+    const box = currentRoom?.objects.find((o) => o.identifier === identifier);
+    if (!box) return say(`No scanned piece ${identifier} in this room.`);
+    const taken = replacedBy(identifier);
+    if (taken) say(`${box.category}: already replaced by ${taken.name}. Remove it first to try another.`);
+    await findFor(needFromDetected(box));
+  }
+
+  /** Runs a search, keeps the result, and redraws both surfaces. Live first, bundled with a note. */
+  async function findFor(need: Need) {
+    listingsNeed = need;
+    listingsBusy = true;
+    showPalette();
+    renderListings();
+    try {
+      listings = await findListings(need, 8);
+    } catch (err) {
+      listings = { recommendations: [], source: 'bundled', note: `Listings unavailable: ${(err as Error).message}` };
+    } finally {
+      listingsBusy = false;
+    }
+    showPalette();
+    renderListings();
+    const top = listings.recommendations[0];
+    const what = need.replaces ? `for the ${need.replaces.category}` : need.text ? `for "${need.text}"` : '';
+    const spoken = top
+      ? `${listings.recommendations.length} listings ${what}. Top pick: ${top.listing.name} from ${top.listing.merchant ?? 'the catalogue'}, ${top.reasons.join(', ')}.`
+      : `Nothing for sale fits ${what}.`;
+    tell(spoken, top ? 'info' : 'warn');
+    if (need.text && lastHeard === need.text) speak(concise(spoken)); // only answer aloud when it was asked aloud
+    return listings;
+  }
+
+  /**
+   * Puts a listing in the room: its GLB when the mesh is ready, else a box of exactly its
+   * bboxMeters. If the search was for a scanned piece, it takes that piece's place.
+   */
+  async function addListing(objectId: string) {
+    const rec = listings?.recommendations.find((r) => r.listing.objectId === objectId);
+    if (!rec) return say('That listing is no longer in the results.');
+    const l = rec.listing;
+    let loaded: LoadedObject;
+    try {
+      // scale 1: the mesh normalisation contract; a measured box is already exact.
+      loaded = l.state === 'ready' && l.glbUrl ? await loader.load(l.glbUrl, 1) : measuredBox(l.bboxMeters, l.name);
+    } catch (err) {
+      return say(`Couldn't load ${l.name}: ${(err as Error).message}`);
+    }
+    const replaces = listingsNeed?.replaces;
+    const obj: PlacedObject = {
+      id: crypto.randomUUID(),
+      objectId: l.objectId,
+      name: l.name,
+      loaded,
+      listing: l,
+      // The category decides which scanned piece it stands in for; a Shopify title rarely contains "chair".
+      category: replaces && !replacedBy(replaces.identifier) ? replaces.category : l.category,
+    };
+    objects.set(obj.id, obj);
+    lastTouchedId = obj.id;
+    if (currentRoom && rise >= 1) place(obj);
+    showPalette();
+    renderCatalog();
+    layoutChanged(obj.id);
+  }
+
+  /** Laptop: the LiDAR pieces as rows with a Find-a-match button. */
+  function renderScanned() {
+    const rows = (currentRoom?.objects ?? []).map((box) => {
+      const row = document.createElement('div');
+      row.className = 'row';
+      const label = document.createElement('span');
+      label.className = 'label';
+      const taken = replacedBy(box.identifier);
+      label.innerHTML = `${box.category.charAt(0).toUpperCase() + box.category.slice(1)} <span class="dims">${fmtDims(box.dimensions)}${taken ? ` · replaced by ${taken.name}` : ''}</span>`;
+      const find = document.createElement('button');
+      find.type = 'button';
+      find.className = listingsNeed?.replaces?.identifier === box.identifier ? 'tinted' : 'gray';
+      find.textContent = 'Find a match';
+      find.addEventListener('click', () => void findForScanned(box.identifier));
+      row.append(label, find);
+      return row;
+    });
+    scannedEl.replaceChildren(...rows);
+  }
+
+  /** Laptop: photo cards for the recommendations, the top one outlined, with why it was chosen. */
+  function renderListings() {
+    listingNote.textContent = listingsBusy
+      ? 'Searching…'
+      : listings
+        ? [listings.note, listings.source === 'live' ? 'From the live catalogue.' : null, listingsNeed?.replaces ? `Fits where the scanned ${listingsNeed.replaces.category} stands.` : null].filter(Boolean).join(' ')
+        : 'Pick a scanned piece above, or describe what you need.';
+    const cards = (listings?.recommendations ?? []).map((r, i) => {
+      const l = r.listing;
+      const card = document.createElement('div');
+      card.className = i === 0 ? 'card top' : 'card';
+      const img = document.createElement('img');
+      img.loading = 'lazy';
+      img.alt = l.name;
+      if (l.imageUrl) img.src = l.imageUrl;
+      img.addEventListener('error', () => (img.style.visibility = 'hidden')); // a missing thumb is not a broken card
+      const body = document.createElement('div');
+      body.className = 'body';
+      const name = document.createElement('div');
+      name.className = 'name';
+      name.textContent = l.name;
+      name.title = l.name;
+      const meta = document.createElement('div');
+      meta.className = 'meta';
+      const { w, h, d } = l.bboxMeters;
+      meta.textContent = `${l.merchant ?? l.source} · ${Math.round(w * 100)} × ${Math.round(h * 100)} × ${Math.round(d * 100)} cm${l.price ? ` · ${(l.price.cents / 100).toFixed(0)} ${l.price.currency}` : ''}`;
+      const why = document.createElement('div');
+      why.className = 'why';
+      why.textContent = `${Math.round(r.score * 100)}% · ${r.reasons.join(' · ')}`;
+      const actions = document.createElement('div');
+      actions.className = 'actions';
+      const add = document.createElement('button');
+      add.type = 'button';
+      add.className = i === 0 ? 'filled' : 'tinted';
+      add.textContent = l.glbUrl ? 'Add' : 'Add as box';
+      add.addEventListener('click', () => void addListing(l.objectId));
+      actions.append(add);
+      if (l.productUrl) {
+        const open = document.createElement('a');
+        open.href = l.productUrl;
+        open.target = '_blank';
+        open.rel = 'noopener';
+        open.textContent = 'Open';
+        actions.append(open);
+      }
+      body.append(name, meta, why, actions);
+      card.append(img, body);
+      return card;
+    });
+    listingCards.replaceChildren(...cards);
+  }
+
+  listingSearch.addEventListener('click', () => {
+    const text = listingText.value.trim();
+    if (text) void findFor(needFromText(text));
+  });
+  listingText.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') listingSearch.click();
+  });
+  renderListings();
 
   /** The person grabbed something: if a proposal is being applied, that object stays in their hand. */
   function onGrab(id: string) {
@@ -208,6 +478,78 @@ async function start() {
     layoutChanged(id);
   }
 
+  /** Removes the held object (or the last one touched). A detected piece it stood in for comes back. */
+  function removeLast() {
+    const id = interaction.heldIds()[0] ?? lastTouchedId ?? [...objects.keys()].pop() ?? null;
+    const obj = id ? objects.get(id) : undefined;
+    if (!id || !obj) return say('Grab or add an object first, then remove it.');
+    interaction.drop(id);
+    physics.remove(id);
+    obj.loaded.node.removeFromParent();
+    objects.delete(id);
+    if (lastTouchedId === id) lastTouchedId = null;
+    const box = obj.replaces;
+    if (box) {
+      box.node.visible = true;
+      physics.moveDetected(box.identifier, box.position[0], box.position[2], box.rotationY, box.dimensions);
+    }
+    fitOverlay.clear(); // ceiling: the overlay is per-report, not per-object; the next report redraws it
+    say(`${obj.name} removed.`);
+    renderScanned();
+    showPalette();
+    layoutChanged(id);
+  }
+
+  // ---------- voice: push-to-talk in, spoken proposals out ----------
+
+
+  /** The talk row: hold the trigger on it, speak, let go. Shows what was heard, or what went wrong. */
+  function voiceTiles(label: (n: string, s?: 'info' | 'warn') => PaletteItem, tile: (n: string, a: string, accent?: boolean) => PaletteItem): PaletteItem[] {
+    if (!voice.supported) return [label('No microphone in this browser', 'warn')];
+    const rows: PaletteItem[] = [];
+    if (voiceState === 'recording') rows.push({ ...tile('Listening… release to send', 'hold:talk', true), destructive: true });
+    else if (voiceState === 'transcribing') rows.push(label('Transcribing…'));
+    else rows.push(tile(voiceState === 'speaking' ? 'Hold to talk (interrupts)' : 'Hold to talk', 'hold:talk', true));
+    if (voiceState === 'error' && voiceDetail) rows.push(label(voiceDetail, 'warn'));
+    return rows; // what was heard is on the transcript card, not the wrist
+  }
+
+  async function talkDown() {
+    voice.stopSpeaking();
+    try {
+      await voice.start();
+    } catch (err) {
+      say(`Voice: ${(err as Error).message}`);
+    }
+  }
+
+  async function talkUp() {
+    const text = await voice.stop();
+    if (!text) return;
+    lastHeard = text;
+    agentText.value = text;
+    tell(`“${text}”`, 'heard');
+    showPalette();
+    await routeRequest(text);
+  }
+
+  /** Spoken output; a failure here is shown, never thrown, so voice never blocks the layout work. */
+  function speak(text: string) {
+    if (!voice.supported || !text) return;
+    voice.speak(text).catch((err) => say(`Voice: ${(err as Error).message}`));
+  }
+
+  // Laptop: hold the mic button. The first press also asks for microphone permission.
+  micButton.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    micButton.setPointerCapture(e.pointerId);
+    void talkDown();
+  });
+  micButton.addEventListener('pointerup', () => void talkUp());
+  micButton.addEventListener('pointercancel', () => void talkUp());
+  // The Quest hides permission prompts inside the immersive session, so ask on the way in.
+  document.getElementById('VRButton')?.addEventListener('click', () => void voice.warmUp(), { once: true });
+
   // ---------- the designer agent ----------
 
   /** The wrist's Designer row: preset tiles, or the agent's status, or the proposal and its buttons. */
@@ -219,26 +561,30 @@ async function start() {
         return [label(s.status || 'Working…'), ...s.log.slice(-3).map((e) => label(e.message, e.severity))];
       case 'proposed': {
         const p = s.proposal!;
+        // The summary, the reasons and the trade-off are on the transcript card in front of
+        // the eyes (onAgentChange); the wrist keeps only the decision.
         return [
-          label(s.offline ? 'Offline: sample proposal' : p.summary),
-          label(p.explanation),
-          ...(p.tradeoffs.length ? [label(p.tradeoffs[0], 'warn')] : []),
+          ...(s.offline ? [label('Offline: sample proposal', 'warn')] : []),
           ...(p.fit.red || p.fit.amber ? [label(`Fit: ${p.fit.red} red, ${p.fit.amber} amber`, p.fit.red ? 'warn' : 'info')] : []),
-          tile('Accept', 'accept', true), tile('Reject', 'reject'), tile('Ask again', 'ask_again'),
+          // The furniture is already gliding (previewProposal); the decision comes once it has landed.
+          ...(applier.active ? [label('Moving…')] : [tile('Keep', 'accept', true), tile('Put back', 'reject'), tile('Ask again', 'ask_again')]),
         ];
       }
       case 'applying':
         return [label('Applying…')];
       case 'failed':
         return [label(s.error ?? 'Failed', 'warn'), tile('Try again', 'try_again')];
-      case 'room_changed':
-        return [label('The room changed.', 'warn'), tile('Ask again', 'ask_again'), tile('Dismiss', 'try_again')];
       default:
         return [
           ...(s.solver === 'offline' ? [label('Solver offline', 'warn')] : []),
+          ...voiceTiles(label, tile),
           tile('Turn 90° left', 'turn:left'),
           tile('Turn 90° right', 'turn:right'),
-          ...(objects.size ? [tile('Rearrange', 'preset:tidy_room', true)] : []), // nothing to rearrange until something is down
+          ...(objects.size ? [tile('Remove', 'remove')] : []),
+          // Rearrange needs a style picked first (see STYLES in services/agent): the style tiles
+          // select, and only the selected one is filled; Rearrange appears once one is chosen.
+          ...(objects.size ? (selectedStyle ? [tile('Rearrange', 'rearrange', true)] : [label('Pick a style, then Rearrange')]) : []),
+          ...(objects.size ? STYLES.map(([name, preset]) => ({ ...tile(selectedStyle === preset ? `● ${name}` : name, `style:${preset}`, selectedStyle === preset), section: 'Style' })) : []),
           ...(undoAvailable ? [tile('Undo', 'undo')] : []),
           tile(showRules ? 'Hide rules' : 'Rules', 'rules'),
           ...(showRules ? REARRANGE_RULES.map(([kind, rule]) => label(`${kind}: ${rule}`)) : []),
@@ -246,10 +592,28 @@ async function start() {
     }
   }
 
+  let spokenFor: string | null = null; // the last proposal (or failure) read aloud, so a redraw never repeats it
   function onAgentChange(s: AgentSnapshot) {
     showPalette();
     renderAgentPanel(s);
-    if (s.state === 'proposed' && s.proposal) showGhosts(s.proposal);
+    if (s.state === 'proposed' && s.proposal) {
+      const key = `proposed:${s.proposal.summary}`;
+      if (spokenFor !== key) {
+        spokenFor = key;
+        const p = s.proposal;
+        // Everything in writing, in front of the eyes; one sentence aloud.
+        tell(p.summary, 'info');
+        if (p.explanation) tell(p.explanation, 'info');
+        if (p.tradeoffs[0]) tell(`Trade-off: ${p.tradeoffs[0]}`, 'warn');
+        if (p.fit.red || p.fit.amber) tell(`Fit: ${p.fit.red} red, ${p.fit.amber} amber.`, p.fit.red ? 'error' : 'warn');
+        speak(concise(p.summary));
+      }
+    } else if (s.state === 'failed' && s.error && spokenFor !== `failed:${s.error}`) {
+      spokenFor = `failed:${s.error}`;
+      tell(s.error, 'error');
+      speak(`That didn't work. ${concise(s.error)}`);
+    }
+    if (s.state === 'proposed' && s.proposal) previewProposal(s.proposal);
     else if (s.state !== 'applying') ghosts.clear();
   }
 
@@ -268,21 +632,16 @@ async function start() {
     const button = (text: string, action: string, accent = false) => {
       const b = document.createElement('button');
       b.type = 'button';
-      b.className = accent ? '' : 'quiet';
+      b.className = accent ? 'filled' : 'gray';
       b.textContent = text;
       b.addEventListener('click', () => onAction(action));
       return b;
     };
     const buttons: HTMLButtonElement[] = [];
-    if (s.state === 'proposed') buttons.push(button('Accept', 'accept', true), button('Reject', 'reject'), button('Ask again', 'ask_again'));
+    if (s.state === 'proposed') buttons.push(button('Keep', 'accept', true), button('Put back', 'reject'), button('Ask again', 'ask_again'));
     if (s.state === 'failed') buttons.push(button('Try again', 'try_again'));
-    if (s.state === 'room_changed') buttons.push(button('Ask again', 'ask_again'), button('Dismiss', 'try_again'));
     if (s.state === 'idle' && undoAvailable) buttons.push(button('Undo', 'undo'));
     agentButtons.replaceChildren(...buttons);
-    if (s.state === 'proposed' && s.proposal) {
-      const p = s.proposal;
-      say(`${p.summary}: ${p.explanation}${p.tradeoffs.length ? ` Trade-off: ${p.tradeoffs[0]}` : ''}`);
-    }
   }
 
   /** Everything the agent needs to know about the room right now. */
@@ -321,11 +680,17 @@ async function start() {
   async function askAgent(req: { preset?: string; text?: string }) {
     if (!currentRoom) return say('Load a room first.');
     await syncAgentState();
-    await agent.request({ ...req, pins: interaction.heldIds() });
+    // The agent pins by objectId (services/agent clean.ts); what the hands hold are placement ids.
+    const pins = interaction.heldIds().map((id) => objects.get(id)?.objectId ?? id);
+    await agent.request({ ...req, pins });
   }
 
   /** The object (placed or detected) a proposal talks about; the offline fixture uses obj_<category>. */
-  function resolveObject(objectId: string): { kind: 'placed'; obj: PlacedObject } | { kind: 'box'; box: ScannedObject } | null {
+  function resolveObject(objectId: string, placementId?: string): { kind: 'placed'; obj: PlacedObject } | { kind: 'box'; box: ScannedObject } | null {
+    // The placementId is the exact instance (it is our own objects-map key, uploaded as such);
+    // the objectId is only a fallback for proposals that don't carry one (the offline fixture).
+    const exact = placementId ? objects.get(placementId) : undefined;
+    if (exact) return { kind: 'placed', obj: exact };
     const placed = [...objects.values()].find((o) => o.objectId === objectId);
     if (placed) return { kind: 'placed', obj: placed };
     if (objectId.startsWith('box:')) {
@@ -339,56 +704,75 @@ async function start() {
     return box ? { kind: 'box', box } : null;
   }
 
-  function showGhosts(p: Proposal) {
-    if (!currentRoom) return;
-    const targets: GhostTarget[] = [];
-    for (const m of p.moves) {
-      const hit = resolveObject(m.objectId);
-      if (!hit) continue;
-      const to = fromPlacement(m.to, currentRoom.offset);
-      if (hit.kind === 'placed') {
-        const n = hit.obj.loaded.node;
-        targets.push({ node: n, from: [n.position.x, 0, n.position.z], to: to.position, rotY: to.rotationY, size: hit.obj.loaded.size });
-      } else {
-        const [w, h, d] = hit.box.dimensions;
-        targets.push({ node: hit.box.node, from: hit.box.position, to: to.position, rotY: to.rotationY, size: new THREE.Vector3(w, h, d) });
-      }
-    }
-    ghosts.show(targets);
+  // A proposal is shown by doing it: the furniture glides to the proposed spots as soon as the
+  // agent answers (instead of drawing ghost outlines), and Keep / Put back come after. What is
+  // still on the wrist during the glide is the summary, so the person sees the move and the
+  // reason together. `previewBefore` is where everything was, so Put back can glide it home.
+  // Grabbing something mid-glide still works: the applier drops it from the move and the rest
+  // continue (onGrab → applier.exclude).
+  type PlacedMove = { id: string; x: number; z: number; rotY: number };
+  type BoxPose = { box: ScannedObject; position: ScannedObject['position']; rotationY: number };
+  let previewedRequest: string | null = null; // onAgentChange fires on every status change; preview once per proposal
+  let previewBefore: { placed: PlacedMove[]; boxes: BoxPose[] } | null = null;
+
+  /** A detected box has no body: it simply moves, and its solid collider with it. */
+  function moveBox(box: ScannedObject, position: ScannedObject['position'], rotationY: number) {
+    box.node.position.set(position[0], position[1], position[2]);
+    box.node.rotation.y = rotationY;
+    box.position = position;
+    box.rotationY = rotationY;
+    physics.moveDetected(box.identifier, position[0], position[2], rotationY, box.dimensions);
   }
 
-  async function acceptProposal() {
-    const p = await agent.accept();
-    if (!p || !currentRoom) return;
+  function previewProposal(p: Proposal) {
+    if (!currentRoom || previewedRequest === p.requestId) return;
+    previewedRequest = p.requestId;
     ghosts.clear();
+    // ceiling: "Ask again" on top of an un-kept preview snapshots the previewed layout, not the
+    // one before it. Put back then returns to the first proposal, not to the hand-made layout.
+    const before: { placed: PlacedMove[]; boxes: BoxPose[] } = { placed: [], boxes: [] };
     const offset = currentRoom.offset;
-    const moves: { id: string; x: number; z: number; rotY: number }[] = [];
+    const moves: PlacedMove[] = [];
     for (const m of p.moves) {
-      const hit = resolveObject(m.objectId);
+      const hit = resolveObject(m.objectId, m.to.placementId);
       if (!hit) continue;
       const to = fromPlacement(m.to, offset);
-      if (hit.kind === 'placed') moves.push({ id: hit.obj.id, x: to.position[0], z: to.position[2], rotY: to.rotationY });
-      else {
-        // A detected box has no body: it simply moves, and its solid collider with it.
-        hit.box.node.position.set(to.position[0], to.position[1], to.position[2]);
-        hit.box.node.rotation.y = to.rotationY;
-        hit.box.position = to.position;
-        hit.box.rotationY = to.rotationY;
-        physics.moveDetected(hit.box.identifier, to.position[0], to.position[2], to.rotationY, hit.box.dimensions);
+      if (hit.kind === 'placed') {
+        const n = hit.obj.loaded.node;
+        before.placed.push({ id: hit.obj.id, x: n.position.x, z: n.position.z, rotY: physics.rotationY(hit.obj.id) });
+        moves.push({ id: hit.obj.id, x: to.position[0], z: to.position[2], rotY: to.rotationY });
+      } else {
+        before.boxes.push({ box: hit.box, position: hit.box.position, rotationY: hit.box.rotationY });
+        moveBox(hit.box, to.position, to.rotationY);
       }
     }
+    previewBefore = before;
     applier.start(moves, interaction.heldIds(), (result) => {
-      if (result.stuck.length) say(`Couldn't reach its spot: ${result.stuck.map((id) => objects.get(id)?.name ?? id).join(', ')}. Left where physics stopped it.`);
-      undoAvailable = true;
-      agent.applied();
-      layoutChanged('');
-      void checkFit();
+      if (result.stuck.length) tell(`Couldn't reach its spot: ${result.stuck.map((id) => objects.get(id)?.name ?? id).join(', ')}. Left where physics stopped it.`);
+      showPalette(); // "Moving…" becomes Keep / Put back
     });
   }
 
+  /** Keep: the furniture is already where the proposal put it; this only records the layout. */
+  async function acceptProposal() {
+    const p = await agent.accept();
+    if (!p) return;
+    previewBefore = null;
+    undoAvailable = true;
+    agent.applied();
+    layoutChanged('');
+    void checkFit();
+  }
+
+  /** Put back: everything glides home to where it was before the preview. */
   async function rejectProposal() {
+    const before = previewBefore;
+    previewBefore = null;
     await agent.reject();
     ghosts.clear();
+    if (!before) return;
+    for (const b of before.boxes) moveBox(b.box, b.position, b.rotationY);
+    applier.start(before.placed, interaction.heldIds(), () => layoutChanged(''));
   }
 
   async function undoLayout() {
@@ -420,20 +804,43 @@ async function start() {
     }
   }
 
-  agentPresets.replaceChildren(
-    ...[['Turn 90° left', 'turn:left'], ['Turn 90° right', 'turn:right'], ['Rearrange', 'preset:tidy_room']].map(([text, action]) => {
+  {
+    const button = (text: string, action: string, cls: string) => {
       const b = document.createElement('button');
       b.type = 'button';
-      b.className = action.startsWith('preset:') ? '' : 'quiet';
+      b.className = cls;
       b.textContent = text;
       b.addEventListener('click', () => onAction(action));
       return b;
-    }),
-  );
+    };
+    const group = (cls: string, ...children: HTMLElement[]) => {
+      const g = document.createElement('div');
+      g.className = cls;
+      g.append(...children);
+      return g;
+    };
+    const rearrange = button('Rearrange', 'rearrange', 'filled');
+    rearrange.disabled = !selectedStyle;
+    rearrange.title = selectedStyle ? '' : 'Pick a style first';
+    agentPresets.replaceChildren(
+      group('segmented', button('Turn 90° left', 'turn:left', ''), button('Turn 90° right', 'turn:right', ''), button('Remove', 'remove', '')),
+      group('styles', ...STYLES.map(([text, preset]) => button(text, `style:${preset}`, selectedStyle === preset ? 'filled' : 'tinted'))),
+      rearrange,
+    );
+  }
   document.getElementById('agent-ask')!.addEventListener('click', () => {
     const text = agentText.value.trim();
-    if (text) void askAgent({ text });
+    if (text) void routeRequest(text);
   });
+
+  /** A sentence from the keyboard or the microphone: shopping goes to listings, everything else to the designer. */
+  function routeRequest(text: string) {
+    if (isShoppingRequest(text)) {
+      listingText.value = text;
+      return findFor(needFromText(text));
+    }
+    return askAgent({ text });
+  }
   agentText.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') document.getElementById('agent-ask')!.click();
   });
@@ -480,6 +887,11 @@ async function start() {
 
     const { width, depth } = built.size;
     say(`${source}: ${width.toFixed(1)} × ${depth.toFixed(1)} m, ${built.objects.length} pieces of furniture detected.`);
+    renderScanned();
+    showPalette();
+    // Start with a recommendation for the largest scanned piece; the person can pick another.
+    const largest = [...built.objects].sort((a, b) => b.dimensions[0] * b.dimensions[2] - a.dimensions[0] * a.dimensions[2])[0];
+    if (largest && !listings) void findFor(needFromDetected(largest));
   }
 
   /** Draws a FitReport and says what's wrong. */
@@ -488,6 +900,7 @@ async function start() {
     fitOverlay.show(report);
     if (report.ok || !report.violations.length) return;
     const blocks = report.violations.filter((v) => v.severity === 'block').length;
+    for (const v of report.violations) tell(v.message, v.severity === 'block' ? 'error' : 'warn');
     say(`Fit: ${report.violations.map((v) => v.message).join('; ')} (${blocks} blocking).`);
   }
 
@@ -506,7 +919,7 @@ async function start() {
   /** Puts an object in the current room: in a detected piece's place, or the nearest free spot. */
   function place(obj: PlacedObject) {
     if (!currentRoom) return;
-    const match = findMatch(obj.name);
+    const match = findMatch(obj.category ?? obj.name);
     obj.replaces = match ?? undefined;
 
     let spot = { x: 0, z: -1 }; // in front of where you stand when entering VR
@@ -521,12 +934,18 @@ async function start() {
     scene.add(obj.loaded.node);
     physics.addObject(obj.id, obj.loaded.node, obj.loaded.size, obj.loaded.hull, spot, rotY);
     report(obj);
+    renderScanned();
   }
 
   /** A detected piece whose category appears in the object's name and isn't taken yet. */
   function findMatch(name: string): ScannedObject | null {
     if (!currentRoom) return null;
     return matchDetected(name, currentRoom.objects, [...objects.values()].map((o) => o.replaces?.identifier));
+  }
+
+  /** An objectId no placed object already carries — see src/ids.ts for why that matters. */
+  function freshObjectId(base: string): string {
+    return instanceObjectId(base, [...objects.values()].map((o) => o.objectId));
   }
 
   function placeAll() {
@@ -539,7 +958,7 @@ async function start() {
   async function addObject(url: string, name: string, scale?: number) {
     try {
       const loaded = await loader.load(url, scale);
-      const obj: PlacedObject = { id: crypto.randomUUID(), objectId: localId(name), name, loaded };
+      const obj: PlacedObject = { id: crypto.randomUUID(), objectId: freshObjectId(localId(name)), name, loaded };
       objects.set(obj.id, obj);
       lastTouchedId = obj.id;
       if (currentRoom && rise >= 1) {
@@ -557,7 +976,7 @@ async function start() {
     if (!currentRoom || rise < 1) return null;
     try {
       const loaded = await loader.load(item.url, item.scale);
-      const obj: PlacedObject = { id: crypto.randomUUID(), objectId: item.objectId ?? localId(item.name), name: item.name, loaded };
+      const obj: PlacedObject = { id: crypto.randomUUID(), objectId: freshObjectId(item.objectId ?? localId(item.name)), name: item.name, loaded };
       objects.set(obj.id, obj);
       lastTouchedId = obj.id;
       const spot = physics.findFreeSpot(loaded.size, 0, at);
@@ -580,8 +999,8 @@ async function start() {
       ...catalog.map((item) => {
         const button = document.createElement('button');
         button.type = 'button';
-        button.className = 'quiet';
-        button.textContent = `Add ${item.name}`;
+        button.className = 'gray';
+        button.textContent = item.name.length <= 2 ? item.name.toUpperCase() : item.name.charAt(0).toUpperCase() + item.name.slice(1); // sentence case; "TV"
         button.addEventListener('click', () => void spawn(item, { x: 0, z: -1 }));
         return button;
       }),
@@ -625,11 +1044,11 @@ async function start() {
       const mismatch = boundsMismatch(loaded.size, item.expected);
       if (mismatch) {
         console.warn(`${item.name}: ${mismatch}`);
-        say(`${item.name}: ${mismatch}.`);
+        tell(`${item.name}: ${mismatch}.`, 'warn');
       }
     } catch (err) {
       console.error(`Loading ${item.name} from ${item.url} failed:`, err);
-      say(`Couldn’t load ${item.name} from the server: ${(err as Error).message}`);
+      tell(`Couldn’t load ${item.name} from the server: ${(err as Error).message}`, 'error');
     }
   }
 
@@ -755,7 +1174,7 @@ async function start() {
           const loaded = await loader.load(item.url, item.scale);
           item.size = loaded.size;
           if (!findMatch(item.name)) return;
-          const obj: PlacedObject = { id: crypto.randomUUID(), objectId: localId(item.name), name: item.name, loaded };
+          const obj: PlacedObject = { id: crypto.randomUUID(), objectId: freshObjectId(localId(item.name)), name: item.name, loaded };
           objects.set(obj.id, obj);
           if (currentRoom && rise >= 1) place(obj); // otherwise placed when the walls are up
         } catch (err) {
@@ -817,6 +1236,14 @@ async function start() {
   }
 
   document.getElementById('reset')!.addEventListener('click', () => onAction('reset'));
+  // Delete / Backspace on the laptop removes the last-touched object; not while typing.
+  window.addEventListener('keydown', (e) => {
+    if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+    const t = e.target as HTMLElement | null;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+    e.preventDefault();
+    onAction('remove');
+  });
 
   (document.getElementById('colliders') as HTMLInputElement).addEventListener('change', (e) => {
     physics.setDebug((e.target as HTMLInputElement).checked);
@@ -827,6 +1254,7 @@ async function start() {
   const clock = new THREE.Clock();
   renderer.setAnimationLoop(() => {
     const dt = Math.min(clock.getDelta(), 0.1);
+    outdoors.update(clock.elapsedTime);
     if (rise < 1) {
       rise = Math.min(1, rise + dt * 1.4);
       room.scale.y = Math.max(0.001, 1 - Math.pow(1 - rise, 3));

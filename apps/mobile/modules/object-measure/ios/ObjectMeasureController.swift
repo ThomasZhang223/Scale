@@ -86,7 +86,7 @@ final class ObjectMeasureController: NSObject {
     arSession.pause()
   }
 
-  func measure(normalizedTapPoint: CGPoint) async throws -> ObjectMeasureResult {
+  func measure(normalizedTapPoint: CGPoint, viewSize: CGSize) async throws -> ObjectMeasureResult {
     guard ARWorldTrackingConfiguration.supportsFrameSemantics(.sceneDepth) else {
       throw ObjectMeasureError.notSupported
     }
@@ -94,7 +94,8 @@ final class ObjectMeasureController: NSObject {
     guard let seed = ObjectMeasurer.raycastSeed(
       session: arSession,
       frame: currentFrame,
-      normalizedTapPoint: normalizedTapPoint
+      normalizedTapPoint: normalizedTapPoint,
+      viewSize: viewSize
     ) else {
       throw ObjectMeasureError.raycastFailed
     }

@@ -5,6 +5,9 @@
 
 export const colors = {
   accent: "#3a86ff",
+  // The LiDAR ghost points are cyan; the measurement readout borrows it so
+  // the number on screen reads as coming from the same sensor.
+  lidar: "#5ac8fa",
   // matches iOS systemFill in both appearances, so it reads correctly
   // whether or not Liquid Glass is available.
   surfaceFallback: "rgba(120,120,128,0.16)",
@@ -15,4 +18,4 @@ export const colors = {
 
 export const spacing = { xs: 4, sm: 8, md: 16, lg: 24, xl: 32 } as const;
 
-export const radius = { sm: 8, md: 12, lg: 20 } as const;
+export const radius = { sm: 8, md: 12, lg: 20, xl: 28, pill: 999 } as const;

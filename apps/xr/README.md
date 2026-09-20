@@ -188,3 +188,31 @@ In dev, Vite proxies `/v1` to `VITE_API_PROXY` (default `http://127.0.0.1:8787`,
 `wrangler dev` in `workers/`), so there's no CORS to configure and the Quest reaches it over
 the same USB port-forward. Copy `.env.example` to `.env` to change any of this;
 `VITE_API_STUB=0` drops the stub header.
+
+## Voice
+
+Push-to-talk in and spoken replies out, through ElevenLabs (`src/voice.ts`). The Meta Quest
+Browser has a microphone (`getUserMedia` + `MediaRecorder`) and `<audio>` playback but **no
+Web Speech API**, so the page records audio and posts it to two same-origin routes; the
+ElevenLabs key lives only server-side:
+
+| Route | Request | Response |
+|---|---|---|
+| `POST /v1/voice/stt` | multipart `file` (webm/opus or mp4), `model_id` (`scribe_v2`) | `{ "text": "…" }` |
+| `POST /v1/voice/tts` | JSON `{ "text", "model_id" }` | `audio/mpeg` (mp3 44.1 kHz 64 kbps) |
+
+In production `worker/index.ts` serves them (before the generic `/v1` forward); in dev the
+Vite proxy forwards them to `api.elevenlabs.io` with the key attached. Both answer
+`501 { "error": "…" }` naming the missing setting instead of falling back.
+
+```bash
+# deploy: the key is a secret, the voice id and TTS model are [vars] in wrangler.toml
+npx wrangler secret put ELEVENLABS_API_KEY
+# dev: put ELEVENLABS_API_KEY (and, to change the voice, ELEVENLABS_VOICE_ID) in .env — see .env.example
+```
+
+Quest notes: the mic permission prompt is hidden inside an immersive session, so the page
+calls `voice.warmUp()` on the 2D page before **Enter VR**. Audio playback needs one prior user
+gesture; the trigger press that starts recording counts. Recordings under 300 ms are dropped
+as trigger mis-fires. `npm test` covers the client (`src/voice.test.ts`) with a fake
+recorder, mic and `<audio>`.

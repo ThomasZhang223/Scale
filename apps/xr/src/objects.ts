@@ -122,3 +122,21 @@ function surfacePoints(node: THREE.Object3D): Float32Array {
   }
   return new Float32Array(points);
 }
+
+/**
+ * A listing that has no mesh yet (Object v1 `state: measured`, `glbUrl: null`): a translucent
+ * box of exactly bboxMeters, origin at the bottom-centre like every GLB. It is placed, grabbed
+ * and solved like anything else; when the mesh arrives it takes the box's place.
+ */
+export function measuredBox(bbox: { w: number; h: number; d: number }, name: string, color = 0x0a84ff): LoadedObject {
+  const geo = new THREE.BoxGeometry(bbox.w, bbox.h, bbox.d);
+  const group = new THREE.Group();
+  group.name = name;
+  group.add(
+    new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color, transparent: true, opacity: 0.45, roughness: 0.6 })),
+    new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({ color })),
+  );
+  const out = prepareObject(group, 1);
+  out.note = 'Measured box: the merchant listed its size, and no mesh has been generated yet';
+  return out;
+}

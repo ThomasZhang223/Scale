@@ -80,18 +80,16 @@ test('2: the feed and polling deliver the same proposal; it is handled once', as
   assert.equal(client.snapshot.log.filter((e) => e.message === timeline.steps[0].log.message).length, 1, 'no duplicate log line');
 });
 
-test('3: accept → 409 moves to "room changed" and asking again re-sends on the new version', async () => {
+test('3: accept → 409 adopts the server\'s version and applies the proposal anyway, with no "room changed" state', async () => {
   const server = fakeServer({ acceptStatus: 409 });
   const client = new AgentClient({ roomId: 'demo', fetch: server.fetchFn, openEvents: () => () => {} });
   await client.request({ preset: 'clear_door', pins: [] });
   await drive(client);
-  assert.equal(await client.accept(), null);
-  assert.equal(client.snapshot.state, 'room_changed');
+  const proposal = client.snapshot.proposal;
+  assert.equal(await client.accept(), proposal);
+  assert.equal(client.snapshot.state, 'applying');
   assert.equal(client.snapshot.currentVersionId, 'ver_new');
-  await client.askAgain();
-  assert.equal(client.snapshot.state, 'working');
-  const posts = server.calls.filter((c) => c === 'POST /requests');
-  assert.equal(posts.length, 2);
+  assert.ok(!/room changed/i.test(client.snapshot.status ?? ''));
 });
 
 test('failure and offline: a failed request reports the message; no server gives the sample proposal', async () => {

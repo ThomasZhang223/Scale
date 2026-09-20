@@ -38,6 +38,7 @@ interface Hand {
   source?: XRInputSource;
   grab?: Grab;
   pulling?: boolean; // trigger still held while a palette pull is loading
+  holding?: string; // a "hold:" palette action pressed and not yet released (push-to-talk)
   pressed: boolean[]; // face buttons last frame, to act once per press
 }
 
@@ -99,6 +100,20 @@ export class Interaction {
     const node = this.physics.nodeOf(held ?? hoverId ?? this.mouseHover ?? '');
     if (node) this.halo.show(node, held ? 0.85 : 0.35);
     else this.halo.hide();
+  }
+
+  /**
+   * Lets go of `id` without a physical release: the object is about to be removed, so no
+   * drop, no onRelease, no layout push for it.
+   */
+  drop(id: string) {
+    for (const hand of this.hands) if (hand.grab?.id === id) hand.grab = undefined;
+    if (this.mouseGrab?.id === id) {
+      this.mouseGrab = undefined;
+      this.controls.enabled = true;
+    }
+    if (this.mouseHover === id) this.mouseHover = null;
+    this.halo.hide();
   }
 
   /** Everything currently in someone's hand. */
@@ -165,6 +180,12 @@ export class Interaction {
       controller.addEventListener('selectstart', () => {
         this.raycaster.setFromXRController(controller);
         const item = this.palette.hitTest(this.raycaster);
+        if (item?.action?.startsWith('hold:')) {
+          // Press-and-release actions: the caller gets ":down" now and ":up" when the trigger lets go.
+          hand.holding = item.action;
+          hand.source?.gamepad?.hapticActuators?.[0]?.pulse?.(0.6, 60);
+          return this.onAction(`${item.action}:down`);
+        }
         if (item?.action) return this.onAction(item.action);
         if (item) return this.pull(hand, item);
         hand.grab = this.tryGrab();
@@ -175,6 +196,10 @@ export class Interaction {
       });
       controller.addEventListener('selectend', () => {
         hand.pulling = false;
+        if (hand.holding) {
+          this.onAction(`${hand.holding}:up`);
+          hand.holding = undefined;
+        }
         if (hand.grab) {
           this.physics.release(hand.grab.id);
           this.onRelease(hand.grab.id);
