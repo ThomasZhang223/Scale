@@ -655,7 +655,11 @@ async function start() {
   /** Spoken output; a failure here is shown, never thrown, so voice never blocks the layout work. */
   function speak(text: string) {
     if (!voice.supported || !text) return;
-    voice.speak(text).catch((err) => console.warn('Voice:', err));
+    // The card lingers while the reply is spoken, then goes on its own.
+    voice
+      .speak(text)
+      .then(() => hud.speechEnded())
+      .catch((err) => console.warn('Voice:', err));
   }
 
   // Laptop: hold the mic button. The first press also asks for microphone permission.
@@ -1501,7 +1505,7 @@ async function start() {
     interaction.update(dt);
     applier.update(dt);
     physics.step(dt);
-    hud.place(renderer.xr.isPresenting ? renderer.xr.getCamera() : camera, palette.group);
+    hud.place(renderer.xr.isPresenting ? renderer.xr.getCamera() : camera, dt);
     findPanel.place(renderer.xr.isPresenting ? renderer.xr.getCamera() : camera);
     if (!renderer.xr.isPresenting) controls.update();
     renderer.render(scene, camera);

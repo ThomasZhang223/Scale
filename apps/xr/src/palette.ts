@@ -43,9 +43,9 @@ const C = {
 
 // Metres on the wrist; canvas pixels map 1 m → 4000 px, so a 44 pt row is 0.034 m.
 const PX = 4000;
-const COL_W = 0.12;
+const COL_W = 0.165;             // wider screen: names and sizes fit on one line
 const GAP_X = 0.006;
-const ROW_H = 0.034;
+const ROW_H = 0.037;
 const HEADER_H = 0.022;
 const GROUP_GAP = 0.012;
 const MARGIN = 0.012;
@@ -87,7 +87,7 @@ export class Palette {
     this.group.name = 'palette';
     this.group.visible = false;
     // Sits just above the back of the hand, tilted toward the eyes when you look at your wrist.
-    this.group.position.set(0, 0.07, -0.02);
+    this.group.position.set(0, 0.075, -0.02);
     this.group.rotation.x = -Math.PI / 3;
   }
 

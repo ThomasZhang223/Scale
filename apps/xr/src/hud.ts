@@ -1,13 +1,13 @@
 import * as THREE from 'three';
 
 /*
- * The transcript: its own panel, standing behind the phone on the left hand — further from
- * the eyes than the phone, on the line from the head through the phone, facing the head. So
- * the phone (items, arrangement options) is in front and the dialogue reads behind it, and
- * both move with the hand. It shows what was heard and what the designer said back — the
- * summary, why the layout is the way it is, the trade-off, and any error, in full. It never
- * truncates: lines wrap and the panel grows downward. Hidden in the spectator view, where
- * the laptop has its own log.
+ * The transcript: a card floating in front of you, a little below eye level, that follows
+ * your head lazily — it stays put while you read and glides over only when you turn well
+ * away from it. It shows what was heard and what the designer said back — the summary, why
+ * the layout is the way it is, the trade-off, and any error, in full. It never truncates:
+ * lines wrap and the card grows downward. It leaves on its own once the dialogue is over
+ * (speech finished, or nothing new for a while), or at once from the × in its corner; a new
+ * message brings it back. Hidden in the spectator view, where the laptop has its own log.
  */
 
 export type Tone = 'heard' | 'info' | 'warn' | 'error';
@@ -17,14 +17,19 @@ export interface HudLine {
 }
 
 const PX = 2400;                 // canvas px per metre
-const WIDTH = 0.6;               // metres: wider than the phone, so it shows on both sides of it
+const WIDTH = 0.72;              // metres, at DISTANCE: comfortable reading width
 const PAD = 0.024;
 const LINE_H = 0.03;             // metres per wrapped line
 const GAP = 0.01;                // between entries
 const RADIUS = 0.024;
 const MAX_LINES = 12;            // the panel's ceiling; older lines fall off the top
-const BEHIND = 0.5;              // metres past the phone, away from the eyes
-const LIFT = 0.12;               // raised so the phone covers the panel's lower part, not its text
+const DISTANCE = 1.25;           // metres in front of the eyes
+const DROP = 0.12;               // below eye level, so it never covers what you are looking at
+const REANCHOR_ANGLE = 0.5;      // rad: how far the head turns before the card follows
+const REANCHOR_DIST = 0.45;      // metres: how far the head moves before the card follows
+const FOLLOW = 5;                // 1/s: glide rate toward the new spot
+const AUTO_HIDE_MS = 12_000;     // nothing new for this long → gone
+const AFTER_SPEECH_MS = 2_000;   // spoken dialogue finished → gone shortly after
 
 const COLOR: Record<Tone, string> = {
   heard: 'rgba(235,235,245,0.60)',
@@ -33,8 +38,8 @@ const COLOR: Record<Tone, string> = {
   error: '#FF453A',
 };
 const BACKGROUND = 'rgba(28,28,30,0.88)';
-const CLOSE_R = 0.022;           // the × button's radius (top-left corner)
-const CLOSE_INSET = 0.034;
+const CLOSE_R = 0.036;           // the × button's radius (top-right corner): a real target for a ray
+const CLOSE_INSET = 0.046;
 const FONT = `${0.02 * PX}px -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", system-ui, sans-serif`;
 
 export class Hud {
@@ -43,12 +48,16 @@ export class Hud {
   private lines: HudLine[] = [];
   private presenting = false;
   private dismissed = false;
-  /** The × in the top-left corner; the only part of the panel a ray can hit. */
+  private hideAt = 0;              // performance.now() deadline; 0 = none
+  private anchored = false;
+  /** The × in the top-right corner; the only part of the panel a ray can hit. */
   private readonly close: THREE.Mesh;
 
   private readonly eye = new THREE.Vector3();
-  private readonly anchor = new THREE.Vector3();
-  private readonly dir = new THREE.Vector3();
+  private readonly forward = new THREE.Vector3();
+  private readonly target = new THREE.Vector3();
+  private readonly toCard = new THREE.Vector3();
+  private readonly quat = new THREE.Quaternion();
 
   constructor() {
     this.group.name = 'hud';
@@ -62,10 +71,17 @@ export class Hud {
     return this.group.visible && raycaster.intersectObject(this.close, false).length > 0;
   }
 
-  /** Hides the panel until the next message arrives. */
+  /** Hides the card until the next message arrives. */
   dismiss() {
     this.dismissed = true;
+    this.hideAt = 0;
     this.group.visible = false;
+  }
+
+  /** The spoken reply has finished: the card has done its job, let it go shortly. */
+  speechEnded() {
+    if (this.dismissed) return;
+    this.hideAt = now() + AFTER_SPEECH_MS;
   }
 
   /** Add to the scene; place() moves it every frame. */
@@ -74,19 +90,34 @@ export class Hud {
   }
 
   /**
-   * Once a frame: stand BEHIND metres past the phone on the line from the eyes through it,
-   * lifted a little, facing the eyes. With no phone yet (no left controller), stay hidden.
+   * Once a frame. The card sits DISTANCE ahead of the eyes along the head's yaw (never
+   * pitch: looking down must not push it into the floor), DROP below eye level, facing the
+   * eyes. It re-anchors only when the head has turned or moved well away from it, and then
+   * glides rather than jumps. Expired cards are let go here too.
    */
-  place(head: THREE.Object3D, phone: THREE.Object3D | null) {
-    if (!phone || !phone.visible || !phone.parent) {
-      this.group.visible = false;
-      return;
-    }
+  place(head: THREE.Object3D, dt = 1 / 72) {
+    if (this.hideAt && now() >= this.hideAt) this.dismiss();
     head.getWorldPosition(this.eye);
-    phone.getWorldPosition(this.anchor);
-    this.dir.subVectors(this.anchor, this.eye).normalize();
-    this.group.position.copy(this.anchor).addScaledVector(this.dir, BEHIND);
-    this.group.position.y += LIFT;
+    head.getWorldQuaternion(this.quat);
+    this.forward.set(0, 0, -1).applyQuaternion(this.quat);
+    this.forward.y = 0;
+    if (this.forward.lengthSq() < 1e-6) this.forward.set(0, 0, -1);
+    this.forward.normalize();
+    this.target.copy(this.eye).addScaledVector(this.forward, DISTANCE);
+    this.target.y = this.eye.y - DROP;
+
+    if (!this.anchored) {
+      this.group.position.copy(this.target);
+      this.anchored = true;
+    } else {
+      this.toCard.subVectors(this.group.position, this.eye);
+      this.toCard.y = 0;
+      const dist = this.toCard.length();
+      const angle = dist > 1e-6 ? Math.acos(Math.max(-1, Math.min(1, this.toCard.dot(this.forward) / dist))) : 0;
+      if (angle > REANCHOR_ANGLE || Math.abs(dist - DISTANCE) > REANCHOR_DIST || Math.abs(this.group.position.y - this.target.y) > REANCHOR_DIST) {
+        this.group.position.lerp(this.target, Math.min(1, FOLLOW * dt));
+      }
+    }
     this.group.lookAt(this.eye);
     this.group.visible = this.presenting && this.mesh !== null && !this.dismissed;
   }
@@ -97,17 +128,28 @@ export class Hud {
     this.group.visible = on && this.mesh !== null;
   }
 
-  /** Replaces the transcript. Empty hides the panel. A new message brings a dismissed panel back. */
+  /**
+   * Replaces the transcript. Empty hides the card. Only a genuinely new message brings a
+   * dismissed card back — a redraw of the same lines (the palette refreshing) does not.
+   */
   set(lines: HudLine[]) {
-    this.lines = lines.filter((l) => l.text.trim());
-    this.dismissed = false;
+    const next = lines.filter((l) => l.text.trim());
+    const changed = next.length !== this.lines.length || next.some((l, i) => l.text !== this.lines[i]?.text || l.tone !== this.lines[i]?.tone);
+    this.lines = next;
+    if (changed) {
+      this.dismissed = false;
+      this.hideAt = now() + AUTO_HIDE_MS;
+      this.anchored = false; // a fresh message appears where you are looking now
+    }
     this.redraw();
   }
 
-  /** Adds one line at the bottom, dropping the oldest when the panel is full. */
+  /** Adds one line at the bottom, dropping the oldest when the card is full. */
   push(text: string, tone: Tone = 'info') {
     if (!text.trim()) return;
     this.lines.push({ text, tone });
+    this.dismissed = false;
+    this.hideAt = now() + AUTO_HIDE_MS;
     this.redraw();
   }
 
@@ -171,9 +213,13 @@ export class Hud {
     // Grow downward: the top edge stays put as the panel gets taller.
     this.mesh.position.y = -height / 2;
     this.group.add(this.mesh);
-    this.close.position.set(-WIDTH / 2 + CLOSE_INSET, -CLOSE_INSET, 0.002);
+    this.close.position.set(WIDTH / 2 - CLOSE_INSET, -CLOSE_INSET, 0.002);
     this.group.visible = this.presenting && !this.dismissed;
   }
+}
+
+function now(): number {
+  return typeof performance !== 'undefined' ? performance.now() : Date.now();
 }
 
 /** A grey disc with a white ×, drawn once. */
@@ -184,7 +230,7 @@ function closeButton(): THREE.Mesh {
     const canvas = document.createElement('canvas');
     canvas.width = canvas.height = px;
     const ctx = canvas.getContext('2d')!;
-    ctx.fillStyle = 'rgba(120,120,128,0.7)';
+    ctx.fillStyle = 'rgba(120,120,128,0.85)';
     ctx.beginPath();
     ctx.arc(px / 2, px / 2, px / 2, 0, Math.PI * 2);
     ctx.fill();
