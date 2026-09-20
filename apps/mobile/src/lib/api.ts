@@ -27,7 +27,10 @@ function requireApiBase(): string {
       "EXPO_PUBLIC_API_BASE is not set — create apps/mobile/.env.local, see apps/mobile/README.md"
     );
   }
-  return API_BASE;
+  // README.md tells people to set this to `…workers.dev/v1`, while every call site in this
+  // app already spells the `/v1` prefix in its path. Accept both forms rather than 404 on
+  // `/v1/v1/...` — a trailing `/v1` (or `/`) on the base is stripped here, once.
+  return API_BASE.replace(/\/+$/, "").replace(/\/v1$/, "");
 }
 
 // contracts.md, "The one line of code that makes this loud": a schemaVersion
@@ -54,7 +57,10 @@ async function request<T>(
   opts: RequestOptions
 ): Promise<T> {
   const base = requireApiBase();
-  const res = await fetch(`${base}${path}`, {
+  // Half the call sites spell "/v1/objects", the other half "/objects" (the capture screens,
+  // written when the base URL carried the prefix). Both mean the same route.
+  const versioned = path.startsWith("/v1/") ? path : `/v1${path}`;
+  const res = await fetch(`${base}${versioned}`, {
     ...init,
     headers: {
       ...(init.headers ?? {}),

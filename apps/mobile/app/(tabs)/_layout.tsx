@@ -1,33 +1,22 @@
 import { NativeTabs } from "expo-router/unstable-native-tabs";
-import { Text } from "react-native";
 
-import { Glass } from "../../src/theme/Glass";
-import { spacing } from "../../src/theme/tokens";
-
-// ceiling: static text. This becomes the "generating… 40%" job-progress
-// strip once a job-tracking store exists — that store reads SSE `job` events
-// over src/lib/sse.ts, which is Panel B's file. Wire it in there, not here.
-function JobProgressAccessory() {
-  return (
-    <Glass style={{ paddingHorizontal: spacing.md, paddingVertical: spacing.sm }}>
-      <Text>Full Scale</Text>
-    </Glass>
-  );
-}
-
+// iOS 26 native tabs: Liquid Glass tab bar, minimises on scroll. No bottom
+// accessory — the "Full Scale" strip that used to sit above the bar was a
+// placeholder for job progress; that now lives on the object detail gauge.
 export default function TabsLayout() {
   return (
     <NativeTabs minimizeBehavior="onScrollDown">
-      <NativeTabs.BottomAccessory>
-        <JobProgressAccessory />
-      </NativeTabs.BottomAccessory>
       <NativeTabs.Trigger name="index">
-        <NativeTabs.Trigger.Label>Rooms</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Label>Room</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf="house" />
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="objects">
-        <NativeTabs.Trigger.Label>Objects</NativeTabs.Trigger.Label>
+      <NativeTabs.Trigger name="scanned">
+        <NativeTabs.Trigger.Label>Scanned</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf="cube" />
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="furniture">
+        <NativeTabs.Trigger.Label>Furniture</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon sf="sofa" />
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="capture">
         <NativeTabs.Trigger.Label>Capture</NativeTabs.Trigger.Label>

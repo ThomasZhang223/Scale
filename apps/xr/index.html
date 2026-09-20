@@ -5,94 +5,248 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Room scan</title>
     <style>
+      /* Apple HIG dark tokens (docs: ~/Downloads/apple-ui-styling.md §10). The scene is dark, so the
+         sidebar is always the dark palette; elevation comes from lighter surfaces, not shadows. */
+      :root {
+        color-scheme: dark;
+        --font-text: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", "Inter", system-ui, sans-serif;
+        --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
+        --accent: #0A84FF;
+        --red: #FF453A;
+        --green: #30D158;
+        --orange: #FF9F0A;
+        --bg-grouped: #000000;
+        --bg-cell: #1C1C1E;
+        --bg-tertiary: #2C2C2E;
+        --label: #FFFFFF;
+        --label-secondary: rgba(235, 235, 245, 0.60);
+        --label-tertiary: rgba(235, 235, 245, 0.30);
+        --separator: rgba(84, 84, 88, 0.60);
+        --fill-tertiary: rgba(118, 118, 128, 0.24);
+        --fill-primary: rgba(120, 120, 128, 0.36);
+        --radius-sm: 8px;
+        --radius-md: 12px;
+        --ease-standard: cubic-bezier(0.25, 0.1, 0.25, 1);
+      }
       html, body { margin: 0; height: 100%; overflow: hidden; background: #1d2126; }
-      body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: #eef1f4; }
+      body {
+        font-family: var(--font-text); font-size: 15px; line-height: 20px; letter-spacing: -0.23px;
+        color: var(--label); -webkit-font-smoothing: antialiased;
+      }
+      * { box-sizing: border-box; }
+
+      /* The sidebar: a material sheet holding an inset grouped list. */
       #panel {
-        position: absolute; top: 16px; left: 16px; width: 290px;
-        padding: 14px; border-radius: 12px; display: grid; gap: 10px;
-        background: rgba(20, 23, 27, 0.86); border: 1px solid rgba(255, 255, 255, 0.08);
+        position: absolute; top: 16px; left: 16px; max-height: calc(100% - 32px); width: 336px;
+        padding: 12px; border-radius: 20px; overflow-y: auto; display: grid; gap: 14px; align-content: start;
+        background: rgba(28, 28, 30, 0.78); -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 12px 32px rgba(0, 0, 0, 0.35);
+        scrollbar-width: thin; scrollbar-color: var(--fill-primary) transparent;
       }
       #panel[hidden] { display: none; }
-      #connection::before {
-        content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 7px;
-        border-radius: 50%; background: #ff9f43; vertical-align: middle;
+      @media (prefers-reduced-transparency: reduce) { #panel { background: var(--bg-cell); backdrop-filter: none; } }
+
+      /* Large title + status pill */
+      .titlebar { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 2px 4px 0; }
+      .titlebar h1 { margin: 0; font-size: 28px; line-height: 34px; font-weight: 700; letter-spacing: 0.36px; }
+      #connection { font-size: 13px; line-height: 18px; color: var(--label-secondary); white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
+      #connection::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--orange); }
+      #connection[data-live="true"]::before { background: var(--green); }
+
+      /* Inset grouped sections */
+      section { display: grid; gap: 6px; }
+      section > h2 {
+        margin: 0 0 0 12px; font-size: 13px; line-height: 18px; font-weight: 400; letter-spacing: -0.08px;
+        color: var(--label-secondary);
       }
-      #connection[data-live="true"]::before { background: #4cd28a; }
+      .group { background: var(--bg-cell); border-radius: var(--radius-md); overflow: hidden; }
+      .group:not(:has(> :not(:empty))) { display: none; } /* nothing in it yet (catalogue, proposal buttons) */
+      .row { display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 6px 12px; }
+      .row + .row { border-top: 0.5px solid var(--separator); }
+      .row.text { color: var(--label-secondary); font-size: 13px; line-height: 18px; letter-spacing: -0.08px; padding: 11px 16px; }
+      .row.text:empty { display: none; }
+      .row.text p { margin: 0; }
+      .row .label { flex: 1; }
+      section > .footer { margin: 0 12px; font-size: 13px; line-height: 18px; color: var(--label-secondary); }
+
+      /* Buttons (HIG §8): filled, tinted, gray. Medium 34px; sentence case. */
       button {
-        font: inherit; padding: 9px 12px; border-radius: 8px; cursor: pointer;
-        color: inherit; background: #2d5d86; border: 1px solid #3f78a8;
+        font: inherit; letter-spacing: inherit; font-weight: 600; color: var(--accent);
+        min-height: 34px; padding: 6px 14px; border: 0; border-radius: 10px; cursor: pointer;
+        background: var(--fill-tertiary);
+        transition: opacity 150ms var(--ease-standard), transform 150ms var(--ease-standard);
       }
-      button:hover { background: #356c9b; }
-      button:focus-visible { outline: 2px solid #5fb3ff; outline-offset: 2px; }
-      #note { color: #a9b2bc; min-height: 1.45em; }
-      .row { display: flex; gap: 8px; }
-      .row button:first-child { flex: 1; }
-      button.quiet { background: #2a2f36; border-color: rgba(255, 255, 255, 0.15); }
-      button.quiet:hover { background: #343a42; }
-      .check { display: flex; align-items: center; gap: 8px; color: #cfd6dd; cursor: pointer; }
-      .check input { accent-color: #4cd28a; width: 16px; height: 16px; }
-      .hint { margin: 0; color: #8a96a3; font-size: 13px; }
-      #catalog { display: flex; flex-wrap: wrap; gap: 6px; }
-      #catalog:empty { display: none; }
-      #catalog button { padding: 6px 10px; font-size: 13px; }
-      #agent { display: grid; gap: 8px; padding-top: 10px; border-top: 1px solid rgba(255, 255, 255, 0.08); }
-      #agent h2 { margin: 0; font-size: 13px; font-weight: 600; color: #cfd6dd; letter-spacing: 0.02em; }
-      #agent .ask { display: flex; gap: 6px; }
-      #agent input { flex: 1; min-width: 0; font: inherit; padding: 8px 10px; border-radius: 8px; color: inherit;
-        background: #14171b; border: 1px solid rgba(255, 255, 255, 0.12); }
-      #agent-presets, #agent-buttons { display: flex; flex-wrap: wrap; gap: 6px; }
-      #agent-presets button, #agent-buttons button { padding: 6px 10px; font-size: 13px; }
-      #agent-status { color: #a9b2bc; min-height: 1.45em; }
-      #agent-status[data-state="working"] { color: #5fb3ff; }
-      #agent-status[data-state="proposed"] { color: #4cd28a; }
-      #agent-status[data-state="failed"], #agent-status[data-state="room_changed"] { color: #ffb347; }
-      #agent-log { max-height: 180px; overflow-y: auto; font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
-        color: #c3cbd3; background: #14171b; border-radius: 8px; padding: 6px 8px; }
+      button:hover { opacity: 0.85; }
+      button:active { transform: scale(0.97); opacity: 0.7; transition-duration: 0s; }
+      button:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 50%, transparent); outline-offset: 2px; }
+      button:disabled { opacity: 0.4; cursor: default; }
+      button.filled { background: var(--accent); color: #fff; }
+      button.tinted { background: color-mix(in srgb, var(--accent) 18%, transparent); }
+      button.gray { color: var(--label); font-weight: 400; }
+      button.destructive { color: var(--red); }
+      button.large { min-height: 44px; width: 100%; font-size: 17px; letter-spacing: -0.43px; }
+      .wrap { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 12px; }
+      /* Listings: photo cards, the recommendation's reasons under the name. */
+      .cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+      .cards:empty { display: none; }
+      .card { background: var(--bg-cell); border-radius: var(--radius-md); overflow: hidden; display: flex; flex-direction: column; }
+      .card img { width: 100%; aspect-ratio: 1; object-fit: cover; background: #2C2C2E; display: block; }
+      .card .body { padding: 8px 10px 10px; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+      .card .name { font-size: 13px; font-weight: 600; line-height: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .card .meta { font-size: 12px; line-height: 15px; color: var(--label-secondary); }
+      .card .why { font-size: 11px; line-height: 14px; color: var(--label-secondary); }
+      .card .actions { display: flex; gap: 6px; margin-top: 4px; }
+      .card .actions button, .card .actions a { flex: 1; min-height: 28px; font-size: 12px; text-align: center; }
+      .card .actions a { color: var(--accent); text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
+      .card.top { outline: 1.5px solid var(--accent); }
+      #scanned .row .dims { font-size: 12px; color: var(--label-secondary); }
+      #agent-mic { min-width: 36px; padding: 4px 8px; font-size: 16px; }
+      #agent-mic[data-state="recording"] { background: var(--red, #FF453A); color: #fff; }
+      #agent-mic[data-state="transcribing"], #agent-mic[data-state="speaking"] { background: color-mix(in srgb, var(--accent) 18%, transparent); }
+      #agent-mic[data-state="error"] { outline: 1.5px solid #FF9F0A; }
+      .wrap:empty { display: none; }
+      .wrap button { min-height: 32px; padding: 5px 12px; font-size: 14px; }
+
+      /* Segmented control (HIG §8): a fill track with two equal segments. */
+      .segmented { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 2px; padding: 2px; border-radius: 9px; background: var(--fill-tertiary); width: 100%; }
+      .segmented button { min-height: 28px; padding: 4px 8px; border-radius: 7px; background: transparent; color: var(--label); font-size: 13px; font-weight: 500; }
+      .segmented button:hover { background: #636366; opacity: 1; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3); }
+
+      /* Toggle (HIG §8): 51×31 switch. */
+      .switch { position: relative; width: 51px; height: 31px; flex: none; }
+      .switch input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+      .switch span {
+        position: absolute; inset: 0; border-radius: 9999px; background: var(--fill-primary);
+        transition: background 200ms var(--ease-standard);
+      }
+      .switch span::after {
+        content: ""; position: absolute; top: 2px; left: 2px; width: 27px; height: 27px; border-radius: 50%; background: #fff;
+        box-shadow: 0 3px 8px rgba(0, 0, 0, 0.25); transition: transform 200ms var(--ease-standard);
+      }
+      .switch input:checked + span { background: var(--green); }
+      .switch input:checked + span::after { transform: translateX(20px); }
+      .switch input:focus-visible + span { outline: 3px solid color-mix(in srgb, var(--accent) 50%, transparent); outline-offset: 2px; }
+
+      /* Designer agent */
+      #agent-ask-row { padding: 4px 6px 4px 12px; }
+      #agent input {
+        flex: 1; min-width: 0; font: inherit; letter-spacing: inherit; color: var(--label);
+        min-height: 36px; padding: 6px 0; border: 0; background: transparent; outline: none;
+      }
+      #agent input::placeholder { color: var(--label-tertiary); }
+      #agent-presets { display: grid; gap: 6px; padding: 8px 12px; }
+      #agent-presets .styles { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+      #agent-presets .styles button { width: 100%; }
+      #agent-status { color: var(--label-secondary); font-size: 13px; line-height: 18px; }
+      #agent-status:empty { display: none; }
+      #agent-status[data-state="working"] { color: var(--accent); }
+      #agent-status[data-state="proposed"] { color: var(--green); }
+      #agent-status[data-state="failed"], #agent-status[data-state="room_changed"] { color: var(--orange); }
+      #agent-buttons:empty { display: none; }
+      #agent-log {
+        max-height: 160px; overflow-y: auto; margin: 0 12px 8px; padding: 6px 8px; border-radius: var(--radius-sm);
+        background: var(--bg-tertiary); font: 12px/16px var(--font-mono); color: var(--label-secondary);
+      }
       #agent-log:empty { display: none; }
-      #agent-log .warn { color: #ffd27a; }
-      #agent-log .decision { color: #e8edf2; }
-      #agent-rules summary { cursor: pointer; color: #a9b2bc; font-size: 13px; }
-      #agent-rules table { margin-top: 6px; border-collapse: collapse; font-size: 12px; color: #c3cbd3; }
-      #agent-rules td { padding: 3px 6px 3px 0; vertical-align: top; border-top: 1px solid rgba(255, 255, 255, 0.06); }
-      #agent-rules td:first-child { color: #e8edf2; white-space: nowrap; }
+      #agent-log .warn { color: var(--orange); }
+      #agent-log .decision { color: var(--label); }
+      #agent-rules summary {
+        list-style: none; cursor: pointer; display: flex; align-items: center; min-height: 40px; padding: 6px 12px; color: var(--label);
+      }
+      #agent-rules summary::-webkit-details-marker { display: none; }
+      #agent-rules summary::after { content: "›"; margin-left: auto; color: var(--label-tertiary); font-size: 20px; transition: transform 200ms var(--ease-standard); }
+      #agent-rules[open] summary::after { transform: rotate(90deg); }
+      #agent-rules table { width: 100%; border-collapse: collapse; font-size: 13px; line-height: 18px; color: var(--label-secondary); }
+      #agent-rules td { padding: 6px 12px; vertical-align: top; border-top: 0.5px solid var(--separator); }
+      #agent-rules td:first-child { color: var(--label); white-space: nowrap; width: 40%; }
+
+      @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: 0.01ms !important; } }
     </style>
   </head>
   <body>
     <div id="panel">
-      <span id="connection" data-live="false">Connecting…</span>
-      <div class="row">
-        <button id="open" type="button">Add room or object</button>
-        <button id="reset" type="button" class="quiet">Reset</button>
+      <div class="titlebar">
+        <h1>Room</h1>
+        <span id="connection" data-live="false">Connecting…</span>
       </div>
-      <input id="picker" type="file" accept=".json,.glb,.gltf,application/json,model/gltf-binary" multiple hidden />
-      <div id="catalog"></div>
-      <label class="check"><input id="colliders" type="checkbox" /> Show physics shapes</label>
-      <p class="hint">Drop a room scan (.json) or scanned objects (.glb) anywhere, or add catalogue items with the buttons. Drag objects to move them; scroll while dragging to turn. In VR, pull items from the panel on your left hand.</p>
-      <div id="note" role="status"></div>
-      <section id="agent">
-        <h2>Designer agent</h2>
-        <div class="ask">
-          <input id="agent-text" type="text" placeholder="e.g. Reading corner by the window" autocomplete="off" />
-          <button id="agent-ask" type="button">Ask</button>
+
+      <section>
+        <div class="group">
+          <div class="row">
+            <button id="open" type="button" class="filled large">Add room or object…</button>
+          </div>
+          <div class="row">
+            <span class="label">Start over with the room only</span>
+            <button id="reset" type="button" class="destructive">Reset</button>
+          </div>
+          <div class="row">
+            <span class="label">Show physics shapes</span>
+            <label class="switch"><input id="colliders" type="checkbox" /><span></span></label>
+          </div>
         </div>
-        <div id="agent-presets"></div>
-        <div id="agent-status"></div>
-        <div id="agent-buttons"></div>
-        <div id="agent-log" aria-live="polite"></div>
-        <details id="agent-rules">
-          <summary>What Rearrange does</summary>
-          <table>
-            <tr><td>sofa</td><td>back against a wall, facing into the room; faces the TV if there is one</td></tr>
-            <tr><td>TV / storage / shelf / cabinet</td><td>against a wall</td></tr>
-            <tr><td>bed</td><td>against a wall, away from the door</td></tr>
-            <tr><td>desk</td><td>against a wall, near a window for daylight</td></tr>
-            <tr><td>dining table</td><td>toward the middle of the room</td></tr>
-            <tr><td>chairs</td><td>if there's a table: pulled up to it, facing it; else grouped with the sofa around the coffee table</td></tr>
-            <tr><td>coffee table</td><td>in front of the sofa</td></tr>
-            <tr><td>lamps, plants, unknown</td><td>against a wall, out of the way</td></tr>
-            <tr><td>always</td><td>90 cm walkways between groups; doors and the 50 cm in front of windows kept clear</td></tr>
-          </table>
-        </details>
+        <input id="picker" type="file" accept=".json,.glb,.gltf,application/json,model/gltf-binary" multiple hidden />
+        <div id="note" role="status" hidden></div>
+      </section>
+
+      <section>
+        <h2>Catalogue</h2>
+        <div class="group">
+          <div id="catalog" class="wrap"></div>
+        </div>
+      </section>
+
+      <section id="scanned-section">
+        <h2>Scanned by LiDAR</h2>
+        <div class="group" id="scanned"></div>
+        <div class="footer">What RoomPlan found in the room. Find a match searches listings that fit in its place.</div>
+      </section>
+
+      <section id="listings-section">
+        <h2>Listings</h2>
+        <div class="group">
+          <div class="row" id="listing-ask-row">
+            <input id="listing-text" type="text" placeholder="Find, e.g. a lamp under 1.5 m for the 80 cm gap" autocomplete="off" />
+            <button id="listing-search" type="button" class="tinted">Find</button>
+          </div>
+        </div>
+        <div id="listing-note" class="footer"></div>
+        <div id="listing-cards" class="cards"></div>
+      </section>
+
+      <section id="agent">
+        <div class="group">
+          <div class="row" id="agent-ask-row">
+            <input id="agent-text" type="text" placeholder="Ask, e.g. reading corner by the window" autocomplete="off" />
+            <button id="agent-mic" type="button" class="gray" title="Hold to talk" aria-label="Hold to talk">🎙</button>
+            <button id="agent-ask" type="button" class="tinted">Ask</button>
+          </div>
+          <div id="agent-presets"></div>
+        </div>
+        <div id="agent-status" class="footer"></div>
+        <div class="group">
+          <div id="agent-buttons" class="wrap"></div>
+          <div id="agent-log" aria-live="polite"></div>
+        </div>
+        <div class="group">
+          <details id="agent-rules">
+            <summary>What Rearrange does</summary>
+            <table>
+              <tr><td>Sofa</td><td>back against a wall, facing into the room; faces the TV if there is one</td></tr>
+              <tr><td>TV, storage, shelves</td><td>against a wall</td></tr>
+              <tr><td>Bed</td><td>against a wall, away from the door</td></tr>
+              <tr><td>Desk</td><td>against a wall, near a window for daylight</td></tr>
+              <tr><td>Dining table</td><td>toward the middle of the room</td></tr>
+              <tr><td>Chairs</td><td>pulled up to the table, facing it; else grouped with the sofa</td></tr>
+              <tr><td>Coffee table</td><td>in front of the sofa</td></tr>
+              <tr><td>Lamps, plants, other</td><td>against a wall, out of the way</td></tr>
+              <tr><td>Always</td><td>90 cm walkways; doors and the 50 cm in front of windows kept clear</td></tr>
+              <tr><td>Cozy</td><td>everything pulled in tight around the seating; narrower walkways</td></tr>
+              <tr><td>Spacious</td><td>everything on the walls, the middle left open; wide walkways</td></tr>
+              <tr><td>Modern</td><td>clean lines: big pieces flush on walls, table centred, TV paired with the sofa</td></tr>
+              <tr><td>Social</td><td>chairs turned toward each other around a central table</td></tr>
+            </table>
+          </details>
+        </div>
       </section>
     </div>
     <script type="module" src="/src/main.ts"></script>

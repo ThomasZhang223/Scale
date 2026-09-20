@@ -100,15 +100,27 @@ export function buildRoomFromScan(scan: Json): BuiltRoom {
   // RoomCapture v1 measures wall thickness; RoomPlan reports 0, so those get a default.
   const wallThickness = (s: Surface) => (s.dims[2] > 0 ? s.dims[2] : WALL_THICKNESS);
   const thickest = walls.reduce((t, s) => Math.max(t, wallThickness(s)), WALL_THICKNESS);
+  // Windows and openings are cut out of the wall they sit in, so you see the outdoors through
+  // them; doors stay as solid slabs. A window whose wall we can't find keeps the old slab.
+  const cut = new Set<Surface>();
   for (const s of walls) {
-    const wall = slab(s, wallThickness(s), COLORS.wall);
-    wall.userData.collider = 'wall'; // physics turns these into solid walls
+    const thickness = wallThickness(s);
+    const holes = [...windows, ...openings].filter((w) => inWall(w, s, thickness));
+    holes.forEach((w) => cut.add(w));
+    const wall = holes.length ? wallWithHoles(s, thickness, holes) : slab(s, thickness, COLORS.wall);
     content.add(wall);
+    // Physics wants a plain box (it reads BoxGeometry.parameters); the visible wall may have holes.
+    const collider = holes.length ? slab(s, thickness, COLORS.wall) : wall;
+    collider.userData.collider = 'wall'; // physics turns these into solid walls
+    if (collider !== wall) {
+      collider.visible = false;
+      content.add(collider);
+    }
   }
-  // Doors and windows lie in the wall's plane; slightly thicker so they show on both sides.
+  // Doors lie in the wall's plane; slightly thicker so they show on both sides.
   for (const s of doors) content.add(slab(s, thickest + 0.02, COLORS.door));
-  for (const s of windows) content.add(slab(s, thickest + 0.02, COLORS.window, 0.55));
-  for (const s of openings) content.add(slab(s, thickest + 0.02, COLORS.opening, 0.35));
+  for (const s of windows) content.add(cut.has(s) ? glass(s, wallThickness(walls.find((w) => inWall(s, w, wallThickness(w)))!)) : slab(s, thickest + 0.02, COLORS.window, 0.55));
+  for (const s of openings) if (!cut.has(s)) content.add(slab(s, thickest + 0.02, COLORS.opening, 0.35));
 
   // ---- furniture: returned as data, drawn as reference boxes ----
   // Boxes live directly in `group` (already-recentered space) with their origin at the
@@ -202,6 +214,66 @@ function slab(s: Surface, thickness: number, color: string, opacity = 1): THREE.
   mesh.position.copy(s.position);
   mesh.quaternion.copy(s.quaternion);
   return mesh;
+}
+
+/** Is this opening in the plane of that wall (its centre within the wall's slab)? */
+function inWall(opening: Surface, wall: Surface, thickness: number): boolean {
+  const local = wallLocal(opening, wall);
+  return Math.abs(local.z) <= thickness / 2 + 0.05
+    && Math.abs(local.x) <= wall.dims[0] / 2 + 0.05
+    && Math.abs(local.y) <= wall.dims[1] / 2 + 0.05;
+}
+
+/** An opening's centre in the wall's own frame (x along the wall, y up, z through it). */
+function wallLocal(opening: Surface, wall: Surface): THREE.Vector3 {
+  return opening.position.clone().sub(wall.position).applyQuaternion(wall.quaternion.clone().invert());
+}
+
+/** The wall as an extruded rectangle with one rectangular hole per opening in it. */
+function wallWithHoles(wall: Surface, thickness: number, holes: Surface[]): THREE.Mesh {
+  const [w, h] = wall.dims;
+  const shape = new THREE.Shape([
+    new THREE.Vector2(-w / 2, -h / 2), new THREE.Vector2(w / 2, -h / 2),
+    new THREE.Vector2(w / 2, h / 2), new THREE.Vector2(-w / 2, h / 2),
+  ]);
+  for (const o of holes) {
+    const c = wallLocal(o, wall);
+    const hw = Math.min(o.dims[0] / 2, w / 2 - 0.01), hh = Math.min(o.dims[1] / 2, h / 2 - 0.01);
+    const path = new THREE.Path([
+      new THREE.Vector2(c.x - hw, c.y - hh), new THREE.Vector2(c.x + hw, c.y - hh),
+      new THREE.Vector2(c.x + hw, c.y + hh), new THREE.Vector2(c.x - hw, c.y + hh),
+    ]);
+    shape.holes.push(path);
+  }
+  const geo = new THREE.ExtrudeGeometry(shape, { depth: thickness, bevelEnabled: false }).translate(0, 0, -thickness / 2);
+  const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: COLORS.wall }));
+  mesh.position.copy(wall.position);
+  mesh.quaternion.copy(wall.quaternion);
+  return mesh;
+}
+
+/** A pane of glass in a window hole: mostly see-through with a faint blue tint and a thin frame. */
+function glass(s: Surface, wallThickness: number): THREE.Group {
+  const g = new THREE.Group();
+  const pane = new THREE.Mesh(
+    new THREE.BoxGeometry(s.dims[0], s.dims[1], 0.012),
+    new THREE.MeshPhysicalMaterial({
+      color: COLORS.window, transparent: true, opacity: 0.16, roughness: 0.05, metalness: 0,
+      depthWrite: false, side: THREE.DoubleSide,
+    }),
+  );
+  g.add(pane);
+  const frameDepth = wallThickness + 0.02, bar = 0.04;
+  const frame = new THREE.MeshStandardMaterial({ color: '#e8e8e6' });
+  const [w, h] = s.dims;
+  for (const [bw, bh, x, y] of [[w, bar, 0, h / 2 - bar / 2], [w, bar, 0, -h / 2 + bar / 2], [bar, h, w / 2 - bar / 2, 0], [bar, h, -w / 2 + bar / 2, 0], [bar, h, 0, 0]]) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, frameDepth), frame);
+    m.position.set(x, y, 0);
+    g.add(m);
+  }
+  g.position.copy(s.position);
+  g.quaternion.copy(s.quaternion);
+  return g;
 }
 
 function objectBox(dims: [number, number, number], category: string): THREE.Group {

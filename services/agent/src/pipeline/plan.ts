@@ -131,6 +131,15 @@ export function validatePlan(plan: Plan, facts: RoomFacts, options: { trusted?: 
       if (!z || !(z === 'walkway' || features.has(z))) errors.push(`${id}.zone: "${z}" must be door:{id}, window:{id} or walkway`);
     }
   }
+  // A pin and a move on the same object cancel out: the solver keeps the pin (a must) and
+  // relaxes the move, and the person sees "nothing needs to move" for the very thing they asked
+  // to move. Seen in a live transcript: "bed stays (must); bed within 100 cm of the window".
+  const pinnedByRule = new Set(plan.rules.filter((r) => r.type === 'pin' && r.a).map((r) => r.a!));
+  for (const r of plan.rules) {
+    if (r.type !== 'pin' && r.type !== 'keep_clear' && r.a && pinnedByRule.has(r.a)) {
+      errors.push(`${r.id || '?'}: ${r.a} is pinned by another rule, yet this rule moves it; drop the pin unless the person asked to keep ${r.a} where it is`);
+    }
+  }
   return errors;
 }
 
@@ -153,6 +162,10 @@ export function resolvePlan(plan: Plan, facts: RoomFacts, geo: RoomGeometry, wal
   const side = (name: string | undefined): Side | 'any' => {
     if (!name || name === 'any') return 'any';
     if (name.startsWith('wall:')) return facts.room.walls.find((w) => w.id === name.slice(5))?.side ?? 'any';
+    // validatePlan accepts door:/window: here ("against the window wall"), so they must resolve
+    // to the side that opening sits on — the solver only knows sides, and answered 422 otherwise.
+    if (name.startsWith('door:')) return facts.room.doors.find((d) => d.id === name.slice(5))?.wall ?? 'any';
+    if (name.startsWith('window:')) return facts.room.windows.find((w) => w.id === name.slice(7))?.wall ?? 'any';
     return name as Side;
   };
   const zone = (r: Rule): SolverRule['zone'] => {

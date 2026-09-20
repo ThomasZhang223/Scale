@@ -115,6 +115,9 @@ export async function runLoop(input: LoopInput, deps: LoopDeps): Promise<Proposa
     say('retry', `Second plan still invalid: ${errors.join('; ')}`, 'warn');
     throw new AgentFailure(`I couldn't turn that into a valid plan: ${errors.join('; ')}`);
   }
+  // No rules means nothing can move, and the reason is in the planner's own words ("there is no
+  // desk in the room"). That is a failure to say out loud, not a proposal that moves nothing.
+  if (!plan.rules.length) throw new AgentFailure(plan.summary || "I couldn't turn that request into a layout rule.");
   say('plan', `Plan: ${describePlan(plan)}`);
 
   // 4–5. Solving and checking, with repair loops

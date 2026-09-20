@@ -16,7 +16,11 @@ export function useFetchState<T>(fetcher: () => Promise<T>, deps: unknown[]): [F
 
   useEffect(() => {
     let cancelled = false;
-    setState({ status: "loading" });
+    // A refetch over existing data stays on that data until the new answer
+    // lands — the tabs refresh on every focus, and a spinner flashing over
+    // a list you were just looking at reads as a bug. First load and
+    // retry-after-error still show the spinner.
+    setState((prev) => (prev.status === "ready" ? prev : { status: "loading" }));
     fetcher()
       .then((data) => {
         if (!cancelled) setState({ status: "ready", data });

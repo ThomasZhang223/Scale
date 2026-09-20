@@ -43,6 +43,8 @@ Worker's stub layer. Prove that loop works end to end before touching Swift.
    ```
    EXPO_PUBLIC_API_BASE=https://full-scale-workers.thomaszhangdev.workers.dev/v1
    ```
+   The Scanned and Furniture tabs read the live catalog by default. Add `EXPO_PUBLIC_STUB=1`
+   to that file to point them at the Worker's stub layer (committed fixtures) instead.
    This is deliberately a **second** Worker — the `htn-2026` Worker already in Thomas's
    dashboard auto-deploys from GitHub and would fight a manual `wrangler deploy` of this one.
    Seeing two Workers and assuming one is stale is how this gets broken; both are live. Reload. The Headset tab's health row should read `stub layer OK — 4 walls`, served
