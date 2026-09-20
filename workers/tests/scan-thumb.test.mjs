@@ -9,7 +9,7 @@ registerHooks({ resolve(specifier, context, next) {
   return next(specifier, context);
 } });
 const { renderOrigin, renderThumbJpeg, runThumbJob, runScanThumbJobs, enqueueScanThumb,
-        thumbHealth, MAX_ATTEMPTS } = await import("../src/lib/scan-thumb.ts");
+        thumbHealth, browserSecondsToday, MAX_ATTEMPTS } = await import("../src/lib/scan-thumb.ts");
 
 const OBJECT_ID = "11111111-2222-4333-8444-555555555555";
 const FINGERPRINT = "a".repeat(64);
@@ -36,7 +36,7 @@ function fakeEnv(over = {}) {
     created_at: "2026-09-20T00:00:00.000Z", ...(over.objectRow ?? {}),
   };
   const calls = { browser: 0, index: [], put: [], sql: [] };
-  const state = { job };
+  const state = { job, browserSeconds: over.browserSeconds ?? 0 };
   const due = (row, at) =>
     row && row.state === "pending"
     && (row.next_attempt_at === null || row.next_attempt_at <= at)
@@ -59,12 +59,21 @@ function fakeEnv(over = {}) {
     BROWSER: { quickAction: async (action, options) => {
       calls.browser += 1;
       calls.lastAction = { action, options };
-      return over.browser ? over.browser(action, options) : new Response(JPEG, { status: 200 });
+      return over.browser ? over.browser(action, options)
+        : new Response(JPEG, { status: 200, headers: { "x-browser-ms-used": "900" } });
     } },
     DB: { prepare: (sql) => {
       const statement = (binds) => ({
       run: async () => {
         calls.sql.push(sql.trim().split("\n")[0]);
+        if (sql.includes("INSERT INTO browser_budget")) {
+          state.browserSeconds += binds[1];
+          return { meta: { changes: 1 } };
+        }
+        if (sql.includes("next_attempt_at = ?, lease_until = NULL") && sql.includes("state = 'pending'")) {
+          state.job = { ...state.job, error: binds[0], next_attempt_at: binds[1], lease_until: null, updated_at: binds[2] };
+          return { meta: { changes: 1 } };
+        }
         if (sql.includes("INSERT INTO scan_thumb_jobs")) {
           if (!state.job) state.job = { object_id: binds[0], state: "pending", attempts: 0,
             error: null, next_attempt_at: null, lease_until: null,
@@ -94,6 +103,7 @@ function fakeEnv(over = {}) {
         throw new Error(`unhandled run: ${sql}`);
       },
       first: async () => {
+        if (sql.includes("FROM browser_budget")) return { seconds: state.browserSeconds };
         if (sql.includes("FROM objects")) return objectRow;
         if (sql.includes("SELECT object_id FROM scan_thumb_jobs")) {
           return due(state.job, binds[0]) ? { object_id: state.job.object_id } : null;
@@ -113,14 +123,18 @@ function fakeEnv(over = {}) {
 
 test("the render page is opened with the canvas as the completion signal", async () => {
   const { env, calls } = fakeEnv();
-  const bytes = await renderThumbJpeg(env, `scans/${OBJECT_ID}/mesh.glb`);
+  const { bytes, browserMs } = await renderThumbJpeg(env, `scans/${OBJECT_ID}/mesh.glb`);
   assert.deepEqual([...bytes], [...JPEG]);
+  assert.equal(browserMs, 900, "the browser states what it charged; the budget is kept from that");
   const { action, options } = calls.lastAction;
   assert.equal(action, "screenshot");
   // /thumb, not /thumb.html: Cloudflare Assets answers the second with a 307.
   assert.equal(options.url,
     `https://xr.example/thumb?glb=${encodeURIComponent(`/v1/assets/scans/${OBJECT_ID}/mesh.glb`)}`);
   assert.deepEqual(options.waitForSelector.selector, "canvas");
+  // Shorter than the page's own 25 s timeout on purpose: waiting for it costs browser time and
+  // tells us nothing new, and the whole daily budget is ten minutes.
+  assert.equal(options.waitForSelector.timeout, 15_000);
   assert.equal(options.selector, "canvas");
   assert.equal(options.screenshotOptions.type, "jpeg");
   assert.deepEqual(options.viewport, { width: 512, height: 512 });
@@ -236,6 +250,40 @@ test("the cron takes one due job per tick, and health reports the state", async 
   assert.equal(health.done, 1);
   assert.equal(health.renderOriginConfigured, true);
   assert.equal(health.maxAttempts, MAX_ATTEMPTS);
+});
+
+test("the daily browser budget stops new renders and defers without spending an attempt", async () => {
+  // Ten minutes a day is the whole allowance. Past 8 minutes this step stops launching renders
+  // rather than racing the rest of the account to the wall.
+  const { env, calls, state } = fakeEnv({ browserSeconds: 8 * 60 });
+  assert.equal(await runThumbJob(env, OBJECT_ID), "deferred");
+  assert.equal(calls.browser, 0, "no browser is launched once the budget is gone");
+  assert.equal(state.job.state, "pending", "still pending: it is out of budget, not broken");
+  assert.match(state.job.error, /deferred: daily browser budget/);
+  assert.ok(state.job.next_attempt_at.endsWith("T00:00:00.000Z"), "retries after the UTC reset");
+});
+
+test("an object that already has a picture is never deferred: that path costs no browser time", async (t) => {
+  const { env, calls, state } = fakeEnv({ browserSeconds: 9 * 60, thumbExists: true });
+  t.mock.method(globalThis, "fetch", async () => Response.json({
+    values: Array(768).fill(1 / Math.sqrt(768)), dimension: 768, fingerprint: FINGERPRINT,
+    inputHash: "b".repeat(64), modality: "image" }));
+  assert.equal(await runThumbJob(env, OBJECT_ID), "done");
+  assert.equal(calls.browser, 0);
+  assert.equal(state.job.state, "done");
+});
+
+test("a failed render is charged to the day too, and health reports the meter", async (t) => {
+  const { env, state } = fakeEnv({ browser: () => new Response("nope", { status: 422,
+    headers: { "x-browser-ms-used": "15000" } }) });
+  t.mock.method(console, "error", () => {});
+  assert.equal(await runThumbJob(env, OBJECT_ID), "failed");
+  assert.equal(state.browserSeconds, 15, "the timeout is browser time we already spent");
+  assert.equal(await browserSecondsToday(env), 15);
+  const health = await thumbHealth(env);
+  assert.equal(health.browserSecondsToday, 15);
+  assert.equal(health.browserBudgetSeconds, 480);
+  assert.equal(health.browserSelectorTimeoutSeconds, 15);
 });
 
 test("acceptance is one row, and a repeat attach does not create a second", async () => {

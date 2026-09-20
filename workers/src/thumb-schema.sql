@@ -17,3 +17,13 @@ CREATE TABLE IF NOT EXISTS scan_thumb_jobs (
 
 -- The only query the cron runs: the oldest due pending row.
 CREATE INDEX IF NOT EXISTS idx_scan_thumb_jobs_due ON scan_thumb_jobs (state, next_attempt_at);
+
+-- Browser Rendering time this Worker has spent, per UTC day. The free plan allows TEN MINUTES a
+-- day and the analytics API needs a token, so this is our own meter — D1 and not KV, because KV
+-- allows only 1,000 writes a DAY and this writes once per render. The step stops launching
+-- renders at 8 minutes and defers the rest past 00:00 UTC, which is when this key rolls over.
+CREATE TABLE IF NOT EXISTS browser_budget (
+  day TEXT PRIMARY KEY,            -- YYYY-MM-DD, UTC
+  seconds REAL NOT NULL,
+  updated_at TEXT NOT NULL
+);

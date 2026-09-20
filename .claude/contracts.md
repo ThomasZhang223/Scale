@@ -271,11 +271,25 @@ is cheap: an existing `scans/{id}/thumb.jpg` skips the render but still re-runs 
 is an upsert on the same vector id — that is what repairs a stored picture whose background
 index failed.
 
-Retries are bounded: 4 attempts, backing off 60 s, 120 s, 240 s, driven by the one-minute cron,
-one object per tick (a second Browser Rendering action fired immediately answers HTTP 429). On
-the last attempt the row stops at `failed` with the reason, and a text vector is written as a
-floor so the object is no worse off than before this existed. Every state is readable on
-`GET /objects/{id}` headers and on `GET /health` under `scanThumbs`.
+Retries are bounded BY A QUOTA, not by patience: Browser Rendering on the free plan allows TEN
+MINUTES of browser time a day, and a mesh that cannot render costs the full selector timeout on
+every attempt. So it is 2 attempts of a 15 s timeout — 30 s worst case per bad mesh, not 108 s.
+The cron drives it, one object per tick (a second Browser Rendering action fired immediately
+answers HTTP 429). On the last attempt the row stops at `failed` with the reason, and a text
+vector is written as a floor so the object is no worse off than before this existed.
+
+The step keeps its own meter in D1: `browser_budget`, one row per UTC day, charged from the
+`X-Browser-Ms-Used` header the binding returns — and charged for FAILED renders too, because a
+timeout is time already spent. Past 8 minutes it stops launching renders and defers the rest
+past 00:00 UTC with `deferred: daily browser budget`, WITHOUT spending an attempt: being out of
+budget says nothing about whether the mesh can render. D1 and not KV, because KV allows only
+1,000 writes a DAY. A deferred scan can still become searchable before midnight — the headset's
+own upload is the second path and costs no browser time at all.
+
+Every state is readable on `GET /objects/{id}` headers and on `GET /health` under `scanThumbs`,
+which also carries `browserSecondsToday`, `browserBudgetSeconds` and
+`browserSelectorTimeoutSeconds`, so the tightest quota on the account is measurable from our own
+accounting with no analytics token.
 
 - When `POST /objects/{id}/mesh` succeeds for a non-scan object (a reviewed hero mesh attached to a
   catalogue object), that object's parked mesh jobs — `kind:"mesh"`, `state:"queued"` — become

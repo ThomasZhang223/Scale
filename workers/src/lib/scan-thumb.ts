@@ -26,14 +26,39 @@ import { indexObject } from "./embedding";
 import { getObject } from "./store";
 import type { ObjectV1 } from "./contracts";
 
-/** How many times one object may be attempted before the row stops at `failed`. */
-export const MAX_ATTEMPTS = 4;
+/**
+ * How many times one object may be attempted before the row stops at `failed`.
+ *
+ * Two, not four, and the reason is a quota rather than patience: Browser Rendering on the free
+ * plan allows TEN MINUTES of browser time a day. A mesh that cannot render costs the full
+ * selector timeout on every attempt, so four attempts of a 27 s timeout was 108 s — 18% of the
+ * whole day's budget spent on one bad scan. Two attempts of 15 s is 30 s, or 5%.
+ */
+export const MAX_ATTEMPTS = 2;
 /** First backoff, doubled per attempt. 60 s, 120 s, 240 s — inside one demo, not hours. */
 const BACKOFF_BASE_MS = 60_000;
-/** A claim is held this long. Longer than a render (about 1-3 s) plus an embed (up to 25 s). */
-const LEASE_MS = 90_000;
-/** The page's own timeout is 25 s; the browser must outlive it to see thumb-error as an error. */
-const SELECTOR_TIMEOUT_MS = 27_000;
+/** A claim is held this long. Longer than a render (now at most 15 s) plus an embed (up to 25 s). */
+const LEASE_MS = 60_000;
+/**
+ * How long to wait for the page's canvas before calling the render failed.
+ *
+ * Fifteen seconds, which is deliberately SHORTER than the page's own 25 s timeout: the page's
+ * timeout exists so it never hangs, and waiting for it costs 10 s of a 10-minute daily budget
+ * for no new information — a page that has not drawn in 15 s has failed either way. Measured on
+ * the deployed system: P-UX's page answers a good mesh in 744 ms, and the one live render
+ * through this step finished the whole attach -> picture -> vector chain in 9 s, of which the
+ * encoder is the slow part. 15 s is five times the slowest render seen.
+ */
+const SELECTOR_TIMEOUT_MS = 15_000;
+
+/**
+ * Stop launching renders for the UTC day once this much browser time has been spent.
+ *
+ * The free plan gives 10 minutes a day. 8 minutes leaves 2 minutes of headroom for anything
+ * else on the account that uses a browser (Paul's scraper path also has a BROWSER binding), so
+ * this step can never be the reason something else is refused.
+ */
+const DAILY_BROWSER_BUDGET_SECONDS = 8 * 60;
 
 export type ThumbState = "pending" | "done" | "failed";
 
@@ -94,7 +119,9 @@ export function renderOrigin(env: Env): string {
  * upgrade path is a DOM element carrying the error, which would let one screenshot call return
  * either outcome.
  */
-export async function renderThumbJpeg(env: Env, meshKey: string): Promise<Uint8Array> {
+export async function renderThumbJpeg(
+  env: Env, meshKey: string,
+): Promise<{ bytes: Uint8Array; browserMs: number }> {
   // A path, not an absolute URL: apps/xr/src/thumbUrl.ts resolves it against the page's own
   // origin and refuses anything that is not same-origin and under /v1/assets/.
   const glb = `/v1/assets/${meshKey}`;
@@ -111,8 +138,14 @@ export async function renderThumbJpeg(env: Env, meshKey: string): Promise<Uint8A
     // The picture of a mesh that was just attached must not come from a cached page.
     cacheTTL: 0,
   });
+  // Browser Rendering states what it charged. A failed render still costs its timeout, so this
+  // is read before the status check and spent either way.
+  const browserMs = Number(res.headers.get("x-browser-ms-used")) || 0;
   if (!res.ok) {
-    throw new Error(`Browser Rendering returned ${res.status} for ${url}: ${(await res.text()).slice(0, 300)}`);
+    const detail = (await res.text()).slice(0, 300);
+    const spent = new Error(`Browser Rendering returned ${res.status} for ${url}: ${detail}`);
+    (spent as Error & { browserMs?: number }).browserMs = browserMs;
+    throw spent;
   }
   const bytes = new Uint8Array(await res.arrayBuffer());
   // The bytes decide, same rule as the upload route: an error page rendered as JSON would
@@ -120,7 +153,44 @@ export async function renderThumbJpeg(env: Env, meshKey: string): Promise<Uint8A
   if (sniffImageType(bytes) !== "image/jpeg") {
     throw new Error(`Browser Rendering returned ${bytes.byteLength} bytes that are not a JPEG.`);
   }
-  return bytes;
+  return { bytes, browserMs };
+}
+
+/** The UTC day a browser second is charged to. The quota resets at 00:00 UTC, so does this. */
+const utcDay = (now: Date) => now.toISOString().slice(0, 10);
+
+/** Browser seconds this step has spent today. D1 and not KV: KV allows 1,000 writes a DAY. */
+export async function browserSecondsToday(env: Env, now = new Date()): Promise<number> {
+  const row = await env.DB.prepare("SELECT seconds FROM browser_budget WHERE day = ?")
+    .bind(utcDay(now)).first<{ seconds: number }>();
+  return row?.seconds ?? 0;
+}
+
+/** Charge the day. Called after every render attempt, including the ones that failed. */
+async function chargeBrowser(env: Env, ms: number, now: Date): Promise<void> {
+  if (!(ms > 0)) return;
+  await env.DB.prepare(
+    `INSERT INTO browser_budget (day, seconds, updated_at) VALUES (?, ?, ?)
+     ON CONFLICT(day) DO UPDATE SET seconds = seconds + excluded.seconds, updated_at = excluded.updated_at`,
+  ).bind(utcDay(now), ms / 1000, now.toISOString()).run();
+}
+
+/**
+ * Put the job back until the budget resets, WITHOUT spending an attempt on it.
+ *
+ * Being out of browser time for today says nothing about whether this mesh can render, so it
+ * must not count against the two attempts the object gets. The headset's own upload is still
+ * the second path and costs no browser time at all, so a deferred scan can still become
+ * searchable before midnight if a headset draws its tile.
+ */
+async function deferForBudget(env: Env, objectId: string, spent: number, now: Date): Promise<void> {
+  const tomorrow = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
+  await env.DB.prepare(
+    "UPDATE scan_thumb_jobs SET error = ?, next_attempt_at = ?, lease_until = NULL, updated_at = ? WHERE object_id = ? AND state = 'pending'",
+  ).bind(
+    `deferred: daily browser budget (${spent.toFixed(1)} s of ${DAILY_BROWSER_BUDGET_SECONDS} s used); retries after 00:00 UTC`,
+    tomorrow.toISOString(), now.toISOString(), objectId,
+  ).run();
 }
 
 /**
@@ -250,7 +320,7 @@ export async function runThumbJob(
   env: Env,
   objectId: string,
   now = new Date(),
-): Promise<"done" | "skipped" | "failed"> {
+): Promise<"done" | "skipped" | "failed" | "deferred"> {
   const claimed = await claim(env, objectId, now);
   if (!claimed) return "skipped";
   let object: ObjectV1 | undefined;
@@ -262,7 +332,23 @@ export async function runThumbJob(
     const meshKey = R2Keys.scanMesh(objectId);
     const key = R2Keys.scanThumb(objectId);
     if (!(await env.BUCKET.head(key))) {
-      await putScanThumb(env, objectId, await renderThumbJpeg(env, meshKey));
+      // The budget is checked here rather than before the claim, so that an object whose
+      // picture already exists is never deferred — that path costs no browser time.
+      const spent = await browserSecondsToday(env, now);
+      if (spent >= DAILY_BROWSER_BUDGET_SECONDS) {
+        await deferForBudget(env, objectId, spent, new Date());
+        return "deferred";
+      }
+      let render;
+      try {
+        render = await renderThumbJpeg(env, meshKey);
+      } catch (error) {
+        // A failed render is charged too: the timeout is browser time we have already spent.
+        await chargeBrowser(env, (error as { browserMs?: number }).browserMs ?? SELECTOR_TIMEOUT_MS, new Date());
+        throw error;
+      }
+      await chargeBrowser(env, render.browserMs, new Date());
+      await putScanThumb(env, objectId, render.bytes);
     }
     await indexObjectImage(env, object, key);
     await markThumbDone(env, objectId, new Date().toISOString());
@@ -318,5 +404,19 @@ export async function thumbHealth(env: Env): Promise<Record<string, unknown>> {
   } catch {
     renderOriginConfigured = false;
   }
-  return { ...counts, renderOriginConfigured, maxAttempts: MAX_ATTEMPTS, lastError: worst ?? null };
+  // Our own accounting of Browser Rendering time. The free plan allows 10 minutes a day and
+  // the analytics API needs a token nobody has tonight, so this is the only number available.
+  // It counts what THIS step spent; anything else on the account using a browser is not in it.
+  let browserSeconds: number | null = null;
+  try {
+    browserSeconds = await browserSecondsToday(env);
+  } catch {
+    browserSeconds = null; // the table may not exist yet on an older deployment
+  }
+  return {
+    ...counts, renderOriginConfigured, maxAttempts: MAX_ATTEMPTS, lastError: worst ?? null,
+    browserSecondsToday: browserSeconds,
+    browserBudgetSeconds: DAILY_BROWSER_BUDGET_SECONDS,
+    browserSelectorTimeoutSeconds: SELECTOR_TIMEOUT_MS / 1000,
+  };
 }
