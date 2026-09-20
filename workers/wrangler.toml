@@ -23,6 +23,12 @@ API_ORIGIN = "https://full-scale-workers.thomaszhangdev.workers.dev"
 # pick. Turn it back to "0" when the Baseten provider is healthy (GET /v1/health says
 # providerConfigured:true). Unset or any other value is a 500, never a guessed side.
 FIND_READY_ONLY = "1"
+# The origin that serves /thumb, the standalone page that renders one GLB to a picture
+# (apps/xr/thumb.html). A [vars] entry and not a KV key: KV holds the four upstream origins
+# because those are quick tunnels that get a new hostname on every infra/up.sh, while this one
+# does not rotate — so KV would be an unversioned manual step a fresh environment silently
+# lacks. Unset, or not https, is a recorded `failed` naming this var, never a guessed origin.
+RENDER_ORIGIN = "https://full-scale-xr.thomaszhangdev.workers.dev"
 
 [triggers]
 crons = ["* * * * *"]

@@ -10,6 +10,15 @@ import { R2Keys, assetUrl, contentTypeFor, isCatalogSourceKey, keyFromAssetPath,
 import { callUpstream, callUpstreamRaw, upstreamOrigin } from "../lib/config";
 import { embedInput, indexObject, type Embedding } from "../lib/embedding";
 import { enqueueMesh } from "../lib/mesh-dispatch";
+import {
+  enqueueScanThumb,
+  getThumbJob,
+  indexObjectImage,
+  markThumbDone,
+  putScanThumb,
+  runThumbJob,
+  thumbHealth,
+} from "../lib/scan-thumb";
 import { emitToRoom, roomAgent, scoutAgent } from "../lib/notify";
 import {
   advanceJob,
@@ -338,7 +347,16 @@ export async function getObjectList(req: Request, env: Env, origin: string): Pro
 }
 
 export async function getObjectById(env: Env, id: string, origin: string): Promise<Response> {
-  return json(await getObject(env, id, origin));
+  const object = await getObject(env, id, origin);
+  // The picture's state rides in headers, not in the body: ObjectV1 is a shared schema and this
+  // is operational detail, not part of what an object IS. A client that does not know about it
+  // is unaffected, and `curl -i` shows it without a second route.
+  const job = await getThumbJob(env, id);
+  const headers: Record<string, string> = { "x-scan-thumb": job?.state ?? "none" };
+  // Header values are ASCII only, and an error text carries whatever the browser said.
+  if (job?.error) headers["x-scan-thumb-error"] = job.error.replace(/[^\x20-\x7e]/g, " ").slice(0, 200);
+  if (job) headers["x-scan-thumb-attempts"] = String(job.attempts);
+  return json(object, 200, headers);
 }
 
 export async function postGenerate(
@@ -447,36 +465,52 @@ export async function postObjectMesh(
 
   // A phone-uploaded GLB never passes through the mesh Workflow, so this is the only place a
   // scanned object can reach Vectorize. Same indexer as the Workflow — there is not a second one.
-  // Object Capture uploads no photo (modules/object-capture exposes only imageCount), so the only
-  // embeddable content is the name the user gave it. SigLIP 2's text tower shares the vision
-  // tower's space, which is why a text vector is comparable with the catalogue's image vectors.
-  // ceiling: a named scan is indexed from text, which is weaker than an image. The upgrade path is
-  // for the capture module to export one frame and for this to pass imageKey instead.
-  const text = [object0.name, object0.category]
-    .filter((part) => part && part !== "unknown")
-    .join(" ")
-    .trim();
   let indexed: Record<string, string>;
-  if (!text) {
-    // Standing rule 4: do not invent a caption. Say the object is unsearchable and why.
-    indexed = { "x-indexed": "false", "x-index-skipped": "no-embeddable-text" };
-  } else {
-    // Not awaited: the embed can take up to 25 s (embedInput's timeout) and this is the phone's
-    // Save button. The mesh is stored and the object IS ready; only search is affected, so a
-    // failure is logged and never reaches the phone.
-    // ceiling: the outcome cannot be reported in this response. The retry path is
-    // POST /v1/objects/{id}/index { text }.
+  if (object0.source === "scan") {
+    // Object Capture uploads no photo, so a scan's only embeddable text is "Captured object" /
+    // "unknown" — the same words on every row, which is one point in the embedding space for all
+    // of them. So the picture is made instead: lib/scan-thumb.ts renders the mesh itself.
+    //
+    // AWAITED, and before the response: this row is the acceptance. Everything after it is
+    // repair, and a crash here is a 500 the phone can retry rather than a picture nobody makes.
+    await enqueueScanThumb(env, objectId, nowIso());
+    // The fast path, deliberately not load-bearing. It turns a one-minute wait into a few
+    // seconds when it works; when it does not, the row is still `pending` and the one-minute
+    // cron takes it. This is the difference between a waitUntil that IS the mechanism and one
+    // that merely hurries it.
     ctx.waitUntil(
-      indexObject(env, {
-        objectId,
-        source: object0.source,
-        category: object0.category,
-        bboxMeters: object0.bboxMeters,
-        dominantHex: object0.palette?.[0] ?? null,
-        text,
-      }).catch((err: unknown) => console.error(`scan_index_failed ${objectId}: ${String(err).slice(0, 300)}`)),
+      runThumbJob(env, objectId).catch((err: unknown) =>
+        console.error(`scan_thumb_fast_path_failed ${objectId}: ${String(err).slice(0, 300)}`)),
     );
-    indexed = { "x-indexed": "pending" };
+    indexed = { "x-indexed": "scan-thumb-pending" };
+  } else {
+    // A catalogue or library row attaching a reviewed mesh by hand. It has its own photo or a
+    // real name, so it is indexed from text here exactly as before.
+    const text = [object0.name, object0.category]
+      .filter((part) => part && part !== "unknown")
+      .join(" ")
+      .trim();
+    if (!text) {
+      // Standing rule 4: do not invent a caption. Say the object is unsearchable and why.
+      indexed = { "x-indexed": "false", "x-index-skipped": "no-embeddable-text" };
+    } else {
+      // Not awaited: the embed can take up to 25 s (embedInput's timeout) and this is the phone's
+      // Save button. The mesh is stored and the object IS ready; only search is affected, so a
+      // failure is logged and never reaches the phone.
+      // ceiling: the outcome cannot be reported in this response. The retry path is
+      // POST /v1/objects/{id}/index { text }.
+      ctx.waitUntil(
+        indexObject(env, {
+          objectId,
+          source: object0.source,
+          category: object0.category,
+          bboxMeters: object0.bboxMeters,
+          dominantHex: object0.palette?.[0] ?? null,
+          text,
+        }).catch((err: unknown) => console.error(`scan_index_failed ${objectId}: ${String(err).slice(0, 300)}`)),
+      );
+      indexed = { "x-indexed": "pending" };
+    }
   }
 
   const object = await getObject(env, objectId, origin);
@@ -540,19 +574,16 @@ export async function postObjectThumbnail(
     return json({ objectId, key, stored: false, reason: "already has a thumbnail; pass ?force=1 to replace" });
   }
 
-  await env.BUCKET.put(key, bytes, { httpMetadata: { contentType } });
+  // The same writer the render step uses, so the key and the stored content-type have one rule.
+  await putScanThumb(env, objectId, bytes);
   // Indexing is a network call to the encoder; the client is inside a frame loop, so it must not
-  // wait. ceiling: the outcome cannot be reported in this response, and the vector takes 20-30 s
-  // to become visible. The retry path is POST /v1/objects/{id}/index { imageKey }.
+  // wait. Unlike before, a failure here is no longer a silent gap: the object's scan_thumb_jobs
+  // row stays `pending` and the one-minute cron re-indexes the picture that is already stored.
+  // ceiling: the outcome still cannot be reported in THIS response.
   ctx.waitUntil(
-    indexObject(env, {
-      objectId,
-      source: object.source,
-      category: object.category,
-      bboxMeters: object.bboxMeters,
-      dominantHex: object.palette?.[0] ?? null,
-      imageKey: key,
-    }).catch((err: unknown) => console.error(`scan_thumb_index_failed ${objectId}: ${String(err).slice(0, 300)}`)),
+    indexObjectImage(env, object, key)
+      .then(() => markThumbDone(env, objectId, nowIso()))
+      .catch((err: unknown) => console.error(`scan_thumb_index_failed ${objectId}: ${String(err).slice(0, 300)}`)),
   );
   return json({ objectId, key, stored: true, indexed: "pending" }, 202);
 }
@@ -1043,6 +1074,7 @@ export async function getHealth(env: Env): Promise<Response> {
       embedding: embedding ?? null,
     },
     embeddingFingerprint: fingerprint ?? null,
+    scanThumbs: await thumbHealth(env),
     meshPipeline: {
       revision: "sequential-v1",
       providerConfigured: Boolean(env.BASETEN_URL && env.BASETEN_API_KEY),
@@ -1060,6 +1092,7 @@ export async function getHealth(env: Env): Promise<Response> {
       "upstream:solver unset -> POST /v1/fit AND POST /v1/solve both return 503 (one service answers both).",
       "Missing Baseten secrets -> accepted mesh jobs wait durably. A configured URL must serve the dimension-binding adapter, not raw SF3D.",
       "Vector search requires upstream:embedding, embedding:fingerprint, and EMBEDDING_API_KEY.",
+      "scanThumbs: a scan's picture is rendered from its own mesh at attach time. A pending count that does not fall means the render or the encoder is failing; lastError says which.",
     ],
   });
 }
