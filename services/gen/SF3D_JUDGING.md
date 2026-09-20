@@ -104,6 +104,50 @@ The Worker secret named `BASETEN_API_KEY` is the adapter's `GENERATION_API_KEY`.
 It authenticates the Worker TO the adapter. The real Baseten credential never
 leaves the laptop.
 
+### The provider is OFF. Re-enabling it, exactly
+
+Thomas turned it off at 07:25 UTC on 2026-09-20: `BASETEN_URL` is deleted from the Worker.
+`MeshDispatcher.drain()` returns early without it, so queued jobs PARK and none fail.
+`BASETEN_API_KEY` is still set, so re-enabling is one command.
+
+```bash
+# 1. Is the adapter still up, and is the tunnel URL still the one it was?
+cat infra/.run/gen.url && curl -s "$(cat infra/.run/gen.url)/health"
+#    Expect {"ok":true,"provider":true,"auth":true}. If cloudflared has restarted, the URL has
+#    changed: re-run `bash infra/gen-up.sh` and use the URL it prints.
+
+# 2. Warm the GPU with ONE real paid prediction. Never let the first real job pay for the
+#    170 s cold wake — it is measured at 170.9 s against the adapter's 180 s provider timeout.
+#    See step 2 of "Run it" below for the exact call.
+
+# 3. Turn it on.
+cd workers && npx wrangler secret put BASETEN_URL    # paste: <tunnel>/generate
+curl -s https://full-scale-workers.thomaszhangdev.workers.dev/v1/health | jq .meshPipeline
+#    -> providerConfigured: true
+
+# Off again, the same clean stop:
+cd workers && npx wrangler secret delete BASETEN_URL
+```
+
+A `wrangler secret put` or `delete` publishes a NEW VERSION built from the code that is
+deployed at that moment. It does not roll code back — but it does mean the secret change and
+whatever someone else deployed a minute earlier ship together. Check
+`npx wrangler deployments list` first, and check afterwards that the behaviour you care about
+still works, not just that the secret flipped.
+
+**Two warnings that belong to the ON state, not to this file's history.**
+
+With the provider ON, **every new catalogue row and every listing a person picks in the headset
+is a paid SF3D call.** `POST /v1/catalog/ingest`, `POST /v1/listings/generate` and
+`ScoutAgent`'s `find_products` tool all enqueue a mesh job; nothing rate-limits or budgets them.
+On 2026-09-20 a teammate's run put 32 products through in 12 minutes without anyone deciding to.
+
+**A caller that hits the adapter's `/generate` directly bypasses `MeshDispatcher`'s single
+admission slot**, and therefore also the job row, the outbox row and the one-at-a-time
+guarantee that keeps a single Baseten replica at `concurrency_target 1`. The adapter
+authenticates with `GENERATION_API_KEY` and enforces nothing else. Anything that reaches it
+without going through the Worker is invisible to `GET /v1/jobs/{id}` and to D1.
+
 ### Run it
 
 ```bash
