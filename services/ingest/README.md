@@ -25,6 +25,11 @@ passes when unconfigured is worse than no auth. `BROWSERBASE_API_KEY` and `OPENA
 `OPENAI_MODEL` are optional and gate the later extraction steps; see the comments in
 `infra/.env.example` and `EXTRACTION.md`.
 
+Mass ingestion — running the whole merchant list into D1 and R2 — is its own runbook:
+**[CATALOG_LOAD.md](CATALOG_LOAD.md)**. The short version is that `bulk_ingest.py` drives this
+service over HTTP merchant by merchant, and `load_catalog.py` turns the result into SQL and an
+upload script without touching the network.
+
 To run just this container:
 
 ```

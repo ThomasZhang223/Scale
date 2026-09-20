@@ -1,8 +1,188 @@
 [
   {
+    "title": "Poof W23082",
+    "handle": "accent-furniture-w23082",
+    "product_type": "",
+    "images": [
+      "https://cdn.shopify.com/s/files/1/0262/8947/1541/files/W23082-398568-4.jpg?v=1789851256",
+      "https://cdn.shopify.com/s/files/1/0262/8947/1541/files/W23082-398565-5.jpg?v=1789851256",
+      "https://cdn.shopify.com/s/files/1/0262/8947/1541/files/W23082-398567-6.jpg?v=1789851256"
+    ],
+    "tags": [
+      "Furniture",
+      "Modern Living Furniture",
+      "Ottomans in Toronto",
+      "Promotions",
+      "Shipping Only",
+      "Stools & Poofs"
+    ],
+    "body_html": "<p>Wrapped in a soft, rich chocolate polyester fabric, this upholstered stool brings warmth to any space. The fabric's unique texture features a dimensional weave with a subtle sheen that catches the light beautifully. Vertical ribbed detailing adds depth and visual interest, while the smooth cushioned top softens the silhouette. An antique gold metal band at the base adds a refined finishing touch.</p><br>Dimensions: 16 W X 18 H X 16 D (in)",
+    "variants": [
+      {
+        "title": "Default Title"
+      }
+    ],
+    "options": [
+      {
+        "name": "Title",
+        "position": 1,
+        "values": [
+          "Default Title"
+        ]
+      }
+    ]
+  },
+  {
+    "title": "TABLE LAMP",
+    "handle": "table-lamp-w26108-1",
+    "product_type": "",
+    "images": [
+      "https://cdn.shopify.com/s/files/1/0262/8947/1541/files/W26108-1-63214-7.jpg?v=1774116343",
+      "https://cdn.shopify.com/s/files/1/0262/8947/1541/files/W26108-1-87637-8.jpg?v=1774116343",
+      "https://cdn.shopify.com/s/files/1/0262/8947/1541/files/W26108-1-65911-9.jpg?v=1774116346"
+    ],
+    "tags": [
+      "Lamp",
+      "Lamps",
+      "Modern Lighting",
+      "Promotions",
+      "Shipping Only",
+      "Shop By Finish",
+      "Shop By Type"
+    ],
+    "body_html": "<p>This beautiful dome shaped ceramic table lamp is finished in a navy blue with brushed nickel accents. A white linen round hardback shade completes the look and is perfect for your coastal hideaway.</p><br>Dimensions: 27H",
+    "variants": [
+      {
+        "title": "Default Title"
+      }
+    ],
+    "options": [
+      {
+        "name": "Title",
+        "position": 1,
+        "values": [
+          "Default Title"
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Lovelle, Ivory 71165-8",
+    "handle": "lovelle-ivory-71165-8",
+    "product_type": "",
+    "images": [
+      "https://cdn.shopify.com/s/files/1/0262/8947/1541/files/71165-8-82611-5.jpg?v=1774116151",
+      "https://cdn.shopify.com/s/files/1/0262/8947/1541/files/71165-8-105856-6.jpg?v=1774116151",
+      "https://cdn.shopify.com/s/files/1/0262/8947/1541/files/71165-8-82608-7.jpg?v=1774116151"
+    ],
+    "tags": [
+      "Best Sellers",
+      "Hides and Rugs",
+      "Ivory",
+      "National Best Sellers",
+      "Regional Best Sellers",
+      "Rugs",
+      "Rugs in Toronto",
+      "Shipping Only",
+      "Shop By Size",
+      "Shop By Type"
+    ],
+    "body_html": "<p>The Lovell, Ivory rug features a hand woven construction using soft to the touch New Zealand Wool with heavy striations for an organic casual appeal.</p><br>Dimensions: 8' W X 10' L",
+    "variants": [
+      {
+        "title": "Default Title"
+      }
+    ],
+    "options": [
+      {
+        "name": "Title",
+        "position": 1,
+        "values": [
+          "Default Title"
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Ladoga 71506-5",
+    "handle": "ladoga-71506-5",
+    "product_type": "",
+    "images": [
+      "https://cdn.shopify.com/s/files/1/0262/8947/1541/files/71506-5-93645-7.jpg?v=1774116146",
+      "https://cdn.shopify.com/s/files/1/0262/8947/1541/files/71506-5-105871-8.jpg?v=1774116146",
+      "https://cdn.shopify.com/s/files/1/0262/8947/1541/files/71506-5-57309-9.jpg?v=1774116146"
+    ],
+    "tags": [
+      "Best Sellers",
+      "Hides and Rugs",
+      "Regional Best Sellers",
+      "Rugs",
+      "Rugs in Toronto",
+      "Shipping Only",
+      "Shop By Size",
+      "Shop By Type"
+    ],
+    "body_html": "<p>This machine woven rug features an abstract design in tones of light beige, cream, denim blue, and gray, constructed from lustrous polyester.</p><br>Dimensions: 5' W X 7'5\" L",
+    "variants": [
+      {
+        "title": "Default Title"
+      }
+    ],
+    "options": [
+      {
+        "name": "Title",
+        "position": 1,
+        "values": [
+          "Default Title"
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Makula, Ivory 70036-6",
+    "handle": "makula-ivory-70036-6",
+    "product_type": "",
+    "images": [
+      "https://cdn.shopify.com/s/files/1/0262/8947/1541/files/70036-6-82555-5.jpg?v=1774116122",
+      "https://cdn.shopify.com/s/files/1/0262/8947/1541/files/70036-6-105847-6.jpg?v=1774116122",
+      "https://cdn.shopify.com/s/files/1/0262/8947/1541/files/70036-6-82552-7.jpg?v=1774116122"
+    ],
+    "tags": [
+      "Best Sellers",
+      "Hides and Rugs",
+      "Ivory",
+      "Regional Best Sellers",
+      "Rugs",
+      "Rugs in Toronto",
+      "Shipping Only",
+      "Shop By Size",
+      "Shop By Type"
+    ],
+    "body_html": "<p>The Makula Ivory rug features a hand knotted construction made of twisted Ivory jute for a casual braided look.</p><br>Dimensions: 6' W X 9' L",
+    "variants": [
+      {
+        "title": "Default Title"
+      }
+    ],
+    "options": [
+      {
+        "name": "Title",
+        "position": 1,
+        "values": [
+          "Default Title"
+        ]
+      }
+    ]
+  },
+  {
     "title": "Arcora",
     "handle": "arcora-mt2778",
     "product_type": "",
+    "images": [
+      "https://cdn.shopify.com/s/files/1/0262/8947/1541/files/MT2778.jpg?v=1789842616",
+      "https://cdn.shopify.com/s/files/1/0262/8947/1541/files/MT2778_1.jpg?v=1789842616",
+      "https://cdn.shopify.com/s/files/1/0262/8947/1541/files/MT2778_2.jpg?v=1789842616"
+    ],
     "tags": [
       "Art and Mirrors",
       "China",
@@ -32,6 +212,11 @@
     "title": "Zoran 60\" Platform Bed",
     "handle": "zoran-60-queen-platform-bed",
     "product_type": "",
+    "images": [
+      "https://cdn.shopify.com/s/files/1/0262/8947/1541/files/101-435Q-MSH.jpg?v=1776203403",
+      "https://cdn.shopify.com/s/files/1/0262/8947/1541/files/101-435Q-MSH_1_2c76b177-99fe-49ae-8b8f-c7690f51e9f7.jpg?v=1776203403",
+      "https://cdn.shopify.com/s/files/1/0262/8947/1541/files/101-435Q-MSH_2_38d0ce36-8998-4fdb-82ab-701bd0fae250.jpg?v=1776203403"
+    ],
     "tags": [
       "!nspire",
       "!nspire Beds & Headboards",
@@ -85,139 +270,17 @@
     "title": "Gia 2 Drawer Nightstand - Whitewash",
     "handle": "gia-2-drawer-nightstand-whitewash-gia002-ww",
     "product_type": "",
+    "images": [
+      "https://cdn.shopify.com/s/files/1/0262/8947/1541/files/GIA002-WW.jpg?v=1789838046",
+      "https://cdn.shopify.com/s/files/1/0262/8947/1541/files/GIA002-WW_50.jpg?v=1789838047",
+      "https://cdn.shopify.com/s/files/1/0262/8947/1541/files/GIA002-WW_100.jpg?v=1789838047"
+    ],
     "tags": [
       "Modern Bedroom Furniture",
       "Nightstand",
       "Nightstands in Toronto"
     ],
     "body_html": "<div class=\"dimensions-container\"> <div class=\"dimensions-content\"> <!-- Main Dimensions --> <div class=\"dimension-row\"> <div class=\"dimension-label\">Assembled Dimensions WDH\":</div> <div class=\"dimension-value dimension-highlight\"> 21.5 x 15.7 x 23.6 in \u00a0\u00b7\u00a036 lbs </div> </div> <div class=\"box-dimensions-block\"> <div class=\"box-dimensions-header\">Box Dimensions WDH\":</div> <div class=\"box-dimensions-body\"> <div class=\"box-row\"> <span class=\"box-tag\">Box 1</span> <span class=\"box-val\">23.5 x 18 x 26 in \u00b7 44 lbs</span> </div> </div> </div> <!-- Additional Specs Grid --> <div class=\"specs-grid\"> <div class=\"spec-item\"> <div class=\"spec-label\">CBM</div> <div class=\"spec-value\">0.2</div> </div> <div class=\"spec-item\"> <div class=\"spec-label\">Capacity</div> <div class=\"spec-value\">60 lbs</div> </div> <div class=\"spec-item\"> <div class=\"spec-label\">Origin</div> <div class=\"spec-value\">Vietnam</div> </div> <div class=\"spec-item\"> <div class=\"spec-label\">Boxes</div> <div class=\"spec-value\"> 1</div> </div> </div> <!-- Materials Row --> <div class=\"dimension-row materials-row\"> <div class=\"dimension-label\">Materials:</div> <div class=\"dimension-value\">Solid Acacia, Acacia Veneer, MDF</div> </div> <!-- Finish Row --> <div class=\"dimension-row\"> <div class=\"dimension-label\">Finish:</div> <div class=\"dimension-value\">Whitewash</div> </div> </div> </div> <style> .dimensions-container { max-width: 100%; background: white; border: 1px solid #e0e0e0; overflow: hidden; } .dimensions-content { padding: 20px; } .dimension-row { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f0f0f0; align-items: flex-start; } .materials-row { border-top: 1px solid #f0f0f0; margin-top: 20px; padding-top: 20px; } .dimension-label { font-size: 14px; color: #000; font-weight: 600; letter-spacing: 1px; flex: 1; } .dimension-value { font-size: 16px; color: #red; text-align: right; flex: 1; } .dimension-highlight { font-weight: 600; } .box-dimensions-list { display: flex; flex-direction: column; gap: 4px; text-align: right; } .box-dimensions-block { padding: 12px 0; border-bottom: 1px solid #f0f0f0; } .box-dimensions-header { font-size: 14px; color: #000; font-weight: 600; letter-spacing: 1px; margin-bottom: 8px; } .box-dimensions-body { display: flex; flex-direction: column; gap: 4px; } .box-row { display: flex; justify-content: space-between; align-items: center; } .box-tag { font-size: 11px; font-weight: 600; letter-spacing: 1px; color: #888; text-transform: uppercase; } .box-val { font-size: 14px; color: #000; } @media (max-width: 480px) { .box-row { justify-content: center; gap: 8px; } } .box-line { display: block; font-size: 16px; } .box-label { font-size: 12px; font-weight: 600; letter-spacing: 1px; color: #888; margin-right: 6px; text-transform: uppercase; } .specs-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 20px; padding-top: 20px; } .spec-item { display: flex; flex-direction: column; gap: 4px; } .spec-label { font-size: 14px; color: #000; font-weight: 600; letter-spacing: 1px; } .spec-value { font-size: 16px; color: #000; font-weight: 500; } /* Responsive Breakpoints */ @media (max-width: 768px) { .dimensions-content { padding: 16px; } .specs-grid { grid-template-columns: repeat(2, 1fr); gap: 16px; } } @media (max-width: 480px) { .dimensions-content { padding: 12px; } .dimension-row { flex-direction: column; gap: 4px; padding: 10px 0; align-items: center; text-align: center; } .dimension-label, .dimension-value { text-align: center; } .dimension-highlight { font-weight: 400; } .dimension-value { font-size: 16px; } .specs-grid { grid-template-columns: 1fr; gap: 12px; margin-top: 10px; padding-top: 0; } .spec-item { padding: 8px 0; border-bottom: 1px solid #f0f0f0; align-items: center; text-align: center; } .spec-item:last-child { border-bottom: none; } .materials-row { margin-top: 10px; padding-top: 10px; } } </style>",
-    "variants": [
-      {
-        "title": "Default Title"
-      }
-    ],
-    "options": [
-      {
-        "name": "Title",
-        "position": 1,
-        "values": [
-          "Default Title"
-        ]
-      }
-    ]
-  },
-  {
-    "title": "Gia Queen Bed - Whitewash",
-    "handle": "gia-queen-bed-whitewash-gia001qb-ww",
-    "product_type": "",
-    "tags": [
-      "Bed",
-      "Beds in Toronto",
-      "Modern Bedroom Furniture"
-    ],
-    "body_html": "<div class=\"dimensions-container\"> <div class=\"dimensions-content\"> <!-- Main Dimensions --> <div class=\"dimension-row\"> <div class=\"dimension-label\">Assembled Dimensions WDH\":</div> <div class=\"dimension-value dimension-highlight\"> 67.5 x 85 x 43.5 in \u00a0\u00b7\u00a0166 lbs </div> </div> <div class=\"box-dimensions-block\"> <div class=\"box-dimensions-header\">Box Dimensions WDH\":</div> <div class=\"box-dimensions-body\"> <div class=\"box-row\"> <span class=\"box-tag\">Box 1</span> <span class=\"box-val\">72.2 x 38.2 x 4.3 in \u00b7 53 lbs</span> </div> <div class=\"box-row\"> <span class=\"box-tag\">Box 2</span> <span class=\"box-val\">66.9 x 8.7 x 10.2 in \u00b7 46.3 lbs</span> </div> <div class=\"box-row\"> <span class=\"box-tag\">Box 3</span> <span class=\"box-val\">81.5 x 8.7 x 8.7 in \u00b7 48.5 lbs</span> </div> <div class=\"box-row\"> <span class=\"box-tag\">Box 4</span> <span class=\"box-val\">54.7 x 10.2 x 4.7 in \u00b7 40 lbs</span> </div> </div> </div> <!-- Additional Specs Grid --> <div class=\"specs-grid\"> <div class=\"spec-item\"> <div class=\"spec-label\">CBM</div> <div class=\"spec-value\">0.47</div> </div> <div class=\"spec-item\"> <div class=\"spec-label\">Capacity</div> <div class=\"spec-value\">551 lbs</div> </div> <div class=\"spec-item\"> <div class=\"spec-label\">Origin</div> <div class=\"spec-value\">Vietnam</div> </div> <div class=\"spec-item\"> <div class=\"spec-label\">Boxes</div> <div class=\"spec-value\"> 4</div> </div> </div> <!-- Materials Row --> <div class=\"dimension-row materials-row\"> <div class=\"dimension-label\">Materials:</div> <div class=\"dimension-value\">Solid Acacia, Plywood</div> </div> <!-- Finish Row --> <div class=\"dimension-row\"> <div class=\"dimension-label\">Finish:</div> <div class=\"dimension-value\">Whitewash</div> </div> </div> </div> <style> .dimensions-container { max-width: 100%; background: white; border: 1px solid #e0e0e0; overflow: hidden; } .dimensions-content { padding: 20px; } .dimension-row { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f0f0f0; align-items: flex-start; } .materials-row { border-top: 1px solid #f0f0f0; margin-top: 20px; padding-top: 20px; } .dimension-label { font-size: 14px; color: #000; font-weight: 600; letter-spacing: 1px; flex: 1; } .dimension-value { font-size: 16px; color: #red; text-align: right; flex: 1; } .dimension-highlight { font-weight: 600; } .box-dimensions-list { display: flex; flex-direction: column; gap: 4px; text-align: right; } .box-dimensions-block { padding: 12px 0; border-bottom: 1px solid #f0f0f0; } .box-dimensions-header { font-size: 14px; color: #000; font-weight: 600; letter-spacing: 1px; margin-bottom: 8px; } .box-dimensions-body { display: flex; flex-direction: column; gap: 4px; } .box-row { display: flex; justify-content: space-between; align-items: center; } .box-tag { font-size: 11px; font-weight: 600; letter-spacing: 1px; color: #888; text-transform: uppercase; } .box-val { font-size: 14px; color: #000; } @media (max-width: 480px) { .box-row { justify-content: center; gap: 8px; } } .box-line { display: block; font-size: 16px; } .box-label { font-size: 12px; font-weight: 600; letter-spacing: 1px; color: #888; margin-right: 6px; text-transform: uppercase; } .specs-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 20px; padding-top: 20px; } .spec-item { display: flex; flex-direction: column; gap: 4px; } .spec-label { font-size: 14px; color: #000; font-weight: 600; letter-spacing: 1px; } .spec-value { font-size: 16px; color: #000; font-weight: 500; } /* Responsive Breakpoints */ @media (max-width: 768px) { .dimensions-content { padding: 16px; } .specs-grid { grid-template-columns: repeat(2, 1fr); gap: 16px; } } @media (max-width: 480px) { .dimensions-content { padding: 12px; } .dimension-row { flex-direction: column; gap: 4px; padding: 10px 0; align-items: center; text-align: center; } .dimension-label, .dimension-value { text-align: center; } .dimension-highlight { font-weight: 400; } .dimension-value { font-size: 16px; } .specs-grid { grid-template-columns: 1fr; gap: 12px; margin-top: 10px; padding-top: 0; } .spec-item { padding: 8px 0; border-bottom: 1px solid #f0f0f0; align-items: center; text-align: center; } .spec-item:last-child { border-bottom: none; } .materials-row { margin-top: 10px; padding-top: 10px; } } </style>",
-    "variants": [
-      {
-        "title": "Default Title"
-      }
-    ],
-    "options": [
-      {
-        "name": "Title",
-        "position": 1,
-        "values": [
-          "Default Title"
-        ]
-      }
-    ]
-  },
-  {
-    "title": "Gia Round Dining Table - Whitewash",
-    "handle": "gia-round-dining-table-whitewash-gia037-ww",
-    "product_type": "",
-    "tags": [
-      "Dining Table",
-      "Dining Tables in Toronto",
-      "Modern Dining Furniture"
-    ],
-    "body_html": "<div class=\"dimensions-container\"> <div class=\"dimensions-content\"> <!-- Main Dimensions --> <div class=\"dimension-row\"> <div class=\"dimension-label\">Assembled Dimensions WDH\":</div> <div class=\"dimension-value dimension-highlight\"> 40 x 40 x 30 in \u00a0\u00b7\u00a053 lbs </div> </div> <div class=\"box-dimensions-block\"> <div class=\"box-dimensions-header\">Box Dimensions WDH\":</div> <div class=\"box-dimensions-body\"> <div class=\"box-row\"> <span class=\"box-tag\">Box 1</span> <span class=\"box-val\">42.5 x 42.5 x 6.3 in \u00b7 61.7 lbs</span> </div> </div> </div> <!-- Additional Specs Grid --> <div class=\"specs-grid\"> <div class=\"spec-item\"> <div class=\"spec-label\">CBM</div> <div class=\"spec-value\">0.22</div> </div> <div class=\"spec-item\"> <div class=\"spec-label\">Capacity</div> <div class=\"spec-value\">\u2014 lbs</div> </div> <div class=\"spec-item\"> <div class=\"spec-label\">Origin</div> <div class=\"spec-value\">Vietnam</div> </div> <div class=\"spec-item\"> <div class=\"spec-label\">Boxes</div> <div class=\"spec-value\"> 1</div> </div> </div> <!-- Materials Row --> <div class=\"dimension-row materials-row\"> <div class=\"dimension-label\">Materials:</div> <div class=\"dimension-value\">Acacia</div> </div> <!-- Finish Row --> <div class=\"dimension-row\"> <div class=\"dimension-label\">Finish:</div> <div class=\"dimension-value\">Whitewash</div> </div> </div> </div> <style> .dimensions-container { max-width: 100%; background: white; border: 1px solid #e0e0e0; overflow: hidden; } .dimensions-content { padding: 20px; } .dimension-row { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f0f0f0; align-items: flex-start; } .materials-row { border-top: 1px solid #f0f0f0; margin-top: 20px; padding-top: 20px; } .dimension-label { font-size: 14px; color: #000; font-weight: 600; letter-spacing: 1px; flex: 1; } .dimension-value { font-size: 16px; color: #red; text-align: right; flex: 1; } .dimension-highlight { font-weight: 600; } .box-dimensions-list { display: flex; flex-direction: column; gap: 4px; text-align: right; } .box-dimensions-block { padding: 12px 0; border-bottom: 1px solid #f0f0f0; } .box-dimensions-header { font-size: 14px; color: #000; font-weight: 600; letter-spacing: 1px; margin-bottom: 8px; } .box-dimensions-body { display: flex; flex-direction: column; gap: 4px; } .box-row { display: flex; justify-content: space-between; align-items: center; } .box-tag { font-size: 11px; font-weight: 600; letter-spacing: 1px; color: #888; text-transform: uppercase; } .box-val { font-size: 14px; color: #000; } @media (max-width: 480px) { .box-row { justify-content: center; gap: 8px; } } .box-line { display: block; font-size: 16px; } .box-label { font-size: 12px; font-weight: 600; letter-spacing: 1px; color: #888; margin-right: 6px; text-transform: uppercase; } .specs-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 20px; padding-top: 20px; } .spec-item { display: flex; flex-direction: column; gap: 4px; } .spec-label { font-size: 14px; color: #000; font-weight: 600; letter-spacing: 1px; } .spec-value { font-size: 16px; color: #000; font-weight: 500; } /* Responsive Breakpoints */ @media (max-width: 768px) { .dimensions-content { padding: 16px; } .specs-grid { grid-template-columns: repeat(2, 1fr); gap: 16px; } } @media (max-width: 480px) { .dimensions-content { padding: 12px; } .dimension-row { flex-direction: column; gap: 4px; padding: 10px 0; align-items: center; text-align: center; } .dimension-label, .dimension-value { text-align: center; } .dimension-highlight { font-weight: 400; } .dimension-value { font-size: 16px; } .specs-grid { grid-template-columns: 1fr; gap: 12px; margin-top: 10px; padding-top: 0; } .spec-item { padding: 8px 0; border-bottom: 1px solid #f0f0f0; align-items: center; text-align: center; } .spec-item:last-child { border-bottom: none; } .materials-row { margin-top: 10px; padding-top: 10px; } } </style>",
-    "variants": [
-      {
-        "title": "Default Title"
-      }
-    ],
-    "options": [
-      {
-        "name": "Title",
-        "position": 1,
-        "values": [
-          "Default Title"
-        ]
-      }
-    ]
-  },
-  {
-    "title": "Gia Extension Dining Table 71/102\" - Whitewash",
-    "handle": "gia-extension-dining-table-71-102-whitewash-gia011-ww",
-    "product_type": "",
-    "tags": [
-      "Dining Table",
-      "Dining Tables in Toronto",
-      "Extendable Dining Tables",
-      "Modern Dining Furniture"
-    ],
-    "body_html": "<div class=\"dimensions-container\"> <div class=\"dimensions-content\"> <!-- Main Dimensions --> <div class=\"dimension-row\"> <div class=\"dimension-label\">Assembled Dimensions WDH\":</div> <div class=\"dimension-value dimension-highlight\"> 71/86.7/102.4 x 39.4 x 30 in \u00a0\u00b7\u00a0141 lbs </div> </div> <div class=\"box-dimensions-block\"> <div class=\"box-dimensions-header\">Box Dimensions WDH\":</div> <div class=\"box-dimensions-body\"> <div class=\"box-row\"> <span class=\"box-tag\">Box 1</span> <span class=\"box-val\">74 x 41 x 8 in \u00b7 160 lbs</span> </div> </div> </div> <!-- Additional Specs Grid --> <div class=\"specs-grid\"> <div class=\"spec-item\"> <div class=\"spec-label\">CBM</div> <div class=\"spec-value\">0.41</div> </div> <div class=\"spec-item\"> <div class=\"spec-label\">Capacity</div> <div class=\"spec-value\">176 lbs</div> </div> <div class=\"spec-item\"> <div class=\"spec-label\">Origin</div> <div class=\"spec-value\">Vietnam</div> </div> <div class=\"spec-item\"> <div class=\"spec-label\">Boxes</div> <div class=\"spec-value\"> 1</div> </div> </div> <!-- Materials Row --> <div class=\"dimension-row materials-row\"> <div class=\"dimension-label\">Materials:</div> <div class=\"dimension-value\">Acacia, Acacia Veneer</div> </div> <!-- Finish Row --> <div class=\"dimension-row\"> <div class=\"dimension-label\">Finish:</div> <div class=\"dimension-value\">Whitewash</div> </div> </div> </div> <style> .dimensions-container { max-width: 100%; background: white; border: 1px solid #e0e0e0; overflow: hidden; } .dimensions-content { padding: 20px; } .dimension-row { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f0f0f0; align-items: flex-start; } .materials-row { border-top: 1px solid #f0f0f0; margin-top: 20px; padding-top: 20px; } .dimension-label { font-size: 14px; color: #000; font-weight: 600; letter-spacing: 1px; flex: 1; } .dimension-value { font-size: 16px; color: #red; text-align: right; flex: 1; } .dimension-highlight { font-weight: 600; } .box-dimensions-list { display: flex; flex-direction: column; gap: 4px; text-align: right; } .box-dimensions-block { padding: 12px 0; border-bottom: 1px solid #f0f0f0; } .box-dimensions-header { font-size: 14px; color: #000; font-weight: 600; letter-spacing: 1px; margin-bottom: 8px; } .box-dimensions-body { display: flex; flex-direction: column; gap: 4px; } .box-row { display: flex; justify-content: space-between; align-items: center; } .box-tag { font-size: 11px; font-weight: 600; letter-spacing: 1px; color: #888; text-transform: uppercase; } .box-val { font-size: 14px; color: #000; } @media (max-width: 480px) { .box-row { justify-content: center; gap: 8px; } } .box-line { display: block; font-size: 16px; } .box-label { font-size: 12px; font-weight: 600; letter-spacing: 1px; color: #888; margin-right: 6px; text-transform: uppercase; } .specs-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 20px; padding-top: 20px; } .spec-item { display: flex; flex-direction: column; gap: 4px; } .spec-label { font-size: 14px; color: #000; font-weight: 600; letter-spacing: 1px; } .spec-value { font-size: 16px; color: #000; font-weight: 500; } /* Responsive Breakpoints */ @media (max-width: 768px) { .dimensions-content { padding: 16px; } .specs-grid { grid-template-columns: repeat(2, 1fr); gap: 16px; } } @media (max-width: 480px) { .dimensions-content { padding: 12px; } .dimension-row { flex-direction: column; gap: 4px; padding: 10px 0; align-items: center; text-align: center; } .dimension-label, .dimension-value { text-align: center; } .dimension-highlight { font-weight: 400; } .dimension-value { font-size: 16px; } .specs-grid { grid-template-columns: 1fr; gap: 12px; margin-top: 10px; padding-top: 0; } .spec-item { padding: 8px 0; border-bottom: 1px solid #f0f0f0; align-items: center; text-align: center; } .spec-item:last-child { border-bottom: none; } .materials-row { margin-top: 10px; padding-top: 10px; } } </style>",
-    "variants": [
-      {
-        "title": "Default Title"
-      }
-    ],
-    "options": [
-      {
-        "name": "Title",
-        "position": 1,
-        "values": [
-          "Default Title"
-        ]
-      }
-    ]
-  },
-  {
-    "title": "Gia Sideboard - Whitewash",
-    "handle": "gia-sideboard-whitewash-gia003b-ww",
-    "product_type": "",
-    "tags": [
-      "Modern Dining Furniture",
-      "Sideboard",
-      "Sideboards in Toronto"
-    ],
-    "body_html": "<div class=\"dimensions-container\"> <div class=\"dimensions-content\"> <!-- Main Dimensions --> <div class=\"dimension-row\"> <div class=\"dimension-label\">Assembled Dimensions WDH\":</div> <div class=\"dimension-value dimension-highlight\"> 63 x 17.7 x 31.5 in \u00a0\u00b7\u00a0116 lbs </div> </div> <div class=\"box-dimensions-block\"> <div class=\"box-dimensions-header\">Box Dimensions WDH\":</div> <div class=\"box-dimensions-body\"> <div class=\"box-row\"> <span class=\"box-tag\">Box 1</span> <span class=\"box-val\">64.5 x 20 x 34.5 in \u00b7 134 lbs</span> </div> </div> </div> <!-- Additional Specs Grid --> <div class=\"specs-grid\"> <div class=\"spec-item\"> <div class=\"spec-label\">CBM</div> <div class=\"spec-value\">0.77</div> </div> <div class=\"spec-item\"> <div class=\"spec-label\">Capacity</div> <div class=\"spec-value\">176 lbs</div> </div> <div class=\"spec-item\"> <div class=\"spec-label\">Origin</div> <div class=\"spec-value\">Vietnam</div> </div> <div class=\"spec-item\"> <div class=\"spec-label\">Boxes</div> <div class=\"spec-value\"> 1</div> </div> </div> <!-- Materials Row --> <div class=\"dimension-row materials-row\"> <div class=\"dimension-label\">Materials:</div> <div class=\"dimension-value\">Solid Acacia, Acacia Veneer, MDF</div> </div> <!-- Finish Row --> <div class=\"dimension-row\"> <div class=\"dimension-label\">Finish:</div> <div class=\"dimension-value\">Whitewash</div> </div> </div> </div> <style> .dimensions-container { max-width: 100%; background: white; border: 1px solid #e0e0e0; overflow: hidden; } .dimensions-content { padding: 20px; } .dimension-row { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f0f0f0; align-items: flex-start; } .materials-row { border-top: 1px solid #f0f0f0; margin-top: 20px; padding-top: 20px; } .dimension-label { font-size: 14px; color: #000; font-weight: 600; letter-spacing: 1px; flex: 1; } .dimension-value { font-size: 16px; color: #red; text-align: right; flex: 1; } .dimension-highlight { font-weight: 600; } .box-dimensions-list { display: flex; flex-direction: column; gap: 4px; text-align: right; } .box-dimensions-block { padding: 12px 0; border-bottom: 1px solid #f0f0f0; } .box-dimensions-header { font-size: 14px; color: #000; font-weight: 600; letter-spacing: 1px; margin-bottom: 8px; } .box-dimensions-body { display: flex; flex-direction: column; gap: 4px; } .box-row { display: flex; justify-content: space-between; align-items: center; } .box-tag { font-size: 11px; font-weight: 600; letter-spacing: 1px; color: #888; text-transform: uppercase; } .box-val { font-size: 14px; color: #000; } @media (max-width: 480px) { .box-row { justify-content: center; gap: 8px; } } .box-line { display: block; font-size: 16px; } .box-label { font-size: 12px; font-weight: 600; letter-spacing: 1px; color: #888; margin-right: 6px; text-transform: uppercase; } .specs-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 20px; padding-top: 20px; } .spec-item { display: flex; flex-direction: column; gap: 4px; } .spec-label { font-size: 14px; color: #000; font-weight: 600; letter-spacing: 1px; } .spec-value { font-size: 16px; color: #000; font-weight: 500; } /* Responsive Breakpoints */ @media (max-width: 768px) { .dimensions-content { padding: 16px; } .specs-grid { grid-template-columns: repeat(2, 1fr); gap: 16px; } } @media (max-width: 480px) { .dimensions-content { padding: 12px; } .dimension-row { flex-direction: column; gap: 4px; padding: 10px 0; align-items: center; text-align: center; } .dimension-label, .dimension-value { text-align: center; } .dimension-highlight { font-weight: 400; } .dimension-value { font-size: 16px; } .specs-grid { grid-template-columns: 1fr; gap: 12px; margin-top: 10px; padding-top: 0; } .spec-item { padding: 8px 0; border-bottom: 1px solid #f0f0f0; align-items: center; text-align: center; } .spec-item:last-child { border-bottom: none; } .materials-row { margin-top: 10px; padding-top: 10px; } } </style>",
-    "variants": [
-      {
-        "title": "Default Title"
-      }
-    ],
-    "options": [
-      {
-        "name": "Title",
-        "position": 1,
-        "values": [
-          "Default Title"
-        ]
-      }
-    ]
-  },
-  {
-    "title": "Gia Small Extension Dining Table w/ Butterfly System 55/71\u201d - Whitewash",
-    "handle": "gia-small-extension-dining-table-w-butterfly-system-55-71-whitewash-gia010-ww",
-    "product_type": "",
-    "tags": [
-      "Dining Table",
-      "Dining Tables in Toronto",
-      "Extendable Dining Tables",
-      "Modern Dining Furniture"
-    ],
-    "body_html": "<div class=\"dimensions-container\"> <div class=\"dimensions-content\"> <!-- Main Dimensions --> <div class=\"dimension-row\"> <div class=\"dimension-label\">Assembled Dimensions WDH\":</div> <div class=\"dimension-value dimension-highlight\"> 55/71 x 31 x 30 in \u00a0\u00b7\u00a095 lbs </div> </div> <div class=\"box-dimensions-block\"> <div class=\"box-dimensions-header\">Box Dimensions WDH\":</div> <div class=\"box-dimensions-body\"> <div class=\"box-row\"> <span class=\"box-tag\">Box 1</span> <span class=\"box-val\">59.4 x 33.9 x 7.9 in \u00b7 108 lbs</span> </div> </div> </div> <!-- Additional Specs Grid --> <div class=\"specs-grid\"> <div class=\"spec-item\"> <div class=\"spec-label\">CBM</div> <div class=\"spec-value\">0.26</div> </div> <div class=\"spec-item\"> <div class=\"spec-label\">Capacity</div> <div class=\"spec-value\">160 lbs</div> </div> <div class=\"spec-item\"> <div class=\"spec-label\">Origin</div> <div class=\"spec-value\">Vietnam</div> </div> <div class=\"spec-item\"> <div class=\"spec-label\">Boxes</div> <div class=\"spec-value\"> 1</div> </div> </div> <!-- Materials Row --> <div class=\"dimension-row materials-row\"> <div class=\"dimension-label\">Materials:</div> <div class=\"dimension-value\">Solid Acacia Wood, Foldable Butterfly Leaf System</div> </div> <!-- Finish Row --> <div class=\"dimension-row\"> <div class=\"dimension-label\">Finish:</div> <div class=\"dimension-value\">Whitewash</div> </div> </div> </div> <style> .dimensions-container { max-width: 100%; background: white; border: 1px solid #e0e0e0; overflow: hidden; } .dimensions-content { padding: 20px; } .dimension-row { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f0f0f0; align-items: flex-start; } .materials-row { border-top: 1px solid #f0f0f0; margin-top: 20px; padding-top: 20px; } .dimension-label { font-size: 14px; color: #000; font-weight: 600; letter-spacing: 1px; flex: 1; } .dimension-value { font-size: 16px; color: #red; text-align: right; flex: 1; } .dimension-highlight { font-weight: 600; } .box-dimensions-list { display: flex; flex-direction: column; gap: 4px; text-align: right; } .box-dimensions-block { padding: 12px 0; border-bottom: 1px solid #f0f0f0; } .box-dimensions-header { font-size: 14px; color: #000; font-weight: 600; letter-spacing: 1px; margin-bottom: 8px; } .box-dimensions-body { display: flex; flex-direction: column; gap: 4px; } .box-row { display: flex; justify-content: space-between; align-items: center; } .box-tag { font-size: 11px; font-weight: 600; letter-spacing: 1px; color: #888; text-transform: uppercase; } .box-val { font-size: 14px; color: #000; } @media (max-width: 480px) { .box-row { justify-content: center; gap: 8px; } } .box-line { display: block; font-size: 16px; } .box-label { font-size: 12px; font-weight: 600; letter-spacing: 1px; color: #888; margin-right: 6px; text-transform: uppercase; } .specs-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 20px; padding-top: 20px; } .spec-item { display: flex; flex-direction: column; gap: 4px; } .spec-label { font-size: 14px; color: #000; font-weight: 600; letter-spacing: 1px; } .spec-value { font-size: 16px; color: #000; font-weight: 500; } /* Responsive Breakpoints */ @media (max-width: 768px) { .dimensions-content { padding: 16px; } .specs-grid { grid-template-columns: repeat(2, 1fr); gap: 16px; } } @media (max-width: 480px) { .dimensions-content { padding: 12px; } .dimension-row { flex-direction: column; gap: 4px; padding: 10px 0; align-items: center; text-align: center; } .dimension-label, .dimension-value { text-align: center; } .dimension-highlight { font-weight: 400; } .dimension-value { font-size: 16px; } .specs-grid { grid-template-columns: 1fr; gap: 12px; margin-top: 10px; padding-top: 0; } .spec-item { padding: 8px 0; border-bottom: 1px solid #f0f0f0; align-items: center; text-align: center; } .spec-item:last-child { border-bottom: none; } .materials-row { margin-top: 10px; padding-top: 10px; } } </style>",
     "variants": [
       {
         "title": "Default Title"

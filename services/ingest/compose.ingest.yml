@@ -1,0 +1,51 @@
+# Owner: Paul. An opt-in overlay for the ingest container. Not loaded by default.
+#
+# Why this file exists rather than three lines in docker-compose.yml:
+#
+# docker-compose.yml is Thomas's (CLAUDE.md, "Shared files nobody may edit casually"), and the
+# thing ingest needs from it is the one thing that file cannot safely give. Compose injects
+# only what `env_file` and `environment` hold, and ingest's env_file is infra/.env — which is
+# deliberately COMMITTED so the whole team shares one UPSTREAM_TOKEN. Putting a Browserbase or
+# OpenAI key there puts a billed third-party credential on somebody's personal account into git
+# history. infra/.env.example says as much and names this as the fix.
+#
+# A bare `environment:` entry takes its value from the shell that runs compose, so the keys
+# reach the container and never touch a file. Nothing here is secret; the secrets stay in your
+# shell.
+#
+# Usage, from the repository root:
+#
+#   export BROWSERBASE_API_KEY=...        # or put them in a shell rc / direnv file
+#   export OPENAI_API_KEY=...
+#   docker compose -f docker-compose.yml -f services/ingest/compose.ingest.yml \
+#     --profile local up -d --build ingest
+#
+#   curl -s localhost:8003/health         # {"ok":true,"browserbase":true}
+#
+# `browserbase: true` in that response is the check that this overlay is actually loaded. If it
+# says false, the overlay was not passed or the variable is not exported in this shell.
+#
+# infra/up.sh does NOT pass this overlay — it brings up all three services with the base file
+# only. That is correct for the normal tunnel-and-demo path, where ingest serves the Worker and
+# the expensive passes are off. This overlay is for a catalogue run.
+
+services:
+  ingest:
+    environment:
+      # Bare names, no "=": each takes its value from the invoking shell, and an unset one
+      # stays unset in the container rather than becoming an empty string. That matters —
+      # app/main.py treats an unset key as "step not configured" and says so in the response,
+      # which is the loud failure; an empty string would look configured and fail per-request.
+      - BROWSERBASE_API_KEY
+      - OPENAI_API_KEY
+      - OPENAI_MODEL
+      - OPENAI_VLM_MODEL
+      # Keeps the rendered-page cache on the mounted volume, so a re-extract after a crash
+      # does not re-fetch (and re-bill) pages that were already pulled.
+      - PAGE_CACHE=/data/.page-cache
+    volumes:
+      # Where a catalogue run writes: raw pulls, extracted rows, and the page cache. Without
+      # this the output dies with the container, which is the wrong way to find out after a
+      # 20-merchant run. Host path is relative to the repository root, because that is where
+      # the compose invocation above runs from.
+      - ./services/ingest/.bulk:/data

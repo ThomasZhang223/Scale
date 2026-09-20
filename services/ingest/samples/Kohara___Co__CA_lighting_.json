@@ -1,8 +1,51 @@
 [
   {
+    "title": "Twisted baby alpaca headband",
+    "handle": "twisted-baby-alpaca-headband-1",
+    "product_type": "clothing",
+    "images": [
+      "https://cdn.shopify.com/s/files/1/0529/4591/1968/files/AHT10.webp?v=1789843562",
+      "https://cdn.shopify.com/s/files/1/0529/4591/1968/files/AHT6.webp?v=1789843779",
+      "https://cdn.shopify.com/s/files/1/0529/4591/1968/files/AHT8.webp?v=1789843805"
+    ],
+    "tags": [
+      "clothing"
+    ],
+    "body_html": "<p><strong>This isn\u2019t your average headband! Made with one of the highest performing technical fibres; this is a thick, non-itchy, ultra soft, and incredibly warm piece. It is luxurious, timeless and oh-so-stylish.</strong></p>\n<p><span>Peruvian alpaca is a natural, technical fiber with remarkable thermal properties - allowing air circulation on warm days (prevents sweating), and heat insulation on cool days (contains heat). These feature a composition of primarily baby-alpaca, which means that they're made with hair from the very first sheer of an alpaca. This is the softest their wool will ever be.</span></p>\n<p><span>Alpacas are shorn once per year, and the hair from the first sheer of an alpaca is remarkably soft. This is an ethical and humane process; no animals are ever harmed for Pokoloko products.</span></p>\n<p><span>As a bonus, alpaca is one of the Earth's most sustainable fibers to make, because alpacas and alpaca fiber harvesting have a very low environmental impact. Keep your beautiful head warm, continue to look incredible, and go play outside!</span></p>",
+    "variants": [
+      {
+        "title": "affogato"
+      },
+      {
+        "title": "woodland"
+      },
+      {
+        "title": "linen/beige"
+      },
+      {
+        "title": "charcoal"
+      }
+    ],
+    "options": [
+      {
+        "name": "Color",
+        "position": 1,
+        "values": [
+          "affogato",
+          "woodland",
+          "linen/beige",
+          "charcoal"
+        ]
+      }
+    ]
+  },
+  {
     "title": "Fleece Lined Throw - Irena - Clove",
     "handle": "fleece-lined-throw-irena-clove",
     "product_type": "Throw",
+    "images": [
+      "https://cdn.shopify.com/s/files/1/0529/4591/1968/files/TFLI2_lg.jpg?v=1789761234"
+    ],
     "tags": [
       "Throw"
     ],
@@ -26,6 +69,9 @@
     "title": "Southwest Blanket - Throw - Etching",
     "handle": "southwest-blanket-throw-etching",
     "product_type": "Throw",
+    "images": [
+      "https://cdn.shopify.com/s/files/1/0529/4591/1968/files/SW-T19_lg.jpg?v=1789761040"
+    ],
     "tags": [
       "Throw"
     ],
@@ -49,6 +95,9 @@
     "title": "Hand Embroidered Ornament - Highland Cow",
     "handle": "hand-embroidered-ornament-highland-cow",
     "product_type": "Christmas",
+    "images": [
+      "https://cdn.shopify.com/s/files/1/0529/4591/1968/files/SQ65_lg.jpg?v=1789760926"
+    ],
     "tags": [
       "Ornament"
     ],
@@ -72,6 +121,10 @@
     "title": "Alpaca Kids Socks - Crew",
     "handle": "alpaca-kids-socks-crew",
     "product_type": "clothing",
+    "images": [
+      "https://cdn.shopify.com/s/files/1/0529/4591/1968/files/PSC1-24_lg.jpg?v=1789760399",
+      "https://cdn.shopify.com/s/files/1/0529/4591/1968/files/PSC3-24_lg.jpg?v=1789760504"
+    ],
     "tags": [
       "clothing",
       "Socks"
@@ -114,22 +167,27 @@
     "title": "Cozy - Twisted Headband",
     "handle": "cozy-twisted-headband",
     "product_type": "clothing",
+    "images": [
+      "https://cdn.shopify.com/s/files/1/0529/4591/1968/files/CKTWH11_lg.jpg?v=1789759896",
+      "https://cdn.shopify.com/s/files/1/0529/4591/1968/files/CKTWH12_lg.jpg?v=1789759985",
+      "https://cdn.shopify.com/s/files/1/0529/4591/1968/files/CKTWH4_lg.jpg?v=1789760038"
+    ],
     "tags": [
       "clothing"
     ],
     "body_html": "<ul>\n<li>\n<b>Size: </b>One-Size</li>\n</ul>\n<p><br></p>\n<ul>\n<li>\n<b>Composition:</b> 20% mohair 5% polyester 75% synthetic</li>\n</ul>\n<p><br></p>\n<ul>\n<li>\n<b>Care: </b>Cold, delicate wash and hang to dry</li>\n</ul>\n<p><br></p>\n<ul>\n<li>\n<b>Origin:</b> Made in Indonesia</li>\n</ul>",
     "variants": [
       {
-        "title": "Beige"
+        "title": "Beige / Denim"
       },
       {
-        "title": "Leaves"
+        "title": "Leaves / Denim"
       },
       {
-        "title": "Stone"
+        "title": "Stone / Denim"
       },
       {
-        "title": "Charcoal"
+        "title": "Charcoal / Denim"
       }
     ],
     "options": [
@@ -142,6 +200,13 @@
           "Stone",
           "Charcoal"
         ]
+      },
+      {
+        "name": "Color",
+        "position": 2,
+        "values": [
+          "Denim"
+        ]
       }
     ]
   },
@@ -149,6 +214,11 @@
     "title": "Alpaca Socks - Thick Print",
     "handle": "alpaca-socks-thick-print",
     "product_type": "clothing",
+    "images": [
+      "https://cdn.shopify.com/s/files/1/0529/4591/1968/files/ATP6-LX_lg.jpg?v=1789757318",
+      "https://cdn.shopify.com/s/files/1/0529/4591/1968/files/ATP7-LX_lg.jpg?v=1789757448",
+      "https://cdn.shopify.com/s/files/1/0529/4591/1968/files/ATP8-LX_lg.jpg?v=1789757504"
+    ],
     "tags": [
       "clothing",
       "Socks"
@@ -198,6 +268,11 @@
     "title": "Alpaca Socks - Vivian",
     "handle": "alpaca-socks-vivian-beige",
     "product_type": "clothing",
+    "images": [
+      "https://cdn.shopify.com/s/files/1/0529/4591/1968/files/ASV10-LX_lg.jpg?v=1789756594",
+      "https://cdn.shopify.com/s/files/1/0529/4591/1968/files/ASV1-LX_lg.jpg?v=1789756781",
+      "https://cdn.shopify.com/s/files/1/0529/4591/1968/files/ASV6-LX_lg.jpg?v=1789756893"
+    ],
     "tags": [
       "clothing",
       "Socks"
@@ -239,61 +314,6 @@
           "Beige",
           "Snow",
           "Grey"
-        ]
-      }
-    ]
-  },
-  {
-    "title": "Twisted Baby Alpaca Headband",
-    "handle": "twisted-baby-alpaca-headband",
-    "product_type": "clothing",
-    "tags": [
-      "clothing"
-    ],
-    "body_html": "<ul>\n<li>\n<b>Size: </b>1-size</li>\n</ul>\n<p><br></p>\n<ul>\n<li>\n<b>Composition:</b> 93% Peruvian baby alpaca 7% spandex</li>\n</ul>\n<p><br></p>\n<ul>\n<li>\n<b>Care: </b>Hand wash cold &amp; lay flat to dry</li>\n</ul>\n<p><br></p>\n<ul>\n<li>\n<b>Origin:</b> Made in Peru</li>\n</ul>",
-    "variants": [
-      {
-        "title": "Linen"
-      },
-      {
-        "title": "Affogato"
-      },
-      {
-        "title": "Petina"
-      },
-      {
-        "title": "Black"
-      },
-      {
-        "title": "Ivory"
-      },
-      {
-        "title": "Charcoal"
-      },
-      {
-        "title": "Denim"
-      },
-      {
-        "title": "Woodland"
-      },
-      {
-        "title": "Wine"
-      }
-    ],
-    "options": [
-      {
-        "name": "Coloiur",
-        "position": 1,
-        "values": [
-          "Linen",
-          "Affogato",
-          "Petina",
-          "Black",
-          "Ivory",
-          "Charcoal",
-          "Denim",
-          "Woodland",
-          "Wine"
         ]
       }
     ]

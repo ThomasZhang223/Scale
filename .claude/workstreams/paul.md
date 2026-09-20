@@ -202,6 +202,58 @@ device; the transport is injected so a Worker route or a small service is a one-
 - Storing or comparing anything in centimetres or inches. Convert at ingest; every schema field is
   metres.
 
+## Backend wiring, as it actually stands (audited before the catalogue load)
+
+Four things to know before the mass ingest. None are in `services/ingest/**`, so none are mine
+to fix — they are asks for Thomas, listed here so the load is not planned around wiring that
+does not exist.
+
+**1. Nothing ever produces to the queue.** `full-scale-jobs` is created by `provision.sh`, the
+consumer is implemented in `workers/src/index.ts`, and `JOB_QUEUE` appears exactly once in the
+whole repository — in `wrangler.toml`, as a binding nobody calls. `POST /objects/{id}/generate`
+calls `GENERATE_MESH.create()` directly, so the `max_concurrency = 3` throttle that
+`DEPLOY.md` describes as the reason the queue exists is not in any path. It costs nothing while
+generation is hand-triggered one object at a time; it costs the demo the moment the pre-bake
+runs 100 products, which is exactly what the free plan's 100-concurrent-Workflow limit was
+going to be spent on. **Ask Thomas for a producer**, or for the pre-bake trigger to enqueue
+rather than create.
+
+**2. There is no HTTP route that starts an ingest.** `IngestMerchantWorkflow` has exactly one
+caller: `ScoutAgent.toolIngest`, reached through an LLM tool loop. A deterministic bulk run —
+20 merchants, unattended, before the demo — has no entry point in the Worker at all. That is
+why `bulk_ingest.py` drives the container directly instead; it is the honest path today, not a
+workaround I expect to keep. **A `POST /v1/ingest` taking `{merchant, storefront}` would make
+this a Worker concern again.**
+
+**3. Catalogue rows loaded into D1 are not in Vectorize.** `OBJECTS_INDEX.upsert` is called in
+one place, `workflows/generate-mesh.ts`, so an object gets embedded when its mesh is generated
+and not before. The 100 pre-bake rows will therefore answer `/v1/search` through the
+**d1-fallback** path — text `LIKE` plus the dimension filter — until Ani's generation has run
+over them. That path works and is the documented cut-list item, but it is not the retrieval
+claim in the pitch, and the `X-Ranker` header will say so on stage. Worth knowing which one the
+demo is actually showing.
+
+**4. `upstream:ingest` is documented as "reserved" and is not.** `infra/cloudflare/README.md`
+lists the key that way, but `IngestMerchantWorkflow` calls `callUpstream(env, "ingest", ...)`
+for both `/crawl` and `/extract`. If that key is unset the workflow 503s naming it. `up.sh`
+already publishes it, so this is a stale comment rather than a broken path — but it is the kind
+of stale comment that sends someone debugging in the wrong direction at hour 20.
+
+### On the tunnel
+
+There is no persistent hostname to check. `infra/tunnel/config.yml` is entirely commented out
+and documents the named-tunnel upgrade for the day a domain exists; what runs today is three
+**quick tunnels** started by `infra/up.sh`, each getting a fresh random `*.trycloudflare.com`
+hostname on every restart, published to KV by `set-upstreams.sh`. So "is the tunnel live" is
+only ever a question about whichever laptop is currently running `up.sh` — it cannot be live
+from a machine that is not running it, and the URL from an hour ago is already wrong. The
+wiring itself is right: `up.sh` health-checks each container, waits for the hostname, publishes
+all three keys positionally, and `GET /v1/health` reports which are set.
+
+The consequence for the catalogue: **the load does not need the tunnel at all.**
+`load_catalog.py` produces SQL and an upload script offline, and `wrangler` talks to Cloudflare
+directly. The tunnel is only on the path when the Worker drives extraction live.
+
 ## Who to ask
 
 | Person | They owe you | Due | You owe them | Due |
