@@ -3,7 +3,8 @@
 **Owner:** Paul
 **Scope:** Catalog and marketplace ingest (Component F, pipeline P3). Pulls furniture listings
 from Shopify storefronts, extracts dimensions out of messy per-merchant data, converts everything
-to metres, and posts each result to `POST /objects` as `Object v1` (`source: "catalog"`).
+to metres, and returns `Object v1` rows (`source: "catalog"`). The service posts nowhere: the
+caller (the Worker's `IngestMerchantWorkflow`, or `bulk_ingest.py` + `catalog-queue.mjs`) owns storage.
 
 This service does not touch the app, the backend routes, the headset, or Baseten. It reads and
 writes only through `.claude/contracts.md`.
@@ -27,8 +28,8 @@ passes when unconfigured is worse than no auth. `BROWSERBASE_API_KEY` and `OPENA
 
 Mass ingestion — running the whole merchant list into D1 and R2 — is its own runbook:
 **[CATALOG_LOAD.md](CATALOG_LOAD.md)**. The short version is that `bulk_ingest.py` drives this
-service over HTTP merchant by merchant, and `load_catalog.py` turns the result into SQL and an
-upload script without touching the network.
+service over HTTP merchant by merchant, and `workers/scripts/catalog-queue.mjs` feeds the result
+to the Worker's `POST /v1/catalog/ingest`. `load_catalog.py` is superseded.
 
 To run just this container:
 
