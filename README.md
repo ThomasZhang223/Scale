@@ -5,8 +5,7 @@
 <h1 align="center">Scale</h1>
 
 <p align="center">
-  Scan your room and any real object, browse Shopify and generate 3d renders, then compose them together at true measured scale:
-  on the phone in 3D and AR, and in a Meta Quest at 1:1.
+  Scale makes physical space searchable. Point at something you like, and Scale can find real products like it, determine what actually fits your room, reconstruct missing 3D geometry, and place it at true scale.
 </p>
 
 Built at Hack the North 2026.
