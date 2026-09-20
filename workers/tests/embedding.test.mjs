@@ -109,8 +109,12 @@ function pipelineEnvironment() {
     category: "chair", bbox_w: 0.7, bbox_h: 1, bbox_d: 0.6 };
   const writes = [];
   env.DB = { prepare: sql => ({ bind: (...args) => ({
-    first: async () => row, all: async () => ({ results: [row] }),
-    run: async () => { writes.push({ sql, args }); },
+    // No scan_thumb_jobs row exists in this fake, and `changes: 0` means the render step's
+    // claim finds nothing to take — so the mesh route's background fast path is a clean no-op
+    // here. The render step has its own tests in tests/scan-thumb.test.mjs.
+    first: async () => (sql.includes("scan_thumb_jobs") ? null : row),
+    all: async () => ({ results: [row] }),
+    run: async () => { writes.push({ sql, args }); return { meta: { changes: 0 } }; },
   }) }) };
   env.BUCKET = {
     list: async () => ({ objects: [{ key: "objects/object/frames/0.jpg" }] }),
@@ -348,17 +352,23 @@ test("a valid GLB at the scan key flips the row to ready with that glb_key", asy
 
 // --- One indexer -------------------------------------------------------------------------------
 
-test("embedInput admits catalogue source keys and still refuses every other key", async t => {
+test("embedInput admits catalogue, frame and scan-thumbnail keys and refuses every other key", async t => {
   const env = environment();
   env.BUCKET = { get: async () => ({ size: 3, arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer }) };
   t.mock.method(globalThis, "fetch", async () => Response.json({ ...vector, modality: "image" }));
   for (const good of ["catalog/Floyd_Home/9246282842274/source.jpg", "catalog/Poly___Bark/1/source.png",
-    "objects/id/frames/0.jpg"]) {
+    "objects/id/frames/0.jpg",
+    // A headset render of a scan's own mesh: the only picture a phone scan ever has.
+    "scans/6e812de9-65f5-4bd7-82c0-b098eef8fac5/thumb.jpg"]) {
     assert.equal((await embedInput(env, { imageKey: good })).modality, "image");
   }
   for (const bad of ["catalog/a/b/other.jpg", "catalog/a/source.jpg", "scans/id/mesh.glb", "objects/id/mesh.glb",
-    "rooms/id/capture.json", "catalog/a/b/c/source.jpg"]) {
-    await assert.rejects(embedInput(env, { imageKey: bad }), /Expected an object frame or catalogue source key/);
+    "rooms/id/capture.json", "catalog/a/b/c/source.jpg",
+    // The thumbnail rule is the whole key, not a prefix: an id that is not a uuid, another
+    // extension, or a deeper path are all still refused.
+    "scans/id/thumb.jpg", "scans/6e812de9-65f5-4bd7-82c0-b098eef8fac5/thumb.png",
+    "scans/6e812de9-65f5-4bd7-82c0-b098eef8fac5/a/thumb.jpg"]) {
+    await assert.rejects(embedInput(env, { imageKey: bad }), /Expected an object frame, catalogue source or scan thumbnail key/);
   }
 });
 
@@ -377,42 +387,52 @@ test("indexObject upserts one vector in millimetres under the fingerprint namesp
     w_mm: 500, h_mm: 750, d_mm: 250, dominant_hex: "#000000" });
 });
 
-test("postObjectMesh answers x-indexed pending and indexes in the background, not in the request", async t => {
-  const { env } = scanEnvironment(glbBytes());
+test("attaching a scan's mesh accepts the render durably, before the response, and embeds nothing yet", async t => {
+  // A scan is no longer indexed from its text here. Every scan's text is "Captured object" /
+  // "unknown", which is one point in the embedding space for all of them; the picture is made
+  // instead. What this route owes the phone is ACCEPTANCE — a scan_thumb_jobs row that exists
+  // before the response, so the one-minute cron owns the work even if this Worker dies now.
+  const { env, writes } = scanEnvironment(glbBytes());
   const upserts = [];
   env.OBJECTS_INDEX = { upsert: async vectors => { upserts.push(...vectors); } };
-  let release;
-  const held = new Promise(resolve => { release = resolve; });
-  t.mock.method(globalThis, "fetch", async () => { await held; return Response.json(vector); });
+  t.mock.method(globalThis, "fetch", async () => { throw Error("must not embed in the request"); });
   const { ctx, settle } = context();
   const response = await postObjectMesh(scanRequest("scans/scan-1/mesh.glb"), env, "scan-1", "https://api.example", ctx);
-  assert.equal(response.headers.get("x-indexed"), "pending");
-  assert.equal(upserts.length, 0, "the response must not wait for the embed");
-  release(); await settle();
-  assert.equal(upserts[0].id, "scan-1");
-  assert.equal(upserts[0].metadata.source, "scan");
+  assert.equal(response.headers.get("x-indexed"), "scan-thumb-pending");
+  const accept = writes.find(w => w.sql.includes("INSERT INTO scan_thumb_jobs"));
+  assert.ok(accept, "acceptance is written, not left to a waitUntil");
+  assert.deepEqual(accept.args[0], "scan-1");
+  assert.ok(writes.indexOf(accept) > writes.findIndex(w => w.sql.includes("state = 'ready'")),
+    "the row is ready before the picture is promised");
+  await settle();
+  assert.equal(upserts.length, 0, "the response never waits for a render or an embed");
 });
 
-test("a background embed failure never fails the scan save", async t => {
+test("a background embed failure never fails a mesh save", async t => {
   const { env, writes } = scanEnvironment(glbBytes());
+  (await env.DB.prepare("").bind().first()).source = "catalog";
   env.OBJECTS_INDEX = { upsert: async () => {} };
+  env.DB.batch = async statements => { for (const statement of statements) await statement.run(); };
   t.mock.method(console, "error", () => {});
   t.mock.method(globalThis, "fetch", async () => new Response("down", { status: 503 }));
   const { ctx, settle } = context();
-  const response = await postObjectMesh(scanRequest("scans/scan-1/mesh.glb"), env, "scan-1", "https://api.example", ctx);
+  const response = await postObjectMesh(scanRequest("objects/scan-1/mesh.glb"), env, "scan-1", "https://api.example", ctx);
   assert.equal(response.status, 200);
   await settle();
   assert.ok(writes.some(w => w.sql.includes("state = 'ready'")));
 });
 
-test("a scan with no embeddable text is saved and reports why it is not searchable", async t => {
+test("a row with no embeddable text is saved and reports why it is not searchable", async t => {
+  // Still the text path, and still only for the sources that have no picture of their own:
+  // a catalogue or library row attaching a reviewed mesh by hand.
   for (const [name, category] of [["", ""], ["unknown", "unknown"], ["", "unknown"]]) {
     const { env, writes } = scanEnvironment(glbBytes());
     const row = (await env.DB.prepare("").bind().first());
-    Object.assign(row, { name, category });
+    Object.assign(row, { name, category, source: "catalog" });
+    env.DB.batch = async statements => { for (const statement of statements) await statement.run(); };
     t.mock.method(globalThis, "fetch", async () => { throw Error("must not embed"); });
     const { ctx } = context();
-    const response = await postObjectMesh(scanRequest("scans/scan-1/mesh.glb"), env, "scan-1", "https://api.example", ctx);
+    const response = await postObjectMesh(scanRequest("objects/scan-1/mesh.glb"), env, "scan-1", "https://api.example", ctx);
     assert.equal(response.headers.get("x-indexed"), "false");
     assert.equal(response.headers.get("x-index-skipped"), "no-embeddable-text");
     assert.ok(writes.some(w => w.sql.includes("state = 'ready'")));
@@ -537,9 +557,10 @@ test("a scan row with the scans/ key is ready and touches no mesh jobs", async t
   t.mock.method(globalThis, "fetch", async () => Response.json(vector));
   const { response, writes, upserts } = await attach("scan", "scans/scan-1/mesh.glb");
   assert.equal(response.status, 200);
-  assert.equal(response.headers.get("x-indexed"), "pending");
+  assert.equal(response.headers.get("x-indexed"), "scan-thumb-pending");
   assert.equal(writes.some(w => w.sql.startsWith("UPDATE jobs") || w.sql.startsWith("UPDATE mesh_outbox")), false);
-  assert.equal(upserts[0].metadata.source, "scan");
+  assert.ok(writes.some(w => w.sql.includes("INSERT INTO scan_thumb_jobs")));
+  assert.equal(upserts.length, 0, "a scan's vector comes from its picture, not from this route");
 });
 
 test("an unknown object 404s before the key is compared", async () => {

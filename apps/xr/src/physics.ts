@@ -20,6 +20,10 @@ import type { BuiltRoom } from './roomScan';
 const STEP = 1 / 60;
 const SKIN = 0.005; // stop this far short of a wall so the next sweep isn't already touching
 const LIFT = 0.01;  // sweep slightly above the floor so resting on it never counts as a hit
+// Stacking. A support's top must be at or below the object's own bottom, give or take a
+// resting object's own settling; and the object must actually be held up, not perched.
+const SUPPORT_TOLERANCE = 0.02; // m
+const SUPPORT_FRACTION = 0.6;   // of the object's footprint that must be over the support
 
 interface Dynamic {
   node: THREE.Object3D;
@@ -42,7 +46,7 @@ export class Physics {
   private world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
   private roomBody: RAPIER.RigidBody | null = null;
   private roomHalf = { x: 3, z: 3 };
-  private detected = new Map<string, { collider: RAPIER.Collider; debug: THREE.Object3D }>();
+  private detected = new Map<string, { collider: RAPIER.Collider; debug: THREE.Object3D; rest: Rest }>();
   private dynamics = new Map<string, Dynamic>();
   private debugRoom = new THREE.Group();
   private debugVisible = false;
@@ -90,7 +94,7 @@ export class Physics {
       const center = new THREE.Vector3(o.position[0], o.position[1] + h / 2, o.position[2]);
       const rot = new THREE.Quaternion().setFromAxisAngle(THREE.Object3D.DEFAULT_UP, o.rotationY);
       const { collider, debug } = this.addFixedBox(body, new THREE.Vector3(w / 2, h / 2, d / 2), center, rot);
-      this.detected.set(o.identifier, { collider, debug });
+      this.detected.set(o.identifier, { collider, debug, rest: restingPlace(o.identifier, o.position[0], o.position[1] + h, o.position[2], new THREE.Vector3(w, h, d), o.rotationY) });
     }
     this.refreshQueries();
   }
@@ -208,7 +212,7 @@ export class Physics {
     const [w, h, d] = size;
     const rot = new THREE.Quaternion().setFromAxisAngle(THREE.Object3D.DEFAULT_UP, rotY);
     const entry = this.addFixedBox(this.roomBody, new THREE.Vector3(w / 2, h / 2, d / 2), new THREE.Vector3(x, h / 2, z), rot);
-    this.detected.set(identifier, entry);
+    this.detected.set(identifier, { ...entry, rest: restingPlace(identifier, x, h, z, new THREE.Vector3(w, h, d), rotY) });
     this.refreshQueries();
   }
 
@@ -226,16 +230,50 @@ export class Physics {
     }
   }
 
-  /** Puts an object exactly here (a stored placement), on the floor, at rest. */
-  moveTo(id: string, x: number, z: number, rotY: number) {
+  /**
+   * Puts an object exactly here, at rest. `y` is its bottom: 0, the floor, unless the caller
+   * means otherwise — a stored placement that was resting on a table carries the table's top.
+   *
+   * The default stays the floor on purpose. Rearrange's result and a freshly added object both
+   * mean the floor, and they should not have to say so.
+   */
+  moveTo(id: string, x: number, z: number, rotY: number, y = 0) {
     const d = this.dynamics.get(id);
     if (!d) return;
     d.target = undefined;
-    d.body.setTranslation({ x, y: 0, z }, true);
+    d.body.setTranslation({ x, y, z }, true);
     d.body.setRotation(this.quat.setFromAxisAngle(THREE.Object3D.DEFAULT_UP, rotY), true);
     d.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
     d.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
     this.refreshQueries();
+  }
+
+  /**
+   * Turns an object in place, about the vertical axis. Anything resting on it turns with it,
+   * around the support's own centre — a lamp on a table travels round as the table swings,
+   * rather than staying put while the table turns underneath it.
+   */
+  turn(id: string, rotY: number) {
+    const d = this.dynamics.get(id);
+    if (!d) return;
+    const riders = this.ridersOf(id);
+    const t = d.body.translation();
+    const delta = rotY - this.rotationY(id);
+    d.body.setRotation(this.quat.setFromAxisAngle(THREE.Object3D.DEFAULT_UP, rotY), true);
+    d.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+    const cos = Math.cos(delta);
+    const sin = Math.sin(delta);
+    for (const riderId of riders) {
+      const rider = this.dynamics.get(riderId);
+      if (!rider) continue;
+      const r = rider.body.translation();
+      const dx = r.x - t.x;
+      const dz = r.z - t.z;
+      rider.body.setTranslation({ x: t.x + dx * cos + dz * sin, y: r.y, z: t.z - dx * sin + dz * cos }, true);
+      rider.body.setRotation(this.quat.setFromAxisAngle(THREE.Object3D.DEFAULT_UP, this.rotationY(riderId) + delta), true);
+      rider.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+      rider.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+    }
   }
 
   release(id: string) {
@@ -262,6 +300,69 @@ export class Physics {
 
   nodeOf(id: string): THREE.Object3D | null {
     return this.dynamics.get(id)?.node ?? null;
+  }
+
+  /**
+   * What this object would come to rest on: the highest thing under it that actually holds it
+   * up. Null is the floor.
+   *
+   * The rule is deliberately strict, because a lamp perched half off a table reads as a bug
+   * rather than a choice: the object's centre must be over the support, AND at least 60% of
+   * its footprint inside it. Footprints are the turned box's world-axis extents, the same
+   * approximation findFreeSpot already uses.
+   */
+  supportUnder(id: string): { supportId: string; top: number } | null {
+    const d = this.dynamics.get(id);
+    if (!d) return null;
+    const t = d.body.translation();
+    const here = footprint(d.size, this.rotationY(id));
+    const area = 4 * here.x * here.z;
+    let best: { supportId: string; top: number } | null = null;
+    for (const rest of this.restingPlaces(id)) {
+      // Above the object's own bottom, so it is a neighbour or a rider, not a support.
+      if (rest.top > t.y + SUPPORT_TOLERANCE) continue;
+      if (best && rest.top <= best.top) continue;
+      const overlapX = Math.min(t.x + here.x, rest.x + rest.half.x) - Math.max(t.x - here.x, rest.x - rest.half.x);
+      const overlapZ = Math.min(t.z + here.z, rest.z + rest.half.z) - Math.max(t.z - here.z, rest.z - rest.half.z);
+      if (overlapX <= 0 || overlapZ <= 0) continue;
+      const overCentre = Math.abs(t.x - rest.x) <= rest.half.x && Math.abs(t.z - rest.z) <= rest.half.z;
+      if (!overCentre || overlapX * overlapZ < area * SUPPORT_FRACTION) continue;
+      best = { supportId: rest.id, top: rest.top };
+    }
+    return best;
+  }
+
+  /** Everything resting on this object, and on those in turn: a stack moves as one. */
+  ridersOf(id: string): string[] {
+    const out: string[] = [];
+    const walk = (supportId: string) => {
+      for (const otherId of this.dynamics.keys()) {
+        if (otherId === id || out.includes(otherId)) continue;
+        if (this.supportUnder(otherId)?.supportId !== supportId) continue;
+        out.push(otherId);
+        walk(otherId);
+      }
+    };
+    walk(id);
+    return out;
+  }
+
+  /** Every top face something could rest on: the other objects, and the furniture the scan found. */
+  private restingPlaces(exceptId: string): Rest[] {
+    const out: Rest[] = [];
+    for (const [id, d] of this.dynamics) {
+      if (id === exceptId) continue;
+      const t = d.body.translation();
+      out.push(restingPlace(id, t.x, t.y + d.size.y, t.z, d.size, this.rotationY(id)));
+    }
+    for (const entry of this.detected.values()) out.push(entry.rest);
+    return out;
+  }
+
+  /** An object's footprint half-extents in world axes: the size of its landing outline. */
+  footprintOf(id: string): { x: number; z: number } | null {
+    const d = this.dynamics.get(id);
+    return d ? footprint(d.size, this.rotationY(id)) : null;
   }
 
   idFromObject(obj: THREE.Object3D | null): string | null {
@@ -304,10 +405,13 @@ export class Physics {
    * the surface, so dragging along a wall feels smooth rather than sticky.
    */
   private followTargets() {
-    for (const d of this.dynamics.values()) {
+    for (const [id, d] of this.dynamics) {
       if (!d.target) continue;
+      // Read the stack before the support moves: once it has, nothing is resting on it any more.
+      const riders = this.ridersOf(id);
       const rot = this.quat.setFromAxisAngle(THREE.Object3D.DEFAULT_UP, d.target.rotY);
       const t = d.body.translation();
+      const from = { x: t.x, y: t.y, z: t.z };
       let dx = d.target.x - t.x;
       let dz = d.target.z - t.z;
       for (let pass = 0; pass < 2 && Math.hypot(dx, dz) > 1e-4; pass++) {
@@ -341,6 +445,20 @@ export class Physics {
         d.body.setLinvel({ x: 0, y: v.y, z: 0 }, true); // gravity only; no coasting
       }
       d.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+      this.carryRiders(riders, d.body.translation(), from);
+    }
+  }
+
+  /** Shifts everything resting on a support by the same amount the support just moved. */
+  private carryRiders(riders: string[], now: { x: number; y: number; z: number }, from: { x: number; y: number; z: number }) {
+    const dx = now.x - from.x, dy = now.y - from.y, dz = now.z - from.z;
+    if (!riders.length || (!dx && !dy && !dz)) return;
+    for (const riderId of riders) {
+      const rider = this.dynamics.get(riderId);
+      if (!rider) continue;
+      const r = rider.body.translation();
+      rider.body.setTranslation({ x: r.x + dx, y: r.y + dy, z: r.z + dz }, true);
+      rider.body.setLinvel({ x: 0, y: 0, z: 0 }, true); // carried, not thrown
     }
   }
 
@@ -372,6 +490,30 @@ export class Physics {
     this.debugRoom.add(debug);
     return { collider, debug };
   }
+}
+
+/** A top face something can rest on, in world axes. */
+interface Rest {
+  id: string;
+  top: number;
+  x: number;
+  z: number;
+  half: { x: number; z: number };
+}
+
+/**
+ * Half the world-axis extents of a box of this size turned by rotY. A turned rectangle's own
+ * corners would be exact; these extents are what findFreeSpot already uses, and for deciding
+ * whether a lamp is on a table the difference is far below the 60% test's own margin.
+ */
+function footprint(size: THREE.Vector3, rotY: number): { x: number; z: number } {
+  const c = Math.abs(Math.cos(rotY));
+  const s = Math.abs(Math.sin(rotY));
+  return { x: c * size.x / 2 + s * size.z / 2, z: s * size.x / 2 + c * size.z / 2 };
+}
+
+function restingPlace(id: string, x: number, top: number, z: number, size: THREE.Vector3, rotY: number): Rest {
+  return { id, top, x, z, half: footprint(size, rotY) };
 }
 
 const DEBUG_MATERIAL = new THREE.MeshBasicMaterial({ color: 0x4cd28a, wireframe: true, transparent: true, opacity: 0.6 });

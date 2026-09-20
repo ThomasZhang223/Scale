@@ -2,12 +2,11 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { VRButton } from 'three/examples/jsm/webxr/VRButton.js';
 import { buildRoomFromScan, type BuiltRoom, type ScannedObject } from './roomScan';
-import { Hud, type HudLine, type Tone } from './hud';
 import { ObjectLoader, type LoadedObject } from './objects';
 import { createPhysics } from './physics';
 import { Interaction } from './interaction';
 import {
-  getRoom, getObject, listObjects, getVersion, postVersion, objectToItem, boundsMismatch, watchRoom, postFit, STUB, listScans, listBuiltIns, sameOrigin, getJob, postListingsGenerate,
+  getRoom, getObject, listObjects, getVersion, postVersion, objectToItem, boundsMismatch, watchRoom, postFit, STUB, askIntent, listScans, listBuiltIns, searchObjects, sameOrigin, getJob, postListingsGenerate, postObjectThumbnail,
   type ObjectV1, type VersionV1, type PlacementV1, getActiveRoom, getRoomLive
 } from './api';
 import { FitOverlay, type FitReport } from './fit';
@@ -17,11 +16,12 @@ import { ProposalApplier } from './apply';
 import { Ghosts, type GhostTarget } from './ghosts';
 import offlineProposal from '../../../services/agent/fixtures/pipeline/proposal.json';
 import { Palette, type PaletteItem } from './palette';
+import { Thumbnails } from './thumbs';
 import { matchDetected } from './placement';
 import { measuredBox } from './objects';
 import { Voice, type VoiceState } from './voice';
-import { findListings, needFromDetected, needFromText, isShoppingRequest, productQuery, STOREFRONTS, type Listing, type ListingsResult, type Need, type StageInfo } from './listings';
-import { FindPanel } from './findpanel';
+import { findListings, matchLibraryByWord, needFromDetected, needFromText, classifyUtterance, clearScanWinner, normalizeTranscript, productQuery, SIMILAR_ENOUGH, STOREFRONTS, type Command, type Listing, type ListingsResult, type Need, type Recommendation, type StageInfo } from './listings';
+import { FindPanel, type FindKind } from './findpanel';
 import { Outdoors } from './outdoors';
 import roomH from '../../../fixtures/room-h.json';
 import roomLarge from '../public/room-large.json';
@@ -57,9 +57,21 @@ const OBJECTS_URL = params.get('objects'); // null: the built-in furniture comes
 const SERVER_ROOM_ID: string | null = params.get('room') ?? import.meta.env.VITE_ROOM_ID ?? null;
 const ROOM_ID = SERVER_ROOM_ID ?? roomLarge.roomId;
 const OBJECT_IDS = params.get('object')?.split(',').filter(Boolean) ?? [];
-// How many of the newest phone scans to bring into the room on load (?scans=N; 0 turns it off).
-// The scan list is shared by the whole team, so "all of them" would fill the room with test rows.
-const RECENT_SCANS = Number(params.get('scans') ?? 6);
+// How many of the newest phone scans to bring into the room on load (?scans=N).
+// ceiling: 0 for the demo — the room opens empty and everything in it was put there on purpose.
+// `?scans=6` brings the old behaviour back for one page load, and changing this default restores
+// it for everyone. The scans themselves are unaffected: they are still listed on the tablet's My
+// scans page and in the scans popout, which read listScans(), and still re-list every 10 s.
+const RECENT_SCANS = Number(params.get('scans') ?? 0);
+/**
+ * A voice request puts its top result in the room by itself. A person who says "find me a lamp"
+ * to a headset expects a lamp to appear, not a list to read.
+ *
+ * ceiling: always on, and only for voice — a typed search and a hand pick are untouched. Set
+ * this to false to make every voice result list-only; that is the switch the popout redesign
+ * flips if it would rather the user chose.
+ */
+const VOICE_AUTO_ADD_TOP = true;
 const VERSION_ID = params.get('version'); // a stored layout to apply after the room loads
 const AGENT_STUB = params.get('agentstub') === '1' || import.meta.env.VITE_AGENT_STUB === '1'; // the agent's fixture timeline
 
@@ -106,16 +118,10 @@ const room = new THREE.Group();
 scene.add(room);
 const fitOverlay = new FitOverlay();
 scene.add(fitOverlay.group);
-// The transcript panel: its own module, standing behind the phone on the left hand (placed
-// every frame in the loop below, from the head through the phone).
-const hud = new Hud();
-hud.attachTo(scene);
-// Merchant listings get their own card, to the right of the design card, so a redesign's
-// reasons and a shop's "mesh job queued" never share a page.
-const listingsHud = new Hud({ side: 0.8, drop: 0.42 });
-listingsHud.attachTo(scene);
-renderer.xr.addEventListener('sessionstart', () => { hud.setPresenting(true); listingsHud.setPresenting(true); });
-renderer.xr.addEventListener('sessionend', () => { hud.setPresenting(false); listingsHud.setPresenting(false); });
+// No transcript card and no listings card: the headset shows no dialogue and no subtitles.
+// What was heard is never written down, and the designer's reasoning is spoken, not drawn.
+// The decision the user must act on (Keep / Put back / Ask again, and the fit counts) lives
+// on the tablet's Designer page instead, where a ray can reach it.
 
 // The find panel: head-locked ahead and to the right, showing per-store Browserbase progress
 // and then the listing cards. Its own module (findpanel.ts), like hud.ts.
@@ -153,21 +159,16 @@ const micButton = document.getElementById('agent-mic') as HTMLButtonElement;
 panel.hidden = !SHOW_PANEL;
 const say = (text: string) => (note.textContent = text);
 
-// The transcript: what was heard and what was answered, shown in full on its own panel behind
-// the phone (hud.ts). The phone keeps the buttons; the reasons live on the panel.
-const TRANSCRIPT_KEEP = 8;
-const transcript: HudLine[] = [];
-const listingsTranscript: HudLine[] = [];
-type Channel = 'design' | 'listings';
-function tell(text: string, tone: Tone = 'info', channel: Channel = 'design') {
+/**
+ * One line to the laptop's note strip. It used to fan out to a transcript card in the
+ * headset as well; that card is gone (no dialogue, no subtitles), so the severity and the
+ * channel it carried have no reader left and are not taken any more.
+ */
+function tell(text: string) {
   say(text);
-  const lines = channel === 'listings' ? listingsTranscript : transcript;
-  lines.push({ text, tone });
-  if (lines.length > TRANSCRIPT_KEEP) lines.splice(0, lines.length - TRANSCRIPT_KEEP);
-  (channel === 'listings' ? listingsHud : hud).set(lines);
 }
 
-/** Spoken output is one sentence: the card carries the rest. */
+/** Spoken output is one sentence: the rest is never written down. */
 function concise(text: string, maxChars = 140): string {
   const first = text.trim().split(/(?<=[.!?])\s+/)[0] ?? '';
   return first.length > maxChars ? `${first.slice(0, maxChars - 1).replace(/\s+\S*$/, '')}…` : first;
@@ -194,8 +195,6 @@ let currentVersionId: string | null = null; // parent for the next version we pu
 let lastFitReport: FitReport | null = null;
 let undoAvailable = false;
 let lastTouchedId: string | null = null; // what the turn buttons act on when nothing is held
-let showRules = false; // the Rearrange guidelines, expanded on the wrist
-let selectedStyle: string | null = null; // the whole-room style Rearrange will use; none picked → Rearrange is disabled
 let listings: ListingsResult | null = null; // the last recommendation set, shown on the wrist and the laptop
 let listingsNeed: Need | null = null;
 let listingsBusy = false;
@@ -203,25 +202,24 @@ let stageLines: string[] = []; // per-store Browserbase progress, mirrored on th
 let voiceState: VoiceState = 'idle';
 let lastHeard: string | null = null;
 
-/** What Rearrange does with each kind of object (mirrors services/agent generatedPlan). */
-const REARRANGE_RULES: [string, string][] = [
-  ['sofa', 'wall, facing in; faces the TV'],
-  ['TV / storage / shelf', 'against a wall'],
-  ['bed', 'wall, away from the door'],
-  ['desk', 'wall, near a window'],
-  ['dining table', 'middle of the room'],
-  ['chairs', 'at the table, facing it; else with the sofa'],
-  ['coffee table', 'in front of the sofa'],
-  ['lamps / other', 'a wall, out of the way'],
-  ['always', '90 cm walkways; doors and windows clear'],
-];
-/** Whole-room styles: [button label, agent preset]. Each is a different set of rules in services/agent STYLES. */
-const STYLES: [string, string][] = [
-  ['Cozy', 'cozy'],
-  ['Spacious', 'spacious'],
-  ['Modern', 'modern'],
-  ['Social', 'social'],
-];
+/**
+ * The tablet's four pages: which sections share one tab. Designer keeps the agent, the style
+ * presets and the way back to the listings popout; Room keeps what LiDAR found and the two
+ * destructive actions. "My scans" and "Furniture" are absent on purpose — a section missing
+ * from this map becomes a page of its own, which is what those two want, and a page named
+ * after its one section drops the header that would otherwise repeat the tab.
+ */
+const PAGE_OF: Record<string, string> = {
+  Listings: 'Designer',
+  Scanned: 'Room',
+};
+
+/**
+ * Scans the server has no picture of. The tablet's render is the only image of them that
+ * exists, so it is sent to the search index the first time it is drawn. Scans only: a
+ * primitive has a real name and vector already, and a catalogue row has the store's photo.
+ */
+const needsThumbnail = new Set<string>();
 const objects = new Map<string, PlacedObject>();
 const catalog: PaletteItem[] = []; // everything in the palette's furniture list, placed or not
 let rise = 1; // 0..1 while the walls rise; objects are placed once it reaches 1
@@ -231,6 +229,22 @@ async function start() {
   const physics = await createPhysics(scene);
   const loader = new ObjectLoader(renderer);
   const palette = new Palette();
+  // A tile's picture of the mesh it stands for. The palette pulls one per visible object
+  // cell; thumbs.ts draws each mesh once, off to the side, and hands back a canvas.
+  const thumbs = new Thumbnails(
+    loader,
+    () => {
+      showPalette();
+      findPanel.refresh(); // a scan row in the popout is waiting on the same picture
+    },
+    // Fire-and-forget, off the frame loop: the render goes to the search index so a scan can
+    // be found by what it looks like. Nothing on screen waits for it and it is never retried.
+    (objectId, jpeg) => void postObjectThumbnail(objectId, jpeg).catch((err) => console.warn(`Thumbnail not indexed for ${objectId}:`, err)),
+  );
+  palette.thumbFor = (item) =>
+    item.url ? thumbs.get(item.objectId ?? item.url, item.url, item.scale, !!item.objectId && needsThumbnail.has(item.objectId)) : null;
+  // Scale 1: a server mesh is already metres, and a picture of it never re-guesses that.
+  findPanel.thumbFor = (objectId, glbUrl) => (glbUrl ? thumbs.get(objectId, sameOrigin(glbUrl), 1, needsThumbnail.has(objectId)) : null);
   const applier = new ProposalApplier(physics);
   // Built before the first showPalette(): the talk row reads voice.supported.
   const voice = new Voice({
@@ -251,46 +265,55 @@ async function start() {
     offlineProposal: offlineProposal as unknown as Proposal,
     onChange: onAgentChange,
   });
-  const interaction = new Interaction(renderer, scene, camera, controls, physics, palette, spawn, onAction, layoutChanged, onGrab, (r) => {
-    if (hud.hitTest(r)) return 'hud:close';
-    if (listingsHud.hitTest(r)) return 'hud:close:listings';
+  const interaction = new Interaction(renderer, scene, camera, controls, physics, palette, spawn, onAction, layoutChanged, onGrab, (id) => removeObject(id), (r) => {
     const hit = findPanel.hitTest(r);
     if (!hit) return null;
     return hit.kind === 'close' ? 'find:close' : `find:pick:${hit.objectId}`;
   });
-  // Designer tiles first (closest to the hand), then the catalogue, then Reset / Clear.
-  const showPalette = () => palette.setItems([...designerTiles(agent.snapshot), ...scannedTiles(), ...listingTiles(), ...catalog, ...PALETTE_ACTIONS]);
+  // The popout stands in the room like the tablet does, and is moved by the same grab on the
+  // same trigger. It is already in the scene (attachTo above); this only makes it grabbable.
+  interaction.addWindow(findPanel);
+  // Designer tiles first (closest to the hand), then the catalogue, then Reset / Clear. Each
+  // item's section decides which tab it lands under; a section named here shares a page with
+  // its neighbours, and one that is not named is its own page.
+  const showPalette = () =>
+    palette.setItems(
+      [...designerTiles(agent.snapshot), ...scannedTiles(), ...listingTiles(), ...catalog, ...PALETTE_ACTIONS].map((it) => ({
+        ...it,
+        page: PAGE_OF[it.section ?? ''] ?? it.section,
+      })),
+    );
   showPalette();
   renderAgentPanel(agent.snapshot);
 
   function onAction(action: string) {
-    if (action === 'hud:close') hud.dismiss();
-    if (action === 'hud:close:listings') listingsHud.dismiss();
-    if (action === 'listings:show') {
-      listingsHud.reopen();
-      findPanel.reopen();
-    }
+    if (action.startsWith('page:')) return palette.showPage(action.slice(5));
+    if (action === 'scroll:back') return palette.scrollBy(-1);
+    if (action === 'scroll:next') return palette.scrollBy(1);
+    if (action === 'listings:show') findPanel.reopen();
     if (action === 'find:close') findPanel.dismiss();
     if (action.startsWith('find:pick:')) void pickListing(action.slice(10));
     if (action === 'reset' && lastScan) showScan(lastScan, 'Room reset');
     if (action === 'clear') clearObjects();
-    if (action.startsWith('style:')) {
-      selectedStyle = selectedStyle === action.slice(6) ? null : action.slice(6); // tap again to clear
-      showPalette();
-      renderAgentPanel(agent.snapshot);
-    }
     if (action === 'rearrange') {
-      if (!selectedStyle) return say('Pick a style first: Cozy, Spacious, Modern or Social.');
-      void askAgent({ preset: selectedStyle });
+      // No presets anywhere now: a style arrives inside the sentence ("make it cozy") and
+      // reaches the agent as free text. Tablet and laptop both come through this one line.
+      //
+      // sampleOnSolverOutage marks this as the BUTTON's request, here at the one place the
+      // button is pressed, rather than by recognising its words later — someone saying
+      // "rearrange the room" out loud is free text and must still fail in view. The spoken
+      // command "rearrange" arrives as this same action, so it is the button and inherits it.
+      //
+      // KEEP IT. It is not decoration. services/agent serves its own sample proposal only for
+      // a request carrying a preset, so with presets gone that fallback can never fire, and the
+      // client-side one this flag selects is all that stands between a solver outage and a dead
+      // button in front of the judges.
+      void askAgent({ text: 'Rearrange the room.' }, { sampleOnSolverOutage: true });
     }
     if (action.startsWith('preset:')) void askAgent({ preset: action.slice(7) });
     if (action === 'turn:left') turnLast(Math.PI / 2);
     if (action === 'turn:right') turnLast(-Math.PI / 2);
     if (action === 'remove') removeLast();
-    if (action === 'rules') {
-      showRules = !showRules;
-      showPalette();
-    }
     if (action === 'accept') void acceptProposal();
     if (action === 'reject') void rejectProposal();
     if (action === 'ask_again') void agent.askAgain();
@@ -299,7 +322,8 @@ async function start() {
     if (action === 'hold:talk:down') void talkDown();
     if (action === 'hold:talk:up') void talkUp();
     if (action.startsWith('scan:')) void findForScanned(action.slice(5));
-    if (action.startsWith('listing:')) void addListing(action.slice(8));
+    // 'listing:<id>' is gone with the tablet's copy of the result rows. A row is picked in the
+    // popout now, which sends 'find:pick:<id>' and goes through pickListing.
   }
 
   // ---------- scanned pieces and merchant listings ----------
@@ -334,17 +358,9 @@ async function start() {
     // The listings card can be closed; the search itself is not over. This brings it back.
     items.push({ url: '', name: 'Show listings', action: 'listings:show', section: 'Listings' });
     if (listings.note) items.push({ url: '', name: listings.note, label: true, severity: 'warn', section: 'Listings' });
-    if (!listings.recommendations.length) items.push({ url: '', name: 'Nothing fits that. Try a wider gap or another kind.', label: true, section: 'Listings' });
-    for (const r of listings.recommendations.slice(0, 6)) {
-      const l = r.listing;
-      items.push({
-        url: '',
-        name: `${l.name.length > 26 ? l.name.slice(0, 25) + '…' : l.name} · ${Math.round(l.bboxMeters.w * 100)} cm`,
-        action: `listing:${l.objectId}`,
-        objectId: l.objectId,
-        section: 'Listings',
-      });
-    }
+    // The rows themselves live in the popout, not here. They used to be repeated as tablet
+    // rows as well, which made the same six results readable in two places and kept the
+    // tablet tall — and a row here could only ever be a truncated name and one dimension.
     return items;
   }
 
@@ -358,7 +374,7 @@ async function start() {
   }
 
   /** Runs a search, keeps the result, and redraws both surfaces. Live first, bundled with a note. */
-  async function findFor(need: Need) {
+  async function findFor(need: Need, opts: { autoAdd?: boolean } = {}) {
     listingsNeed = need;
     listingsBusy = true;
     stageLines = [];
@@ -378,18 +394,19 @@ async function start() {
     } finally {
       listingsBusy = false;
     }
-    findPanel.showResults(listings.recommendations, listings.note);
-    showPalette();
-    renderListings();
+    presentResults({ mode: 'shop', query, rows: listings.recommendations, note: listings.note });
     const top = listings.recommendations[0];
+    // Asked by voice, so something has to appear: the top row goes in through the same pick a
+    // hand would make. Placement, generation and dedupe stay entirely that code's business.
+    if (opts.autoAdd && top) void pickListing(top.listing.objectId);
     const what = need.replaces ? `for the ${need.replaces.category}` : need.text ? `for "${need.text}"` : '';
     // The card: one short line per listing, nothing else. The voice reads each one out.
     const shown = listings.recommendations.slice(0, 6);
     if (!top) {
-      tell(`Nothing for sale fits ${what}.`, 'warn', 'listings');
+      tell(`Nothing for sale fits ${what}.`);
     } else {
-      tell(`${listings.recommendations.length} listings ${what}`, 'info', 'listings');
-      shown.forEach((r, i) => tell(`${i + 1}. ${r.listing.name} — ${r.listing.merchant ?? 'catalogue'}`, 'info', 'listings'));
+      tell(`${listings.recommendations.length} listings ${what}`);
+      shown.forEach((r, i) => tell(`${i + 1}. ${r.listing.name} — ${r.listing.merchant ?? 'catalogue'}`));
     }
     if (need.text && lastHeard === need.text) {
       const readout = top
@@ -446,7 +463,7 @@ async function start() {
     const l = rec.listing;
     const placedId = await addListing(objectId); // the measured box, placed where it belongs
     const placed = placedId ? objects.get(placedId) : undefined;
-    if (!placed) return tell(`${l.name}: no room to place it.`, 'warn', 'listings');
+    if (!placed) return tell(`${l.name}: no room to place it.`);
     // Already has a real mesh — addListing loaded it, there's nothing left to generate.
     if (l.state === 'ready' && l.glbUrl) {
       findPanel.setProgress(objectId, 'Mesh placed at true scale');
@@ -458,7 +475,7 @@ async function start() {
       job = await postListingsGenerate(l, SERVER_ROOM_ID);
     } catch (err) {
       findPanel.setProgress(objectId, `Couldn’t queue the mesh: ${(err as Error).message}`);
-      return tell(`${l.name}: 3D request failed — ${concise((err as Error).message, 80)}`, 'error', 'listings');
+      return tell(`${l.name}: 3D request failed — ${concise((err as Error).message, 80)}`);
     }
     // The server mints a stable id; the placed box keeps tracking it so SSE dedupe works.
     placed.objectId = job.objectId;
@@ -472,11 +489,11 @@ async function start() {
         findPanel.setProgress(objectId, 'Mesh placed at true scale');
       } catch (err) {
         findPanel.setProgress(objectId, `Mesh failed to load: ${(err as Error).message}`);
-        tell(`${l.name}: ${concise((err as Error).message, 80)}`, 'error', 'listings');
+        tell(`${l.name}: ${concise((err as Error).message, 80)}`);
       }
       return;
     }
-    tell(`${l.name}: in the room as a box, 3D on the way.`, 'info', 'listings');
+    tell(`${l.name}: in the room as a box, 3D on the way.`);
     const started = Date.now();
     // ceiling: 3 s polling for up to 10 min. The SSE `object` event usually lands first; when it
     // does, addServerObject's own dedupe guard (matching objects by objectId) skips placing a
@@ -493,24 +510,24 @@ async function start() {
           const item = objectToItem(obj);
           const loaded = await loader.load(item.url, 1); // scale 1: the mesh normalisation contract
           const mismatch = boundsMismatch(loaded.size, item.expected);
-          if (mismatch) tell(`${item.name}: ${mismatch}.`, 'warn');
+          if (mismatch) tell(`${item.name}: ${mismatch}.`);
           if (objects.has(placed.id)) {
             swapLoaded(placed, loaded);
             findPanel.setProgress(objectId, 'Mesh placed at true scale');
-            tell(`${l.name}: 3D ready.`, 'info', 'listings');
+            tell(`${l.name}: 3D ready.`);
           } else {
             findPanel.setProgress(objectId, 'Mesh ready, but the box was removed');
-            tell(`${l.name}: 3D ready; add it again from the tablet.`, 'warn', 'listings');
+            tell(`${l.name}: 3D ready; add it again from the tablet.`);
           }
         } catch (err) {
           findPanel.setProgress(objectId, `Mesh failed to load: ${(err as Error).message}`);
-          tell(`${l.name}: ${(err as Error).message}`, 'error', 'listings');
+          tell(`${l.name}: ${(err as Error).message}`);
         }
         return;
       }
       if (j.state === 'failed') {
         findPanel.setProgress(objectId, `Generation failed: ${j.error ?? 'unknown'}`);
-        return tell(`${l.name}: 3D failed, the box stays.`, 'error', 'listings');
+        return tell(`${l.name}: 3D failed, the box stays.`);
       }
       const waiting = j.state === 'queued' && elapsed > 20_000;
       findPanel.setProgress(objectId, waiting ? 'Waiting on Baseten — box placed at true size' : `Generating mesh ${j.progressPct}%`);
@@ -595,6 +612,12 @@ async function start() {
       add.textContent = l.glbUrl ? 'Add' : 'Add + generate mesh';
       add.addEventListener('click', () => void pickListing(l.objectId));
       actions.append(add);
+      const shopify = document.createElement('a');
+      shopify.href = `/shopify.html?${new URLSearchParams({ reference: l.productUrl ?? '', query: l.category || l.name, room: ROOM_ID })}`;
+      shopify.target = '_blank';
+      shopify.rel = 'noopener';
+      shopify.textContent = 'Find similar on Shopify';
+      actions.append(shopify);
       if (l.productUrl) {
         const open = document.createElement('a');
         open.href = l.productUrl;
@@ -631,14 +654,23 @@ async function start() {
     const obj = id ? objects.get(id) : undefined;
     if (!id || !obj) return say('Grab or add an object first, then turn it.');
     const n = obj.loaded.node;
-    physics.moveTo(id, n.position.x, n.position.z, physics.rotationY(id) + delta);
+    physics.moveTo(id, n.position.x, n.position.z, physics.rotationY(id) + delta, n.position.y);
     say(`${obj.name}: turned ${delta > 0 ? 'left' : 'right'} 90°.`);
     layoutChanged(id);
   }
 
   /** Removes the held object (or the last one touched). A detected piece it stood in for comes back. */
+  /** The Remove tile: whatever is in hand, else the last one touched. */
   function removeLast() {
-    const id = interaction.heldIds()[0] ?? lastTouchedId ?? [...objects.keys()].pop() ?? null;
+    removeObject(interaction.heldIds()[0] ?? lastTouchedId ?? [...objects.keys()].pop() ?? null);
+  }
+
+  /**
+   * Removes exactly this object. The A button names the one under its own ray, so this must not
+   * fall back to a guess — and it is final: Undo restores a layout, which only moves objects
+   * that still exist, so an object removed here does not come back.
+   */
+  function removeObject(id: string | null) {
     const obj = id ? objects.get(id) : undefined;
     if (!id || !obj) return say('Grab or add an object first, then remove it.');
     interaction.drop(id);
@@ -685,7 +717,7 @@ async function start() {
     if (!text) return;
     lastHeard = text;
     agentText.value = text;
-    tell(`“${text}”`, 'heard');
+    tell(`“${text}”`);
     showPalette();
     await routeRequest(text);
   }
@@ -693,11 +725,7 @@ async function start() {
   /** Spoken output; a failure here is shown, never thrown, so voice never blocks the layout work. */
   function speak(text: string) {
     if (!voice.supported || !text) return;
-    // The card lingers while the reply is spoken, then goes on its own.
-    voice
-      .speak(text)
-      .then(() => hud.speechEnded())
-      .catch((err) => console.warn('Voice:', err));
+    voice.speak(text).catch((err) => console.warn('Voice:', err));
   }
 
   // Laptop: hold the mic button. The first press also asks for microphone permission.
@@ -722,10 +750,12 @@ async function start() {
         return [label(s.status || 'Working…'), ...s.log.slice(-3).map((e) => label(e.message, e.severity))];
       case 'proposed': {
         const p = s.proposal!;
-        // The summary, the reasons and the trade-off are on the transcript card in front of
-        // the eyes (onAgentChange); the wrist keeps only the decision.
+        // There is no transcript card any more, so what the user must know before pressing
+        // Keep has to be here: one line of summary, and the fit counts, which are a warning
+        // and not dialogue. The explanation and the trade-off are spoken and not written.
         return [
           ...(s.offline ? [label('Offline: sample proposal', 'warn')] : []),
+          label(p.summary),
           ...(p.fit.red || p.fit.amber ? [label(`Fit: ${p.fit.red} red, ${p.fit.amber} amber`, p.fit.red ? 'warn' : 'info')] : []),
           // The furniture is already gliding (previewProposal); the decision comes once it has landed.
           ...(applier.active ? [label('Moving…')] : [tile('Keep', 'accept', true), tile('Put back', 'reject'), tile('Ask again', 'ask_again')]),
@@ -742,13 +772,11 @@ async function start() {
           tile('Turn 90° left', 'turn:left'),
           tile('Turn 90° right', 'turn:right'),
           ...(objects.size ? [tile('Remove', 'remove')] : []),
-          // Rearrange needs a style picked first (see STYLES in services/agent): the style tiles
-          // select, and only the selected one is filled; Rearrange appears once one is chosen.
-          ...(objects.size ? (selectedStyle ? [tile('Rearrange', 'rearrange', true)] : [label('Pick a style, then Rearrange')]) : []),
-          ...(objects.size ? STYLES.map(([name, preset]) => ({ ...tile(selectedStyle === preset ? `● ${name}` : name, `style:${preset}`, selectedStyle === preset), section: 'Style' })) : []),
+          // No style presets on the tablet and no gate in front of Rearrange: a style now
+          // arrives inside the spoken sentence ("make it cozy"), which reaches the agent as
+          // free text. The laptop panel keeps its preset buttons for a keyboard demo.
+          ...(objects.size ? [tile('Rearrange', 'rearrange', true)] : []),
           ...(undoAvailable ? [tile('Undo', 'undo')] : []),
-          tile(showRules ? 'Hide rules' : 'Rules', 'rules'),
-          ...(showRules ? REARRANGE_RULES.map(([kind, rule]) => label(`${kind}: ${rule}`)) : []),
         ];
     }
   }
@@ -763,17 +791,17 @@ async function start() {
         spokenFor = key;
         const p = s.proposal;
         // Everything in writing, in front of the eyes; one sentence aloud.
-        tell(p.summary, 'info');
-        if (p.explanation) tell(p.explanation, 'info');
-        if (p.tradeoffs[0]) tell(`Trade-off: ${p.tradeoffs[0]}`, 'warn');
-        if (p.fit.red || p.fit.amber) tell(`Fit: ${p.fit.red} red, ${p.fit.amber} amber.`, p.fit.red ? 'error' : 'warn');
+        tell(p.summary);
+        if (p.explanation) tell(p.explanation);
+        if (p.tradeoffs[0]) tell(`Trade-off: ${p.tradeoffs[0]}`);
+        if (p.fit.red || p.fit.amber) tell(`Fit: ${p.fit.red} red, ${p.fit.amber} amber.`);
         // Aloud: the summary and the reasoning behind it. The trade-off and the fit counts stay
         // written only, so the voice stops while the furniture is still gliding.
         speak([p.summary, p.explanation].filter(Boolean).join(' '));
       }
     } else if (s.state === 'failed' && s.error && spokenFor !== `failed:${s.error}`) {
       spokenFor = `failed:${s.error}`;
-      tell(s.error, 'error');
+      tell(s.error);
       speak(`That didn't work. ${concise(s.error)}`);
     }
     if (s.state === 'proposed' && s.proposal) previewProposal(s.proposal);
@@ -840,12 +868,12 @@ async function start() {
     await agent.syncState(state);
   }
 
-  async function askAgent(req: { preset?: string; text?: string }) {
+  async function askAgent(req: { preset?: string; text?: string }, options: { sampleOnSolverOutage?: boolean } = {}) {
     if (!currentRoom) return say('Load a room first.');
     await syncAgentState();
     // The agent pins by objectId (services/agent clean.ts); what the hands hold are placement ids.
     const pins = interaction.heldIds().map((id) => objects.get(id)?.objectId ?? id);
-    await agent.request({ ...req, pins });
+    await agent.request({ ...req, pins }, options);
   }
 
   /** The object (placed or detected) a proposal talks about; the offline fixture uses obj_<category>. */
@@ -949,14 +977,21 @@ async function start() {
     layoutChanged('');
   }
 
-  /** Puts every object where a stored layout says, instantly. */
+  /** Puts every object where a stored layout says, instantly. Lowest first, as applyVersion. */
   function applyPlacements(placements: PlacementV1[]) {
     if (!currentRoom) return;
-    for (const p of placements) {
+    const gone: string[] = [];
+    for (const p of [...placements].sort((a, b) => a.p[1] - b.p[1])) {
       const layout = fromPlacement(p, currentRoom.offset);
       const hit = resolveObject(p.objectId);
-      if (!hit) continue;
-      if (hit.kind === 'placed') physics.moveTo(hit.obj.id, layout.position[0], layout.position[2], layout.rotationY);
+      if (!hit) {
+        // Same rule as applyVersion: skip what no longer exists, and name it. This path had no
+        // message at all, so an Undo onto a layout holding a deleted object came back short
+        // with nothing said.
+        gone.push(p.objectId.slice(0, 8));
+        continue;
+      }
+      if (hit.kind === 'placed') physics.moveTo(hit.obj.id, layout.position[0], layout.position[2], layout.rotationY, layout.position[1]);
       else {
         hit.box.node.position.set(...layout.position);
         hit.box.node.rotation.y = layout.rotationY;
@@ -964,6 +999,10 @@ async function start() {
         hit.box.rotationY = layout.rotationY;
         physics.moveDetected(hit.box.identifier, layout.position[0], layout.position[2], layout.rotationY, hit.box.dimensions);
       }
+    }
+    if (gone.length) {
+      console.warn(`Layout: ${gone.length} object(s) no longer exist and were left out:`, gone);
+      tell(`${gone.length} object${gone.length > 1 ? 's are' : ' is'} no longer available and ${gone.length > 1 ? 'were' : 'was'} left out: ${gone.join(', ')}.`);
     }
   }
 
@@ -982,13 +1021,12 @@ async function start() {
       g.append(...children);
       return g;
     };
-    const rearrange = button('Rearrange', 'rearrange', 'filled');
-    rearrange.disabled = !selectedStyle;
-    rearrange.title = selectedStyle ? '' : 'Pick a style first';
+    // This row is built ONCE, here: renderAgentPanel never writes agentPresets. So nothing in
+    // it may depend on state that changes — the style buttons did, which is why they could be
+    // clicked and never became selected, and why Rearrange stayed disabled for good.
     agentPresets.replaceChildren(
       group('segmented', button('Turn 90° left', 'turn:left', ''), button('Turn 90° right', 'turn:right', ''), button('Remove', 'remove', '')),
-      group('styles', ...STYLES.map(([text, preset]) => button(text, `style:${preset}`, selectedStyle === preset ? 'filled' : 'tinted'))),
-      rearrange,
+      button('Rearrange', 'rearrange', 'filled'),
     );
   }
   document.getElementById('agent-ask')!.addEventListener('click', () => {
@@ -996,13 +1034,254 @@ async function start() {
     if (text) void routeRequest(text);
   });
 
-  /** A sentence from the keyboard or the microphone: shopping goes to listings, everything else to the designer. */
-  function routeRequest(text: string) {
-    if (isShoppingRequest(text)) {
+  /**
+   * A sentence from the keyboard or the microphone, routed to one of three handlers by one pure
+   * function (listings.ts `classifyUtterance`), never by a model.
+   *
+   *   mine    the user's own phone scans
+   *   shop    the merchants, through /v1/find
+   *   design  the layout agent, unchanged
+   *
+   * Until 2026-09-20 only the shop test existed, and it tested a narrower verb list than
+   * productQuery could parse, so ordinary speech ("show me some lamps") fell through here to the
+   * agent — which is why voice appeared to do nothing but rearrange.
+   */
+  async function routeRequest(said: string) {
+    // One known speech-to-text homophone, repaired before either router sees it, so both agree.
+    const text = normalizeTranscript(said);
+    // A command is decided here, instantly and with no network: it is a button press, and a
+    // button press must not wait on a model.
+    const rules = classifyUtterance(text);
+    if (rules.kind === 'command') return runCommand(rules.command!);
+
+    // Everything else asks the Worker's intent parser what the sentence MEANS. Thomas names the
+    // SOURCE he wants searched ("find me some objects for shopify", "search my scanned
+    // objects"), and no verb list can learn that a source is not a product. On any failure the
+    // regex router answers instead — both are deterministic about what they do with the result.
+    let kind = rules.kind;
+    let query: string | null = null;
+    let router: 'llm' | 'rules' = 'rules';
+    try {
+      const parsed = await askIntent(text);
+      kind = parsed.intent === 'scans' ? 'mine' : parsed.intent;
+      query = parsed.query;
+      router = 'llm';
+    } catch (err) {
+      console.info('intent: rules (', (err as Error).message, ')');
+    }
+    // METRES COME FROM ONE PLACE. needFromText is tested and the model is not: it returned a
+    // null fit for "the 80 centimeter gap" that the parser reads as 0.8 exactly.
+    const need = needFromText(text);
+    console.info(`intent: ${kind} via ${router}`, query ?? '(browse)');
+
+    if (kind === 'mine') return findMine(text, rules, query);
+    if (kind === 'library') return findLibrary(text, query ?? productQuery(text));
+    if (kind === 'shop') {
       listingText.value = text;
-      return findFor(needFromText(text));
+      // A clean query from the model beats productQuery's strip, but it is still run through
+      // the strip: the model sometimes hands back the whole clause.
+      const words = query ? productQuery(query) : productQuery(text);
+      return findFor({ ...need, query: words || undefined, browse: !words }, { autoAdd: VOICE_AUTO_ADD_TOP });
     }
     return askAgent({ text });
+  }
+
+  /**
+   * Intent (d): the furniture this app ships — `source:"primitive"` rows, the Furniture page.
+   *
+   * Two signals, because they fail differently. A word that appears in a row's own name or
+   * category is exact and survives a noisy query. A vector score catches the synonyms a word
+   * match cannot: measured on the deployed index, couch -> sofa 0.9695 and armchair -> chair
+   * 0.9646, while lamp's best is 0.8907 with no lamp in the library at all. One clear match is
+   * placed; several are listed; none falls through to the merchants, which is the whole point of
+   * trying the library first.
+   */
+  async function findLibrary(text: string, query: string) {
+    listingsBusy = true;
+    showPalette();
+    let rows: ObjectV1[];
+    try {
+      rows = await listBuiltIns();
+    } catch (err) {
+      listingsBusy = false;
+      // Visible, not just spoken. sayAloud says nothing at all when the request was TYPED, so an
+      // error on this path used to reach console.info and nowhere else — the panel simply never
+      // appeared, which reads as "the library is empty" rather than "the library is unreachable".
+      return failedResults('library', text, `Couldn't reach the library: ${(err as Error).message}`);
+    } finally {
+      listingsBusy = false;
+    }
+
+    let matches = matchLibraryByWord(rows as Listing[], query) as ObjectV1[];
+    if (!matches.length && query) {
+      // Nothing carried the word, so ask the index whether anything MEANS it.
+      try {
+        const hits = await searchObjects({ text: query, source: 'primitive', limit: 5 });
+        const top = hits[0];
+        if (top && top.score >= SIMILAR_ENOUGH) matches = [top.object];
+      } catch (err) {
+        console.info('library vector search unavailable:', (err as Error).message);
+      }
+    }
+    if (!matches.length) {
+      // The library has nothing like it. The merchants might, so say so and go there.
+      sayAloud(`Nothing like that in the library — looking in the shops.`);
+      return findFor({ ...needFromText(text), query: query || undefined, browse: !query }, { autoAdd: VOICE_AUTO_ADD_TOP });
+    }
+
+    presentResults({
+      mode: 'library',
+      query,
+      rows: matches.map((o) => ({ listing: o as Listing, score: 0, reasons: ['from the library'] })),
+      note: null,
+    });
+    if (matches.length > 1) return sayAloud(`${matches.length} in the library. Pick one to place it.`);
+    const one = matches[0];
+    if ([...objects.values()].some((o) => o.objectId === one.objectId)) {
+      return sayAloud(`The ${one.name} is already in the room.`);
+    }
+    if (!VOICE_AUTO_ADD_TOP) return sayAloud(`${one.name} is in the list. Pick it to place it.`);
+    await addServerObject(one);
+    return sayAloud(`Placed the ${one.name}.`);
+  }
+
+  /**
+   * A spoken button press fires the SAME action the tile fires, through onAction — never a copy
+   * of a tile's body, so voice and hand can never drift apart. Nothing destructive is reachable:
+   * 'reset' and 'clear' are tablet-only on purpose, because a misheard word must not be able to
+   * empty the room on stage.
+   */
+  function runCommand(command: Command) {
+    // Verbatim from designerTiles: while the furniture is still gliding into the proposed
+    // layout the three decision tiles do not exist, so neither does the spoken command — firing
+    // 'accept' then would decide something the user cannot yet see.
+    const decidable = agent.snapshot.state === 'proposed' && !applier.active;
+    switch (command) {
+      case 'keep':
+        return decidable ? onAction('accept') : sayAloud('Nothing to keep yet.');
+      case 'ask_again':
+        return decidable ? onAction('ask_again') : sayAloud('There is no proposal to redo.');
+      // What a person means by "undo that" depends on what just happened: the proposal's Put
+      // back while one is pending, the layout Undo once it has been applied.
+      case 'putback':
+        if (decidable) return onAction('reject');
+        return undoAvailable ? onAction('undo') : sayAloud('There is nothing to put back.');
+      case 'rearrange':
+        return onAction('rearrange');
+      case 'listings':
+        return onAction('listings:show');
+      default:
+        return onAction(command); // page:<name>, the tab bar's own ids
+    }
+  }
+
+  /**
+   * Intent (a): the user's own captures. Answers from the scan library, never from a merchant,
+   * and never falls through to the agent — a person who asked for their own thing is not asking
+   * for the room to be rearranged. `source:"scan"` only: no catalogue row and no primitive can
+   * reach this list.
+   *
+   * What it will and will not add is deliberate. Every scan row on the server today is called
+   * "Captured object" with category "unknown", so a noun in the sentence has nothing to match
+   * against and picking one anyway would be a guess (standing rule 4). So: a sentence that names
+   * the newest adds the newest, a library of exactly one adds that one, and anything else is
+   * listed for a hand to choose from.
+   */
+  async function findMine(text: string, intent: ReturnType<typeof classifyUtterance>, query: string | null = null) {
+    listingsNeed = null;
+    listingsBusy = true;
+    showPalette();
+    let scans: ObjectV1[];
+    try {
+      scans = await listScans();
+    } catch (err) {
+      // Same reason as findLibrary: an unreachable scan library must not look like an empty one.
+      return failedResults('scans', text, `Couldn't reach your scans: ${(err as Error).message}`);
+    } finally {
+      listingsBusy = false;
+    }
+
+    if (!scans.length) {
+      // Nothing to show and nothing to guess. Never hand this to the agent.
+      //
+      // No note: an empty scans panel already says "No finished scans. Capture something on
+      // the phone first.", which is the same thing and also says what to do about it. A note
+      // as well printed both, one under the other. This is the first thing a new user sees —
+      // there are no scans until they make one — so it has to look deliberate.
+      presentResults({ mode: 'scans', query: text, rows: [], note: null });
+      return sayAloud('You have no finished scans yet. Capture something on the phone first.');
+    }
+
+    // ceiling: matches on the name and category the phone sent. Those are "Captured object" and
+    // "unknown" for every row today, so this finds nothing and the count rules below decide
+    // instead. It starts working by itself the day the phone names a capture — the real fix is
+    // upstream, on the phone's Save screen, or a caption written at index time.
+    // Ranked by what the scan LOOKS like. Every scan row is called "Captured object" with no
+    // category, so a word match has nothing to read; what it does have is a render of its own
+    // mesh, image-embedded into the same space the query text is embedded into. Measured live:
+    // "person" puts the person and the bust on top, "bag" puts the bag on top, and a query for
+    // furniture scores all four near zero because none of them is furniture.
+    let ranked: { score: number; object: ObjectV1 }[] = [];
+    if (query) {
+      try {
+        ranked = await searchObjects({ text: query, source: 'scan', limit: 10 });
+      } catch (err) {
+        console.info('scan search unavailable, listing instead:', (err as Error).message);
+      }
+    }
+    const shown = ranked.length ? ranked.map((h) => h.object) : scans;
+
+    presentResults({
+      mode: 'scans',
+      query: text,
+      rows: shown.map((o) => ({ listing: o as Listing, score: 0, reasons: ['scanned on your phone'] })),
+      note: null,
+    });
+
+    // Placed without asking only when the answer is not in doubt: a clear winner on the ranking,
+    // a sentence that names the newest, or a library of exactly one.
+    const one = ranked.length ? clearScanWinner(ranked)
+      : intent.newest ? shown[0]
+      : shown.length === 1 ? shown[0]
+      : null;
+    if (intent.listOnly || !one) {
+      const what = ranked.length ? `${ranked.length} scans, none of them a clear match` : `${scans.length} scan${scans.length === 1 ? '' : 's'}`;
+      return sayAloud(`You have ${what}. Pick one to place it.`);
+    }
+    if ([...objects.values()].some((o) => o.objectId === one.objectId)) {
+      return sayAloud(`${one.name || 'That scan'} is already in the room.`);
+    }
+    if (!VOICE_AUTO_ADD_TOP) return sayAloud(`${one.name || 'Your scan'} is in the list. Pick it to place it.`);
+    await addServerObject(one); // the scan library's own add path: it places, dedupes and reports
+    return sayAloud(`Placed ${one.name || 'your scan'} at its measured size.`);
+  }
+
+  /**
+   * The one seam between intent and presentation. This file decides WHICH rows; the panel decides
+   * how they look. Today it drives the existing FindPanel, so nothing regresses before the popout
+   * lands. `mode` says which library the rows came from: merchants, or the user's own scans.
+   */
+  function presentResults(res: { mode: FindKind; query: string; rows: Recommendation[]; note: string | null }) {
+    listings = { recommendations: res.rows, source: 'live', note: res.note };
+    findPanel.showResults(res.rows, res.note, res.mode, res.query);
+    showPalette();
+    renderListings();
+  }
+
+  /**
+   * A request that could not be answered at all. The panel is the only reader this path has, so
+   * the reason goes there as well as being spoken — an empty panel with no note is
+   * indistinguishable from a library that is genuinely empty.
+   */
+  function failedResults(mode: FindKind, query: string, reason: string) {
+    presentResults({ mode, query, rows: [], note: reason });
+    sayAloud(reason);
+  }
+
+  /** Spoken only, and only when the request was spoken. No on-screen text: the panel is the UI. */
+  function sayAloud(line: string) {
+    if (lastHeard) speak(concise(line));
+    else console.info(line);
   }
   agentText.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') document.getElementById('agent-ask')!.click();
@@ -1063,7 +1342,7 @@ async function start() {
     fitOverlay.show(report);
     if (report.ok || !report.violations.length) return;
     const blocks = report.violations.filter((v) => v.severity === 'block').length;
-    for (const v of report.violations) tell(v.message, v.severity === 'block' ? 'error' : 'warn');
+    for (const v of report.violations) tell(v.message);
     say(`Fit: ${report.violations.map((v) => v.message).join('; ')} (${blocks} blocking).`);
   }
 
@@ -1148,6 +1427,12 @@ async function start() {
       physics.addObject(obj.id, loaded.node, loaded.size, loaded.hull, spot, 0, 0);
       report(obj);
       showPalette(); // Rearrange appears with the first object
+      // Saved as soon as it is in the room, not only once it has been moved. In VR the pull
+      // puts it straight into your hand and the release saves it, but an object added from the
+      // laptop's Add button is never grabbed, so without this it lived only in this tab.
+      // layoutChanged is debounced, so the grab-and-release that usually follows still costs
+      // one version, not two.
+      layoutChanged(obj.id);
       return obj.id;
     } catch (err) {
       console.error(`Loading ${item.name} failed:`, err);
@@ -1199,7 +1484,7 @@ async function start() {
         objects.set(placed.id, placed);
         if (currentRoom && rise >= 1) place(placed); // otherwise placed when the walls are up
         const cm = (m: number) => Math.round(m * 100);
-        tell(`${name}: measured on the phone, ${cm(obj.bboxMeters.w)} × ${cm(obj.bboxMeters.h)} × ${cm(obj.bboxMeters.d)} cm. Shown as a box until its mesh is generated.`, 'info');
+        tell(`${name}: measured on the phone, ${cm(obj.bboxMeters.w)} × ${cm(obj.bboxMeters.h)} × ${cm(obj.bboxMeters.d)} cm. Shown as a box until its mesh is generated.`);
         showPalette();
         return;
       }
@@ -1222,11 +1507,11 @@ async function start() {
       const mismatch = boundsMismatch(loaded.size, item.expected);
       if (mismatch) {
         console.warn(`${item.name}: ${mismatch}`);
-        tell(`${item.name}: ${mismatch}.`, 'warn');
+        tell(`${item.name}: ${mismatch}.`);
       }
     } catch (err) {
       console.error(`Loading ${item.name} from ${item.url} failed:`, err);
-      tell(`Couldn’t load ${item.name} from the server: ${(err as Error).message}`, 'error');
+      tell(`Couldn’t load ${item.name} from the server: ${(err as Error).message}`);
     }
   }
 
@@ -1251,27 +1536,57 @@ async function start() {
 
   // ---------- versions (stored layouts) ----------
 
-  /** Moves every object the version mentions to its stored spot; fetches ones we don't have yet. */
+  /**
+   * Moves every object the version mentions to its stored spot; fetches ones we don't have yet.
+   *
+   * Lowest first. A Placement's `p` is a full 3D point, so an object that was resting on a table
+   * comes back on the table — but only if the table is already there. These bodies are dynamic
+   * and under gravity, so a rider restored before its support falls straight through to the floor
+   * and the stack is lost a frame later, where nobody can see why. Ascending y puts every support
+   * in place, collider and all, before anything that rests on it.
+   */
   async function applyVersion(version: VersionV1) {
     if (!currentRoom) return;
     currentVersionId = version.versionId;
     const offset = currentRoom.offset;
-    for (const p of version.placements) {
+    const lowestFirst = [...version.placements].sort((a, b) => a.p[1] - b.p[1]);
+    const unsupported: string[] = [];
+    const missing: string[] = [];
+    for (const p of lowestFirst) {
       const layout = fromPlacement(p, offset);
       let obj = objects.get(p.placementId) ?? [...objects.values()].find((o) => o.objectId === p.objectId && !version.placements.some((q) => q.placementId === o.id && q !== p));
       if (!obj) {
         try {
           await addServerObject(await getObject(p.objectId));
         } catch (err) {
+          // The object was deleted, or its mesh is gone. Skip it: a layout must never be able to
+          // refuse to open because one thing in it no longer exists. But say which one — a room
+          // that quietly comes back smaller than it was saved is worse than one that explains.
           console.warn(`Version ${version.versionId}: object ${p.objectId} unavailable:`, err);
+          missing.push(p.objectId.slice(0, 8));
           continue;
         }
         obj = [...objects.values()].find((o) => o.objectId === p.objectId);
-        if (!obj) continue;
+        if (!obj) {
+          missing.push(p.objectId.slice(0, 8));
+          continue;
+        }
       }
-      physics.moveTo(obj.id, layout.position[0], layout.position[2], layout.rotationY);
+      physics.moveTo(obj.id, layout.position[0], layout.position[2], layout.rotationY, layout.position[1]);
+      // Stored off the floor with nothing under it: whatever it rested on is missing from this
+      // version, or its GLB failed to load. Gravity is about to drop it. Say so rather than let
+      // the layout quietly differ from the one that was saved.
+      if (layout.position[1] > 0.01 && !physics.supportUnder(obj.id)) unsupported.push(obj.name);
     }
-    say(`Layout "${version.label}" applied: ${version.placements.length} placements.`);
+    if (unsupported.length) {
+      console.warn(`Version ${version.versionId}: nothing to rest on for ${unsupported.join(', ')}; they fall to the floor.`);
+      tell(`${unsupported.join(', ')} had nothing to rest on and fell to the floor.`);
+    }
+    // One line, because #note holds one line: a separate message for the missing objects was
+    // overwritten by this one the same frame, which made the naming useless.
+    if (missing.length) console.warn(`Version ${version.versionId}: left out ${missing.join(', ')}`);
+    const left = missing.length ? ` ${missing.length} no longer available: ${missing.join(', ')}.` : '';
+    say(`Layout "${version.label}" applied: ${version.placements.length - missing.length} of ${version.placements.length} placements.${left}`);
   }
 
   let pushTimer: number | undefined;
@@ -1353,7 +1668,13 @@ async function start() {
       }
     } catch (err) {
       console.warn('The furniture list could not be read:', err);
-      tell(`Built-in furniture unavailable: ${(err as Error).message}`, 'warn');
+      tell(`Built-in furniture unavailable: ${(err as Error).message}`);
+      // And on the tablet, in the section the furniture would have filled. Without this the
+      // Furniture tab simply never appears, which looks exactly like an empty catalogue: a
+      // failure that cannot be told from a normal state is not a loud one (standing rule 4).
+      // A section with a row in it is a page, so the tab exists and says what went wrong.
+      catalog.push({ url: '', name: `Furniture unavailable: ${(err as Error).message}`, label: true, severity: 'warn', section: 'Furniture' });
+      showPalette();
       return;
     }
     for (const o of list) catalog.push({ url: o.url, name: o.name ?? o.url.split('/').pop()!, scale: o.scale, objectId: o.objectId, section: 'Furniture' });
@@ -1388,17 +1709,33 @@ async function start() {
    * stable: designer, scanned pieces, listings, my scans, furniture.
    */
   const knownScans = new Set<string>();
+  let scansUnavailable = false; // the warning row is added once, not once per failed poll
   async function loadMyScans(announce = false) {
     let scans;
     try {
       scans = await listScans();
     } catch (err) {
       console.warn('My scans unavailable:', err);
+      // Same reasoning as the furniture list above: a missing tab reads as "you have no
+      // scans", which is a different and much less alarming thing than "the server did not
+      // answer". Shown once — a failed poll every few seconds must not stack up rows.
+      if (!scansUnavailable) {
+        scansUnavailable = true;
+        catalog.unshift({ url: '', name: `My scans unavailable: ${(err as Error).message}`, label: true, severity: 'warn', section: 'My scans' });
+        showPalette();
+      }
       return;
     }
     const fresh = scans.filter((o) => !knownScans.has(o.objectId));
     if (!fresh.length) return;
     for (const o of fresh) knownScans.add(o.objectId);
+    // A phone scan arrives with no picture of any kind: Object Capture uploads the mesh alone.
+    // The render the tablet makes is therefore the only image of it that exists, and the
+    // search index needs one — without it every scan is the same "Captured object" text,
+    // embeds to the same point, and no query can separate two of them. Decided here from the
+    // row the server actually sent, never from a Recommendation, which carries a fallback URL
+    // that makes an object with no image look like it has one (listings.ts).
+    for (const o of fresh) if (o.source === 'scan' && !o.imageUrl) needsThumbnail.add(o.objectId);
     const items: PaletteItem[] = fresh.map((o) => ({
       url: sameOrigin(o.glbUrl!),
       name: o.name || 'Captured object',
@@ -1543,8 +1880,7 @@ async function start() {
     interaction.update(dt);
     applier.update(dt);
     physics.step(dt);
-    hud.place(renderer.xr.isPresenting ? renderer.xr.getCamera() : camera, dt);
-    listingsHud.place(renderer.xr.isPresenting ? renderer.xr.getCamera() : camera, dt);
+    thumbs.update(); // at most one tile picture drawn per frame, and only for the page on screen
     findPanel.place(renderer.xr.isPresenting ? renderer.xr.getCamera() : camera);
     if (!renderer.xr.isPresenting) controls.update();
     renderer.render(scene, camera);

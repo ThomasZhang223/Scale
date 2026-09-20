@@ -27,6 +27,14 @@ export interface ObjectV1 {
   name: string;
   category: string;
   glbUrl: string | null;
+  /**
+   * A picture of the object, when the server has one. A catalogue row carries the store's
+   * photo; a phone scan has none at all, because Object Capture uploads only the mesh — the
+   * field is absent on those rows, which is the signal the headset renders one and sends it.
+   * Read it only from a row the server sent: listings.ts fills a fallback URL in for search
+   * results, so a Recommendation always looks like it has an image whether or not one exists.
+   */
+  imageUrl?: string | null;
   createdAt?: string;
   bboxMeters: BBoxMeters;
 }
@@ -74,6 +82,60 @@ export interface JobV1 { state: 'queued' | 'running' | 'done' | 'failed'; progre
 
 export function getJob(jobId: string): Promise<JobV1> {
   return get(`/jobs/${jobId}`);
+}
+
+/**
+ * POST /search, the contract route. Returns `[{objectId, score, object}]` in similarity order.
+ * `source` is always explicit here: an unscoped text query is narrowed to the catalogue by the
+ * Worker (X-Search-Scope), which is the wrong library for a scan or a built-in.
+ */
+export async function searchObjects(body: {
+  text?: string;
+  source: 'scan' | 'catalog' | 'primitive';
+  fit?: { maxW?: number; maxH?: number; maxD?: number };
+  limit?: number;
+}): Promise<{ objectId: string; score: number; object: ObjectV1 }[]> {
+  const res = await fetch(`${API_BASE}/search`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`${res.status} from POST ${API_BASE}/search`);
+  const hits = (await res.json()) as { objectId: string; score: number; object: ObjectV1 }[];
+  return Array.isArray(hits) ? hits : [];
+}
+
+/** What POST /v1/intent answers. `fit` is ignored by the caller: metres come from needFromText. */
+export interface ParsedIntent {
+  intent: 'shop' | 'scans' | 'library' | 'design';
+  query: string | null;
+  category: string | null;
+  fit: { maxW?: number; maxH?: number; maxD?: number } | null;
+}
+
+/**
+ * POST /intent: what the sentence means, decided by a small model on the Worker.
+ *
+ * Rejects rather than guessing. Every failure — a timeout, a 502 from a model that answered
+ * nothing, an offline headset — has one meaning for the caller: use the regex router instead.
+ * The budget is deliberately shorter than the Worker's own, so a slow answer never becomes a
+ * silent wait on a headset where nothing is drawn yet.
+ */
+export async function askIntent(text: string, budgetMs = 1200): Promise<ParsedIntent> {
+  const abort = new AbortController();
+  const timer = setTimeout(() => abort.abort(), budgetMs);
+  try {
+    const res = await fetch(`${API_BASE}/intent`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ text }),
+      signal: abort.signal,
+    });
+    if (!res.ok) throw new Error(`${res.status} from POST ${API_BASE}/intent`);
+    return (await res.json()) as ParsedIntent;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /**
@@ -260,4 +322,23 @@ export function watchRoom(roomId: string, on: RoomEvents): () => void {
     clearTimeout(retry);
     source?.close();
   };
+}
+
+/**
+ * Sends a rendered picture of an object to the search index (thumbs.ts makes it).
+ *
+ * Object Capture uploads only the mesh, so for a phone scan this render is the only image of
+ * that object that exists anywhere. Without one every scan carries the same text — "Captured
+ * object", category "unknown" — embeds to the same point, and no query can tell two apart.
+ *
+ * Fire-and-forget by design: it resolves to nothing, it is never retried, and a failure is a
+ * console warning. Nothing the user is doing depends on it.
+ */
+export async function postObjectThumbnail(objectId: string, jpeg: Blob): Promise<void> {
+  const res = await fetch(`${API_BASE}/objects/${encodeURIComponent(objectId)}/thumbnail`, {
+    method: 'POST',
+    headers: { 'content-type': 'image/jpeg', ...(STUB ? { 'X-Stub': '1' } : {}) },
+    body: jpeg,
+  });
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText} from POST ${API_BASE}/objects/${objectId}/thumbnail`);
 }

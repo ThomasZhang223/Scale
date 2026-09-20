@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import * as THREE from 'three';
 import { AgentClient, type Proposal } from './agent.ts';
+import { commandOf } from './listings.ts';
 import { ProposalApplier } from './apply.ts';
 import { Ghosts } from './ghosts.ts';
 import { Palette, type PaletteItem } from './palette.ts';
@@ -200,4 +201,83 @@ test('8: Designer tiles and action tiles are hit where drawn; label lines are no
   assert.equal(palette.hitTest(rayInto(tiles[0])), items[0]);
   assert.equal(palette.hitTest(rayInto(tiles[1])), null, 'the status line is not a target');
   assert.equal(palette.hitTest(rayInto(tiles[2])), items[2]);
+});
+
+// ---------- the Rearrange button's solver-outage fallback ----------
+
+/* The button used to send a preset, and services/agent answers a failed preset solve with its
+ * own built-in sample (agent.ts:230). Removing the style gate made the button send free text,
+ * which that condition does not cover, so the net is kept here for the same press only. */
+
+const SOLVER_DOWN = 'The layout solver isn’t reachable right now.';
+
+/** A client mid-request, ready to be handed a failure exactly as the feed or a poll would. */
+async function pressed(options: { sampleOnSolverOutage?: boolean }, req: { text?: string; preset?: string }) {
+  const server = fakeServer();
+  const client = new AgentClient({ roomId: 'demo', fetch: server.fetchFn, openEvents: () => () => {}, offlineProposal: proposal });
+  await client.request({ ...req, pins: [] }, options);
+  assert.equal(client.snapshot.state, 'working');
+  return client;
+}
+
+test('the button plus a solver outage shows the sample proposal, announced as a sample', async () => {
+  const client = await pressed({ sampleOnSolverOutage: true }, { text: 'Rearrange the room.' });
+  client.handleEvent('agent.failed', { requestId: 'stub-req-1', message: SOLVER_DOWN });
+  const s = client.snapshot;
+  assert.equal(s.state, 'proposed', 'the press is answered, as a picked preset used to be');
+  assert.equal(s.proposal?.requestId, proposal.requestId);
+  assert.equal(s.offline, true);
+  assert.match(s.status, /sample proposal/, 'never presented as a real answer');
+  assert.match(s.log.at(-1)!.message, /Solver offline: showing the sample proposal\./);
+  assert.equal(s.log.at(-1)!.severity, 'warn');
+});
+
+test('free text plus the same outage fails in view: a canned layout is not an answer to a sentence', async () => {
+  const client = await pressed({}, { text: 'move the sofa under the window' });
+  client.handleEvent('agent.failed', { requestId: 'stub-req-1', message: SOLVER_DOWN });
+  assert.equal(client.snapshot.state, 'failed');
+  assert.equal(client.snapshot.error, SOLVER_DOWN);
+  assert.equal(client.snapshot.proposal, null);
+});
+
+test('the button plus any other failure still fails in view', async () => {
+  const client = await pressed({ sampleOnSolverOutage: true }, { text: 'Rearrange the room.' });
+  client.handleEvent('agent.failed', { requestId: 'stub-req-1', message: 'The room changed under the request.' });
+  assert.equal(client.snapshot.state, 'failed');
+  assert.equal(client.snapshot.error, 'The room changed under the request.');
+  assert.equal(client.snapshot.proposal, null);
+});
+
+test('the straight apostrophe services/agent actually throws is matched too', async () => {
+  // loop.ts:154 writes "isn't"; the fixture above writes "isn’t". Either can arrive.
+  const client = await pressed({ sampleOnSolverOutage: true }, { text: 'Rearrange the room.' });
+  client.handleEvent('agent.failed', { requestId: 'stub-req-1', message: "The layout solver isn't reachable right now." });
+  assert.equal(client.snapshot.state, 'proposed');
+});
+
+test('the flag never reaches the wire: services/agent has no such field to read', async () => {
+  const bodies: string[] = [];
+  const server = fakeServer();
+  const spy: typeof fetch = async (input, init) => {
+    if ((init?.method ?? 'GET') === 'POST' && String(input).endsWith('/requests')) bodies.push(String(init!.body));
+    return server.fetchFn(input, init);
+  };
+  const client = new AgentClient({ roomId: 'demo', fetch: spy, openEvents: () => () => {}, offlineProposal: proposal });
+  await client.request({ text: 'Rearrange the room.', pins: [] }, { sampleOnSolverOutage: true });
+  assert.equal(bodies.length, 1);
+  const sent = Object.keys(JSON.parse(bodies[0]));
+  assert.equal(sent.includes('sampleOnSolverOutage'), false, 'the flag is ours, not the service’s');
+  // Every key sent is one services/agent postRequest declares. baseVersionId is absent here
+  // only because no version has been synced yet, and JSON.stringify drops undefined.
+  const declared = ['text', 'preset', 'pins', 'baseVersionId', 'source'];
+  assert.deepEqual(sent.filter((k) => !declared.includes(k)), []);
+});
+
+test('the spoken "rearrange" is the button, and a sentence around it is not', () => {
+  // The fallback above follows the BUTTON, and the voice command reaches it through the same
+  // onAction('rearrange') the tile uses (main.ts), so it inherits the sample. This pins the
+  // boundary that decides which spoken words do: listings.ts anchors both ends of the pattern.
+  assert.equal(commandOf('rearrange the room'), 'rearrange', 'a bare command: the button, so the sample may show');
+  assert.equal(commandOf('Rearrange.'), 'rearrange');
+  assert.equal(commandOf('rearrange the room so the sofa faces the window'), null, 'a specific request: free text, so it must fail in view');
 });

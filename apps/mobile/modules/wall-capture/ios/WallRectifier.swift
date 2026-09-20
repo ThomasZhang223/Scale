@@ -198,11 +198,11 @@ enum WallRectifier {
     // Metric aspect when possible: EXIF focal length first, self-calibration from the quad
     // second (needs an angled shot); the image-space ratio last, flagged so the room builder
     // can say the size is only approximate.
-    let pt = { (p: CGPoint) in CGPoint(x: p.x * w, y: p.y * h) }
+    let pxPoint = { (p: CGPoint) in CGPoint(x: p.x * w, y: p.y * h) }
     let known = focalPx(path: path, longEdge: max(w, h))
     let metric: Double? = detected == nil ? nil : (
-      metricAspect(tl: pt(quad.topLeft), tr: pt(quad.topRight), br: pt(quad.bottomRight), bl: pt(quad.bottomLeft), size: CGSize(width: w, height: h), f: known)
-      ?? metricAspect(tl: pt(quad.topLeft), tr: pt(quad.topRight), br: pt(quad.bottomRight), bl: pt(quad.bottomLeft), size: CGSize(width: w, height: h), f: nil)
+      metricAspect(tl: pxPoint(quad.topLeft), tr: pxPoint(quad.topRight), br: pxPoint(quad.bottomRight), bl: pxPoint(quad.bottomLeft), size: CGSize(width: w, height: h), f: known)
+      ?? metricAspect(tl: pxPoint(quad.topLeft), tr: pxPoint(quad.topRight), br: pxPoint(quad.bottomRight), bl: pxPoint(quad.bottomLeft), size: CGSize(width: w, height: h), f: nil)
     )
     return RectifiedPhoto(
       imagePath: url.path,

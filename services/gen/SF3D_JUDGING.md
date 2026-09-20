@@ -104,6 +104,50 @@ The Worker secret named `BASETEN_API_KEY` is the adapter's `GENERATION_API_KEY`.
 It authenticates the Worker TO the adapter. The real Baseten credential never
 leaves the laptop.
 
+### The provider is OFF. Re-enabling it, exactly
+
+Thomas turned it off at 07:25 UTC on 2026-09-20: `BASETEN_URL` is deleted from the Worker.
+`MeshDispatcher.drain()` returns early without it, so queued jobs PARK and none fail.
+`BASETEN_API_KEY` is still set, so re-enabling is one command.
+
+```bash
+# 1. Is the adapter still up, and is the tunnel URL still the one it was?
+cat infra/.run/gen.url && curl -s "$(cat infra/.run/gen.url)/health"
+#    Expect {"ok":true,"provider":true,"auth":true}. If cloudflared has restarted, the URL has
+#    changed: re-run `bash infra/gen-up.sh` and use the URL it prints.
+
+# 2. Warm the GPU with ONE real paid prediction. Never let the first real job pay for the
+#    170 s cold wake — it is measured at 170.9 s against the adapter's 180 s provider timeout.
+#    See step 2 of "Run it" below for the exact call.
+
+# 3. Turn it on.
+cd workers && npx wrangler secret put BASETEN_URL    # paste: <tunnel>/generate
+curl -s https://full-scale-workers.thomaszhangdev.workers.dev/v1/health | jq .meshPipeline
+#    -> providerConfigured: true
+
+# Off again, the same clean stop:
+cd workers && npx wrangler secret delete BASETEN_URL
+```
+
+A `wrangler secret put` or `delete` publishes a NEW VERSION built from the code that is
+deployed at that moment. It does not roll code back — but it does mean the secret change and
+whatever someone else deployed a minute earlier ship together. Check
+`npx wrangler deployments list` first, and check afterwards that the behaviour you care about
+still works, not just that the secret flipped.
+
+**Two warnings that belong to the ON state, not to this file's history.**
+
+With the provider ON, **every new catalogue row and every listing a person picks in the headset
+is a paid SF3D call.** `POST /v1/catalog/ingest`, `POST /v1/listings/generate` and
+`ScoutAgent`'s `find_products` tool all enqueue a mesh job; nothing rate-limits or budgets them.
+On 2026-09-20 a teammate's run put 32 products through in 12 minutes without anyone deciding to.
+
+**A caller that hits the adapter's `/generate` directly bypasses `MeshDispatcher`'s single
+admission slot**, and therefore also the job row, the outbox row and the one-at-a-time
+guarantee that keeps a single Baseten replica at `concurrency_target 1`. The adapter
+authenticates with `GENERATION_API_KEY` and enforces nothing else. Anything that reaches it
+without going through the Worker is invisible to `GET /v1/jobs/{id}` and to D1.
+
 ### Run it
 
 ```bash
@@ -177,6 +221,55 @@ mesh need a rotated orientation profile.
 lamps, side tables bind cleanly. Wide, shallow pieces — dressers, sideboards,
 dining tables, sectionals — will bind to the right numbers and look stretched.
 Every receipt carries `distortion_ratio`; sort by it before choosing a hero object.
+
+Measured over the 46 meshes this adapter has produced so far
+(`integration-sweep/reports/p-gen-distortion.json`, sorted ascending):
+20 `eligible_for_visual_review`, 14 `review_required`, 12 `proxy_recommended`.
+Worst is the Forge Large Wall Mount Barn Light at 4.04, best the Gia King Bed at
+1.04. Roughly a quarter of the catalogue needs a look before it goes on stage.
+
+**One mesh did fail the yaw test**, and it is the only one of the 46 that does:
+Forge Large Wall Mount Barn Light, `distortion_ratio` 4.04 as bound against 2.42
+if `w` and `d` were swapped. A wall-mounted lamp is measured 0.406 wide by 0.660
+deep — deeper than it is wide, because the "depth" is its projection from the wall
+— and SF3D produced it the other way round. Give that one a rotated orientation
+profile through `GENERATION_ORIENTATION`, or keep it off the stage.
+
+### Live generation fails on some products and cannot be made to succeed
+
+**Three of the 19 products in the live drain never bound, in three attempts each.**
+The adapter answers HTTP 422 `mesh_binding_rejected` and the job fails. The wire
+code is deliberately sanitized, so the reason only reaches the adapter's log (see
+`app/generation.py`); running `bind_glb` by hand on the raw mesh gives it in full:
+
+| Product | Reason from the binder |
+| --- | --- |
+| Max Medium Wall Sconce | `Degenerate triangles` |
+| Aledo Nightstand \| Walnut | `Degenerate normal-map UV triangle: cannot construct tangent basis` |
+| Westcott Counter Stool | `Degenerate normal-map UV triangle: cannot construct tangent basis` |
+
+The binder is right to refuse: a zero-area UV triangle has no tangent basis, and a
+mesh without one cannot carry its normal map. **The failure is per-RUN, not per
+product.** SF3D runs unseeded under `cuda-bfloat16-autocast`, so marching
+tetrahedra produces a different mesh every time, and some of those meshes contain a
+degenerate triangle. Two products whose CACHED meshes the binder rejected — Lunaria
+Terra and Pino 6 Drawer Dresser — bound cleanly on a fresh run through this
+pipeline. A fresh Westcott mesh bound cleanly by hand at distortion 1.245, then
+failed twice more through the Worker.
+
+So: **16 of 19 products bound on the first attempt; 3 failed 3 times each.** Risk is
+concentrated in particular products — thin, slatted or openwork shapes — not spread
+evenly across runs. Re-running one of those is a coin flip, not a fix.
+
+Two rules follow, and they are why the demo does not depend on this path:
+
+1. **Cap deliberate re-runs at two per object** (three paid attempts in total). Each
+   one is an operator's decision, never an automatic retry: `retryable:false` in the
+   adapter's response and `retries: 0` on the Worker's `baseten-generate` step both
+   stay as they are. They exist to stop a blind resubmission of an AMBIGUOUS paid
+   call, which is a different failure and must never be retried at all.
+2. **Never let a judge watch a first-time generation of an unknown product.** One in
+   six products cannot be generated on demand, and you find out 30 seconds in.
 
 ## Profiling diagnostics
 

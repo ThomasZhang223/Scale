@@ -3,12 +3,37 @@ import { wrap } from './hud.ts';
 import type { Recommendation, StageInfo, FindStage } from './listings.ts';
 
 /*
- * The find panel: what Browserbase is doing on each store, then the listings that came back.
- * A canvas texture on a plane, like hud.ts, but head-locked ahead and to the right so it sits
- * beside the transcript rather than behind the phone. Three states: searching (one stage row
- * per store), results (cards you can point at), generating (the picked card's progress line).
- * Only the cards and the × are hittable; everything else ignores the ray.
+ * The find panel: the popout window a search opens, in front of you and to the right, so
+ * results never become rows inside the tablet. A canvas texture on a plane, with a × to close
+ * it. The cards, the × and the title band are hittable; everything else ignores the ray.
+ *
+ * It stands in the room, it does not follow your head. A search puts it in front of you once
+ * and then leaves it there, and you move it by grabbing the band across its title — the same
+ * grab, on the same trigger, that moves the tablet (interaction.ts). Reading a list that
+ * slides away every time you look down at the thing you are choosing for is what that fixes.
+ *
+ * It answers two searches, and the difference is `kind`:
+ *
+ *   shop    the merchants. Searching shows one small browser window per store with what
+ *           Browserbase is doing there; the results are listings, with the store's own
+ *           product photo, its merchant and its price.
+ *   scans   the user's own phone captures, and nothing else — no catalogue GLB and no
+ *           primitive. There is no searching phase, because the library is already on the
+ *           server. Every row is called "Captured object", so the picture is a render of
+ *           the mesh itself and is the only thing that tells two rows apart.
+ *   library the built-in furniture: real names, real categories, no merchant and no price.
+ *   recommend  what to add when a design request cannot be met with what is in the room. The
+ *           rows are MIXED — library pieces and merchant listings together — so each card is
+ *           drawn from its own row rather than from the kind, and the caller supplies the
+ *           title, because only it knows which request went unmet.
  */
+
+/**
+ * Which library a set of rows came from. It decides the title, the picture and the line under
+ * each name — never the layout, the anchoring or the drag, which belong to the panel itself,
+ * so a fourth kind is a case in three switches and nothing else.
+ */
+export type FindKind = 'shop' | 'scans' | 'library' | 'recommend';
 
 export type PanelHit = { kind: 'card'; objectId: string } | { kind: 'close' } | null;
 
@@ -29,11 +54,23 @@ const CARD_GAP = 0.008;
 const THUMB = 0.09;
 const RADIUS = 0.024;
 const MAX_CARDS = 6;
-const AHEAD = 0.9;         // metres in front of the eyes
-const RIGHT = 0.28;        // metres to the right of the gaze line
-const DOWN = 0.05;
 const CLOSE_R = 0.022;
 const CLOSE_INSET = 0.034;
+// Where a search puts the panel the first time: ahead of where you are looking, a little below
+// eye line, and far enough to the right to clear the tablet, which spawns dead ahead at 1.4 m
+// and is 0.74 m wide. Half the tablet plus half this panel is 0.67 m, so 0.75 m leaves a gap.
+const SPAWN_AHEAD = 1.35;
+const SPAWN_SIDE = 0.75;
+const SPAWN_DROP = 0.15;
+// It stays where you left it. These two are the only reasons to move it back in front of you:
+// you walked away from it, or you turned your back on it, and either way it is lost.
+const RESPAWN_DIST = 3;
+// The drag handle: a band across the title, stopping clear of the × so a press meant to close
+// the panel never starts a drag instead.
+const GRAB_H = TITLE_H + PAD * 0.6;
+const GRAB_LEFT = 2 * CLOSE_INSET + CLOSE_R;
+const POSE_KEY = 'fullscale.findpanel.pose'; // where this session last left it
+const POSE_SAVE_MS = 1000;
 
 const BACKGROUND = 'rgba(28,28,30,0.90)';
 const CARD_BG = 'rgba(44,44,46,0.95)';
@@ -48,6 +85,34 @@ interface StageRow { merchant: string; stage: FindStage | 'queued'; detail: stri
 /** A store window's height: tab + status, plus the photo strip once its page has answered. */
 function windowHeight(row: StageRow): number {
   return WIN_TAB_H + WIN_STATUS_H + (row.photos?.length ? WIN_STRIP + WIN_PAD : 0) + WIN_PAD;
+}
+
+/**
+ * The two lines of an empty result. The TITLE says what happened; the BODY says what to do
+ * next. Keeping those jobs apart is what stops them saying the same thing twice — which they
+ * did, in two kinds, until each was rendered and looked at.
+ *
+ * Pure and exported so both can be tested without a canvas.
+ */
+export function resultsTitle(kind: FindKind, count: number, query: string): string {
+  const q = `“${query}”`;
+  // An empty scans result never means "none matched": main.ts shows every scan when a noun
+  // matches none, so rows are empty only when there are no scans at all. Saying "none match"
+  // would be a wrong answer as well as a repetitive one.
+  if (kind === 'scans') return count ? `${count} of your scans for ${q}` : 'No scans yet';
+  if (kind === 'library') return count ? `${count} from the library for ${q}` : `Nothing in the library for ${q}`;
+  // 'recommend' normally arrives with a title of its own: only the caller knows which request
+  // went unmet. This is the fallback when it sends none.
+  if (kind === 'recommend') return count ? `${count} that would fit` : 'Nothing to suggest yet';
+  return count ? `${count} listings for ${q}` : `No listings for ${q}`;
+}
+
+/** What to do about an empty result. Never a restatement of the title above it. */
+export function emptyAdvice(kind: FindKind): string {
+  if (kind === 'scans') return 'Capture something on the phone first.';
+  if (kind === 'library') return 'Try another word, or ask to search the shops.';
+  if (kind === 'recommend') return 'Say what to add, or open the Furniture page.';
+  return 'Try a wider gap, or another kind of thing.';
 }
 
 /** Card i occupies [y, y+h) metres below the panel's top edge. Pure, so hit tests are testable. */
@@ -65,7 +130,19 @@ export class FindPanel {
   private presenting = false;
   private dismissed = false;
   private mode: 'hidden' | 'searching' | 'results' = 'hidden';
+  private kind: FindKind = 'shop';
   private query = '';
+  /**
+   * A title from the caller, for a panel whose heading cannot be computed from the rows —
+   * 'recommend' has to name the request that went unmet. Cleared by any showResults that does
+   * not pass one, so a later shop or scans search never inherits it.
+   */
+  private title: string | null = null;
+  /**
+   * A render of a row's own mesh, for a row that has no product photo — which is every scan.
+   * Set once by main.ts and shared with the tablet, so a mesh is drawn once for both.
+   */
+  thumbFor: ((objectId: string, glbUrl: string | null) => CanvasImageSource | null) | null = null;
   private rows: StageRow[] = [];
   private recs: Recommendation[] = [];
   private note: string | null = null;
@@ -74,13 +151,66 @@ export class FindPanel {
 
   private readonly eye = new THREE.Vector3();
   private readonly forward = new THREE.Vector3();
-  private readonly right = new THREE.Vector3();
+  private readonly toPanel = new THREE.Vector3();
+  /** Where the panel stands. It is put there once and then left alone; you move it by hand. */
+  private posed = false;
+  private checkPose = true;
+  private savedAt = 0;
+  /** The band across the title that a controller grabs to move the window. */
+  private readonly grab: THREE.Mesh;
+  /**
+   * The whole panel as one plane, behind everything on it. Read only by hitSurface: it is not
+   * a card, not the ×, not the handle, and it never competes for a press.
+   */
+  private body: THREE.Mesh | null = null;
 
   constructor() {
     this.group.name = 'find-panel';
     this.group.visible = false;
     this.close = closeDisc();
     this.group.add(this.close);
+    // opacity 0, not visible:false — three.js skips raycasting a mesh whose material is
+    // invisible, and this one exists only to be hit. What you see is the lighter band the
+    // canvas draws behind the title.
+    this.grab = new THREE.Mesh(
+      new THREE.PlaneGeometry(WIDTH - GRAB_LEFT - PAD, GRAB_H),
+      new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false }),
+    );
+    this.grab.name = 'find-grab';
+    this.group.add(this.grab);
+  }
+
+  /**
+   * Is the ray anywhere on this panel at all — not on a card, just on it?
+   *
+   * The panel is opaque and stands between the user and the room, but its body has its raycast
+   * turned off so a ray can reach the furniture behind. That is right for choosing what to
+   * point at and wrong for deciding whether the user is aiming at the interface, which is what
+   * the delete button has to know (controls.ts objectButtonsActive).
+   */
+  hitSurface(raycaster: THREE.Raycaster): boolean {
+    return this.group.visible && !!this.body && raycaster.intersectObject(this.body, false).length > 0;
+  }
+
+  /**
+   * The title band under the ray: the handle for dragging the window. Same shape as the
+   * tablet's, so interaction.ts moves both with one implementation and one gesture.
+   */
+  hitGrab(raycaster: THREE.Raycaster): THREE.Intersection | null {
+    if (!this.group.visible) return null;
+    const [hit] = raycaster.intersectObject(this.grab, false);
+    return hit ?? null;
+  }
+
+  /** Puts the panel ahead of the eyes, off to the right of the tablet, facing them. */
+  placeInFront(eye: THREE.Vector3, forward: THREE.Vector3) {
+    this.group.position.copy(eye).addScaledVector(forward, SPAWN_AHEAD);
+    // (-fz, 0, fx) is the floor-plane forward turned a quarter turn to the right.
+    this.group.position.x += -forward.z * SPAWN_SIDE;
+    this.group.position.z += forward.x * SPAWN_SIDE;
+    this.group.position.y = eye.y - SPAWN_DROP;
+    this.group.lookAt(eye);
+    this.posed = true;
   }
 
   attachTo(scene: THREE.Object3D) { scene.add(this.group); }
@@ -90,17 +220,29 @@ export class FindPanel {
     this.group.visible = on && this.mode !== 'hidden' && !this.dismissed;
   }
 
-  /** Brought back on purpose: the listings are still there after the card was closed. */
+  /** Brought back on purpose: the listings are still there after the panel was closed. */
   reopen() {
     this.dismissed = false;
+    this.checkPose = true;
   }
 
+  /** Closed by hand. Closing is a decision about where it was, so the next search re-places it. */
   dismiss() {
     this.dismissed = true;
+    this.posed = false;
     this.group.visible = false;
   }
 
-  /** Once a frame: ahead of the eyes, offset right, facing them. Head-locked, so it never gets lost. */
+  /**
+   * Once a frame, and it does NOT move the panel. The panel stands in the room where it was
+   * put, like a thing on a table: reading a list while it slides with your head is what this
+   * replaces. All this does is note where the head is, decide a pose on the frames where one
+   * is owed, and keep the visibility right.
+   *
+   * A pose is owed when a search has just opened the panel. Even then it is only re-placed if
+   * the panel has no pose yet, or has been left behind — see strayed(). A second search while
+   * it is open changes the rows and leaves the panel alone.
+   */
   place(head: THREE.Object3D) {
     if (this.mode === 'hidden' || this.dismissed) { this.group.visible = false; return; }
     head.getWorldPosition(this.eye);
@@ -108,16 +250,75 @@ export class FindPanel {
     this.forward.y = 0;
     if (this.forward.lengthSq() < 1e-6) this.forward.set(0, 0, -1);
     this.forward.normalize();
-    this.right.crossVectors(this.forward, new THREE.Vector3(0, 1, 0)).normalize();
-    this.group.position.copy(this.eye).addScaledVector(this.forward, AHEAD).addScaledVector(this.right, RIGHT);
-    this.group.position.y -= DOWN;
-    this.group.lookAt(this.eye);
+    if (this.checkPose) {
+      this.checkPose = false;
+      if (!this.posed && this.restorePose(this.eye)) {
+        // Put back where this session last left it.
+      } else if (!this.posed || this.strayed()) {
+        this.placeInFront(this.eye, this.forward);
+      }
+    }
+    this.savePose();
     this.group.visible = this.presenting && this.mesh !== null;
+  }
+
+  /** Too far to read, or behind you: either way you cannot see it, so a search brings it back. */
+  private strayed(): boolean {
+    if (this.group.position.distanceTo(this.eye) > RESPAWN_DIST) return true;
+    this.toPanel.subVectors(this.group.position, this.eye);
+    this.toPanel.y = 0;
+    return this.toPanel.dot(this.forward) <= 0;
+  }
+
+  /**
+   * Keeps the pose across a reload, which in a headset is one stray gesture away. Throttled,
+   * because this writes to sessionStorage and a drag would otherwise write every frame.
+   */
+  private savePose() {
+    if (!this.posed) return;
+    const at = now();
+    if (at - this.savedAt < POSE_SAVE_MS) return;
+    this.savedAt = at;
+    try {
+      const { x, y, z } = this.group.position;
+      const q = this.group.quaternion;
+      sessionStorage.setItem(POSE_KEY, JSON.stringify({ p: [x, y, z], q: [q.x, q.y, q.z, q.w] }));
+    } catch {
+      // Private mode has no sessionStorage. The panel still works; only the memory is lost.
+    }
+  }
+
+  /** True when a stored pose was used. A stored pose you cannot see is ignored, not trusted. */
+  private restorePose(eye: THREE.Vector3): boolean {
+    let raw: string | null = null;
+    try {
+      raw = typeof sessionStorage === 'undefined' ? null : sessionStorage.getItem(POSE_KEY);
+    } catch {
+      return false;
+    }
+    if (!raw) return false;
+    try {
+      const { p, q } = JSON.parse(raw) as { p: number[]; q: number[] };
+      if (p?.length !== 3 || q?.length !== 4 || [...p, ...q].some((n) => !Number.isFinite(n))) return false;
+      this.group.position.set(p[0], p[1], p[2]);
+      this.group.quaternion.set(q[0], q[1], q[2], q[3]);
+      this.posed = true;
+      // The room may have changed under it, so the same test a search uses applies here.
+      if (this.strayed()) {
+        this.placeInFront(eye, this.forward);
+      }
+      return true;
+    } catch {
+      return false; // unreadable: spawn fresh rather than guess a pose
+    }
   }
 
   showSearching(query: string, merchants: readonly string[]) {
     this.mode = 'searching';
+    this.title = null;
+    this.kind = 'shop'; // only the merchants have a search worth watching happen
     this.dismissed = false;
+    this.checkPose = true;
     this.query = query;
     this.rows = merchants.map((merchant) => ({ merchant, stage: 'queued', detail: 'waiting…' }));
     this.recs = [];
@@ -137,14 +338,33 @@ export class FindPanel {
     if (this.mode === 'searching') this.redraw();
   }
 
-  showResults(recs: Recommendation[], note: string | null) {
+  /**
+   * The rows a search came back with. `kind` says which library they came from, which decides
+   * the title, the picture and what the second line of a card says. `query` is what was asked
+   * — a scans search has no searching phase to have set it already.
+   */
+  showResults(recs: Recommendation[], note: string | null, kind: FindKind = 'shop', query = this.query, title?: string) {
     this.mode = 'results';
+    this.kind = kind;
+    this.query = query;
+    this.title = title ?? null;
     this.dismissed = false;
+    this.checkPose = true;
     // ceiling: six cards, no paging; the upgrade is a scroll or a "+N more" row.
     this.recs = recs.slice(0, MAX_CARDS);
     this.note = note;
     this.loadThumbs();
     this.redraw();
+  }
+
+  /** The heading now on the panel: the caller's title when it gave one, else the computed one. */
+  heading(): string {
+    return this.mode === 'searching' ? `Searching Shopify via Browserbase — “${this.query}”` : this.title ?? resultsTitle(this.kind, this.recs.length, this.query);
+  }
+
+  /** Redraws what is already showing, for a picture that has only now been rendered. */
+  refresh() {
+    if (this.mode !== 'hidden') this.redraw();
   }
 
   setProgress(objectId: string, text: string) {
@@ -159,8 +379,21 @@ export class FindPanel {
     return hit ? { kind: 'card', objectId: hit.object.userData.objectId as string } : null;
   }
 
+  /**
+   * Asks for every row's picture as the rows arrive, not while drawing them: a panel shows at
+   * most MAX_CARDS rows and all of them are on screen, so there is nothing to defer, and the
+   * request must not depend on a canvas existing. A merchant photo comes over HTTP; a row
+   * with no photo — which is every scan — gets a render of its own mesh instead.
+   */
   private loadThumbs() {
-    for (const { listing } of this.recs) if (listing.imageUrl) this.loadThumb(listing.objectId, listing.imageUrl);
+    for (const { listing } of this.recs) {
+      // A scan's imageUrl is never trusted: listings.ts fills a fallback URL in for any row
+      // without one, so a scan row looks like it has a photo when nothing exists. Every other
+      // kind uses a real photo when the row carries one, and its mesh when it does not —
+      // which is what lets a 'recommend' list mix merchant rows and library rows.
+      if (listing.imageUrl && this.kind !== 'scans') this.loadThumb(listing.objectId, listing.imageUrl);
+      else this.thumbFor?.(listing.objectId, listing.glbUrl ?? null);
+    }
   }
 
   /**
@@ -200,6 +433,7 @@ export class FindPanel {
     }
     for (const m of this.cardMeshes) { m.geometry.dispose(); (m.material as THREE.MeshBasicMaterial).dispose(); m.removeFromParent(); }
     this.cardMeshes = [];
+    if (this.body) { this.body.geometry.dispose(); (this.body.material as THREE.MeshBasicMaterial).dispose(); this.body.removeFromParent(); this.body = null; }
     if (this.mode === 'hidden') { this.group.visible = false; return; }
 
     const height = this.height();
@@ -215,6 +449,8 @@ export class FindPanel {
       });
     }
     this.close.position.set(-WIDTH / 2 + CLOSE_INSET, -CLOSE_INSET, 0.002);
+    // The drag band spans the title, starting clear of the × on its left.
+    this.grab.position.set((GRAB_LEFT - PAD) / 2, -(PAD + TITLE_H) / 2, 0.001);
 
     if (typeof document === 'undefined') { this.group.visible = this.presenting && !this.dismissed; return; }
     const canvas = document.createElement('canvas');
@@ -227,10 +463,17 @@ export class FindPanel {
     ctx.fill();
     ctx.textBaseline = 'middle';
 
+    // The title sits on a lighter band, which is also the handle you grab to move the window —
+    // the same cue the store windows' tab bars use, so it reads as something to take hold of.
+    ctx.fillStyle = 'rgba(58,58,60,0.95)';
+    ctx.beginPath();
+    ctx.roundRect(0, 0, canvas.width, (PAD + TITLE_H) * PX, [RADIUS * PX, RADIUS * PX, 0, 0]);
+    ctx.fill();
+
     // Title
     ctx.fillStyle = TEXT;
     ctx.font = FONT(0.022, 600);
-    const title = this.mode === 'searching' ? `Searching Shopify via Browserbase — “${this.query}”` : `${this.recs.length ? this.recs.length : 'No'} listings for “${this.query}”`;
+    const title = this.heading();
     ctx.fillText(ellipsis(ctx, title, (WIDTH - 2 * PAD - 0.06) * PX), (PAD + 0.05) * PX, (PAD + TITLE_H / 2) * PX);
 
     if (this.mode === 'searching') {
@@ -296,7 +539,7 @@ export class FindPanel {
       if (!this.recs.length) {
         ctx.fillStyle = SECONDARY;
         ctx.font = FONT(0.018);
-        ctx.fillText('Nothing fits that. Try a wider gap or another kind.', PAD * PX, (PAD + TITLE_H + CARD_H / 2) * PX);
+        ctx.fillText(emptyAdvice(this.kind), PAD * PX, (PAD + TITLE_H + CARD_H / 2) * PX);
       }
       cardRects(this.recs.length).forEach((r, i) => {
         const { listing: l, reasons } = this.recs[i];
@@ -306,15 +549,27 @@ export class FindPanel {
         ctx.roundRect(x0, y0, w, h, 0.012 * PX);
         ctx.fill();
         if (i === 0) { ctx.strokeStyle = ACCENT; ctx.lineWidth = 0.002 * PX; ctx.stroke(); }
-        // Thumbnail
-        const img = this.thumbs.get(l.objectId);
+        // The picture. A merchant listing has a product photo; a scan never does, so it gets a
+        // render of its own mesh instead. A row with neither keeps the plain plate — it is
+        // never given another row's picture to look complete.
         const tx = x0 + 0.01 * PX, ty = y0 + (r.h - THUMB) / 2 * PX, ts = THUMB * PX;
         ctx.fillStyle = 'rgba(120,120,128,0.35)';
         ctx.fillRect(tx, ty, ts, ts);
-        if (img?.complete && img.naturalWidth) {
-          const s = Math.max(ts / img.naturalWidth, ts / img.naturalHeight);
+        // Per ROW, not per kind, so a mixed list draws each card from what that row has.
+        const img = this.kind === 'scans' ? undefined : this.thumbs.get(l.objectId);
+        const loaded = img?.complete && img.naturalWidth ? img : null;
+        const mesh = loaded ? null : this.thumbFor?.(l.objectId, l.glbUrl ?? null) ?? null;
+        if (mesh) {
+          // "Contain": a mesh is framed to its own bounding box, and cropping it would make a
+          // tall piece and a wide one look alike.
+          const mw = Number((mesh as { width: number }).width) || ts;
+          const mh = Number((mesh as { height: number }).height) || ts;
+          const s = Math.min(ts / mw, ts / mh);
+          ctx.drawImage(mesh, tx + (ts - mw * s) / 2, ty + (ts - mh * s) / 2, mw * s, mh * s);
+        } else if (loaded) {
+          const s = Math.max(ts / loaded.naturalWidth, ts / loaded.naturalHeight);
           ctx.save(); ctx.beginPath(); ctx.rect(tx, ty, ts, ts); ctx.clip();
-          ctx.drawImage(img, tx + (ts - img.naturalWidth * s) / 2, ty + (ts - img.naturalHeight * s) / 2, img.naturalWidth * s, img.naturalHeight * s);
+          ctx.drawImage(loaded, tx + (ts - loaded.naturalWidth * s) / 2, ty + (ts - loaded.naturalHeight * s) / 2, loaded.naturalWidth * s, loaded.naturalHeight * s);
           ctx.restore();
         }
         // Text column
@@ -325,16 +580,33 @@ export class FindPanel {
         ctx.fillText(ellipsis(ctx, l.name, cw), cx, y0 + 0.022 * PX);
         const { w: bw, h: bh, d: bd } = l.bboxMeters;
         const cm = (m: number) => Math.round(m * 100); // UI edge: the only place metres become cm
+        const size = `${cm(bw)} × ${cm(bh)} × ${cm(bd)} cm`;
         const price = l.price ? ` · ${(l.price.cents / 100).toFixed(0)} ${l.price.currency}` : '';
         ctx.fillStyle = SECONDARY;
         ctx.font = FONT(0.016);
-        ctx.fillText(ellipsis(ctx, `${l.merchant ?? 'catalogue'} · ${cm(bw)} × ${cm(bh)} × ${cm(bd)} cm${price}`, cw), cx, y0 + 0.05 * PX);
+        // A scan has no merchant and no price, so it says where it came from instead of
+        // printing "catalogue" over something the user captured themselves.
+        // 'recommend' decides per row, because its list mixes the two: a row with a merchant
+        // is a listing and shows its price, a row without one came from the library.
+        const meta =
+          this.kind === 'scans' ? `Scanned on your phone · ${size}`
+          : this.kind === 'library' || (this.kind === 'recommend' && !l.merchant) ? `From the library · ${size}`
+          : `${l.merchant ?? 'catalogue'} · ${size}${price}`;
+        ctx.fillText(ellipsis(ctx, meta, cw), cx, y0 + 0.05 * PX);
         const conf = l.measure?.confidence ?? 0.5;
         const badge = conf < 0.7 ? { text: 'size unverified', color: SECONDARY } : { text: 'fits', color: STAGE_COLOR.done };
         const status = this.progress.get(l.objectId);
-        ctx.fillStyle = status ? ACCENT : badge.color;
-        ctx.font = FONT(0.016, 500);
-        ctx.fillText(ellipsis(ctx, status ?? `${badge.text} · ${reasons[0] ?? ''}`, cw), cx, y0 + 0.078 * PX);
+        // A scan is already measured and already has its mesh, so it has no third line to
+        // write: "fits" is a merchant's claim about a size it declared, and the reason a scan
+        // came back is already the line above it. Only real progress gets written.
+        // 'recommend' says which missing category this row answers ("a lamp"), which is what
+        // lets a mixed list read as grouped without section headers.
+        const line = status ?? (this.kind === 'shop' ? `${badge.text} · ${reasons[0] ?? ''}` : this.kind === 'recommend' ? reasons[0] ?? null : null);
+        if (line) {
+          ctx.fillStyle = status ? ACCENT : badge.color;
+          ctx.font = FONT(0.016, 500);
+          ctx.fillText(ellipsis(ctx, line, cw), cx, y0 + 0.078 * PX);
+        }
       });
       if (this.note) {
         ctx.fillStyle = STAGE_COLOR.searching;
@@ -355,8 +627,21 @@ export class FindPanel {
     this.mesh.raycast = () => {};
     this.mesh.position.y = -height / 2;
     this.group.add(this.mesh);
+    // One plane over the whole panel, behind it, hit by nothing but hitSurface.
+    this.body = new THREE.Mesh(
+      new THREE.PlaneGeometry(WIDTH, height),
+      new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false }),
+    );
+    this.body.position.set(0, -height / 2, -0.002);
+    this.body.name = 'find-body';
+    this.group.add(this.body);
     this.group.visible = this.presenting && !this.dismissed;
   }
+}
+
+/** performance.now() where there is one; Date.now() in a test runner. */
+function now(): number {
+  return typeof performance !== 'undefined' ? performance.now() : Date.now();
 }
 
 function ellipsis(ctx: CanvasRenderingContext2D, text: string, maxPx: number): string {

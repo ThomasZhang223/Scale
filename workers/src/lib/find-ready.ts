@@ -176,11 +176,13 @@ export async function restrictFindToReady(
     });
     const rows = await getObjects(env, ranked.filter((id) => !seen.has(id)), origin);
     const order = new Map(ranked.map((id, i) => [id, i]));
-    topped = rows
+    const ranked2 = rows
       .filter(isReady)
-      .sort((a, b) => (order.get(a.objectId) ?? 0) - (order.get(b.objectId) ?? 0))
-      .slice(0, target - kept.length)
-      .map(asCatalogListing);
+      .sort((a, b) => (order.get(a.objectId) ?? 0) - (order.get(b.objectId) ?? 0));
+    // A browse names nothing, so the rows arrive newest-first and the newest 30 are all side
+    // tables. Take one category at a time so "show me what there is" shows a room's worth.
+    const picked = body.browse ? spreadByCategory(ranked2, target - kept.length) : ranked2.slice(0, target - kept.length);
+    topped = picked.map(asCatalogListing);
   }
 
   // Both branches are ordered together: a storefront hit can be just as stretched as a
@@ -193,6 +195,28 @@ export async function restrictFindToReady(
     header: `storefront=${kept.length},catalog=${topped.length},dropped=${dropped},`
       + `unidentified=${unidentified},stretched=${stretched},unrated=${unrated}`,
   };
+}
+
+/**
+ * One per category before any category repeats, keeping each category's own order. Only used
+ * for a browse: a query already says what kind of thing was wanted.
+ */
+function spreadByCategory(rows: ObjectV1[], limit: number): ObjectV1[] {
+  const byCategory = new Map<string, ObjectV1[]>();
+  for (const row of rows) {
+    const key = (row.category || "unknown").toLowerCase();
+    (byCategory.get(key) ?? byCategory.set(key, []).get(key)!).push(row);
+  }
+  const out: ObjectV1[] = [];
+  const queues = [...byCategory.values()];
+  while (out.length < limit && queues.some((q) => q.length)) {
+    for (const q of queues) {
+      if (out.length >= limit) break;
+      const next = q.shift();
+      if (next) out.push(next);
+    }
+  }
+  return out;
 }
 
 /**
@@ -230,7 +254,7 @@ export function failedFindResult(body: FindBody, err: unknown): FindResult {
     measured: 0,
     fitting: 0,
     fallbackSuspected: false,
-    warning: `storefront search failed: ${(err as Error)?.message ?? String(err)}`,
+    warning: err == null ? null : `storefront search failed: ${(err as Error)?.message ?? String(err)}`,
     listings: [],
   };
 }

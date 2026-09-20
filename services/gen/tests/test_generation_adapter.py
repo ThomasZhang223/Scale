@@ -165,6 +165,25 @@ def test_worker_request_accepts_every_contract_tier(tier, accepted):
             call()
 
 
+def test_binding_rejection_is_logged_but_never_returned(caplog):
+    """The operator needs the reason; the caller must still get only the sanitized code.
+
+    Reading only "mesh_binding_rejected" off the wire cost a live drain a hand-run of
+    bind_glb to discover the real reason was a degenerate UV triangle.
+    """
+    import logging
+    caplog.set_level(logging.WARNING)
+    req = request()
+    provider = FakeProvider()
+    provider.glb = b"not a glb at all"
+    with pytest.raises(g.GenerationError) as raised:
+        g.GenerationAttempt(req, provider, IDENTITY).prepare()
+    assert str(raised.value) == "mesh_binding_rejected"
+    assert "binding rejected" in caplog.text and req.object_id in caplog.text
+    # The binder's own reason reaches the log and nothing else.
+    assert "mesh_binding_rejected" not in caplog.text.split("binding rejected", 1)[1]
+
+
 def test_paid_disabled_by_default():
     client = Mock()
     with pytest.raises(g.GenerationError, match="not_enabled"):

@@ -55,3 +55,169 @@ test('only catalogue items that match a detected piece are auto-placed', () => {
   assert.equal(matchDetected('xander', detected, []), null);
   assert.equal(matchDetected('chair', detected, [chairId]), null, 'the chair spot is already taken');
 });
+
+// ---------- pages ----------
+
+const paged: PaletteItem[] = [
+  { url: '', name: 'Rearrange', action: 'rearrange', page: 'Designer' },
+  { url: '', name: 'Cozy', action: 'style:cozy', page: 'Designer' },
+  { url: '/objects/scan-a.glb', name: 'Captured object', page: 'Scans' },
+  { url: '/objects/scan-b.glb', name: 'Captured object', page: 'Scans' },
+  { url: '', name: 'Clear objects', action: 'clear', page: 'Room' },
+];
+
+/** Every tile the window can be hit on, by the name drawn on it. */
+function hittableNames(palette: Palette): string[] {
+  const grip = new THREE.Group();
+  palette.attachTo(grip);
+  grip.updateMatrixWorld(true);
+  return palette.group.children
+    .filter((c) => c.userData.item)
+    .map((c) => (c.userData.item as PaletteItem).name);
+}
+
+test('one page is on screen at a time, with one tab per page', () => {
+  const palette = new Palette();
+  palette.setItems(paged);
+  assert.equal(palette.activePage, 'Designer', 'the first page is shown when none is remembered');
+  // Three tabs, plus the two tiles of the Designer page. Nothing from Scans or Room.
+  assert.deepEqual(hittableNames(palette), ['Designer', 'Scans', 'Room', 'Rearrange', 'Cozy']);
+});
+
+test('a tab carries a page: action, and showPage swaps which tiles are drawn', () => {
+  const palette = new Palette();
+  palette.setItems(paged);
+  const grip = new THREE.Group();
+  palette.attachTo(grip);
+  grip.updateMatrixWorld(true);
+  const scansTab = palette.group.children.find((c) => (c.userData.item as PaletteItem | undefined)?.name === 'Scans')!;
+  assert.equal(palette.hitTest(rayInto(scansTab))?.action, 'page:Scans');
+
+  palette.showPage('Scans');
+  assert.equal(palette.activePage, 'Scans');
+  assert.deepEqual(hittableNames(palette), ['Designer', 'Scans', 'Room', 'Captured object', 'Captured object']);
+});
+
+test('a single page draws no tabs at all', () => {
+  const palette = new Palette();
+  palette.setItems(paged.filter((it) => it.page === 'Scans'));
+  assert.deepEqual(hittableNames(palette), ['Captured object', 'Captured object']);
+});
+
+test('a remembered page that no longer exists falls back to the first, never to a guess', () => {
+  const palette = new Palette();
+  palette.setItems(paged);
+  palette.showPage('Room');
+  // The scans have gone away and Room went with them: the window must not be left blank.
+  palette.setItems(paged.filter((it) => it.page === 'Designer'));
+  assert.equal(palette.activePage, 'Designer');
+});
+
+// ---------- a page too long to show at once ----------
+
+/** A catalogue the size the built-in library is heading for. */
+const many: PaletteItem[] = Array.from({ length: 30 }, (_, i) => ({
+  url: `/objects/piece-${i}.glb`,
+  name: `Piece ${i}`,
+  page: 'Furniture',
+}));
+
+test('a long page is sliced, and only one slice is on screen', () => {
+  const palette = new Palette();
+  palette.setItems(many);
+  const shown = hittableNames(palette);
+  const steps = shown.filter((n) => n === '‹' || n === '›');
+  assert.deepEqual(steps, ['›'], 'the first slice offers forward only: there is no back from the top');
+  const pieces = shown.filter((n) => n.startsWith('Piece '));
+  assert.ok(pieces.length < 30 && pieces.length >= 4, `one slice holds ${pieces.length} of 30`);
+  assert.equal(pieces[0], 'Piece 0');
+});
+
+test('stepping forward and back walks the same page without losing a tile', () => {
+  const palette = new Palette();
+  palette.setItems(many);
+  const slice = () => hittableNames(palette).filter((n) => n.startsWith('Piece '));
+  const seen: string[] = [...slice()];
+  let guard = 0;
+  while (hittableNames(palette).includes('›') && guard++ < 10) {
+    palette.scrollBy(1);
+    seen.push(...slice());
+  }
+  assert.deepEqual(seen, many.map((it) => it.name), 'every tile appears exactly once, in order');
+  assert.deepEqual(hittableNames(palette).filter((n) => n === '‹' || n === '›'), ['‹'], 'the last slice offers back only');
+  palette.scrollBy(-1);
+  assert.ok(hittableNames(palette).includes('›'), 'and forward comes back');
+});
+
+test('a widget row is never cut in half by a slice', () => {
+  const palette = new Palette();
+  palette.setItems(many);
+  // Four cells across, so a slice must hold whole rows: its tile count is a multiple of four.
+  // The final slice is exempt, because 30 tiles end in a row of two however they are sliced.
+  const counts: number[] = [];
+  let guard = 0;
+  for (;;) {
+    counts.push(hittableNames(palette).filter((n) => n.startsWith('Piece ')).length);
+    if (!hittableNames(palette).includes('›') || guard++ > 10) break;
+    palette.scrollBy(1);
+  }
+  assert.ok(counts.length > 1, 'it did slice');
+  for (const n of counts.slice(0, -1)) assert.equal(n % 4, 0, `a middle slice holds ${n} tiles`);
+  assert.equal(counts.reduce((a, b) => a + b, 0), many.length, 'and nothing is dropped or repeated');
+});
+
+test('a short page has no pager at all, and changing tab returns to the top', () => {
+  const palette = new Palette();
+  palette.setItems(paged);
+  assert.deepEqual(hittableNames(palette).filter((n) => n === '‹' || n === '›'), []);
+
+  const mixed = new Palette();
+  mixed.setItems([...many, { url: '', name: 'Clear objects', action: 'clear', page: 'Room' }]);
+  mixed.scrollBy(1);
+  assert.ok(hittableNames(mixed).includes('‹'), 'moved down the catalogue');
+  mixed.showPage('Room');
+  mixed.showPage('Furniture');
+  assert.deepEqual(hittableNames(mixed).filter((n) => n === '‹' || n === '›'), ['›'], 'back at the top');
+});
+
+// ---------- the window is opaque to the delete button, not just to a tile ----------
+
+test('every point down the window body reads as interface, tile or not', () => {
+  const palette = new Palette();
+  palette.setItems([
+    { url: '', name: 'Hold to talk', action: 'hold:talk', accent: true, section: 'Designer' },
+    { url: '', name: 'Fit: 2 red, 1 amber', label: true, section: 'Designer' },
+    { url: '', name: 'Clear objects', action: 'clear', destructive: true, section: 'Room' },
+  ]);
+  const grip = new THREE.Group();
+  palette.attachTo(grip);
+  grip.updateMatrixWorld(true);
+
+  // The frame, the screen, the section headers and the label rows all have their raycast off,
+  // so hitTest answers for only a fraction of an opaque window. A ray anywhere on it has to
+  // count as aiming at the interface, or the delete button acts on the room behind it.
+  const box = new THREE.Box3().setFromObject(palette.group);
+  const missed: string[] = [];
+  for (let i = 1; i < 10; i++) {
+    const y = box.min.y + (box.max.y - box.min.y) * (i / 10);
+    const r = new THREE.Raycaster(new THREE.Vector3(0, y, 1), new THREE.Vector3(0, 0, -1));
+    if (!palette.hitSurface(r)) missed.push(y.toFixed(3));
+  }
+  assert.deepEqual(missed, [], 'these heights let a ray through the window');
+
+  // A ray well beside the window is the room, and must stay the room.
+  const beside = new THREE.Raycaster(new THREE.Vector3(3, 0, 1), new THREE.Vector3(0, 0, -1));
+  assert.equal(palette.hitSurface(beside), false);
+});
+
+test('a hidden window is not a surface: nothing is aimed at a window that is not there', () => {
+  const palette = new Palette();
+  palette.setItems([{ url: '', name: 'Clear objects', action: 'clear', section: 'Room' }]);
+  const grip = new THREE.Group();
+  palette.attachTo(grip);
+  grip.updateMatrixWorld(true);
+  const r = new THREE.Raycaster(new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, 0, -1));
+  assert.equal(palette.hitSurface(r), true);
+  palette.setItems([]); // nothing to show: the window goes away
+  assert.equal(palette.hitSurface(r), false);
+});

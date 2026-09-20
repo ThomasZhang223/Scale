@@ -135,8 +135,6 @@
       }
       #agent input::placeholder { color: var(--label-tertiary); }
       #agent-presets { display: grid; gap: 6px; padding: 8px 12px; }
-      #agent-presets .styles { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-      #agent-presets .styles button { width: 100%; }
       #agent-status { color: var(--label-secondary); font-size: 13px; line-height: 18px; }
       #agent-status:empty { display: none; }
       #agent-status[data-state="working"] { color: var(--accent); }
@@ -203,6 +201,7 @@
 
       <section id="listings-section">
         <h2>Listings</h2>
+        <div class="group"><a href="/shopify.html" target="_blank" rel="noopener">Shopify: find something that fits</a></div>
         <div class="group">
           <div class="row" id="listing-ask-row">
             <input id="listing-text" type="text" placeholder="Find, e.g. a lamp under 1.5 m for the 80 cm gap" autocomplete="off" />

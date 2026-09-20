@@ -128,7 +128,7 @@ export function buildRoomFromScan(scan: Json): BuiltRoom {
   for (const s of walls) {
     const thickness = wallThickness(s);
     const look = appearance.get(s.identifier);
-    const photo = surfaceTexture(look);
+    const photo = look?.textureUrl ? photoMaterial(look, COLORS.wall) : null;
     // A door or window in a photographed wall is already in the photo, so it is painted, not
     // cut. ExtrudeGeometry's UVs are not the wall rectangle, so a hole would scramble the
     // photo across the whole wall.
@@ -301,9 +301,9 @@ function readAppearance(scan: Json, walls: Surface[]): Map<string, SurfaceAppear
  * image aspect is not the surface aspect. Stretching it to UV 0..1 is what undoes the
  * transform — it is the correction, not a distortion. Never tiled, never aspect-fitted.
  */
-function surfaceTexture(look: SurfaceAppearance | undefined): THREE.Texture | null {
+function surfaceTexture(look: SurfaceAppearance | undefined, onError?: () => void): THREE.Texture | null {
   if (!look?.textureUrl) return null;
-  const texture = textureLoader.load(look.textureUrl);
+  const texture = textureLoader.load(look.textureUrl, undefined, undefined, onError);
   texture.colorSpace = THREE.SRGBColorSpace; // a photo is sRGB; without this the room goes pale
   // A photo that is the whole surface must not wrap at all: clamping keeps a rounding error at
   // the edge from pulling in the opposite edge. One that repeats mirrors instead, so that each
@@ -320,6 +320,28 @@ function surfaceTexture(look: SurfaceAppearance | undefined): THREE.Texture | nu
 }
 
 /**
+ * The material for a photographed surface, and what it becomes if the photo never arrives.
+ *
+ * An unlit material whose map never loaded renders WHITE. A room whose photos 404 would come up
+ * as a white box saying nothing about why — worse than the sampled colour it already has, and
+ * indistinguishable from a room that was never photographed. So a failed photo falls back to the
+ * colour, and names the URL that failed.
+ */
+function photoMaterial(look: SurfaceAppearance, fallback: string): THREE.MeshBasicMaterial {
+  const material = new THREE.MeshBasicMaterial();
+  const useColour = () => {
+    console.warn(`Room appearance: ${look.textureUrl} did not load; using the sampled colour instead.`);
+    material.map = null;
+    material.color.set(look.hex ?? fallback);
+    material.needsUpdate = true;
+  };
+  const map = surfaceTexture(look, useColour);
+  if (map) material.map = map;
+  else useColour();
+  return material;
+}
+
+/**
  * A whole surface: its photo when it has one, its sampled colour when it does not.
  *
  * A photographed surface is UNLIT. The photo already contains the room's own light — the
@@ -328,9 +350,8 @@ function surfaceTexture(look: SurfaceAppearance | undefined): THREE.Texture | nu
  * y and a vertical wall sits exactly halfway. A flat colour still needs the scene's lights.
  */
 function surfaceMaterial(look: SurfaceAppearance | undefined, fallback: string): THREE.Material {
-  const map = surfaceTexture(look);
-  return map
-    ? new THREE.MeshBasicMaterial({ map })
+  return look?.textureUrl
+    ? photoMaterial(look, fallback)
     : new THREE.MeshStandardMaterial({ color: look?.hex ?? fallback });
 }
 
@@ -353,14 +374,14 @@ function wallSlab(
   s: Surface,
   thickness: number,
   look: SurfaceAppearance | undefined,
-  photo: THREE.Texture | null,
+  photo: THREE.MeshBasicMaterial | null,
   roomCenter: THREE.Vector3,
 ): THREE.Mesh {
   const plain = new THREE.MeshStandardMaterial({ color: look?.hex ?? COLORS.wall });
   let material: THREE.Material | THREE.Material[] = plain;
   if (photo) {
     const faces: THREE.Material[] = [plain, plain, plain, plain, plain, plain];
-    faces[inwardFace(s, roomCenter)] = new THREE.MeshBasicMaterial({ map: photo }); // unlit: see surfaceMaterial
+    faces[inwardFace(s, roomCenter)] = photo; // unlit, and colour-on-failure: see photoMaterial
     material = faces;
   }
   const mesh = new THREE.Mesh(new THREE.BoxGeometry(s.dims[0], s.dims[1], thickness), material);

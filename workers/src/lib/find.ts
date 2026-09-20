@@ -13,6 +13,8 @@ export interface FindBody {
   storefront: string;
   merchant: string;
   query: string;
+  /** "show me what there is": skip the storefront round trip and answer from the catalogue. */
+  browse?: boolean;
   fit?: { maxW?: number; maxH?: number; maxD?: number };
   limit?: number;
 }
@@ -58,7 +60,11 @@ const PAGE_LIMIT = 12;             // ceiling: rendered pages per store; raise o
 
 export function assertFindBody(body: unknown): FindBody {
   const b = (body ?? {}) as Record<string, unknown>;
-  for (const key of ["storefront", "merchant", "query"] as const) {
+  // A browse has nothing to type into a merchant's search box, so it carries no query. It still
+  // needs the storefront and merchant, because they name which shop the answer is about.
+  if (b.browse === true && (b.query == null || b.query === "")) b.query = "";
+  const required = b.browse === true ? (["storefront", "merchant"] as const) : (["storefront", "merchant", "query"] as const);
+  for (const key of required) {
     if (typeof b[key] !== "string" || !(b[key] as string).trim()) {
       throw new HttpError(400, "missing_field", `${key} is required.`); // standing rule 4
     }

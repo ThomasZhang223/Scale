@@ -10,13 +10,15 @@ function run(args, executable = process.execPath) {
 run([wrangler, "types"]);
 run([fileURLToPath(new URL("../node_modules/typescript/bin/tsc", import.meta.url)), "--noEmit"]);
 run(["--experimental-transform-types", "--test", "tests/mesh-queue.test.mjs", "tests/embedding.test.mjs",
-     "tests/find.test.mjs", "tests/find-ready.test.mjs", "tests/listings-generate.test.mjs"]);
+     "tests/find.test.mjs", "tests/find-ready.test.mjs", "tests/listings-generate.test.mjs",
+     "tests/scan-thumb.test.mjs"]);
 run([wrangler, "deploy", "--dry-run"]);
 if (process.argv.includes("--check")) process.exit(0);
 run([wrangler, "whoami"]);
 // These are additive CREATE IF NOT EXISTS migrations; existing catalogue/room data stays.
 run([wrangler, "d1", "execute", "full-scale-db", "--remote", "--file", "src/schema.sql", "--yes"]);
 run([wrangler, "d1", "execute", "full-scale-db", "--remote", "--file", "src/mesh-schema.sql", "--yes"]);
+run([wrangler, "d1", "execute", "full-scale-db", "--remote", "--file", "src/thumb-schema.sql", "--yes"]);
 run([wrangler, "deploy"]);
 run([wrangler, "deployments", "list"]);
 run([wrangler, "queues", "info", "full-scale-jobs"]);

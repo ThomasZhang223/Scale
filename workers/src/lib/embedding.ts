@@ -11,6 +11,8 @@ export interface Embedding {
 
 const OBJECT_FRAME = /^objects\/[^/]+\/frames\/[^/]+\.(jpg|jpeg|png)$/;
 const CATALOG_SOURCE = /^catalog\/[^/]+\/[^/]+\/source\.(jpg|jpeg|png)$/;
+/** A headset render of a phone scan's own mesh: the only picture a scan ever has. */
+const SCAN_THUMB = /^scans\/[0-9a-f-]{36}\/thumb\.jpg$/;
 
 /** Both queries and indexed images use the same CPU encoder and fingerprint namespace. */
 export async function embedInput(
@@ -28,10 +30,10 @@ export async function embedInput(
   if (input.imageKey != null) {
     // Read directly from the bound private bucket; the encoder needs no R2 credentials
     // or arbitrary URL-fetch capability. Never trust a caller-provided public image URL.
-    // Exactly the two image key shapes R2Keys mints (objectFrame, catalogSource) — the guard
-    // still refuses every other key.
-    if (!OBJECT_FRAME.test(input.imageKey) && !CATALOG_SOURCE.test(input.imageKey)) {
-      throw new HttpError(400, "bad_image_key", `Expected an object frame or catalogue source key, got ${JSON.stringify(input.imageKey)}.`);
+    // Exactly the three image key shapes R2Keys mints (objectFrame, catalogSource, scanThumb)
+    // — the guard still refuses every other key.
+    if (!OBJECT_FRAME.test(input.imageKey) && !CATALOG_SOURCE.test(input.imageKey) && !SCAN_THUMB.test(input.imageKey)) {
+      throw new HttpError(400, "bad_image_key", `Expected an object frame, catalogue source or scan thumbnail key, got ${JSON.stringify(input.imageKey)}.`);
     }
     const image = await env.BUCKET.get(input.imageKey);
     if (!image) throw new HttpError(404, "image_not_found", `Embedding image not found at ${input.imageKey}.`);

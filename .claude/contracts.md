@@ -203,7 +203,7 @@ B ships this surface as stubs in hours 0–2. Real logic lands behind it afterwa
 | `POST /uploads` | `{ kind, ext?, objectId?, roomId?, n?, merchant?, productId? }` | `{ key, putUrl }` — `putUrl` points back at the Worker, which streams the PUT into R2 | A, C |
 | `POST /objects` | `{ source, name, category, bboxMeters, measure, frameKeys[] }` | `Object v1` with `state:"measured"` | A |
 | `GET /objects?source=&merchant=&limit=` | — | `[Object v1]`, newest first, `state != 'failed'`; `limit` 1-500, default 100 | A, D |
-| `GET /objects/{id}` | — | `Object v1` | all |
+| `GET /objects/{id}` | — | `Object v1`. Response headers `X-Scan-Thumb: none\|pending\|done\|failed`, plus `X-Scan-Thumb-Attempts` and `X-Scan-Thumb-Error` when there is one — the state of the row's rendered picture. Headers and not body, because `Object v1` is a shared schema and this is operational detail | all |
 | `POST /objects/{id}/generate` | `{ tier: "live" \| "quality" }` | `{ jobId }` | A, C |
 | `POST /objects/{id}/mesh` | `{ key, roomId? }` — `key` must be `scans/{id}/mesh.glb` for a `source:"scan"` object and `objects/{id}/mesh.glb` for `catalog` or `primitive` | `Object v1` with `state:"ready"` | A, C |
 | `POST /objects/{id}/index` | `{ imageKey }` or `{ text }` (exactly one), `X-Upstream-Token` | `{ objectId, fingerprint, modality }` | backfill, retry |
@@ -216,6 +216,7 @@ B ships this surface as stubs in hours 0–2. Real logic lands behind it afterwa
 | `POST /ingest` | `{ merchant, storefront, collection?, browserbase?, llm?, vlm? }`, `X-Upstream-Token` | `202 { workflowId, merchant, storefront }` | operator, P3 |
 | `POST /catalog/ingest` | `[item]` or `{ products \| objects \| items }`, 1-100, `X-Upstream-Token` | `202 { accepted, jobs: [{ objectId, jobId }] }` | scrapers |
 | `POST /find` | `{ storefront, merchant, query, fit?, limit? }` — one live storefront; the Worker fans into `services/ingest` `/find` then `/extract` with the upstream token the browser never holds | `{ merchant, storefront, searchUrl, searchedFor, handles, products, measured, fitting, fallbackSuspected, warning, listings: [Object v1-shaped row + imageUrl] }`. Writes nothing. With `FIND_READY_ONLY="1"` each row also carries `findSource` (`"storefront"` \| `"catalog"`) and the response carries `X-Find-Source: storefront=N,catalog=N,dropped=N,unidentified=N,stretched=N,unrated=N` — see below | F (headset, three stores in parallel) |
+| `POST /objects/{id}/thumbnail` | Raw JPEG or PNG bytes, no wrapper. `?force=1` replaces an existing one | `202 { objectId, key, stored, indexed:"pending" }`, or `200 { stored:false }` when one already exists. Scans only (`422 not_a_scan` otherwise): stores `scans/{id}/thumb.jpg` and IMAGE-embeds it through `indexObject`, so a text query can finally rank scans apart. The vector takes 20-30 s to appear | F (headset thumbnail cache) |
 | `POST /listings/generate` | `{ listing, roomId? }` — a row picked from `/find` | `202 { objectId, jobId }`. Reuses the catalogue intake: one D1 object (`source:"catalog"`) and one mesh job; `roomId` makes the ready mesh arrive on that room's SSE feed. When the object is ALREADY `ready` with a mesh: `200 { objectId, jobId: null, state, glbUrl }` — no second job, no state change | F |
 
 **`FIND_READY_ONLY` (Worker `[vars]`, additive and optional).** `"1"`: `/find` still runs the
@@ -240,8 +241,42 @@ Notes on the rows above that are not in the table:
   `scans/` (400 `bad_mesh_key`, naming the expected key and the source). It refuses bytes that are not a binary glTF — bad magic, version or declared length — with 422
   `not_a_glb`, leaving the row `measured`. It answers before the object is searchable: the
   response carries `X-Indexed: pending` (indexing runs in the background),
-  or `X-Indexed: false` with `X-Index-Skipped: no-embeddable-text` when the scan has no name or
-  category to embed.
+  or `X-Indexed: false` with `X-Index-Skipped: no-embeddable-text` when a catalogue or library row
+  has no name or category to embed. A `source:"scan"` row answers `X-Indexed: scan-thumb-pending`
+  instead and is NOT indexed from text — see "Every scan is searchable" below.
+**Every scan is searchable, with no headset in the loop (additive).** Object Capture uploads a
+mesh and no photo, so a scan's only text is "Captured object" / "unknown" — the same words on
+every row, one point in the embedding space, and no query can tell two scans apart. So the
+picture is made instead, in the pipeline:
+
+1. `POST /objects/{id}/mesh` on a `source:"scan"` row writes one `scan_thumb_jobs` row
+   **before it answers**, and answers `X-Indexed: scan-thumb-pending`. That row is the
+   acceptance; nothing after it is best-effort.
+2. A background step opens `GET {RENDER_ORIGIN}/thumb?glb=/v1/assets/scans/{id}/mesh.glb` in
+   Cloudflare Browser Rendering. The page is `apps/xr/thumb.html`, and it calls the same
+   `renderThumbnail()` the headset calls, so the framing is shared by construction: 512 square,
+   JPEG q0.9, white, camera (1, 0.65, 1), box framed to 88%. The completion signal is the page's
+   CANVAS, which it appends only on success — `quickAction` cannot evaluate JavaScript, so
+   `window.__thumb` is out of reach and `waitForSelector` waits for the element instead.
+3. The JPEG is stored at `scans/{id}/thumb.jpg` and IMAGE-embedded through `indexObject` — the
+   same key and the same indexer `POST /objects/{id}/thumbnail` uses. There is one render
+   implementation and one index implementation, called from two places.
+
+`RENDER_ORIGIN` is a Worker `[vars]` entry: the origin that serves `/thumb`. Unset, or not
+`https://`, is never guessed — the step records `failed` naming the var, and `/v1/health` says
+`scanThumbs.renderOriginConfigured: false`.
+
+The headset's own upload stays as the second path. Whichever finishes first wins, and the other
+is cheap: an existing `scans/{id}/thumb.jpg` skips the render but still re-runs the index, which
+is an upsert on the same vector id — that is what repairs a stored picture whose background
+index failed.
+
+Retries are bounded: 4 attempts, backing off 60 s, 120 s, 240 s, driven by the one-minute cron,
+one object per tick (a second Browser Rendering action fired immediately answers HTTP 429). On
+the last attempt the row stops at `failed` with the reason, and a text vector is written as a
+floor so the object is no worse off than before this existed. Every state is readable on
+`GET /objects/{id}` headers and on `GET /health` under `scanThumbs`.
+
 - When `POST /objects/{id}/mesh` succeeds for a non-scan object (a reviewed hero mesh attached to a
   catalogue object), that object's parked mesh jobs — `kind:"mesh"`, `state:"queued"` — become
   `done` at 100% with the note `mesh attached via POST /mesh (reviewed offline); generation
@@ -338,6 +373,10 @@ objects(id TEXT PK, source, state, name, category,
         caption, palette_json, price_cents INTEGER, currency,
         product_url, merchant, created_at)
 jobs(id TEXT PK, object_id, kind, tier, state, progress_pct, error, created_at, updated_at)
+-- One row per scan whose mesh was attached, holding the state of its rendered picture.
+-- Written by POST /objects/{id}/mesh before it answers; drained by the one-minute cron.
+scan_thumb_jobs(object_id TEXT PK, state, attempts INTEGER, error,
+                next_attempt_at, lease_until, created_at, updated_at)
 ```
 
 ### Vectorize index `objects-v1`

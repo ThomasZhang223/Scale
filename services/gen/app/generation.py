@@ -3,6 +3,7 @@ import base64
 from dataclasses import dataclass, field
 import hashlib
 import json
+import logging
 import re
 import threading
 import time
@@ -167,7 +168,14 @@ class GenerationAttempt:
                 bound = bind_selected(GeneratedAsset(raw.glb, raw.image_sha256),
                     SelectedProduct(req.object_id, req.image_sha256, req.bbox_meters), self.orientation,
                     scope=req.scope)
-            except (BindingError, RecordError):
+            except (BindingError, RecordError) as rejection:
+                # The wire code stays sanitized — callers get "mesh_binding_rejected" and
+                # nothing else. But that code alone cost an operator a hand-run of bind_glb
+                # to learn the reason was a degenerate UV triangle, so the reason goes to
+                # this process's log, where only the operator sees it. The binder's own
+                # messages are local ("Degenerate triangles"), never upstream text.
+                logging.getLogger(__name__).warning(
+                    "binding rejected for %s: %s: %s", req.object_id, type(rejection).__name__, rejection)
                 raise GenerationError("mesh_binding_rejected") from None
             finished = time.perf_counter()
             receipt = {"schemaVersion": 1, "objectId": req.object_id, "source": req.source,

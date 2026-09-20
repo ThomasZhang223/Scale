@@ -1,5 +1,6 @@
 import { defineConfig, loadEnv, type Plugin } from 'vite';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), 'VITE_');
@@ -92,6 +93,19 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [voiceGuard, activeRoom],
+    build: {
+      rollupOptions: {
+        // Two pages, not one. thumb.html is the headless renderer the pipeline opens to get a
+        // picture of a mesh with no headset in the loop; without naming it here Vite builds
+        // index.html alone and a plain `npm run deploy` ships a front door with no thumb.html
+        // behind it, which fails only when someone tries to use it.
+        input: {
+          index: resolve(__dirname, 'index.html'),
+          thumb: resolve(__dirname, 'thumb.html'),
+          shopify: resolve(__dirname, 'shopify.html'),
+        },
+      },
+    },
     server: {
       host: true,
       port: 5173,
