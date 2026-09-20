@@ -77,6 +77,35 @@ MAX_TRIANGLES = 100_000
 PACK_ARGS = ["--compress", "false", "--instance", "false", "--simplify", "false",
              "--palette", "false", "--texture-size", "1024", "--texture-compress", "auto"]
 
+# The app's own vocabulary, copied from the `known` list in apps/xr/src/main.ts categoryOf().
+# A category outside this list still seeds and still shows on the Furniture page, but the app
+# cannot use it to decide which scanned piece the model stands in for. Every such model is
+# flagged `categoryInKnownList: false` in the manifest and listed in the report, so the gap is
+# a decision for a person and never a silent invention.
+# Where a lamp has to live to make sense. Every object in the headset is a dynamic physics body
+# under gravity and there is no wall or ceiling mounting, so a `ceiling` or `wall` light added by
+# "add a lamp" drops to the floor and sits there. Those are packed, measured and recorded, but
+# NOT seeded: see HELD. A `floor` or `table` lamp stands on its own and is seeded normally.
+MOUNT = {
+    "Chandelier_01": "ceiling", "Chandelier_02": "ceiling", "Chandelier_03": "ceiling",
+    "chinese_chandelier": "ceiling", "lantern_chandelier_01": "ceiling",
+    "caged_hanging_light": "ceiling", "hanging_industrial_lamp": "ceiling",
+    "mounted_fluorescent_lights": "ceiling", "modern_ceiling_lamp_01": "ceiling",
+    "industrial_caged_sconce": "wall", "industrial_wall_lamp": "wall",
+    "industrial_wall_sconce": "wall",
+    "industrial_pipe_lamp": "table", "vintage_oil_lamp": "table", "wooden_lantern_01": "table",
+    "Lantern_01": "table", "brass_diya_lantern": "table", "desk_lamp_arm_01": "table",
+}
+# Packed and measured, deliberately not seeded. Seeding one later is deleting its line here.
+# modern_ceiling_lamp_01 went live in the first wave and was removed again on Thomas's word, so
+# it is held with the rest: every ceiling and wall light is now out of the live library.
+HELD_REASON = "needs wall/ceiling mount — not seeded"
+HELD = {a for a, m in MOUNT.items() if m in ("ceiling", "wall")}
+
+KNOWN_CATEGORIES = ("coffee table", "side table", "sofa", "couch", "armchair", "chair", "stool",
+                    "bench", "dining", "table", "desk", "bed", "storage", "shelf", "bookcase",
+                    "cabinet", "dresser", "wardrobe", "lamp", "television", "tv", "plant", "rug")
+
 # The app's own vocabulary, from the `known` list in apps/xr/src/main.ts categoryOf(). The
 # category is load-bearing: main.ts decides which scanned piece a model stands in for by it.
 # Each entry declares the plausible range for its LARGEST side, in metres. A model outside its
@@ -114,6 +143,114 @@ CURATED = [
     ("desk_lamp_arm_01",         "Adjustable desk lamp",        "lamp",         0.1, 2.0),
     ("potted_plant_01",          "Tall potted plant",           "plant",        0.2, 2.5),
     ("potted_plant_02",          "Potted plant",                "plant",        0.2, 2.5),
+
+    # --- Second wave -------------------------------------------------------------------------
+    # Lamps first, because the library had only two. Poly Haven's lighting is period and
+    # industrial rather than modern, so the set leans that way; each one still reads as a light
+    # from three metres. Eleven of these need a wall or a ceiling to make sense — they are the
+    # chandeliers, the pendants, the sconces and the strip light. That is called out in the
+    # report rather than hidden, because a chandelier standing on the floor looks like a bug.
+    ("Chandelier_01",            "Brass chandelier",            "lamp",         0.2, 2.0),
+    ("Chandelier_02",            "Crystal chandelier",          "lamp",         0.2, 2.0),
+    ("Chandelier_03",            "Tiered chandelier",           "lamp",         0.2, 2.0),
+    ("chinese_chandelier",       "Wooden ceiling chandelier",   "lamp",         0.2, 2.0),
+    ("lantern_chandelier_01",    "Lantern chandelier",          "lamp",         0.2, 2.0),
+    ("caged_hanging_light",      "Caged pendant light",         "lamp",         0.1, 2.0),
+    ("hanging_industrial_lamp",  "Industrial pendant lamp",     "lamp",         0.1, 2.0),
+    ("mounted_fluorescent_lights", "Fluorescent ceiling light", "lamp",         0.1, 2.0),
+    ("industrial_caged_sconce",  "Caged wall sconce",           "lamp",         0.1, 2.0),
+    ("industrial_wall_lamp",     "Industrial wall lamp",        "lamp",         0.05, 1.5),
+    ("industrial_wall_sconce",   "Small wall sconce",           "lamp",         0.05, 1.5),
+    ("industrial_pipe_lamp",     "Industrial pipe desk lamp",              "lamp",         0.05, 1.5),
+    ("vintage_oil_lamp",         "Vintage oil table lamp",            "lamp",         0.05, 1.5),
+    ("wooden_lantern_01",        "Wooden table lantern",              "lamp",         0.05, 1.5),
+    ("Lantern_01",               "Small metal table lantern",         "lamp",         0.05, 1.5),
+    ("brass_diya_lantern",       "Brass diya table lamp",          "lamp",         0.05, 1.5),
+
+    # More seating, for variety rather than count.
+    ("Rockingchair_01",          "Rocking chair",               "chair",        0.4, 1.6),
+    ("SchoolChair_01",           "School chair",                "chair",        0.4, 1.4),
+    ("gallinera_chair",          "Gallinera chair",             "chair",        0.4, 1.4),
+    ("painted_wooden_chair_01",  "Painted wooden chair",        "chair",        0.4, 1.4),
+    ("painted_wooden_chair_02",  "High-back painted chair",     "chair",        0.4, 1.6),
+    ("plastic_monobloc_chair_01", "Plastic garden chair",       "chair",        0.4, 1.4),
+    ("chinese_armchair",         "Carved wooden armchair",      "armchair",     0.5, 1.8),
+    ("chinese_sofa",             "Carved wooden sofa",          "sofa",         1.2, 3.5),
+    ("painted_wooden_sofa",      "Painted wooden settle",       "sofa",         1.2, 3.5),
+    ("metal_stool_01",           "Tall metal stool",            "stool",        0.2, 1.2),
+    ("metal_stool_03",           "Metal bar stool",             "stool",        0.2, 1.4),
+    ("wooden_stool_01",          "Wooden stool",                "stool",        0.2, 1.2),
+    ("folding_wooden_stool",     "Folding wooden stool",        "stool",        0.2, 1.2),
+    ("vintage_day_bed",          "Vintage day bed",             "bed",          1.0, 2.6),
+    ("GothicBed_01",             "Carved double bed",           "bed",          1.0, 2.6),
+
+    # Tables, the other thin category.
+    ("CoffeeTable_01",           "Glass-top coffee table",      "coffee table", 0.5, 2.0),
+    ("WoodenTable_01",           "Long wooden coffee table",    "coffee table", 0.5, 2.0),
+    ("chinese_tea_table",        "Square tea table",            "coffee table", 0.4, 2.0),
+    ("gothic_coffee_table",      "Carved square coffee table",  "coffee table", 0.5, 2.0),
+    ("industrial_coffee_table",  "Industrial coffee table",     "coffee table", 0.4, 2.0),
+    ("ClassicConsole_01",        "Classic console table",       "table",        0.5, 2.5),
+    ("chinese_console_table",    "Long console table",          "table",        0.5, 2.5),
+    ("round_wooden_table_01",    "Round dining table",          "dining",       0.8, 2.5),
+    ("painted_wooden_table",     "Painted dining table",        "dining",       1.0, 3.5),
+    ("wooden_table_02",          "Plain wooden dining table",   "dining",       0.8, 3.0),
+    ("WoodenTable_02",           "Small square side table",     "side table",   0.2, 1.2),
+    ("painted_wooden_nightstand", "Painted nightstand",         "side table",   0.2, 1.2),
+    ("side_table_tall_01",       "Tall side table",             "side table",   0.2, 1.2),
+    ("small_wooden_table_01",    "Low wooden side table",       "side table",   0.2, 1.4),
+    ("WoodenTable_03",           "Wooden sideboard",            "cabinet",      0.5, 3.0),
+    ("SchoolDesk_01",            "School desk",                 "desk",         0.4, 2.0),
+
+    # Storage. steel_frame_shelves_02 and _03 are the same family as steel_frame_shelves_01,
+    # which measured 21 m against a published 2.14 m. They are included ON PURPOSE: if the
+    # family shares that export fault, the gate says so from the measured bytes.
+    # (steel_frame_shelves_01 is already in the first wave above; it was never seeded, so it is
+    # re-fetched and re-measured on this run rather than assumed still broken.)
+    ("steel_frame_shelves_02",   "Narrow steel shelving",       "shelf",        0.5, 3.0),
+    ("steel_frame_shelves_03",   "Wide steel shelving",         "shelf",        0.5, 3.0),
+    ("painted_wooden_shelves",   "Small painted shelves",       "shelf",        0.3, 2.5),
+    ("wooden_display_shelves_01", "Wooden display shelves",     "shelf",        0.3, 2.5),
+    ("worn_metal_rack",          "Metal storage rack",          "shelf",        0.5, 3.0),
+    ("GothicCabinet_01",         "Carved tall cabinet",         "cabinet",      0.5, 3.0),
+    ("chinese_cabinet",          "Tall wooden cabinet",         "cabinet",      0.5, 3.0),
+    ("painted_wooden_cabinet_02", "Tall painted cupboard",      "cabinet",      0.5, 3.0),
+    ("vintage_cabinet_01",       "Vintage glass cabinet",       "cabinet",      0.5, 3.0),
+    ("GothicCommode_01",         "Carved commode",              "dresser",      0.5, 2.5),
+    ("vintage_wooden_drawer_01", "Small drawer unit",           "dresser",      0.3, 2.0),
+    ("potted_plant_04",          "Small potted plant",          "plant",        0.1, 2.5),
+
+    # Television is in the app's vocabulary, so these two are honest matches.
+    ("Television_01",            "Vintage television",          "television",   0.2, 1.6),
+    ("television_02",            "Small vintage television",    "television",   0.2, 1.6),
+
+    # --- Desk and room props ------------------------------------------------------------------
+    # NONE of these categories is in the app's `known` list. They seed and they show on the
+    # Furniture page, but the app cannot use them to decide which scanned piece they stand in
+    # for. Every one is flagged categoryInKnownList:false and listed in the report. The nearest
+    # existing word was not honest for any of them — a mirror is not a "tv", a vase is not a
+    # "plant" — so no word was stretched to fit.
+    ("classic_laptop",           "Laptop computer",             "laptop",       0.2, 1.0),
+    ("book_encyclopedia_set_01", "Encyclopedia set",            "books",        0.1, 1.5),
+    ("decorative_book_set_01",   "Stack of books",              "books",        0.1, 3.0),
+    ("office_notepads",          "Notepads",                    "stationery",   0.05, 1.5),
+    ("stationery_supplies",      "Desk stationery",             "stationery",   0.05, 1.0),
+    ("vintage_stapler",          "Stapler",                     "stationery",   0.03, 0.6),
+    ("clipboard",                "Clipboard",                   "stationery",   0.05, 0.8),
+    ("standing_chalkboard_01",   "Standing chalkboard",         "chalkboard",   0.4, 2.5),
+    ("wall_clock",               "Wall clock",                  "clock",        0.05, 1.0),
+    ("alarm_clock_01",           "Alarm clock",                 "clock",        0.03, 0.6),
+    ("ornate_mirror_01",         "Ornate wall mirror",          "mirror",       0.2, 2.5),
+    ("hanging_picture_frame_01", "Hanging picture frame",       "picture frame", 0.1, 1.5),
+    ("fancy_picture_frame_01",   "Gilt picture frame",          "picture frame", 0.1, 1.5),
+    ("standing_picture_frame_01", "Standing photo frame",       "picture frame", 0.05, 0.8),
+    ("ceramic_vase_01",          "Ceramic vase",                "vase",         0.05, 1.0),
+    ("brass_vase_02",            "Brass vase",                  "vase",         0.05, 1.0),
+    ("planter_pot_clay",         "Clay planter pot",            "planter",      0.05, 1.2),
+    ("planter_box_01",           "Wooden planter box",          "planter",      0.1, 2.0),
+    ("throw_pillows_01",         "Throw pillows",               "cushion",      0.1, 1.5),
+    ("ceiling_fan",              "Ceiling fan",                 "fan",          0.3, 2.0),
+    ("industrial_pastic_container", "Storage bin",              "bin",          0.1, 1.5),
 ]
 
 
@@ -271,14 +408,27 @@ def verify(base, oid, sha256, box):
             "state": row.get("state"), "listed": listed}
 
 
-def process(spec, args, index):
+def process(spec, args, index, previous):
     asset_id, name, category, low, high = spec
     record = {"source": "polyhaven", "assetId": asset_id, "name": name, "category": category,
+              "categoryInKnownList": category in KNOWN_CATEGORIES, "mount": MOUNT.get(asset_id),
               "url": f"https://polyhaven.com/a/{asset_id}", "license": LICENSE,
               "licenseUrl": LICENSE_URL, "objectId": object_id(asset_id), "status": None}
     meta = index.get(asset_id)
     if meta is None:
         return {**record, "status": "skipped", "reason": "not in the Poly Haven model list"}
+
+    # A model this manifest already recorded is checked BEFORE it is fetched again: the
+    # post-pack check needs the packed hash, which would mean re-downloading every earlier
+    # model on every run. A changed upstream file simply is not noticed until --refresh.
+    earlier = previous.get(asset_id)
+    if earlier and not args.plan_only and not args.refresh:
+        done = already_seeded(args.base, record["objectId"], earlier["packedSha256"])
+        if done is not None:
+            return {**earlier, **{k: record[k] for k in ("name", "category", "categoryInKnownList", "mount")},
+                    "status": "already_seeded",
+                    "verified": verify(args.base, record["objectId"], earlier["packedSha256"],
+                                       earlier["bboxMeters"])}
     record["attribution"] = sorted(meta.get("authors", {}))
     record["polyhavenPolycount"] = meta.get("polycount")
 
@@ -320,6 +470,9 @@ def process(spec, args, index):
 
     if args.plan_only:
         return {**record, "status": "planned"}
+    if asset_id in HELD:
+        # Measured and recorded, never posted. Nothing about this model reaches D1 or R2.
+        return {**record, "status": "held", "held": HELD_REASON}
 
     oid = record["objectId"]
     done = already_seeded(args.base, oid, sha256)
@@ -345,6 +498,8 @@ def build_parser():
     parser.add_argument("--manifest", required=True, help="where to write the committed manifest")
     parser.add_argument("--only", action="append", default=None, help="Poly Haven asset id; repeatable")
     parser.add_argument("--plan-only", action="store_true", help="download, pack and measure; upload nothing")
+    parser.add_argument("--refresh", action="store_true",
+                        help="re-fetch and re-pack even a model the manifest already records")
     return parser
 
 
@@ -355,11 +510,17 @@ def main(argv=None):
     args.base = args.base.rstrip("/")
     Path(args.work).mkdir(parents=True, exist_ok=True)
     index = get(f"{API}/assets?type=models")
+    manifest_path = Path(args.manifest)
+    previous = {}
+    if manifest_path.exists():
+        for row in json.loads(manifest_path.read_text(encoding="utf-8")).get("models", []):
+            if row.get("status") in ("seeded", "already_seeded") and row.get("packedSha256"):
+                previous[row["assetId"]] = row
     specs = [s for s in CURATED if not args.only or s[0] in set(args.only)]
     records = []
     for number, spec in enumerate(specs, 1):
         try:
-            record = process(spec, args, index)
+            record = process(spec, args, index, previous)
         except Stop as stop:
             record = {"assetId": spec[0], "name": spec[1], "category": spec[2],
                       "status": "failed", "reason": str(stop)}
@@ -389,6 +550,11 @@ def main(argv=None):
     }
     Path(args.manifest).write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     say(f"manifest: {args.manifest}")
+    held = [r for r in records if r["status"] == "held"]
+    if held:
+        say(f"held, packed and measured but NOT seeded ({len(held)}): {HELD_REASON}")
+        for r in held:
+            say(f"  {r['assetId']} ({r.get('mount')})")
     return 1 if any(r["status"] == "failed" for r in records) else 0
 
 
