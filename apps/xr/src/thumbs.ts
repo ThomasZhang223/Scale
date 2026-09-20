@@ -20,11 +20,12 @@ import type { ObjectLoader } from './objects';
  *  - the answer is cached per key and drawn once.
  */
 
-// Landscape, not square, because the band it lands in is a whole cell wide and only a third
-// of one tall (palette.ts COL_W and CELL_THUMB). A square render would be fitted to the band's
-// height and leave half the cell's width empty around the object.
-const W = 384;
-const H = 208;
+// Square, because the same picture serves two slots of different shape: the tablet's wide
+// cell band and the popout card's square well. A square is fitted by height in the first and
+// exactly in the second, so the object is the same size in both; a landscape render would fill
+// the tablet a little better and then sit in the middle third of the card, looking tiny.
+const W = 256;
+const H = 256;
 const VIEW = new THREE.Vector3(1, 0.65, 1).normalize(); // three-quarter, slightly above
 const FOV = 35;
 const FILL = 0.88; // how much of the frame the object's widest corner should reach
@@ -111,7 +112,7 @@ interface Stage {
 /**
  * A second, tiny renderer rather than a render target on the headset's own. Reading pixels
  * back out of the XR renderer means a synchronous GPU stall inside the frame the headset is
- * presenting; a separate 384 x 208 context costs a little memory once and stalls nothing.
+ * presenting; a separate 256 px context costs a little memory once and stalls nothing.
  */
 function makeStage(): Stage {
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });

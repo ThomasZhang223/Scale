@@ -230,8 +230,13 @@ async function start() {
   const palette = new Palette();
   // A tile's picture of the mesh it stands for. The palette pulls one per visible object
   // cell; thumbs.ts draws each mesh once, off to the side, and hands back a canvas.
-  const thumbs = new Thumbnails(loader, () => showPalette());
+  const thumbs = new Thumbnails(loader, () => {
+    showPalette();
+    findPanel.refresh(); // a scan row in the popout is waiting on the same picture
+  });
   palette.thumbFor = (item) => (item.url ? thumbs.get(item.objectId ?? item.url, item.url, item.scale) : null);
+  // Scale 1: a server mesh is already metres, and a picture of it never re-guesses that.
+  findPanel.thumbFor = (objectId, glbUrl) => (glbUrl ? thumbs.get(objectId, sameOrigin(glbUrl), 1) : null);
   const applier = new ProposalApplier(physics);
   // Built before the first showPalette(): the talk row reads voice.supported.
   const voice = new Voice({
@@ -300,7 +305,8 @@ async function start() {
     if (action === 'hold:talk:down') void talkDown();
     if (action === 'hold:talk:up') void talkUp();
     if (action.startsWith('scan:')) void findForScanned(action.slice(5));
-    if (action.startsWith('listing:')) void addListing(action.slice(8));
+    // 'listing:<id>' is gone with the tablet's copy of the result rows. A row is picked in the
+    // popout now, which sends 'find:pick:<id>' and goes through pickListing.
   }
 
   // ---------- scanned pieces and merchant listings ----------
@@ -335,17 +341,9 @@ async function start() {
     // The listings card can be closed; the search itself is not over. This brings it back.
     items.push({ url: '', name: 'Show listings', action: 'listings:show', section: 'Listings' });
     if (listings.note) items.push({ url: '', name: listings.note, label: true, severity: 'warn', section: 'Listings' });
-    if (!listings.recommendations.length) items.push({ url: '', name: 'Nothing fits that. Try a wider gap or another kind.', label: true, section: 'Listings' });
-    for (const r of listings.recommendations.slice(0, 6)) {
-      const l = r.listing;
-      items.push({
-        url: '',
-        name: `${l.name.length > 26 ? l.name.slice(0, 25) + '…' : l.name} · ${Math.round(l.bboxMeters.w * 100)} cm`,
-        action: `listing:${l.objectId}`,
-        objectId: l.objectId,
-        section: 'Listings',
-      });
-    }
+    // The rows themselves live in the popout, not here. They used to be repeated as tablet
+    // rows as well, which made the same six results readable in two places and kept the
+    // tablet tall — and a row here could only ever be a truncated name and one dimension.
     return items;
   }
 
@@ -1118,7 +1116,7 @@ async function start() {
    */
   function presentResults(res: { mode: 'shop' | 'scans'; query: string; rows: Recommendation[]; note: string | null }) {
     listings = { recommendations: res.rows, source: 'live', note: res.note };
-    findPanel.showResults(res.rows, res.note);
+    findPanel.showResults(res.rows, res.note, res.mode, res.query);
     showPalette();
     renderListings();
   }

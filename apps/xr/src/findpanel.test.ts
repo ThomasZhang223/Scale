@@ -45,3 +45,53 @@ test('a searching panel has no card hits, and dismiss hides everything', () => {
   panel.dismiss();
   assert.equal(panel.group.visible, false);
 });
+
+// ---------- the two modes ----------
+
+/** A phone scan as the scans branch hands it over: ready, with a mesh, no merchant, no photo. */
+const scan = (id: string): Recommendation => ({
+  score: 0, reasons: ['scanned on your phone'],
+  listing: { schemaVersion: 1, objectId: id, source: 'scan', state: 'ready', name: 'Captured object', category: 'unknown', glbUrl: `/v1/assets/scans/${id}/mesh.glb`, bboxMeters: { w: 0.53, h: 0.85, d: 0.47 }, imageUrl: null },
+});
+
+test('a scans row asks for a mesh picture; a listing with a photo does not', () => {
+  const panel = new FindPanel();
+  const asked: string[] = [];
+  panel.thumbFor = (objectId) => {
+    asked.push(objectId);
+    return null; // still rendering: the card keeps its plain plate
+  };
+  panel.setPresenting(true);
+  panel.showResults([scan('s1'), scan('s2')], null, 'scans', 'my chair');
+  assert.deepEqual(asked, ['s1', 's2'], 'every scan row wants its own mesh, since all are named the same');
+
+  // A merchant listing carries a product photo, so the mesh render is not asked for as well.
+  asked.length = 0;
+  const withPhoto = rec('m1');
+  withPhoto.listing.imageUrl = 'https://example.test/lamp.jpg';
+  panel.showResults([withPhoto], null, 'shop', 'lamp');
+  assert.deepEqual(asked, [], 'a photo is enough; no mesh is rendered for it');
+});
+
+test('picking a scans row hits the same card path a listing does', () => {
+  const panel = new FindPanel();
+  panel.setPresenting(true);
+  panel.showResults([scan('s1')], null, 'scans', 'my chair');
+  panel.group.position.set(0, 0, 0);
+  panel.group.updateMatrixWorld(true);
+  const [first] = cardRects(1);
+  const r = new THREE.Raycaster();
+  r.set(new THREE.Vector3(0, -(first.y + first.h / 2), 1), new THREE.Vector3(0, 0, -1));
+  assert.deepEqual(panel.hitTest(r), { kind: 'card', objectId: 's1' });
+});
+
+test('the mode does not leak: a shop search after a scans one is a shop search again', () => {
+  const panel = new FindPanel();
+  panel.setPresenting(true);
+  panel.showResults([scan('s1')], null, 'scans', 'my chair');
+  panel.showSearching('lamp', ['Poly & Bark']);
+  const asked: string[] = [];
+  panel.thumbFor = (objectId) => { asked.push(objectId); return null; };
+  panel.showResults([rec('m1')], null); // no kind given: shop is the default
+  assert.deepEqual(asked, ['m1'], 'a shop row with no photo still falls back to its mesh');
+});

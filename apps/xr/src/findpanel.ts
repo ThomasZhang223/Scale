@@ -3,11 +3,19 @@ import { wrap } from './hud.ts';
 import type { Recommendation, StageInfo, FindStage } from './listings.ts';
 
 /*
- * The find panel: what Browserbase is doing on each store, then the listings that came back.
- * A canvas texture on a plane, like hud.ts, but head-locked ahead and to the right so it sits
- * beside the transcript rather than behind the phone. Three states: searching (one stage row
- * per store), results (cards you can point at), generating (the picked card's progress line).
- * Only the cards and the × are hittable; everything else ignores the ray.
+ * The find panel: the popout window a search opens, in front of you and to the right, so
+ * results never become rows inside the tablet. A canvas texture on a plane, head-locked, with
+ * a × to close it. Only the cards and the × are hittable; everything else ignores the ray.
+ *
+ * It answers two searches, and the difference is `kind`:
+ *
+ *   shop    the merchants. Searching shows one small browser window per store with what
+ *           Browserbase is doing there; the results are listings, with the store's own
+ *           product photo, its merchant and its price.
+ *   scans   the user's own phone captures, and nothing else — no catalogue GLB and no
+ *           primitive. There is no searching phase, because the library is already on the
+ *           server. Every row is called "Captured object", so the picture is a render of
+ *           the mesh itself and is the only thing that tells two rows apart.
  */
 
 export type PanelHit = { kind: 'card'; objectId: string } | { kind: 'close' } | null;
@@ -65,7 +73,13 @@ export class FindPanel {
   private presenting = false;
   private dismissed = false;
   private mode: 'hidden' | 'searching' | 'results' = 'hidden';
+  private kind: 'shop' | 'scans' = 'shop';
   private query = '';
+  /**
+   * A render of a row's own mesh, for a row that has no product photo — which is every scan.
+   * Set once by main.ts and shared with the tablet, so a mesh is drawn once for both.
+   */
+  thumbFor: ((objectId: string, glbUrl: string | null) => CanvasImageSource | null) | null = null;
   private rows: StageRow[] = [];
   private recs: Recommendation[] = [];
   private note: string | null = null;
@@ -117,6 +131,7 @@ export class FindPanel {
 
   showSearching(query: string, merchants: readonly string[]) {
     this.mode = 'searching';
+    this.kind = 'shop'; // only the merchants have a search worth watching happen
     this.dismissed = false;
     this.query = query;
     this.rows = merchants.map((merchant) => ({ merchant, stage: 'queued', detail: 'waiting…' }));
@@ -137,14 +152,26 @@ export class FindPanel {
     if (this.mode === 'searching') this.redraw();
   }
 
-  showResults(recs: Recommendation[], note: string | null) {
+  /**
+   * The rows a search came back with. `kind` says which library they came from, which decides
+   * the title, the picture and what the second line of a card says. `query` is what was asked
+   * — a scans search has no searching phase to have set it already.
+   */
+  showResults(recs: Recommendation[], note: string | null, kind: 'shop' | 'scans' = 'shop', query = this.query) {
     this.mode = 'results';
+    this.kind = kind;
+    this.query = query;
     this.dismissed = false;
     // ceiling: six cards, no paging; the upgrade is a scroll or a "+N more" row.
     this.recs = recs.slice(0, MAX_CARDS);
     this.note = note;
     this.loadThumbs();
     this.redraw();
+  }
+
+  /** Redraws what is already showing, for a picture that has only now been rendered. */
+  refresh() {
+    if (this.mode !== 'hidden') this.redraw();
   }
 
   setProgress(objectId: string, text: string) {
@@ -159,8 +186,17 @@ export class FindPanel {
     return hit ? { kind: 'card', objectId: hit.object.userData.objectId as string } : null;
   }
 
+  /**
+   * Asks for every row's picture as the rows arrive, not while drawing them: a panel shows at
+   * most MAX_CARDS rows and all of them are on screen, so there is nothing to defer, and the
+   * request must not depend on a canvas existing. A merchant photo comes over HTTP; a row
+   * with no photo — which is every scan — gets a render of its own mesh instead.
+   */
   private loadThumbs() {
-    for (const { listing } of this.recs) if (listing.imageUrl) this.loadThumb(listing.objectId, listing.imageUrl);
+    for (const { listing } of this.recs) {
+      if (listing.imageUrl && this.kind !== 'scans') this.loadThumb(listing.objectId, listing.imageUrl);
+      else this.thumbFor?.(listing.objectId, listing.glbUrl ?? null);
+    }
   }
 
   /**
@@ -230,7 +266,13 @@ export class FindPanel {
     // Title
     ctx.fillStyle = TEXT;
     ctx.font = FONT(0.022, 600);
-    const title = this.mode === 'searching' ? `Searching Shopify via Browserbase — “${this.query}”` : `${this.recs.length ? this.recs.length : 'No'} listings for “${this.query}”`;
+    const count = this.recs.length ? String(this.recs.length) : 'No';
+    const title =
+      this.mode === 'searching'
+        ? `Searching Shopify via Browserbase — “${this.query}”`
+        : this.kind === 'scans'
+          ? `${count} of your scans for “${this.query}”`
+          : `${count} listings for “${this.query}”`;
     ctx.fillText(ellipsis(ctx, title, (WIDTH - 2 * PAD - 0.06) * PX), (PAD + 0.05) * PX, (PAD + TITLE_H / 2) * PX);
 
     if (this.mode === 'searching') {
@@ -296,7 +338,8 @@ export class FindPanel {
       if (!this.recs.length) {
         ctx.fillStyle = SECONDARY;
         ctx.font = FONT(0.018);
-        ctx.fillText('Nothing fits that. Try a wider gap or another kind.', PAD * PX, (PAD + TITLE_H + CARD_H / 2) * PX);
+        const empty = this.kind === 'scans' ? 'No finished scans. Capture something on the phone first.' : 'Nothing fits that. Try a wider gap or another kind.';
+        ctx.fillText(empty, PAD * PX, (PAD + TITLE_H + CARD_H / 2) * PX);
       }
       cardRects(this.recs.length).forEach((r, i) => {
         const { listing: l, reasons } = this.recs[i];
@@ -306,12 +349,22 @@ export class FindPanel {
         ctx.roundRect(x0, y0, w, h, 0.012 * PX);
         ctx.fill();
         if (i === 0) { ctx.strokeStyle = ACCENT; ctx.lineWidth = 0.002 * PX; ctx.stroke(); }
-        // Thumbnail
-        const img = this.thumbs.get(l.objectId);
+        // The picture. A merchant listing has a product photo; a scan never does, so it gets a
+        // render of its own mesh instead. A row with neither keeps the plain plate — it is
+        // never given another row's picture to look complete.
         const tx = x0 + 0.01 * PX, ty = y0 + (r.h - THUMB) / 2 * PX, ts = THUMB * PX;
         ctx.fillStyle = 'rgba(120,120,128,0.35)';
         ctx.fillRect(tx, ty, ts, ts);
-        if (img?.complete && img.naturalWidth) {
+        const img = this.thumbs.get(l.objectId);
+        const mesh = this.kind === 'scans' || !img ? this.thumbFor?.(l.objectId, l.glbUrl ?? null) ?? null : null;
+        if (mesh) {
+          // "Contain": a mesh is framed to its own bounding box, and cropping it would make a
+          // tall piece and a wide one look alike.
+          const mw = Number((mesh as { width: number }).width) || ts;
+          const mh = Number((mesh as { height: number }).height) || ts;
+          const s = Math.min(ts / mw, ts / mh);
+          ctx.drawImage(mesh, tx + (ts - mw * s) / 2, ty + (ts - mh * s) / 2, mw * s, mh * s);
+        } else if (img?.complete && img.naturalWidth) {
           const s = Math.max(ts / img.naturalWidth, ts / img.naturalHeight);
           ctx.save(); ctx.beginPath(); ctx.rect(tx, ty, ts, ts); ctx.clip();
           ctx.drawImage(img, tx + (ts - img.naturalWidth * s) / 2, ty + (ts - img.naturalHeight * s) / 2, img.naturalWidth * s, img.naturalHeight * s);
@@ -325,16 +378,26 @@ export class FindPanel {
         ctx.fillText(ellipsis(ctx, l.name, cw), cx, y0 + 0.022 * PX);
         const { w: bw, h: bh, d: bd } = l.bboxMeters;
         const cm = (m: number) => Math.round(m * 100); // UI edge: the only place metres become cm
+        const size = `${cm(bw)} × ${cm(bh)} × ${cm(bd)} cm`;
         const price = l.price ? ` · ${(l.price.cents / 100).toFixed(0)} ${l.price.currency}` : '';
         ctx.fillStyle = SECONDARY;
         ctx.font = FONT(0.016);
-        ctx.fillText(ellipsis(ctx, `${l.merchant ?? 'catalogue'} · ${cm(bw)} × ${cm(bh)} × ${cm(bd)} cm${price}`, cw), cx, y0 + 0.05 * PX);
+        // A scan has no merchant and no price, so it says where it came from instead of
+        // printing "catalogue" over something the user captured themselves.
+        const meta = this.kind === 'scans' ? `Scanned on your phone · ${size}` : `${l.merchant ?? 'catalogue'} · ${size}${price}`;
+        ctx.fillText(ellipsis(ctx, meta, cw), cx, y0 + 0.05 * PX);
         const conf = l.measure?.confidence ?? 0.5;
         const badge = conf < 0.7 ? { text: 'size unverified', color: SECONDARY } : { text: 'fits', color: STAGE_COLOR.done };
         const status = this.progress.get(l.objectId);
-        ctx.fillStyle = status ? ACCENT : badge.color;
-        ctx.font = FONT(0.016, 500);
-        ctx.fillText(ellipsis(ctx, status ?? `${badge.text} · ${reasons[0] ?? ''}`, cw), cx, y0 + 0.078 * PX);
+        // A scan is already measured and already has its mesh, so it has no third line to
+        // write: "fits" is a merchant's claim about a size it declared, and the reason a scan
+        // came back is already the line above it. Only real progress gets written.
+        const line = status ?? (this.kind === 'scans' ? null : `${badge.text} · ${reasons[0] ?? ''}`);
+        if (line) {
+          ctx.fillStyle = status ? ACCENT : badge.color;
+          ctx.font = FONT(0.016, 500);
+          ctx.fillText(ellipsis(ctx, line, cw), cx, y0 + 0.078 * PX);
+        }
       });
       if (this.note) {
         ctx.fillStyle = STAGE_COLOR.searching;
