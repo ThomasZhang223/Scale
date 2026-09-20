@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { FindPanel, cardRects, resultsTitle } from './findpanel.ts';
+import { FindPanel, cardRects, resultsTitle, emptyAdvice } from './findpanel.ts';
 import type { Recommendation } from './listings.ts';
 
 const rec = (id: string): Recommendation => ({
@@ -212,12 +212,32 @@ test('a hidden panel offers no handle: a ray through where it was grabs nothing'
 test('an empty result reads as a sentence in every mode, not as a counted one', () => {
   // "No listings for X" is English. "No of your scans for X" is not, and an empty scans panel
   // is the first thing a new user sees, because there are no scans until they make one.
-  assert.equal(resultsTitle('scans', 0, 'my stuff'), 'None of your scans match “my stuff”');
+  assert.equal(resultsTitle('scans', 0, 'my stuff'), 'No scans yet');
   assert.equal(resultsTitle('library', 0, 'a couch'), 'Nothing in the library for “a couch”');
   assert.equal(resultsTitle('shop', 0, 'a lamp'), 'No listings for “a lamp”');
   for (const kind of ['scans', 'library', 'shop'] as const) {
     assert.doesNotMatch(resultsTitle(kind, 0, 'x'), /\bNo of\b|\b0 \b/, `${kind} reads badly when empty`);
   }
+});
+
+test('an empty result never says the same thing twice: the title tells, the line advises', () => {
+  // Both lines stated the outcome once, in two kinds, and both printed one under the other.
+  // The jobs are split now, so the duplication cannot come back by adding a fourth kind.
+  const words = (s: string) => new Set(s.toLowerCase().replace(/[“”".,]/g, '').split(/\s+/).filter((w) => w.length > 3));
+  for (const kind of ['scans', 'library', 'shop'] as const) {
+    const title = resultsTitle(kind, 0, 'a couch');
+    const advice = emptyAdvice(kind);
+    const shared = [...words(title)].filter((w) => words(advice).has(w));
+    assert.deepEqual(shared, [], `${kind}: "${title}" and "${advice}" repeat ${shared.join(', ')}`);
+    assert.match(advice, /\.$/, `${kind}: the advice is a sentence`);
+  }
+});
+
+test('an empty scans result does not claim a match was tried', () => {
+  // main.ts shows every scan when a noun matches none, so empty means there are none at all.
+  // "None of your scans match X" would be a wrong answer as well as a repetitive one.
+  assert.doesNotMatch(resultsTitle('scans', 0, 'chair'), /match/i);
+  assert.doesNotMatch(resultsTitle('scans', 0, 'chair'), /chair/i);
 });
 
 test('a result that found something counts it, per kind', () => {

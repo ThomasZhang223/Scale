@@ -1659,6 +1659,12 @@ async function start() {
     } catch (err) {
       console.warn('The furniture list could not be read:', err);
       tell(`Built-in furniture unavailable: ${(err as Error).message}`);
+      // And on the tablet, in the section the furniture would have filled. Without this the
+      // Furniture tab simply never appears, which looks exactly like an empty catalogue: a
+      // failure that cannot be told from a normal state is not a loud one (standing rule 4).
+      // A section with a row in it is a page, so the tab exists and says what went wrong.
+      catalog.push({ url: '', name: `Furniture unavailable: ${(err as Error).message}`, label: true, severity: 'warn', section: 'Furniture' });
+      showPalette();
       return;
     }
     for (const o of list) catalog.push({ url: o.url, name: o.name ?? o.url.split('/').pop()!, scale: o.scale, objectId: o.objectId, section: 'Furniture' });
@@ -1693,12 +1699,21 @@ async function start() {
    * stable: designer, scanned pieces, listings, my scans, furniture.
    */
   const knownScans = new Set<string>();
+  let scansUnavailable = false; // the warning row is added once, not once per failed poll
   async function loadMyScans(announce = false) {
     let scans;
     try {
       scans = await listScans();
     } catch (err) {
       console.warn('My scans unavailable:', err);
+      // Same reasoning as the furniture list above: a missing tab reads as "you have no
+      // scans", which is a different and much less alarming thing than "the server did not
+      // answer". Shown once — a failed poll every few seconds must not stack up rows.
+      if (!scansUnavailable) {
+        scansUnavailable = true;
+        catalog.unshift({ url: '', name: `My scans unavailable: ${(err as Error).message}`, label: true, severity: 'warn', section: 'My scans' });
+        showPalette();
+      }
       return;
     }
     const fresh = scans.filter((o) => !knownScans.has(o.objectId));

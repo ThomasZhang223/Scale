@@ -83,18 +83,27 @@ function windowHeight(row: StageRow): number {
 }
 
 /**
- * The line over the rows. Written out per kind, with the empty case a sentence of its own,
- * because a count read as a word only works for some of them: "No listings for X" is English
- * and "No of your scans for X" is not. An empty scans panel is the FIRST thing a new user sees
- * — there are no scans until they make one — so it is not a corner to be clever in.
+ * The two lines of an empty result. The TITLE says what happened; the BODY says what to do
+ * next. Keeping those jobs apart is what stops them saying the same thing twice — which they
+ * did, in two kinds, until each was rendered and looked at.
  *
- * Pure and exported so it can be tested without a canvas.
+ * Pure and exported so both can be tested without a canvas.
  */
 export function resultsTitle(kind: FindKind, count: number, query: string): string {
   const q = `“${query}”`;
-  if (kind === 'scans') return count ? `${count} of your scans for ${q}` : `None of your scans match ${q}`;
+  // An empty scans result never means "none matched": main.ts shows every scan when a noun
+  // matches none, so rows are empty only when there are no scans at all. Saying "none match"
+  // would be a wrong answer as well as a repetitive one.
+  if (kind === 'scans') return count ? `${count} of your scans for ${q}` : 'No scans yet';
   if (kind === 'library') return count ? `${count} from the library for ${q}` : `Nothing in the library for ${q}`;
   return count ? `${count} listings for ${q}` : `No listings for ${q}`;
+}
+
+/** What to do about an empty result. Never a restatement of the title above it. */
+export function emptyAdvice(kind: FindKind): string {
+  if (kind === 'scans') return 'Capture something on the phone first.';
+  if (kind === 'library') return 'Try another word, or ask to search the shops.';
+  return 'Try a wider gap, or another kind of thing.';
 }
 
 /** Card i occupies [y, y+h) metres below the panel's top edge. Pure, so hit tests are testable. */
@@ -504,13 +513,7 @@ export class FindPanel {
       if (!this.recs.length) {
         ctx.fillStyle = SECONDARY;
         ctx.font = FONT(0.018);
-        const empty =
-          this.kind === 'scans'
-            ? 'No finished scans. Capture something on the phone first.'
-            : this.kind === 'library'
-              ? 'Nothing in the library matches that.'
-              : 'Nothing fits that. Try a wider gap or another kind.';
-        ctx.fillText(empty, PAD * PX, (PAD + TITLE_H + CARD_H / 2) * PX);
+        ctx.fillText(emptyAdvice(this.kind), PAD * PX, (PAD + TITLE_H + CARD_H / 2) * PX);
       }
       cardRects(this.recs.length).forEach((r, i) => {
         const { listing: l, reasons } = this.recs[i];
