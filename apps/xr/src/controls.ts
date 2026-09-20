@@ -47,12 +47,20 @@ export interface StickHand {
 /**
  * Whether A and B act at all this frame.
  *
- * A hand dragging a window is aiming at the window, and the ray behind it still reaches objects
- * the window is covering — so A would delete something the person cannot see. The right hand
- * only, for the reason in the table above.
+ * The ray does not stop at the interface. A window, a panel button and a palette tile all stand
+ * between the person and the room, and the ray carries on through them to whatever object is
+ * behind — so aiming at any of those and pressing A deletes something the person cannot see, and
+ * cannot get back. Holding a window is the same thing one step on: the window is what you aim at.
+ *
+ * The right hand only, for the reason in the table above.
  */
-export function objectButtonsActive(hand: { draggingWindow: boolean; handedness?: string }): boolean {
-  return !hand.draggingWindow && hand.handedness === 'right';
+export function objectButtonsActive(hand: {
+  draggingWindow: boolean;
+  handedness?: string;
+  /** The ray is on a panel button, a window's handle or a palette tile. */
+  rayOnUi?: boolean;
+}): boolean {
+  return !hand.draggingWindow && !hand.rayOnUi && hand.handedness === 'right';
 }
 
 export function stickUse(hand: StickHand): 'window' | 'object' | 'locomotion' {

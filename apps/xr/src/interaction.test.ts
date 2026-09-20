@@ -40,6 +40,14 @@ test('A and B do nothing while that hand is dragging a window', () => {
   assert.equal(objectButtonsActive({ draggingWindow: false, handedness: 'right' }), true);
 });
 
+test('A and B do nothing while the ray is on the interface', () => {
+  // Same reason one step earlier: a panel button, a window handle or a palette tile stands in
+  // front of the room, and the ray carries on through it to the object behind.
+  assert.equal(objectButtonsActive({ draggingWindow: false, handedness: 'right', rayOnUi: true }), false);
+  assert.equal(objectButtonsActive({ draggingWindow: false, handedness: 'right', rayOnUi: false }), true);
+  assert.equal(objectButtonsActive({ draggingWindow: true, handedness: 'right', rayOnUi: true }), false);
+});
+
 test('A and B are the right controller only', () => {
   assert.equal(objectButtonsActive({ draggingWindow: false, handedness: 'left' }), false);
   assert.equal(objectButtonsActive({ draggingWindow: false, handedness: undefined }), false);

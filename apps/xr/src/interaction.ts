@@ -433,17 +433,37 @@ export class Interaction {
   private objectButtons(hand: Hand) {
     const buttons = hand.source?.gamepad?.buttons;
     if (!buttons) return;
-    const active = objectButtonsActive({ draggingWindow: !!hand.windowDrag, handedness: hand.source?.handedness });
+    const edges: number[] = [];
     for (const index of [BUTTON_A, BUTTON_B]) {
       const down = buttons[index]?.pressed ?? false;
-      const pressedNow = down && !hand.pressed[index];
-      // Recorded even when the buttons do nothing, or a button held down through a window drag
-      // would read as a fresh press the moment the drag ended — and that press is a delete.
+      // The down edge only: holding A must not empty a room. Recorded even when the buttons do
+      // nothing, or a button held down through a window drag reads as a fresh press the moment
+      // the drag ends — and that press is a delete.
+      if (down && !hand.pressed[index]) edges.push(index);
       hand.pressed[index] = down;
-      if (!pressedNow || !active) continue; // the down edge only: holding A must not empty a room
+    }
+    if (!edges.length) return; // the ray tests below cost more than the bookkeeping above
+    if (!objectButtonsActive({
+      draggingWindow: !!hand.windowDrag,
+      handedness: hand.source?.handedness,
+      rayOnUi: this.rayOnUi(),
+    })) return;
+    for (const index of edges) {
       if (index === BUTTON_A) this.deleteTargeted(hand);
       else this.toggleLift(hand);
     }
+  }
+
+  /**
+   * Is this ray on the interface rather than on the room? A panel button, a window's handle and
+   * a palette tile all stand in front of the room, and the ray runs straight through them to the
+   * objects behind. The trigger resolves exactly these three, in this order, before it grabs an
+   * object; A and B have to agree with it, or they act on something nobody is looking at.
+   */
+  private rayOnUi(): boolean {
+    return this.panelHit(this.raycaster) !== null
+      || this.hitWindow() !== null
+      || this.palette.hitTest(this.raycaster) !== null;
   }
 
   /**
