@@ -190,10 +190,16 @@ test("failedFindResult names the storefront failure instead of hiding it", () =>
   assert.equal(out.searchedFor, body.query);
 });
 
-test("the fixture covers every catalogue mesh P-PAUL bound, and the limit is the binder's", () => {
-  assert.equal(Object.keys(DISTORTION_RATIOS).length, 85);
+test("the fixture is well formed and the limit is the binder's", () => {
+  // A lower bound, not an exact count: the fixture is regenerated from the binder reports as
+  // more meshes are bound (scripts/distortion-fixture.mjs), and it must never shrink.
+  assert.ok(Object.keys(DISTORTION_RATIOS).length >= 85, `${Object.keys(DISTORTION_RATIOS).length} rows`);
   assert.equal(DISTORTION_LIMIT, 1.5);
-  assert.ok(Object.values(DISTORTION_RATIOS).every((r) => typeof r === "number" && r >= 1));
+  for (const [id, ratio] of Object.entries(DISTORTION_RATIOS)) {
+    assert.match(id, /^[0-9a-f-]{36}$/, id);
+    // A ratio below 1 is max/min of the same set and impossible; it would mean a broken report.
+    assert.ok(typeof ratio === "number" && Number.isFinite(ratio) && ratio >= 1, `${id}: ${ratio}`);
+  }
 });
 
 test("orderByDistortion ranks a stretched mesh down, keeps every row, and holds the search order", () => {
