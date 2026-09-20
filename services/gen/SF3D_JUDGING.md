@@ -178,6 +178,55 @@ lamps, side tables bind cleanly. Wide, shallow pieces — dressers, sideboards,
 dining tables, sectionals — will bind to the right numbers and look stretched.
 Every receipt carries `distortion_ratio`; sort by it before choosing a hero object.
 
+Measured over the 46 meshes this adapter has produced so far
+(`integration-sweep/reports/p-gen-distortion.json`, sorted ascending):
+20 `eligible_for_visual_review`, 14 `review_required`, 12 `proxy_recommended`.
+Worst is the Forge Large Wall Mount Barn Light at 4.04, best the Gia King Bed at
+1.04. Roughly a quarter of the catalogue needs a look before it goes on stage.
+
+**One mesh did fail the yaw test**, and it is the only one of the 46 that does:
+Forge Large Wall Mount Barn Light, `distortion_ratio` 4.04 as bound against 2.42
+if `w` and `d` were swapped. A wall-mounted lamp is measured 0.406 wide by 0.660
+deep — deeper than it is wide, because the "depth" is its projection from the wall
+— and SF3D produced it the other way round. Give that one a rotated orientation
+profile through `GENERATION_ORIENTATION`, or keep it off the stage.
+
+### Live generation fails on some products and cannot be made to succeed
+
+**Three of the 19 products in the live drain never bound, in three attempts each.**
+The adapter answers HTTP 422 `mesh_binding_rejected` and the job fails. The wire
+code is deliberately sanitized, so the reason only reaches the adapter's log (see
+`app/generation.py`); running `bind_glb` by hand on the raw mesh gives it in full:
+
+| Product | Reason from the binder |
+| --- | --- |
+| Max Medium Wall Sconce | `Degenerate triangles` |
+| Aledo Nightstand \| Walnut | `Degenerate normal-map UV triangle: cannot construct tangent basis` |
+| Westcott Counter Stool | `Degenerate normal-map UV triangle: cannot construct tangent basis` |
+
+The binder is right to refuse: a zero-area UV triangle has no tangent basis, and a
+mesh without one cannot carry its normal map. **The failure is per-RUN, not per
+product.** SF3D runs unseeded under `cuda-bfloat16-autocast`, so marching
+tetrahedra produces a different mesh every time, and some of those meshes contain a
+degenerate triangle. Two products whose CACHED meshes the binder rejected — Lunaria
+Terra and Pino 6 Drawer Dresser — bound cleanly on a fresh run through this
+pipeline. A fresh Westcott mesh bound cleanly by hand at distortion 1.245, then
+failed twice more through the Worker.
+
+So: **16 of 19 products bound on the first attempt; 3 failed 3 times each.** Risk is
+concentrated in particular products — thin, slatted or openwork shapes — not spread
+evenly across runs. Re-running one of those is a coin flip, not a fix.
+
+Two rules follow, and they are why the demo does not depend on this path:
+
+1. **Cap deliberate re-runs at two per object** (three paid attempts in total). Each
+   one is an operator's decision, never an automatic retry: `retryable:false` in the
+   adapter's response and `retries: 0` on the Worker's `baseten-generate` step both
+   stay as they are. They exist to stop a blind resubmission of an AMBIGUOUS paid
+   call, which is a different failure and must never be retried at all.
+2. **Never let a judge watch a first-time generation of an unknown product.** One in
+   six products cannot be generated on demand, and you find out 30 seconds in.
+
 ## Profiling diagnostics
 
 Production bake resolution remains 1024 unless the evidence explicitly selects
