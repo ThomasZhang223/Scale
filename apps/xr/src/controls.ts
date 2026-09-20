@@ -44,6 +44,17 @@ export interface StickHand {
  * So aiming at an object costs the snap turn while you aim at it. That is the trade the mapping
  * asks for: the stick belongs to whatever you are aiming at.
  */
+/**
+ * Whether A and B act at all this frame.
+ *
+ * A hand dragging a window is aiming at the window, and the ray behind it still reaches objects
+ * the window is covering — so A would delete something the person cannot see. The right hand
+ * only, for the reason in the table above.
+ */
+export function objectButtonsActive(hand: { draggingWindow: boolean; handedness?: string }): boolean {
+  return !hand.draggingWindow && hand.handedness === 'right';
+}
+
 export function stickUse(hand: StickHand): 'window' | 'object' | 'locomotion' {
   if (hand.draggingWindow) return 'window';
   if (hand.handedness === 'right' && (hand.holding || hand.pointingAt !== null)) return 'object';

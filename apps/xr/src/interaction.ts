@@ -4,7 +4,7 @@ import { XRControllerModelFactory } from 'three/examples/jsm/webxr/XRControllerM
 import type { Physics } from './physics';
 import type { Palette, PaletteItem } from './palette';
 import { Halo, LandingPad } from './halo';
-import { BUTTON_A, BUTTON_B, LIFT_HEIGHT, STICK_X, STICK_Y, stickUse } from './controls';
+import { BUTTON_A, BUTTON_B, LIFT_HEIGHT, STICK_X, STICK_Y, objectButtonsActive, stickUse } from './controls';
 
 /*
  * Moving scanned objects, in the headset and on the laptop.
@@ -432,12 +432,15 @@ export class Interaction {
    */
   private objectButtons(hand: Hand) {
     const buttons = hand.source?.gamepad?.buttons;
-    if (!buttons || hand.source?.handedness !== 'right') return;
+    if (!buttons) return;
+    const active = objectButtonsActive({ draggingWindow: !!hand.windowDrag, handedness: hand.source?.handedness });
     for (const index of [BUTTON_A, BUTTON_B]) {
       const down = buttons[index]?.pressed ?? false;
       const pressedNow = down && !hand.pressed[index];
+      // Recorded even when the buttons do nothing, or a button held down through a window drag
+      // would read as a fresh press the moment the drag ended — and that press is a delete.
       hand.pressed[index] = down;
-      if (!pressedNow) continue; // the down edge only: holding A must not delete a whole room
+      if (!pressedNow || !active) continue; // the down edge only: holding A must not empty a room
       if (index === BUTTON_A) this.deleteTargeted(hand);
       else this.toggleLift(hand);
     }
