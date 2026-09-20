@@ -110,6 +110,11 @@ Every object, from a phone scan, a Shopify product, or a primitive fallback, is 
 }
 ```
 
+A `source:"scan"` object whose mesh came from the phone's Object Capture has no binding step —
+Object Capture writes metres at true size, so `bboxMeters` is the exported mesh's own bounding box
+and invariant 1 below holds by construction — and its GLB lives under `scans/`, not `objects/`.
+`source` is `"scan"`, never `"capture"`. Such an object carries `measure.method: "declared"`.
+
 `state` is the perceived-latency fix, and it lives in the schema rather than in the UI. A returns `state:"measured"` with a real `bboxMeters` and a null `glbUrl` in under one second. The client renders the measured box with its numbers straight away. `glbUrl` arrives later, over SSE, when `state` becomes `ready`.
 
 ### The mesh normalisation contract
@@ -168,16 +173,40 @@ B ships this surface as stubs in hours 0–2. Real logic lands behind it afterwa
 | `POST /rooms/{id}/versions` | Version without ids | `Version v1` | A, D, F |
 | `GET /rooms/{id}/versions` | — | `[{ versionId, label, createdAt, parentId }]` | A, D |
 | `GET /versions/{id}` | — | `Version v1` | D |
-| `POST /uploads` | `{ kind, ext }` | `{ key, putUrl }` presigned R2 | A, C |
+| `POST /uploads` | `{ kind, ext?, objectId?, roomId?, n?, merchant?, productId? }` | `{ key, putUrl }` — `putUrl` points back at the Worker, which streams the PUT into R2 | A, C |
 | `POST /objects` | `{ source, name, category, bboxMeters, measure, frameKeys[] }` | `Object v1` with `state:"measured"` | A |
+| `GET /objects?source=&merchant=&limit=` | — | `[Object v1]`, newest first, `state != 'failed'`; `limit` 1-500, default 100 | A, D |
 | `GET /objects/{id}` | — | `Object v1` | all |
 | `POST /objects/{id}/generate` | `{ tier: "live" \| "quality" }` | `{ jobId }` | A, C |
+| `POST /objects/{id}/mesh` | `{ key, roomId? }` — `key` must be `scans/{id}/mesh.glb` | `Object v1` with `state:"ready"` | A |
+| `POST /objects/{id}/index` | `{ imageKey }` or `{ text }` (exactly one), `X-Upstream-Token` | `{ objectId, fingerprint, modality }` | backfill, retry |
 | `GET /jobs/{id}` | — | `{ state, progressPct, objectId, error }` | A |
 | `POST /search` | `{ text?, imageKey?, fit?, source?, limit }` | `[{ objectId, score, object }]` | F |
-| `POST /fit` | `{ roomId, versionId }` or `{ roomId, placements }` | `FitReport v1` | A, D |
+| `POST /fit` | `{ roomId, versionId }`, `{ roomId, placements }`, or `{ roomId }` alone (the newest version's placements) | `FitReport v1` | A, D |
 | `POST /solve` | `{ roomId, intent, budgetCents?, fixed[] }` | `{ placements, objective, infeasible? }` | F |
 | `POST /push/{roomId}` | `{ versionId }` | `204` | A, F |
 | `GET /sync/{roomId}` | — | SSE stream | D |
+| `POST /ingest` | `{ merchant, storefront, collection?, browserbase?, llm?, vlm? }`, `X-Upstream-Token` | `202 { workflowId, merchant, storefront }` | operator, P3 |
+| `POST /catalog/ingest` | `[item]` or `{ products \| objects \| items }`, 1-100, `X-Upstream-Token` | `202 { accepted, jobs: [{ objectId, jobId }] }` | scrapers |
+
+Notes on the rows above that are not in the table:
+
+- `POST /uploads` `kind` is one of `roomCapture`, `objectFrame`, `objectMesh`, `objectThumb`,
+  `scanMesh`, `catalogSource`. `scanMesh` is the phone's Object Capture GLB and lands under
+  `scans/`; `objectMesh` is the generated mesh's key under `objects/` and is Ani's, unchanged.
+- `POST /objects/{id}/mesh` refuses a key other than `scans/{id}/mesh.glb` (400 `bad_mesh_key`) and
+  refuses bytes that are not a binary glTF — bad magic, version or declared length — with 422
+  `not_a_glb`, leaving the row `measured`. It answers before the object is searchable: the
+  response carries `X-Indexed: pending` (indexing runs in the background),
+  or `X-Indexed: false` with `X-Index-Skipped: no-embeddable-text` when the scan has no name or
+  category to embed.
+- `POST /objects/{id}/index`, `POST /ingest` and `POST /catalog/ingest` spend money or write a
+  shared index, so all three need `X-Upstream-Token`.
+- Object ids on the catalogue intake are computed by the Worker, whichever route the row came
+  through: a hash of `productUrl`, else of `merchant:productId`, else of the sender's `objectId`.
+  An id the sender supplies is advisory, never stored as given.
+- `POST /solve` places by rule: the model's rule targets are resolved against the room by the
+  Worker, and a target that resolves to nothing is a 422 `unknown_rule_target` naming it.
 
 `fit` in a search body is a numeric filter, not a vector term: `{ "maxW": 0.8, "maxH": 1.2, "maxD": 0.6 }`. That is the half of the query Kreativ cannot express.
 
@@ -220,9 +249,18 @@ The Quest subscribes on room open and never polls. This is pipeline P6.
 | `rooms/{roomId}/capture.json` | B, on upload |
 | `objects/{objectId}/frames/{n}.jpg` | A, presigned |
 | `objects/{objectId}/mesh.glb` | C |
+| `objects/{objectId}/mesh-receipt.json` | C, optional |
+| `objects/{objectId}/catalog.json` | B, catalogue intake |
 | `objects/{objectId}/thumb.jpg` | C |
+| `scans/{objectId}/mesh.glb` | A, phone Object Capture, via upload kind `scanMesh` |
 | `catalog/{merchant}/{productId}/source.jpg` | P3 crawler |
 | `fixtures/…` | committed by hand at H0 |
+
+`catalog/{merchant}/{productId}/source.jpg` is written by `workers/scripts/catalog-queue.mjs images`
+through `POST /uploads`; `{productId}` is the Shopify numeric product id, as
+`services/gen/app/embedding/catalog_manifest.py` asserts. Ani's Python asserts the literal key
+`objects/{objectId}/mesh.glb` for generated meshes, which is why phone scans got their own prefix
+rather than a change to it.
 
 Keys are derived, never stored as URLs in D1. A URL in a row is a cache-invalidation bug waiting to happen.
 
