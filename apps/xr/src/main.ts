@@ -1112,18 +1112,16 @@ async function start() {
       rooms.disabled = true;
       rooms.append(new Option('No rooms configured', ''));
     } else {
-      for (const room of ROOMS) rooms.append(new Option(room.label, room.id, false, room.id === currentRoomId()));
+      // ROOM_ID, not currentRoomId(): this row is built before the switch's own state exists,
+      // and calling into it here reads a `let` that is still in its dead zone — which throws and
+      // takes the whole row with it, silently, because it happens inside an async startup.
+      for (const room of ROOMS) rooms.append(new Option(room.label, room.id, false, room.id === ROOM_ID));
       rooms.addEventListener('change', () => {
         void switchRoom(rooms.value).catch(() => {
           rooms.value = currentRoomId(); // the switch failed: the select must not claim otherwise
         });
       });
     }
-    onSwitchState((state) => {
-      rooms.disabled = state === 'switching' || !ROOMS.length;
-      if (state === 'idle') rooms.value = currentRoomId();
-    });
-
     agentPresets.replaceChildren(
       group('segmented', button('Turn 90° left', 'turn:left', ''), button('Turn 90° right', 'turn:right', ''), button('Remove', 'remove', '')),
       rooms,
@@ -1975,6 +1973,16 @@ async function start() {
     const forward = seat.lookAt.clone().sub(eye).setY(0).normalize();
     interaction.reseatWindows(eye, forward);
   }
+
+  // Kept in step with the switch, by id rather than by a captured reference: the select is built
+  // further up, before the switch's own state exists, and reaching it from there would read a
+  // `const` that has not been initialised yet — which silently kills the whole row it sits in.
+  onSwitchState((state) => {
+    const select = document.getElementById('room-pick') as HTMLSelectElement | null;
+    if (!select) return;
+    select.disabled = state === 'switching' || !ROOMS.length;
+    if (state === 'idle') select.value = currentRoomId();
+  });
 
   // Published for the room picker (apps/xr/src/rooms.ts): it imports these, never this module.
   roomControl.currentRoomId = currentRoomId;
