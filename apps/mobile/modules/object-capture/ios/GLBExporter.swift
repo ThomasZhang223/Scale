@@ -112,10 +112,12 @@ enum GLBExporter {
 
       pad4(&bin)
       let positionsOffset = bin.count
-      positions.withUnsafeBufferPointer { bin.append(Data(buffer: $0)) }
+      // SIMD3<Float> is 16 bytes (one zero pad lane), not 12: Data(buffer:) on it writes 16 bytes
+      // per vertex while the accessors below declare a packed VEC3 of 12. Flatten to [Float].
+      positions.flatMap { [$0.x, $0.y, $0.z] }.withUnsafeBufferPointer { bin.append(Data(buffer: $0)) }
       pad4(&bin)
       let normalsOffset = bin.count
-      normals.withUnsafeBufferPointer { bin.append(Data(buffer: $0)) }
+      normals.flatMap { [$0.x, $0.y, $0.z] }.withUnsafeBufferPointer { bin.append(Data(buffer: $0)) }
       pad4(&bin)
       let uvsOffset = bin.count
       uvs.withUnsafeBufferPointer { bin.append(Data(buffer: $0)) }
