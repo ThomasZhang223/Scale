@@ -33,6 +33,8 @@ const COLOR: Record<Tone, string> = {
   error: '#FF453A',
 };
 const BACKGROUND = 'rgba(28,28,30,0.88)';
+const CLOSE_R = 0.022;           // the × button's radius (top-left corner)
+const CLOSE_INSET = 0.034;
 const FONT = `${0.02 * PX}px -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", system-ui, sans-serif`;
 
 export class Hud {
@@ -40,6 +42,9 @@ export class Hud {
   private mesh: THREE.Mesh | null = null;
   private lines: HudLine[] = [];
   private presenting = false;
+  private dismissed = false;
+  /** The × in the top-left corner; the only part of the panel a ray can hit. */
+  private readonly close: THREE.Mesh;
 
   private readonly eye = new THREE.Vector3();
   private readonly anchor = new THREE.Vector3();
@@ -47,6 +52,19 @@ export class Hud {
 
   constructor() {
     this.group.name = 'hud';
+    this.group.visible = false;
+    this.close = closeButton();
+    this.group.add(this.close);
+  }
+
+  /** True when the ray is on the × button. */
+  hitTest(raycaster: THREE.Raycaster): boolean {
+    return this.group.visible && raycaster.intersectObject(this.close, false).length > 0;
+  }
+
+  /** Hides the panel until the next message arrives. */
+  dismiss() {
+    this.dismissed = true;
     this.group.visible = false;
   }
 
@@ -70,7 +88,7 @@ export class Hud {
     this.group.position.copy(this.anchor).addScaledVector(this.dir, BEHIND);
     this.group.position.y += LIFT;
     this.group.lookAt(this.eye);
-    this.group.visible = this.presenting && this.mesh !== null;
+    this.group.visible = this.presenting && this.mesh !== null && !this.dismissed;
   }
 
   /** Only shown inside the headset; the spectator view has the laptop panel. */
@@ -79,9 +97,10 @@ export class Hud {
     this.group.visible = on && this.mesh !== null;
   }
 
-  /** Replaces the transcript. Empty hides the panel. */
+  /** Replaces the transcript. Empty hides the panel. A new message brings a dismissed panel back. */
   set(lines: HudLine[]) {
     this.lines = lines.filter((l) => l.text.trim());
+    this.dismissed = false;
     this.redraw();
   }
 
@@ -152,8 +171,39 @@ export class Hud {
     // Grow downward: the top edge stays put as the panel gets taller.
     this.mesh.position.y = -height / 2;
     this.group.add(this.mesh);
-    this.group.visible = this.presenting;
+    this.close.position.set(-WIDTH / 2 + CLOSE_INSET, -CLOSE_INSET, 0.002);
+    this.group.visible = this.presenting && !this.dismissed;
   }
+}
+
+/** A grey disc with a white ×, drawn once. */
+function closeButton(): THREE.Mesh {
+  const material = new THREE.MeshBasicMaterial({ transparent: true, depthTest: false, depthWrite: false });
+  if (typeof document !== 'undefined') {
+    const px = 128;
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = px;
+    const ctx = canvas.getContext('2d')!;
+    ctx.fillStyle = 'rgba(120,120,128,0.7)';
+    ctx.beginPath();
+    ctx.arc(px / 2, px / 2, px / 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.lineWidth = 10;
+    ctx.lineCap = 'round';
+    const a = px * 0.33, b = px * 0.67;
+    ctx.beginPath();
+    ctx.moveTo(a, a); ctx.lineTo(b, b);
+    ctx.moveTo(b, a); ctx.lineTo(a, b);
+    ctx.stroke();
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    material.map = texture;
+  }
+  const mesh = new THREE.Mesh(new THREE.CircleGeometry(CLOSE_R, 32), material);
+  mesh.renderOrder = 1000;
+  mesh.name = 'hud-close';
+  return mesh;
 }
 
 /** Greedy word wrap; a single word longer than the line is broken by characters. */

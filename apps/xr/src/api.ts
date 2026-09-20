@@ -42,6 +42,13 @@ export function getRoom(roomId: string): Promise<Record<string, unknown>> {
   return get(`/rooms/${roomId}`);
 }
 
+/** GET /objects?source=… : every object of that source, newest first. */
+export async function listObjects(source: ObjectV1['source'], limit = 200): Promise<(ObjectV1 & { createdAt?: string })[]> {
+  const rows = await get<(ObjectV1 & { createdAt?: string })[]>(`/objects?source=${source}&limit=${limit}`);
+  for (const row of rows) checkSchema(row, 'Object');
+  return rows.sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''));
+}
+
 export async function getObject(objectId: string): Promise<ObjectV1> {
   const obj = await get<ObjectV1>(`/objects/${objectId}`);
   checkSchema(obj, 'Object');

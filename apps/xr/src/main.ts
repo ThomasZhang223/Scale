@@ -7,7 +7,7 @@ import { ObjectLoader, type LoadedObject } from './objects';
 import { createPhysics } from './physics';
 import { Interaction } from './interaction';
 import {
-  getRoom, getObject, getVersion, postVersion, objectToItem, boundsMismatch, watchRoom, postFit, STUB, listScans, sameOrigin,
+  getRoom, getObject, listObjects, getVersion, postVersion, objectToItem, boundsMismatch, watchRoom, postFit, STUB, listScans, sameOrigin,
   type ObjectV1, type VersionV1, type PlacementV1,
 } from './api';
 import { FitOverlay, type FitReport } from './fit';
@@ -55,6 +55,9 @@ const OBJECTS_URL = params.get('objects') ?? '/objects.json';
 const SERVER_ROOM_ID: string | null = params.get('room') ?? import.meta.env.VITE_ROOM_ID ?? null;
 const ROOM_ID = SERVER_ROOM_ID ?? roomLarge.roomId;
 const OBJECT_IDS = params.get('object')?.split(',').filter(Boolean) ?? [];
+// How many of the newest phone scans to bring into the room on load (?scans=N; 0 turns it off).
+// The scan list is shared by the whole team, so "all of them" would fill the room with test rows.
+const RECENT_SCANS = Number(params.get('scans') ?? 6);
 const VERSION_ID = params.get('version'); // a stored layout to apply after the room loads
 const AGENT_STUB = params.get('agentstub') === '1' || import.meta.env.VITE_AGENT_STUB === '1'; // the agent's fixture timeline
 
@@ -231,13 +234,14 @@ async function start() {
     offlineProposal: offlineProposal as unknown as Proposal,
     onChange: onAgentChange,
   });
-  const interaction = new Interaction(renderer, scene, camera, controls, physics, palette, spawn, onAction, layoutChanged, onGrab);
+  const interaction = new Interaction(renderer, scene, camera, controls, physics, palette, spawn, onAction, layoutChanged, onGrab, (r) => hud.hitTest(r));
   // Designer tiles first (closest to the hand), then the catalogue, then Reset / Clear.
   const showPalette = () => palette.setItems([...designerTiles(agent.snapshot), ...scannedTiles(), ...listingTiles(), ...catalog, ...PALETTE_ACTIONS]);
   showPalette();
   renderAgentPanel(agent.snapshot);
 
   function onAction(action: string) {
+    if (action === 'hud:close') hud.dismiss();
     if (action === 'reset' && lastScan) showScan(lastScan, 'Room reset');
     if (action === 'clear') clearObjects();
     if (action.startsWith('style:')) {
@@ -1026,6 +1030,20 @@ async function start() {
     try {
       item = objectToItem(obj);
     } catch (err) {
+      // No mesh yet (state "measured": the phone scanned it, nobody has generated a mesh).
+      // Stand it in as a box of its measured size so it is in the room, and in every
+      // rearrange, tonight; the mesh replaces it when generation exists.
+      if (obj.bboxMeters && obj.bboxMeters.w > 0 && obj.bboxMeters.h > 0 && obj.bboxMeters.d > 0) {
+        if ([...objects.values()].some((o) => o.objectId === obj.objectId)) return;
+        const name = obj.name?.trim() || obj.category || 'scanned object';
+        const placed: PlacedObject = { id: crypto.randomUUID(), objectId: obj.objectId, name, loaded: measuredBox(obj.bboxMeters, name) };
+        objects.set(placed.id, placed);
+        if (currentRoom && rise >= 1) place(placed); // otherwise placed when the walls are up
+        const cm = (m: number) => Math.round(m * 100);
+        tell(`${name}: measured on the phone, ${cm(obj.bboxMeters.w)} × ${cm(obj.bboxMeters.h)} × ${cm(obj.bboxMeters.d)} cm. Shown as a box until its mesh is generated.`, 'info');
+        showPalette();
+        return;
+      }
       return say(`${obj.name ?? obj.objectId}: ${(err as Error).message}.`);
     }
     if (catalog.some((c) => c.url === item.url)) return; // the feed can repeat an object
@@ -1059,6 +1077,15 @@ async function start() {
       } catch (err) {
         say(`Object ${id}: ${(err as Error).message}`);
       }
+    }
+    // The phone's scans: the newest few, ready ones as their mesh, measured ones as a box.
+    if (STUB || SCAN_URL || !(RECENT_SCANS > 0)) return;
+    try {
+      const scans = (await listObjects('scan')).filter((o) => !OBJECT_IDS.includes(o.objectId)).slice(0, RECENT_SCANS);
+      for (const obj of scans) await addServerObject(obj);
+      if (scans.length) say(`${scans.length} scanned objects from the phone loaded.`);
+    } catch (err) {
+      console.warn('Listing scanned objects failed:', err);
     }
   }
 
