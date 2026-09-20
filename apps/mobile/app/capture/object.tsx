@@ -6,15 +6,16 @@ import {
   type LayoutChangeEvent,
   Pressable,
   StyleSheet,
-  Text,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ObjectMeasureModule, ObjectMeasureView } from "../../modules/object-measure";
 import type { ObjectMeasureResult } from "../../modules/object-measure";
 import { postJSON, putUpload } from "../../src/lib/api";
-import { Glass } from "../../src/theme/Glass";
-import { colors, radius, spacing } from "../../src/theme/tokens";
+import { GlassButton, GlassCloseButton } from "../../src/theme/Glass";
+import { spacing } from "../../src/theme/tokens";
+import { Readout, ReadoutHint } from "../../src/ui/Readout";
 
 type Phase = "idle" | "measuring" | "measured" | "uploading";
 
@@ -63,6 +64,8 @@ export default function CaptureObjectScreen() {
         const measured = await ObjectMeasureModule.measure({
           x: event.nativeEvent.locationX / layoutSize.width,
           y: event.nativeEvent.locationY / layoutSize.height,
+          viewWidth: layoutSize.width,
+          viewHeight: layoutSize.height,
         });
         setResult(measured);
         setPhase("measured");
@@ -78,28 +81,25 @@ export default function CaptureObjectScreen() {
     if (!result) return;
     setPhase("uploading");
     try {
-      // Every frame first through POST /uploads for a presigned R2 target,
-      // then straight to R2 — the Worker never sees the bytes.
-      const frameKeys: string[] = [];
-      for (const framePath of result.framePaths) {
-        const { key, putUrl } = await postJSON<{ key: string; putUrl: string }>("/uploads", {
-          kind: "object-frame",
-          ext: "jpg",
-        });
-        await putUpload(framePath, putUrl, "image/jpeg");
-        frameKeys.push(key);
-      }
-
-      // state:"measured" comes back from this call in under a second per
-      // contracts.md — the mesh follows later, over SSE.
+      // The Worker keys frames by objectId (objects/{id}/frames/{n}.jpg), so
+      // the object row has to exist before the first frame can be granted a
+      // key. Row first, then the frames. The earlier order — frames first,
+      // with kind "object-frame" — was the HTTP 400 seen on device.
       const object = await postJSON<{ objectId: string }>("/objects", {
         source: "scan",
         name: "Scanned object",
         category: "unknown",
         bboxMeters: result.bboxMeters,
         measure: { method: "lidar", confidence: result.confidence },
-        frameKeys,
       });
+      for (const [n, framePath] of result.framePaths.entries()) {
+        const { putUrl } = await postJSON<{ key: string; putUrl: string }>("/uploads", {
+          kind: "objectFrame",
+          objectId: object.objectId,
+          n,
+        });
+        await putUpload(framePath, putUrl, "image/jpeg");
+      }
 
       router.replace(`/object/${object.objectId}`);
     } catch (error) {
@@ -132,55 +132,38 @@ export default function CaptureObjectScreen() {
         }
         ghostPoints={result?.ghostPoints}
       />
-      <SafeAreaView style={styles.footer} pointerEvents="box-none">
-        {phase === "idle" && (
-          <Glass style={styles.hintPill}>
-            <Text style={styles.hintText}>Tap the object to measure it</Text>
-          </Glass>
-        )}
-        {result && phase !== "idle" && (
-          <Glass style={styles.hintPill}>
-            <Text style={styles.hintText}>
-              {(result.bboxMeters.w * 100).toFixed(0)} × {(result.bboxMeters.h * 100).toFixed(0)} ×{" "}
-              {(result.bboxMeters.d * 100).toFixed(0)} cm · {(result.confidence * 100).toFixed(0)}% confidence
-            </Text>
-          </Glass>
-        )}
-        {phase === "measured" && (
-          <Pressable style={styles.confirmButton} onPress={confirm}>
-            <Text style={styles.confirmButtonText}>Use this measurement</Text>
-          </Pressable>
-        )}
-        {phase === "measured" && (
-          <Pressable onPress={retry}>
-            <Text style={styles.retryText}>Measure again</Text>
-          </Pressable>
-        )}
-        {phase === "uploading" && <Text style={styles.uploadingText}>Uploading…</Text>}
+      <SafeAreaView style={styles.chrome} pointerEvents="box-none">
+        <View style={styles.top} pointerEvents="box-none">
+          <GlassCloseButton onPress={() => router.back()} />
+        </View>
+
+        <View style={styles.footer} pointerEvents="box-none">
+          {phase === "idle" && <ReadoutHint text="Tap the object to measure it" />}
+          {phase === "measuring" && <ReadoutHint text="Hold still, reading depth…" />}
+          {result && (phase === "measured" || phase === "uploading") && (
+            <Readout bboxMeters={result.bboxMeters} confidence={result.confidence} />
+          )}
+          {phase === "measured" && (
+            <View style={styles.actions}>
+              <GlassButton label="Measure again" icon="arrow.counterclockwise" onPress={retry} />
+              <GlassButton label="Use this measurement" icon="checkmark" prominent onPress={confirm} />
+            </View>
+          )}
+          {phase === "uploading" && <ReadoutHint text="Saving to your library…" />}
+        </View>
       </SafeAreaView>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
+  chrome: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, justifyContent: "space-between" },
+  top: { flexDirection: "row", justifyContent: "flex-start", paddingHorizontal: spacing.md, paddingTop: spacing.sm },
   footer: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
     alignItems: "center",
+    paddingHorizontal: spacing.md,
     paddingBottom: spacing.lg,
     gap: spacing.md,
   },
-  hintPill: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
-  hintText: { color: "white", fontSize: 13, fontWeight: "500" },
-  confirmButton: {
-    backgroundColor: colors.accent,
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.md,
-    borderRadius: radius.lg,
-  },
-  confirmButtonText: { color: "white", fontSize: 17, fontWeight: "600" },
-  retryText: { color: "white", fontSize: 15, opacity: 0.8 },
-  uploadingText: { color: "white", fontSize: 15 },
+  actions: { flexDirection: "row", gap: spacing.sm, justifyContent: "center", flexWrap: "wrap" },
 });

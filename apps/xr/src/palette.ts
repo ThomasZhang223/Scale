@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { wrap } from './hud.ts';
 
 /*
  * The wrist panel, drawn as a phone: a dark rounded body on the left controller with an
@@ -54,6 +55,8 @@ const SCREEN_W = 2 * COL_W + GAP_X + 2 * MARGIN;
 const RADIUS_CELL = 0.004; // ~12 pt, grouped list corners
 const RADIUS_SCREEN = 0.018;
 const RADIUS_FRAME = RADIUS_SCREEN + BEZEL;
+const LABEL_LINE_H = 0.0145; // one wrapped footnote line; a label row grows by this per extra line
+const LABEL_PAD = 64; // canvas px, the leading text inset of a row
 
 interface Slot {
   item: PaletteItem;
@@ -64,6 +67,14 @@ interface Slot {
   corners: [boolean, boolean, boolean, boolean]; // TL, TR, BR, BL rounded
   separator: boolean;
   header?: string; // a section header drawn above this slot's group
+  lines?: string[]; // labels only: the text wrapped to the row's width, never truncated
+}
+
+/** A throwaway context for measuring text at layout time; null in tests (no document). */
+let measurer: CanvasRenderingContext2D | null | undefined;
+function measure(): CanvasRenderingContext2D | null {
+  if (measurer === undefined) measurer = typeof document === 'undefined' ? null : document.createElement('canvas').getContext('2d');
+  return measurer;
 }
 
 export class Palette {
@@ -181,11 +192,24 @@ function layout(items: PaletteItem[]): Slot[] {
     }
     const first = newGroup || isObject(items[i - 1]);
     const last = groupEnd(i + 1) || isObject(items[i + 1]);
+    const w = 2 * COL_W + GAP_X;
+    // A label (an error, a log line) shows every word: it wraps, and the row grows to fit.
+    // Buttons and furniture cells stay one line.
+    let lines: string[] | undefined;
+    let h = ROW_H;
+    if (item.label) {
+      const ctx = measure();
+      if (ctx) {
+        ctx.font = FONT.footnote;
+        lines = wrap(ctx, item.name, w * PX - 2 * LABEL_PAD);
+        h = ROW_H + Math.max(0, lines.length - 1) * LABEL_LINE_H;
+      }
+    }
     slots.push({
-      item, x: 0, y: y + ROW_H / 2, w: 2 * COL_W + GAP_X, h: ROW_H,
-      corners: [first, first, last, last], separator: !last, header,
+      item, x: 0, y: y + h / 2, w, h,
+      corners: [first, first, last, last], separator: !last, header, lines,
     });
-    y += ROW_H;
+    y += h;
     i++;
   }
   return slots;
@@ -271,12 +295,15 @@ function draw(s: Slot): THREE.Texture | null {
     ctx.fillRect(64, H - 2, W - 64, 2);
   }
 
-  const pad = 64;
+  const pad = LABEL_PAD;
   ctx.textBaseline = 'middle';
   if (it.label) {
     ctx.font = FONT.footnote;
     ctx.fillStyle = it.severity === 'warn' ? C.orange : C.secondary;
-    ctx.fillText(fitText(ctx, it.name, W - 2 * pad), pad, H / 2 + 4);
+    const lines = s.lines ?? [fitText(ctx, it.name, W - 2 * pad)];
+    const step = LABEL_LINE_H * PX;
+    const y0 = H / 2 + 4 - ((lines.length - 1) * step) / 2;
+    lines.forEach((line, k) => ctx.fillText(line, pad, y0 + k * step));
   } else if (it.action) {
     ctx.font = it.accent ? FONT.headline : FONT.body;
     ctx.fillStyle = it.accent ? C.label : it.destructive ? C.red : C.accent;

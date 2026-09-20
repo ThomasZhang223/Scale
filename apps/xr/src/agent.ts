@@ -8,7 +8,7 @@ import type { PlacementV1 } from './api';
  * Every outside call goes through `fetch` and `openEvents`, so it runs under Node tests.
  */
 
-export type AgentUIState = 'idle' | 'working' | 'proposed' | 'applying' | 'failed' | 'room_changed';
+export type AgentUIState = 'idle' | 'working' | 'proposed' | 'applying' | 'failed';
 
 export interface LogEntry {
   at: string;
@@ -238,7 +238,7 @@ export class AgentClient {
 
   // ---------- accept / reject / undo ----------
 
-  /** Resolves to the proposal to apply, or null (rejected by the server: room changed, offline). */
+  /** Resolves to the proposal to apply, or null (nothing proposed, or the accept failed). */
   async accept(): Promise<Proposal | null> {
     const proposal = this.snap.proposal;
     if (this.snap.state !== 'proposed' || !proposal) return null;
@@ -249,9 +249,14 @@ export class AgentClient {
     try {
       const res = await this.fetchFn(`${this.base}/requests/${proposal.requestId}/accept`, { method: 'POST', headers: this.headers(), body: JSON.stringify({ baseVersionId: proposal.baseVersionId }) });
       if (res.status === 409) {
+        // The room moved on under this proposal (another device, a drag). Nobody wants to
+        // read "the room changed" on stage: adopt the server's version and apply the proposal
+        // anyway. The layout that results is pushed as a new version on top of it.
+        // ceiling: the proposal was solved against the old layout; an object that moved in
+        // between may end up overlapping. Re-solving here would need the agent round-trip again.
         const body = (await res.json()) as { currentVersionId?: string };
-        this.set({ state: 'room_changed', status: 'The room changed. Ask again?', currentVersionId: body.currentVersionId ?? this.snap.currentVersionId });
-        return null;
+        this.set({ state: 'applying', status: 'Applying…', currentVersionId: body.currentVersionId ?? this.snap.currentVersionId });
+        return proposal;
       }
       if (!res.ok) throw new Error(`${res.status}`);
       const { versionId } = (await res.json()) as { versionId: string };

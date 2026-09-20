@@ -5,6 +5,8 @@ import ExpoModulesCore
 struct MeasureTapPoint: Record {
   @Field var x: Double = 0.5
   @Field var y: Double = 0.5
+  @Field var viewWidth: Double = 0
+  @Field var viewHeight: Double = 0
 }
 
 struct WireframeBoxProp: Record {
@@ -39,7 +41,8 @@ public final class ObjectMeasureModule: Module {
     // lost, too few surviving samples): see ObjectMeasureError.
     AsyncFunction("measure") { (tap: MeasureTapPoint) async throws -> [String: Any] in
       let result = try await ObjectMeasureController.shared.measure(
-        normalizedTapPoint: CGPoint(x: tap.x, y: tap.y)
+        normalizedTapPoint: CGPoint(x: tap.x, y: tap.y),
+        viewSize: CGSize(width: tap.viewWidth, height: tap.viewHeight)
       )
       return [
         "bboxMeters": [

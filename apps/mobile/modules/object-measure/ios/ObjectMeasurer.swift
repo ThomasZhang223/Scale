@@ -1,4 +1,5 @@
 import ARKit
+import UIKit
 import CoreVideo
 import simd
 
@@ -31,9 +32,26 @@ enum ObjectMeasurer {
   // subsequent frame in the sweep: the object does not move, only the depth
   // samples around it change frame to frame, which is exactly what taking a
   // median across frames is for.
-  static func raycastSeed(session: ARSession, frame: ARFrame, normalizedTapPoint: CGPoint) -> ObjectSeed? {
+  //
+  // The tap arrives normalised to the portrait *view*. ARFrame.raycastQuery
+  // wants normalised *image* coordinates — the landscape camera buffer, which
+  // the view shows rotated and aspect-filled. Feeding a view point straight
+  // in lands the seed a quarter turn away from the finger: the first on-device
+  // measurement of a cap put its box on the empty table behind it. The
+  // display transform is Apple's own map from image to view for this
+  // orientation and aspect; its inverse is the one we need.
+  static func raycastSeed(
+    session: ARSession,
+    frame: ARFrame,
+    normalizedTapPoint: CGPoint,
+    viewSize: CGSize
+  ) -> ObjectSeed? {
+    let size = viewSize.width > 0 && viewSize.height > 0 ? viewSize : UIScreen.main.bounds.size
+    let imagePoint = normalizedTapPoint.applying(
+      frame.displayTransform(for: .portrait, viewportSize: size).inverted()
+    )
     let query = frame.raycastQuery(
-      from: normalizedTapPoint,
+      from: imagePoint,
       allowing: .estimatedPlane,
       alignment: .horizontal
     )

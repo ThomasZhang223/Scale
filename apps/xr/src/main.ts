@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { VRButton } from 'three/examples/jsm/webxr/VRButton.js';
 import { buildRoomFromScan, type BuiltRoom, type ScannedObject } from './roomScan';
+import { Hud, type HudLine, type Tone } from './hud';
 import { ObjectLoader, type LoadedObject } from './objects';
 import { createPhysics } from './physics';
 import { Interaction } from './interaction';
@@ -100,6 +101,13 @@ const room = new THREE.Group();
 scene.add(room);
 const fitOverlay = new FitOverlay();
 scene.add(fitOverlay.group);
+// The transcript card follows the head: it hangs off the camera, which must be in the scene
+// for its children to render.
+scene.add(camera);
+const hud = new Hud();
+hud.attachTo(camera);
+renderer.xr.addEventListener('sessionstart', () => hud.setPresenting(true));
+renderer.xr.addEventListener('sessionend', () => hud.setPresenting(false));
 
 const PALETTE_ACTIONS: PaletteItem[] = [
   { url: '', name: 'Reset room', action: 'reset', section: 'Room' },
@@ -129,6 +137,23 @@ const listingCards = document.getElementById('listing-cards')!;
 const micButton = document.getElementById('agent-mic') as HTMLButtonElement;
 panel.hidden = !SHOW_PANEL;
 const say = (text: string) => (note.textContent = text);
+
+// The transcript: what was heard and what was answered, shown in full on the head-locked
+// card (hud.ts). The wrist keeps the buttons; the reasons live here, in front of the eyes.
+const TRANSCRIPT_KEEP = 8;
+const transcript: HudLine[] = [];
+function tell(text: string, tone: Tone = 'info') {
+  say(text);
+  transcript.push({ text, tone });
+  if (transcript.length > TRANSCRIPT_KEEP) transcript.splice(0, transcript.length - TRANSCRIPT_KEEP);
+  hud.set(transcript);
+}
+
+/** Spoken output is one sentence: the card carries the rest. */
+function concise(text: string, maxChars = 140): string {
+  const first = text.trim().split(/(?<=[.!?])\s+/)[0] ?? '';
+  return first.length > maxChars ? `${first.slice(0, maxChars - 1).replace(/\s+\S*$/, '')}…` : first;
+}
 
 // ---------- state ----------
 
@@ -196,7 +221,7 @@ async function start() {
       voiceDetail = detail;
       micButton.dataset.state = state;
       micButton.title = state === 'recording' ? 'Release to send' : state === 'error' ? detail ?? 'Voice error' : 'Hold to talk';
-      if (state === 'error' && detail) say(`Voice: ${detail}`);
+      if (state === 'error' && detail) tell(`Voice: ${detail}`, 'error');
       showPalette();
     },
   });
@@ -317,8 +342,8 @@ async function start() {
     const spoken = top
       ? `${listings.recommendations.length} listings ${what}. Top pick: ${top.listing.name} from ${top.listing.merchant ?? 'the catalogue'}, ${top.reasons.join(', ')}.`
       : `Nothing for sale fits ${what}.`;
-    say(spoken);
-    if (need.text && lastHeard === need.text) speak(spoken); // only answer aloud when it was asked aloud
+    tell(spoken, top ? 'info' : 'warn');
+    if (need.text && lastHeard === need.text) speak(concise(spoken)); // only answer aloud when it was asked aloud
     return listings;
   }
 
@@ -486,8 +511,7 @@ async function start() {
     else if (voiceState === 'transcribing') rows.push(label('Transcribing…'));
     else rows.push(tile(voiceState === 'speaking' ? 'Hold to talk (interrupts)' : 'Hold to talk', 'hold:talk', true));
     if (voiceState === 'error' && voiceDetail) rows.push(label(voiceDetail, 'warn'));
-    else if (lastHeard) rows.push(label(`Heard: ${lastHeard}`));
-    return rows;
+    return rows; // what was heard is on the transcript card, not the wrist
   }
 
   async function talkDown() {
@@ -504,7 +528,7 @@ async function start() {
     if (!text) return;
     lastHeard = text;
     agentText.value = text;
-    say(`Heard: "${text}"`);
+    tell(`“${text}”`, 'heard');
     showPalette();
     await routeRequest(text);
   }
@@ -537,10 +561,10 @@ async function start() {
         return [label(s.status || 'Working…'), ...s.log.slice(-3).map((e) => label(e.message, e.severity))];
       case 'proposed': {
         const p = s.proposal!;
+        // The summary, the reasons and the trade-off are on the transcript card in front of
+        // the eyes (onAgentChange); the wrist keeps only the decision.
         return [
-          label(s.offline ? 'Offline: sample proposal' : p.summary),
-          label(p.explanation),
-          ...(p.tradeoffs.length ? [label(p.tradeoffs[0], 'warn')] : []),
+          ...(s.offline ? [label('Offline: sample proposal', 'warn')] : []),
           ...(p.fit.red || p.fit.amber ? [label(`Fit: ${p.fit.red} red, ${p.fit.amber} amber`, p.fit.red ? 'warn' : 'info')] : []),
           // The furniture is already gliding (previewProposal); the decision comes once it has landed.
           ...(applier.active ? [label('Moving…')] : [tile('Keep', 'accept', true), tile('Put back', 'reject'), tile('Ask again', 'ask_again')]),
@@ -550,8 +574,6 @@ async function start() {
         return [label('Applying…')];
       case 'failed':
         return [label(s.error ?? 'Failed', 'warn'), tile('Try again', 'try_again')];
-      case 'room_changed':
-        return [label('The room changed.', 'warn'), tile('Ask again', 'ask_again'), tile('Dismiss', 'try_again')];
       default:
         return [
           ...(s.solver === 'offline' ? [label('Solver offline', 'warn')] : []),
@@ -578,11 +600,18 @@ async function start() {
       const key = `proposed:${s.proposal.summary}`;
       if (spokenFor !== key) {
         spokenFor = key;
-        speak([s.proposal.summary, s.proposal.explanation, s.proposal.tradeoffs[0] ? `One trade-off: ${s.proposal.tradeoffs[0]}` : ''].filter(Boolean).join(' '));
+        const p = s.proposal;
+        // Everything in writing, in front of the eyes; one sentence aloud.
+        tell(p.summary, 'info');
+        if (p.explanation) tell(p.explanation, 'info');
+        if (p.tradeoffs[0]) tell(`Trade-off: ${p.tradeoffs[0]}`, 'warn');
+        if (p.fit.red || p.fit.amber) tell(`Fit: ${p.fit.red} red, ${p.fit.amber} amber.`, p.fit.red ? 'error' : 'warn');
+        speak(concise(p.summary));
       }
     } else if (s.state === 'failed' && s.error && spokenFor !== `failed:${s.error}`) {
       spokenFor = `failed:${s.error}`;
-      speak(`That didn't work: ${s.error}`);
+      tell(s.error, 'error');
+      speak(`That didn't work. ${concise(s.error)}`);
     }
     if (s.state === 'proposed' && s.proposal) previewProposal(s.proposal);
     else if (s.state !== 'applying') ghosts.clear();
@@ -611,13 +640,8 @@ async function start() {
     const buttons: HTMLButtonElement[] = [];
     if (s.state === 'proposed') buttons.push(button('Keep', 'accept', true), button('Put back', 'reject'), button('Ask again', 'ask_again'));
     if (s.state === 'failed') buttons.push(button('Try again', 'try_again'));
-    if (s.state === 'room_changed') buttons.push(button('Ask again', 'ask_again'), button('Dismiss', 'try_again'));
     if (s.state === 'idle' && undoAvailable) buttons.push(button('Undo', 'undo'));
     agentButtons.replaceChildren(...buttons);
-    if (s.state === 'proposed' && s.proposal) {
-      const p = s.proposal;
-      say(`${p.summary}: ${p.explanation}${p.tradeoffs.length ? ` Trade-off: ${p.tradeoffs[0]}` : ''}`);
-    }
   }
 
   /** Everything the agent needs to know about the room right now. */
@@ -724,7 +748,7 @@ async function start() {
     }
     previewBefore = before;
     applier.start(moves, interaction.heldIds(), (result) => {
-      if (result.stuck.length) say(`Couldn't reach its spot: ${result.stuck.map((id) => objects.get(id)?.name ?? id).join(', ')}. Left where physics stopped it.`);
+      if (result.stuck.length) tell(`Couldn't reach its spot: ${result.stuck.map((id) => objects.get(id)?.name ?? id).join(', ')}. Left where physics stopped it.`);
       showPalette(); // "Moving…" becomes Keep / Put back
     });
   }
@@ -876,6 +900,7 @@ async function start() {
     fitOverlay.show(report);
     if (report.ok || !report.violations.length) return;
     const blocks = report.violations.filter((v) => v.severity === 'block').length;
+    for (const v of report.violations) tell(v.message, v.severity === 'block' ? 'error' : 'warn');
     say(`Fit: ${report.violations.map((v) => v.message).join('; ')} (${blocks} blocking).`);
   }
 
@@ -1019,11 +1044,11 @@ async function start() {
       const mismatch = boundsMismatch(loaded.size, item.expected);
       if (mismatch) {
         console.warn(`${item.name}: ${mismatch}`);
-        say(`${item.name}: ${mismatch}.`);
+        tell(`${item.name}: ${mismatch}.`, 'warn');
       }
     } catch (err) {
       console.error(`Loading ${item.name} from ${item.url} failed:`, err);
-      say(`Couldn’t load ${item.name} from the server: ${(err as Error).message}`);
+      tell(`Couldn’t load ${item.name} from the server: ${(err as Error).message}`, 'error');
     }
   }
 

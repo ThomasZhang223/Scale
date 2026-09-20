@@ -24,6 +24,7 @@ import {
   putRoom,
   roomExists,
   listObjects,
+  markObjectReady,
 } from "../lib/store";
 import {
   assertBBoxMeters,
@@ -325,6 +326,39 @@ export async function postGenerate(
   }
 
   return json({ jobId });
+}
+
+// POST /v1/objects/{id}/mesh  { key, roomId? }
+//
+// The phone's Object Capture path (apps/mobile/modules/object-capture) reconstructs the mesh
+// on-device with Apple's PhotogrammetrySession and uploads the GLB itself through POST /uploads
+// (kind objectMesh). This is how it then flips the object to ready. Not in contracts.md yet —
+// same standing as GET /v1/objects, see workers/DEPLOY.md "Schema proposals".
+//
+// Standing rule 2 ("the scale binding happens exactly once, in C") is honoured, not skipped:
+// Object Capture output is already in metres at true size, so no binding step exists for this
+// mesh at all — nothing here or downstream rescales it. `bboxMeters` on the object row was
+// measured from that same mesh on the phone.
+export async function postObjectMesh(
+  req: Request,
+  env: Env,
+  objectId: string,
+  origin: string,
+): Promise<Response> {
+  const body = await readJson<{ key: string; roomId?: string | null }>(req);
+  const key = required(body.key, "key");
+  if (key !== R2Keys.objectMesh(objectId)) {
+    throw new HttpError(400, "bad_mesh_key", `key must be ${R2Keys.objectMesh(objectId)}, got ${key}.`);
+  }
+  // 404 before touching the row, and a loud error if the client marks ready before its PUT landed.
+  await getObject(env, objectId, origin);
+  const head = await env.BUCKET.head(key);
+  if (!head) throw new HttpError(409, "mesh_not_uploaded", `Nothing is stored at ${key} yet. PUT it first.`);
+
+  await markObjectReady(env, objectId, { glbKey: key });
+  const object = await getObject(env, objectId, origin);
+  if (body.roomId) await emitToRoom(env, body.roomId, "object", object);
+  return json(object);
 }
 
 export async function getJobById(env: Env, jobId: string): Promise<Response> {

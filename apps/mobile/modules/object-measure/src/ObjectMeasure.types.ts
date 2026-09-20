@@ -3,6 +3,11 @@ import type { ViewProps } from "react-native";
 export interface NormalizedTapPoint {
   x: number;
   y: number;
+  // The size in points of the view the tap landed in. The native side needs
+  // the aspect ratio to map a portrait view point onto the landscape camera
+  // image (ARFrame.displayTransform).
+  viewWidth: number;
+  viewHeight: number;
 }
 
 // Mirrors the measured shape of .claude/contracts.md's Object v1 —

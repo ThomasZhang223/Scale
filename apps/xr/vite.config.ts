@@ -71,7 +71,9 @@ export default defineConfig(({ mode }) => {
         },
         // The designer agent is its own Worker (services/agent); longer prefix first.
         '/v1/agent': env.VITE_AGENT_PROXY ?? 'http://127.0.0.1:8789',
-        '/v1': env.VITE_API_PROXY ?? 'http://127.0.0.1:8787',
+        // changeOrigin so an https workers.dev target (used when no local stub is running)
+        // sees its own hostname rather than localhost:5173, which Cloudflare would refuse.
+        '/v1': { target: env.VITE_API_PROXY ?? 'http://127.0.0.1:8787', changeOrigin: true },
       },
     },
   };
