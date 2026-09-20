@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useFocusEffect, useRouter } from "expo-router";
 import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { SymbolView } from "expo-symbols";
@@ -37,28 +37,32 @@ async function versionCountFor(roomId: string, stub: boolean): Promise<number | 
 }
 
 async function fetchRoomsPayload(): Promise<RoomsPayload> {
-  const room = await getJSON<RoomCaptureV1>(`/v1/rooms/${DEMO_ROOM_ID}`, {
-    stub: true,
-    schemaLabel: "RoomCapture v1",
-  });
   // Best-effort: fixtures/README.md commits only four fixtures, and this
   // endpoint's stub answer isn't one of them, so its exact shape is
   // whatever Panel C's Worker improvises. A failure here degrades the
   // version-count metric to "unknown" rather than breaking the screen —
   // this is missing data, not a guessed decision (CLAUDE.md "Fail loud"
   // targets the latter).
-  // Rooms built on this phone (photo upload, wall capture): live reads, newest first. One
-  // failing id does not hide the rest, but it is reported, not dropped (CLAUDE.md "Fail loud").
-  const local = await Promise.all(
-    [...localRoomIds(), ...SEED_ROOM_IDS.filter((id) => !localRoomIds().includes(id))].map((id) =>
-      getJSON<RoomCaptureV1>(`/v1/rooms/${id}`, { schemaLabel: "RoomCapture v1" }).then(
+  // Rooms built on this phone (photo upload, wall capture) and the seeded rooms: live reads, newest
+  // first, then the demo fixture. One failing id — the demo fixture included — does not hide the
+  // rest, but it is reported, not dropped (CLAUDE.md "Fail loud").
+  const localIds = localRoomIds();
+  const targets = [
+    ...[...localIds, ...SEED_ROOM_IDS.filter((id) => !localIds.includes(id))].map((id) => ({ id, stub: false })),
+    { id: DEMO_ROOM_ID, stub: true },
+  ];
+  const settled = await Promise.all(
+    targets.map(({ id, stub }) =>
+      getJSON<RoomCaptureV1>(`/v1/rooms/${id}`, { stub, schemaLabel: "RoomCapture v1" }).then(
         (r) => ({ room: r }),
         (err: unknown) => ({ id, error: err instanceof Error ? err.message : String(err) })
       )
     )
   );
-  const rooms = [...local.flatMap((r) => ("room" in r ? [r.room] : [])), room];
-  const failed = local.flatMap((r) => ("error" in r ? [r] : []));
+  const rooms = settled.flatMap((r) => ("room" in r ? [r.room] : []));
+  const failed = settled.flatMap((r) => ("error" in r ? [r] : []));
+  // Every room failing is an error screen with the reason, not an empty list that reads "no rooms".
+  if (rooms.length === 0 && failed.length > 0) throw new Error(failed[0].error);
   const counts = await Promise.all(rooms.map((r) => versionCountFor(r.roomId, r.roomId === DEMO_ROOM_ID)));
   const versionCount = Object.fromEntries(rooms.map((r, i) => [r.roomId, counts[i]]));
   return { rooms, versionCount, failed };
@@ -83,6 +87,17 @@ function RoomsScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const [state, retry] = useFetchState(fetchRoomsPayload, []);
+  // The last list that loaded. A refresh that fails (a dropped connection on tab focus) keeps showing
+  // it under a warning, instead of swapping a list you were just reading for a full-screen error.
+  const lastGood = useRef<RoomsPayload | null>(null);
+  if (state.status === "ready") lastGood.current = state.data;
+  const shown = state.status === "ready" ? state.data : lastGood.current;
+  // roomPhotoSource stats the documents folder synchronously; do it once per fetched list, not on
+  // every render of five cards.
+  const photos = useMemo(
+    () => Object.fromEntries((shown?.rooms ?? []).map((r) => [r.roomId, roomPhotoSource(r.roomId)])),
+    [shown]
+  );
   const [selected, setSelected] = useState<string | null>(() => activeRoomId());
   const [sending, setSending] = useState<string | null>(null);
 
@@ -109,10 +124,12 @@ function RoomsScreen() {
     }, [])
   );
 
-  if (state.status === "loading") return <LoadingView />;
-  if (state.status === "error") return <ErrorView message={state.message} onRetry={retry} />;
+  if (!shown) {
+    if (state.status === "error") return <ErrorView message={state.message} onRetry={retry} />;
+    return <LoadingView />;
+  }
 
-  const { rooms, versionCount, failed } = state.data;
+  const { rooms, versionCount, failed } = shown;
 
   if (rooms.length === 0) {
     return (
@@ -139,11 +156,12 @@ function RoomsScreen() {
           </Pressable>
         }
       />
+      {state.status === "error" ? <Text style={styles.warn}>{`Could not refresh: ${state.message}`}</Text> : null}
       {failed.length > 0 ? (
         <Text style={styles.warn}>{`${failed.length} room${failed.length === 1 ? "" : "s"} on this phone could not be loaded: ${failed[0].error}`}</Text>
       ) : null}
       {rooms.map((r) => {
-        const photo = roomPhotoSource(r.roomId);
+        const photo = photos[r.roomId];
         const isSelected = selected === r.roomId;
         return (
           <Pressable
