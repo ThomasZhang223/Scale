@@ -472,3 +472,96 @@ test("POST /v1/ingest is token-gated, needs an https storefront and defaults eve
   assert.deepEqual(created[0].params, { merchant: "M", storefront: "https://shop.example", collection: null,
     browserbase: false, llm: false, vlm: false });
 });
+
+// --- Attach by source --------------------------------------------------------------------------
+
+// scanEnvironment's row is shared by reference through DB.first(), so a test sets its source there.
+async function attach(source, key, stored = glbBytes()) {
+  const { env, writes } = scanEnvironment(stored);
+  env.DB.batch = async statements => { for (const statement of statements) await statement.run(); };
+  (await env.DB.prepare("").bind().first()).source = source;
+  const upserts = [];
+  env.OBJECTS_INDEX = { upsert: async vectors => { upserts.push(...vectors); } };
+  const { ctx, settle } = context();
+  const outcome = await postObjectMesh(scanRequest(key), env, "scan-1", "https://api.example", ctx).then(
+    response => ({ response }), error => ({ error }));
+  await settle();
+  return { ...outcome, writes, upserts };
+}
+
+test("a catalogue row takes objects/{id}/mesh.glb, is ready, and its parked mesh jobs are closed", async t => {
+  t.mock.method(globalThis, "fetch", async () => Response.json(vector));
+  const { response, writes, upserts } = await attach("catalog", "objects/scan-1/mesh.glb");
+  assert.equal(response.status, 200);
+  assert.equal(writes.find(w => w.sql.includes("state = 'ready'")).args[0], "objects/scan-1/mesh.glb");
+  const outbox = writes.find(w => w.sql.startsWith("UPDATE mesh_outbox"));
+  assert.match(outbox.sql, /delivered_at IS NULL/);
+  assert.match(outbox.sql, /state = 'queued'/);
+  assert.equal(outbox.args[1], "scan-1");
+  const jobs = writes.find(w => w.sql.startsWith("UPDATE jobs"));
+  assert.match(jobs.sql, /kind = 'mesh' AND state = 'queued'/);
+  assert.deepEqual([jobs.args[0], jobs.args[2]], ["mesh attached via POST /mesh (reviewed offline); generation skipped", "scan-1"]);
+  assert.ok(jobs.sql.includes("state = 'done', progress_pct = 100"));
+  assert.ok(writes.indexOf(outbox) < writes.indexOf(jobs), "outbox must be closed before the jobs its subquery selects");
+  assert.equal(upserts[0].metadata.source, "catalog");
+});
+
+test("a primitive row also takes objects/{id}/mesh.glb", async t => {
+  t.mock.method(globalThis, "fetch", async () => Response.json(vector));
+  const { response } = await attach("primitive", "objects/scan-1/mesh.glb");
+  assert.equal(response.status, 200);
+});
+
+test("a catalogue row can never be attached under scans/", async () => {
+  const { error, writes } = await attach("catalog", "scans/scan-1/mesh.glb");
+  assert.equal(error.status, 400);
+  assert.equal(error.code, "bad_mesh_key");
+  assert.match(error.message, /objects\/scan-1\/mesh\.glb/);
+  assert.match(error.message, /catalog/);
+  assert.equal(writes.length, 0);
+});
+
+test("a scan row can never be attached under objects/, and its jobs are left alone", async () => {
+  const { error, writes } = await attach("scan", "objects/scan-1/mesh.glb");
+  assert.equal(error.status, 400);
+  assert.equal(error.code, "bad_mesh_key");
+  assert.match(error.message, /scans\/scan-1\/mesh\.glb/);
+  assert.match(error.message, /scan object/);
+  assert.equal(writes.length, 0);
+});
+
+test("a scan row with the scans/ key is ready and touches no mesh jobs", async t => {
+  t.mock.method(globalThis, "fetch", async () => Response.json(vector));
+  const { response, writes, upserts } = await attach("scan", "scans/scan-1/mesh.glb");
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("x-indexed"), "pending");
+  assert.equal(writes.some(w => w.sql.startsWith("UPDATE jobs") || w.sql.startsWith("UPDATE mesh_outbox")), false);
+  assert.equal(upserts[0].metadata.source, "scan");
+});
+
+test("an unknown object 404s before the key is compared", async () => {
+  const { env } = scanEnvironment(glbBytes());
+  env.DB = { prepare: () => ({ bind: () => ({ first: async () => null }) }) };
+  await assert.rejects(postObjectMesh(scanRequest("anything"), env, "ghost", "https://api.example", context().ctx),
+    error => error.status === 404);
+});
+
+test("a job that reaches the workflow after a mesh was attached is refused without touching the object", async t => {
+  const { env, row, writes } = pipelineEnvironment();
+  Object.assign(row, { state: "ready", glb_key: "objects/object/mesh.glb" });
+  env.BASETEN_URL = "https://gpu.example/predict";
+  const fetched = t.mock.method(globalThis, "fetch", async () => { throw Error("must not call Baseten"); });
+  const catalog = { objectId: "object", name: "chair", description: "", imageUrl: "https://cdn.example/a.jpg",
+    category: "chair", bboxMeters: { w: 0.7, h: 1, d: 0.6 }, measure: { method: "extracted", confidence: 1 },
+    merchant: "M", productUrl: null, price: null, productId: null };
+  const steps = [];
+  await assert.rejects(new GenerateMeshWorkflow({}, env).run({ payload: { jobId: "job", objectId: "object", tier: "live",
+    apiOrigin: "https://api.example", roomId: null, catalog } }, { do: async (...args) => { steps.push(args[0]); return args.at(-1)(); } }),
+    /already ready with objects\/object\/mesh\.glb/);
+  assert.deepEqual(steps, ["refuse-attached-object"]);
+  assert.equal(fetched.mock.callCount(), 0);
+  assert.equal(writes.some(w => w.sql.includes("INSERT INTO objects")), false, "the catalogue step must not upsert the object");
+  assert.equal(writes.some(w => w.sql.includes("state = 'failed'")), false, "a ready object must never be marked failed");
+  const job = writes.find(w => w.sql.includes("UPDATE jobs"));
+  assert.deepEqual([job.args[0], job.args[2]], ["done", "mesh attached via POST /mesh (reviewed offline); generation skipped"]);
+});

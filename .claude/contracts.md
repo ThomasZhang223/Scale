@@ -178,7 +178,7 @@ B ships this surface as stubs in hours 0–2. Real logic lands behind it afterwa
 | `GET /objects?source=&merchant=&limit=` | — | `[Object v1]`, newest first, `state != 'failed'`; `limit` 1-500, default 100 | A, D |
 | `GET /objects/{id}` | — | `Object v1` | all |
 | `POST /objects/{id}/generate` | `{ tier: "live" \| "quality" }` | `{ jobId }` | A, C |
-| `POST /objects/{id}/mesh` | `{ key, roomId? }` — `key` must be `scans/{id}/mesh.glb` | `Object v1` with `state:"ready"` | A |
+| `POST /objects/{id}/mesh` | `{ key, roomId? }` — `key` must be `scans/{id}/mesh.glb` for a `source:"scan"` object and `objects/{id}/mesh.glb` for `catalog` or `primitive` | `Object v1` with `state:"ready"` | A, C |
 | `POST /objects/{id}/index` | `{ imageKey }` or `{ text }` (exactly one), `X-Upstream-Token` | `{ objectId, fingerprint, modality }` | backfill, retry |
 | `GET /jobs/{id}` | — | `{ state, progressPct, objectId, error }` | A |
 | `POST /search` | `{ text?, imageKey?, fit?, source?, limit }` | `[{ objectId, score, object }]` | F |
@@ -194,12 +194,19 @@ Notes on the rows above that are not in the table:
 - `POST /uploads` `kind` is one of `roomCapture`, `objectFrame`, `objectMesh`, `objectThumb`,
   `scanMesh`, `catalogSource`. `scanMesh` is the phone's Object Capture GLB and lands under
   `scans/`; `objectMesh` is the generated mesh's key under `objects/` and is Ani's, unchanged.
-- `POST /objects/{id}/mesh` refuses a key other than `scans/{id}/mesh.glb` (400 `bad_mesh_key`) and
-  refuses bytes that are not a binary glTF — bad magic, version or declared length — with 422
+- `POST /objects/{id}/mesh` loads the row first (404 if absent), then expects the key that matches
+  the row's `source` and no other — never a scan under `objects/`, never a catalogue object under
+  `scans/` (400 `bad_mesh_key`, naming the expected key and the source). It refuses bytes that are not a binary glTF — bad magic, version or declared length — with 422
   `not_a_glb`, leaving the row `measured`. It answers before the object is searchable: the
   response carries `X-Indexed: pending` (indexing runs in the background),
   or `X-Indexed: false` with `X-Index-Skipped: no-embeddable-text` when the scan has no name or
   category to embed.
+- When `POST /objects/{id}/mesh` succeeds for a non-scan object (a reviewed hero mesh attached to a
+  catalogue object), that object's parked mesh jobs — `kind:"mesh"`, `state:"queued"` — become
+  `done` at 100% with the note `mesh attached via POST /mesh (reviewed offline); generation
+  skipped`, and their undelivered outbox rows are marked delivered. A generation job that already
+  reached the workflow is refused by its first step when the object is `ready` with a `glb_key`, so
+  an attached mesh is never overwritten.
 - `POST /objects/{id}/index`, `POST /ingest` and `POST /catalog/ingest` spend money or write a
   shared index, so all three need `X-Upstream-Token`.
 - Object ids on the catalogue intake are computed by the Worker, whichever route the row came
@@ -248,7 +255,7 @@ The Quest subscribes on room open and never polls. This is pipeline P6.
 | --- | --- |
 | `rooms/{roomId}/capture.json` | B, on upload |
 | `objects/{objectId}/frames/{n}.jpg` | A, presigned |
-| `objects/{objectId}/mesh.glb` | C |
+| `objects/{objectId}/mesh.glb` | C; also a reviewed mesh attached to a catalogue object via `POST /objects/{id}/mesh` |
 | `objects/{objectId}/mesh-receipt.json` | C, optional |
 | `objects/{objectId}/catalog.json` | B, catalogue intake |
 | `objects/{objectId}/thumb.jpg` | C |

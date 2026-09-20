@@ -18,6 +18,7 @@ import {
   getObject,
   getObjects,
   getVersion,
+  closeParkedMeshJobs,
   insertObject,
   insertVersion,
   latestVersion,
@@ -333,15 +334,20 @@ export async function postGenerate(
 
 // POST /v1/objects/{id}/mesh  { key, roomId? }
 //
-// The phone's Object Capture path (apps/mobile/modules/object-capture) reconstructs the mesh
-// on-device with Apple's PhotogrammetrySession and uploads the GLB itself through POST /uploads
-// (kind scanMesh, stored under scans/). This is how it then flips the object to ready. Not in contracts.md yet —
-// same standing as GET /v1/objects, see workers/DEPLOY.md "Schema proposals".
+// Attaches an already-uploaded GLB to an object and flips it to ready. Which key is acceptable
+// follows the ROW's source, and there is no fallback either way:
+//   scan               scans/{id}/mesh.glb    the phone's Object Capture path
+//                      (apps/mobile/modules/object-capture reconstructs on-device with Apple's
+//                      PhotogrammetrySession and uploads through POST /uploads, kind scanMesh)
+//   catalog/primitive  objects/{id}/mesh.glb  a reviewed hero mesh (services/gen's
+//                      WorkerArtifactSink, kind objectMesh — services/gen asserts that literal key)
+// A scan is never attached under objects/ and a catalogue object never under scans/.
+// Not in contracts.md yet — same standing as GET /v1/objects, see workers/DEPLOY.md "Schema proposals".
 //
 // Standing rule 2 ("the scale binding happens exactly once, in C") is honoured, not skipped:
-// Object Capture output is already in metres at true size, so no binding step exists for this
+// Object Capture output is already in metres at true size, so no binding step exists for a scan
 // mesh at all — nothing here or downstream rescales it. `bboxMeters` on the object row was
-// measured from that same mesh on the phone.
+// measured from that same mesh on the phone. A reviewed catalogue mesh was bound in C.
 export async function postObjectMesh(
   req: Request,
   env: Env,
@@ -351,11 +357,30 @@ export async function postObjectMesh(
 ): Promise<Response> {
   const body = await readJson<{ key: string; roomId?: string | null }>(req);
   const key = required(body.key, "key");
-  if (key !== R2Keys.scanMesh(objectId)) {
-    throw new HttpError(400, "bad_mesh_key", `key must be ${R2Keys.scanMesh(objectId)}, got ${key}.`);
-  }
-  // 404 before touching the row, and a loud error if the client marks ready before its PUT landed.
+  // 404 before anything else; the row decides which key is acceptable.
   const object0 = await getObject(env, objectId, origin);
+  let expected: string;
+  switch (object0.source) {
+    case "scan":
+      expected = R2Keys.scanMesh(objectId);
+      break;
+    case "catalog":
+    case "primitive":
+      expected = R2Keys.objectMesh(objectId);
+      break;
+    default:
+      // Standing rule 4: an unrecognised source has no folder, and guessing one would file a
+      // mesh where nothing looks for it.
+      throw new HttpError(422, "unknown_object_source", `Object ${objectId} has source "${object0.source}".`);
+  }
+  if (key !== expected) {
+    throw new HttpError(
+      400,
+      "bad_mesh_key",
+      `key must be ${expected} for a ${object0.source} object, got ${key}.`,
+    );
+  }
+  // A loud error if the client marks ready before its PUT landed.
   const head = await env.BUCKET.head(key);
   if (!head) throw new HttpError(409, "mesh_not_uploaded", `Nothing is stored at ${key} yet. PUT it first.`);
   // A truncated upload or an HTML error page must not flip a row to ready. Same check
@@ -377,6 +402,9 @@ export async function postObjectMesh(
   }
 
   await markObjectReady(env, objectId, { glbKey: key });
+  // A catalogue object may have mesh jobs parked (queued, undelivered) waiting for a Baseten
+  // that is not configured. Close them so configuring it later cannot regenerate over this mesh.
+  if (object0.source !== "scan") await closeParkedMeshJobs(env, objectId, nowIso());
 
   // A phone-uploaded GLB never passes through the mesh Workflow, so this is the only place a
   // scanned object can reach Vectorize. Same indexer as the Workflow — there is not a second one.
@@ -402,7 +430,7 @@ export async function postObjectMesh(
     ctx.waitUntil(
       indexObject(env, {
         objectId,
-        source: "scan",
+        source: object0.source,
         category: object0.category,
         bboxMeters: object0.bboxMeters,
         dominantHex: object0.palette?.[0] ?? null,
