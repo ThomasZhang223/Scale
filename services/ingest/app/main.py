@@ -37,7 +37,8 @@ from .browserbase import BrowserbaseFetch, CachedFetch, FetchError
 from .dimensions import extract
 from .page_extract import extract_from_page, product_url
 from .product_search import (
-    handles_from_search_page, normalise_query, products_by_handle, search_url,
+    drop_unplaceable, handles_from_search_page, normalise_query, products_by_handle,
+    relevance, search_url,
 )
 from .validate import validate
 
@@ -205,7 +206,17 @@ async def find_products(request: Request):
                     (x.get("handle") or "").lower() for x in catalogue}) == 0:
                 break
 
-    products = products_by_handle(catalogue, handles)
+    matched = products_by_handle(catalogue, handles)
+    products = drop_unplaceable(matched)
+    hits, ratio = relevance(query, products)
+
+    # A store whose search finds nothing may serve its popular products instead, and that page
+    # is indistinguishable from a real result set — Floyd answers "red chair" with twelve beds.
+    # Returning those unflagged is the worst outcome available: a confident answer to a
+    # question nobody asked. Flagged rather than emptied, because the caller knows whether it
+    # would rather show something loosely related or say it found nothing.
+    fallback = bool(products) and hits == 0
+
     return {
         "query": raw_query,
         "searchedFor": query,
@@ -215,7 +226,13 @@ async def find_products(request: Request):
         # Handles the catalogue does not serve cannot be measured, so they are reported rather
         # than quietly dropped — a caller comparing count to handles should see why.
         "missing": [h for h in handles if h not in {
-            (x.get("handle") or "").lower() for x in products}],
+            (x.get("handle") or "").lower() for x in matched}],
+        "relevance": {"matched": hits, "ratio": round(ratio, 2)},
+        "fallbackSuspected": fallback,
+        "warning": (
+            f"no result matches any word of {query!r} — this storefront most likely has "
+            f"nothing for that query and served popular products instead"
+        ) if fallback else None,
         "products": products,
     }
 

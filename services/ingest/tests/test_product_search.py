@@ -12,6 +12,7 @@ sys.path.insert(0, str(ROOT))
 
 from app.product_search import (
     search_url, handles_from_search_page, products_by_handle, normalise_query,
+    relevance, drop_unplaceable,
 )
 
 
@@ -144,6 +145,65 @@ def test_a_handle_the_catalogue_does_not_list_is_dropped_not_half_filled():
 def test_handle_matching_ignores_case():
     got = products_by_handle([{"handle": "Oak-Chair"}], ["oak-chair"])
     assert len(got) == 1
+
+
+# --- a no-results page that looks like results -----------------------------
+
+def _p(title, ptype="", tags=()):
+    return {"handle": title.lower().replace(" ", "-"), "title": title,
+            "product_type": ptype, "tags": list(tags)}
+
+
+def test_a_store_serving_popular_products_for_a_miss_is_detectable():
+    """Measured on the real thing: floydhome.com answers "red chair" with twelve beds, and
+    "red chair" and "bed" return the same twelve handles in the same order. Their catalogue
+    has no chairs, so the theme falls back — and that page looks exactly like a real one."""
+    beds = [_p("The Floyd Bed", "beds"), _p("The Mattress 2.0", "mattresses"),
+            _p("Bedside Table", "tables"), _p("Underbed Storage", "storage")]
+    hits, ratio = relevance("red chair", beds)
+    assert hits == 0 and ratio == 0.0, "a fallback page must be distinguishable from a ranking"
+
+
+def test_a_genuine_result_set_scores_high():
+    chairs = [_p("Ligna Dining Chair | Walnut", "chairs"),
+              _p("Ferrara Dining Chair | Walnut", "chairs"),
+              _p("Torge Dining Chair | Walnut", "chairs")]
+    hits, ratio = relevance("walnut dining chair", chairs)
+    assert hits == 3 and ratio == 1.0
+
+
+def test_a_match_on_type_or_tags_counts_not_just_the_title():
+    """Bend Goods names products "Ethel" and "Gloria"; the word chair is in the type."""
+    rows = [_p("Ethel", "Chairs"), _p("Gloria", "", tags=["chair", "dining"])]
+    hits, _ = relevance("chair", rows)
+    assert hits == 2
+
+
+def test_short_words_do_not_create_false_matches():
+    """A two-letter token matches half a catalogue by accident."""
+    hits, _ = relevance("a in of", [_p("Linen Sofa", "sofas")])
+    assert hits == 0
+
+
+def test_relevance_of_nothing_is_zero_not_a_crash():
+    assert relevance("chair", []) == (0, 0.0)
+    assert relevance("", [_p("Chair")]) == (0, 0.0)
+
+
+# --- things that are not objects -------------------------------------------
+
+def test_gift_cards_and_samples_are_dropped():
+    """polyandbark.com returns its gift card first for "walnut dining chair". Nothing
+    downstream can make a mesh of it or place it in a room."""
+    rows = [_p("Digital Gift Card"), _p("Ligna Dining Chair", "chairs"),
+            _p("Fabric Swatch", "samples"), _p("5-Year Protection Plan")]
+    kept = [p["title"] for p in drop_unplaceable(rows)]
+    assert kept == ["Ligna Dining Chair"], kept
+
+
+def test_real_furniture_survives_the_filter():
+    rows = [_p("Oak Chair", "chairs"), _p("Linen Sofa", "sofas"), _p("The Floyd Bed", "beds")]
+    assert len(drop_unplaceable(rows)) == 3
 
 
 if __name__ == "__main__":
