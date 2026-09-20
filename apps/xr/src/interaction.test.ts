@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DELETE_ARM_MS, armDelete, objectButtonsActive, stickUse } from './controls.ts';
+import { RoomSwitch, parseRooms, seatIn } from './rooms.ts';
 
 // The thumbstick has three jobs and they must never overlap. This is the whole rule; the
 // update loop branches on it rather than repeating it, so these cases are the real behaviour.
@@ -96,4 +97,62 @@ test('a press on the interface, or on nothing, disarms and deletes nothing', () 
 test('the edge of the window counts as in time', () => {
   const first = press(null, 'lamp', 1000);
   assert.equal(press(first.armed, 'lamp', 1000 + DELETE_ARM_MS).deleteId, 'lamp');
+});
+
+// --- switching rooms without leaving VR ------------------------------------------------
+
+test('a room list comes from config, and a bad one is empty rather than guessed', () => {
+  assert.deepEqual(parseRooms('[{"id":"a","label":"Meeting room"}]'), [{ id: 'a', label: 'Meeting room' }]);
+  assert.deepEqual(parseRooms(undefined), [], 'unset');
+  assert.deepEqual(parseRooms('   '), [], 'blank');
+  assert.deepEqual(parseRooms('not json'), [], 'unparseable');
+  assert.deepEqual(parseRooms('{"id":"a"}'), [], 'not a list');
+  assert.deepEqual(parseRooms('[{"label":"No id"}]'), [], 'an entry with no id');
+  assert.deepEqual(parseRooms('[{"id":"a"}]'), [], 'an entry with no label');
+});
+
+test('a switch runs fade out -> load -> fade in, and covers the view in between', () => {
+  const s = new RoomSwitch();
+  assert.equal(s.covered, false);
+  assert.equal(s.begin(), true);
+  assert.equal(s.covered, true, 'covered as soon as the fade starts');
+  s.covering();
+  assert.equal(s.covered, true, 'still covered while the new room loads');
+  s.uncovering();
+  assert.equal(s.covered, false, 'uncovered once the fade back in begins');
+  s.finish();
+  assert.equal(s.busy, false);
+});
+
+test('a second switch while one is running is dropped, not queued', () => {
+  const s = new RoomSwitch();
+  assert.equal(s.begin(), true);
+  assert.equal(s.begin(), false, 'while fading out');
+  s.covering();
+  assert.equal(s.begin(), false, 'while loading');
+  s.uncovering();
+  assert.equal(s.begin(), false, 'while fading back in');
+  s.finish();
+  assert.equal(s.begin(), true, 'and allowed again once it has finished');
+});
+
+test('a failed load uncovers the view and carries the reason', () => {
+  const s = new RoomSwitch();
+  s.begin();
+  s.covering();
+  s.fail('404 from GET /v1/rooms/nope');
+  assert.equal(s.covered, false, 'the fade back in starts: never leave someone in the dark');
+  assert.match(s.error ?? '', /404/);
+  s.finish();
+  assert.equal(s.busy, false);
+  assert.equal(s.begin(), true, 'and they can try another room');
+});
+
+test('a seat is inside the room whatever shape it is', () => {
+  for (const size of [{ width: 2.76, depth: 4.72 }, { width: 3.48, depth: 3.48 }]) {
+    const { position, lookAt } = seatIn(size);
+    assert.ok(Math.abs(position.z) < size.depth / 2, `inside the walls of ${size.width}x${size.depth}`);
+    assert.ok(Math.abs(position.x) < size.width / 2, 'and not through a side wall');
+    assert.ok(lookAt.z < position.z, 'facing the far wall, not the one behind you');
+  }
 });

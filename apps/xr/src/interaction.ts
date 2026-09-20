@@ -53,6 +53,8 @@ interface Lift {
 export interface DraggableWindow {
   readonly group: THREE.Group;
   hitGrab(raycaster: THREE.Raycaster): THREE.Intersection | null;
+  /** Put this window in front of the person; it keeps its own pose bookkeeping in step. */
+  placeInFront(eye: THREE.Vector3, forward: THREE.Vector3): void;
   /** True when the ray is anywhere on the window, tile or not. See rayOnUi(). */
   hitSurface?(raycaster: THREE.Raycaster): boolean;
 }
@@ -103,6 +105,7 @@ export class Interaction {
   private landing = new LandingPad();
   /** The object A has armed. A second A press on the same one deletes it. */
   private armed: Armed | null = null;
+  private inert = false;
 
   constructor(
     renderer: THREE.WebGLRenderer,
@@ -133,6 +136,25 @@ export class Interaction {
     this.windows.push(palette);
     this.setUpControllers(renderer);
     this.setUpMouse(renderer.domElement);
+  }
+
+  /**
+   * Nothing may be grabbed, armed or deleted while the view is covered — during a room switch
+   * the room under the ray is on its way out, and a press would land in a room nobody can see.
+   */
+  setInert(inert: boolean) {
+    this.inert = inert;
+    if (!inert) return;
+    this.armed = null;
+    this.landing.hide();
+  }
+
+  /**
+   * Puts every window in front of the person. Called after a room switch: the rooms are
+   * different shapes, so a window left where it was can be inside the new room's wall.
+   */
+  reseatWindows(eye: THREE.Vector3, forward: THREE.Vector3) {
+    for (const window of this.windows) window.placeInFront(eye, forward);
   }
 
   /**
@@ -279,6 +301,7 @@ export class Interaction {
 
   /** Uses whatever ray the raycaster currently holds. */
   private tryGrab(): Grab | undefined {
+    if (this.inert) return undefined;
     const [first] = this.raycaster.intersectObjects(this.physics.pickables(), true);
     const id = this.physics.idFromObject(first?.object ?? null);
     if (!id || this.isHeld(id)) return undefined;
@@ -310,6 +333,7 @@ export class Interaction {
    */
   /** Turns an object that is pointed at but not held. What rests on it turns with it. */
   private turnStick(hand: Hand, id: string, dt: number) {
+    if (this.inert) return;
     const stick = hand.source?.gamepad?.axes[STICK_X] ?? 0;
     if (Math.abs(stick) < STICK_DEAD) return;
     this.physics.turn(id, this.physics.rotationY(id) - stick * TURN_SPEED * dt);
@@ -444,7 +468,7 @@ export class Interaction {
    */
   private objectButtons(hand: Hand) {
     const buttons = hand.source?.gamepad?.buttons;
-    if (!buttons) return;
+    if (!buttons || this.inert) return;
     const edges: number[] = [];
     for (const index of [BUTTON_A, BUTTON_B]) {
       const down = buttons[index]?.pressed ?? false;

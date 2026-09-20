@@ -275,6 +275,11 @@ export interface VersionV1 {
   contentHash: string;
 }
 
+/** GET /rooms/{id}/versions: the room's layout history, oldest first. The last one is its head. */
+export function listVersions(roomId: string): Promise<{ versionId: string; label: string; createdAt: string; parentId: string | null }[]> {
+  return get(`/rooms/${roomId}/versions`);
+}
+
 export async function getVersion(versionId: string): Promise<VersionV1> {
   const version = await get<VersionV1>(`/versions/${versionId}`);
   checkSchema(version, 'Version');

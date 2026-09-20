@@ -6,7 +6,7 @@ import { ObjectLoader, type LoadedObject } from './objects';
 import { createPhysics } from './physics';
 import { Interaction } from './interaction';
 import {
-  getRoom, getObject, listObjects, getVersion, postVersion, objectToItem, boundsMismatch, watchRoom, postFit, STUB, askIntent, listScans, listBuiltIns, searchObjects, sameOrigin, getJob, postListingsGenerate, postObjectThumbnail,
+  getRoom, listVersions, getObject, listObjects, getVersion, postVersion, objectToItem, boundsMismatch, watchRoom, postFit, STUB, askIntent, listScans, listBuiltIns, searchObjects, sameOrigin, getJob, postListingsGenerate, postObjectThumbnail,
   type ObjectV1, type VersionV1, type PlacementV1, getActiveRoom, getRoomLive
 } from './api';
 import { FitOverlay, type FitReport } from './fit';
@@ -23,6 +23,7 @@ import { Voice, type VoiceState } from './voice';
 import { findListings, matchLibraryByWord, needFromDetected, needFromText, classifyUtterance, clearScanWinner, normalizeTranscript, productQuery, SIMILAR_ENOUGH, STOREFRONTS, type Command, type Listing, type ListingsResult, type Need, type Recommendation, type StageInfo } from './listings';
 import { FindPanel, type FindKind } from './findpanel';
 import { Outdoors } from './outdoors';
+import { RoomSwitch, ViewFade, disposeRoom, parseRooms, roomControl, seatIn, type RoomChoice } from './rooms';
 import roomH from '../../../fixtures/room-h.json';
 import roomLarge from '../public/room-large.json';
 
@@ -56,6 +57,8 @@ const OBJECTS_URL = params.get('objects'); // null: the built-in furniture comes
 // every object comes from the palette. With one, the room is fetched from the server.
 const SERVER_ROOM_ID: string | null = params.get('room') ?? import.meta.env.VITE_ROOM_ID ?? null;
 const ROOM_ID = SERVER_ROOM_ID ?? roomLarge.roomId;
+/** The rooms you may switch to, from committed config (VITE_ROOMS). See rooms.ts. */
+export const ROOMS: readonly RoomChoice[] = parseRooms(import.meta.env.VITE_ROOMS as string | undefined);
 const OBJECT_IDS = params.get('object')?.split(',').filter(Boolean) ?? [];
 // How many of the newest phone scans to bring into the room on load (?scans=N).
 // ceiling: 0 for the demo — the room opens empty and everything in it was put there on purpose.
@@ -111,6 +114,11 @@ renderer.xr.addEventListener('sessionend', () => {
   camera.position.copy(SPECTATOR_POSITION);
   camera.quaternion.identity();
 });
+
+// Covers the view while a room is torn down and rebuilt. On the camera, so it covers both eyes.
+const fade = new ViewFade();
+fade.attachTo(camera);
+const roomSwitch = new RoomSwitch();
 
 const waiting = new THREE.GridHelper(6, 12, 0x5fb3ff, 0x39424c);
 scene.add(waiting);
@@ -1590,12 +1598,21 @@ async function start() {
   }
 
   let pushTimer: number | undefined;
+  let pushNow: (() => Promise<void>) | null = null;
+
+  /** Sends a pending layout save immediately. What was edited belongs to the room it was edited in. */
+  async function flushLayout() {
+    if (!pushTimer) return;
+    clearTimeout(pushTimer);
+    pushTimer = undefined;
+    await pushNow?.().catch((err) => console.warn('Layout not saved before the room changed:', err));
+  }
 
   /** After a drop, push the layout as a new version (debounced; one call per pause in editing). */
   function layoutChanged(_id: string) {
     if (SCAN_URL || !currentRoom) return;
     clearTimeout(pushTimer);
-    pushTimer = window.setTimeout(async () => {
+    const send = async () => {
       void syncAgentState(); // the agent keeps its own layout history until the server's is real
       if (!SERVER_ROOM_ID) return;
       const offset = currentRoom!.offset;
@@ -1614,6 +1631,11 @@ async function start() {
         // The stub answers 501 here; once versions are real this becomes the live save.
         console.info('Layout not saved to the server:', (err as Error).message);
       }
+    };
+    pushNow = send;
+    pushTimer = window.setTimeout(() => {
+      pushTimer = undefined;
+      void send();
     }, 800);
   }
 
@@ -1644,15 +1666,137 @@ async function start() {
       return;
     }
     try {
-      const scan = await getRoom(ROOM_ID);
-      showScan(scan, `Room ${ROOM_ID.slice(0, 8)}… from the server`);
-      setConnection(STUB ? 'stub' : 'server');
+      await enterRoom(ROOM_ID);
     } catch (err) {
       console.warn('The server did not answer; showing the committed fixture instead.', err);
       showScan(roomH, 'room-h.json (the demo room, offline)');
       setConnection('offline');
     }
   }
+
+  // ---------- rooms ----------
+
+  let activeRoomId = ROOM_ID;
+  let unwatch: (() => void) | null = null;
+
+  /**
+   * Puts a room on screen: the one path the first load and every switch both take. Throws if
+   * the room cannot be fetched, so a switch can fade back into the room it never left.
+   */
+  async function enterRoom(roomId: string) {
+    const scan = await getRoom(roomId);
+    const previous = currentRoom?.group ?? null;
+    showScan(scan, `Room ${roomId.slice(0, 8)}… from the server`);
+    if (previous && previous !== currentRoom?.group) disposeRoom(previous);
+    activeRoomId = roomId;
+    currentVersionId = null; // the layout history belongs to the room you were in
+    setConnection(STUB ? 'stub' : 'server');
+
+    unwatch?.();
+    unwatch = SCAN_URL ? null : watchRoom(roomId, {
+      object: (obj) => void addServerObject(obj),
+      version: (v) => void getVersion(v.versionId).then(applyVersion).catch((err) => console.warn('Version event:', err)),
+      fit: showFit,
+      status: setConnection,
+    });
+
+    // The room's own stored layout, skipping and naming anything that no longer exists.
+    try {
+      const head = (await listVersions(roomId)).at(-1);
+      if (head) await applyVersion(await getVersion(head.versionId));
+    } catch (err) {
+      console.warn(`Room ${roomId}: its stored layout could not be read:`, err);
+    }
+  }
+
+  /** The room on screen right now. */
+  function currentRoomId(): string {
+    return activeRoomId;
+  }
+
+
+  type SwitchState = 'idle' | 'switching' | { error: string };
+  const switchListeners: ((s: SwitchState) => void)[] = [];
+  function onSwitchState(cb: (s: SwitchState) => void) {
+    switchListeners.push(cb);
+  }
+  const emitSwitch = (s: SwitchState) => switchListeners.forEach((cb) => cb(s));
+
+  /**
+   * Stands the person in another room without reloading the page — a reload would drop the XR
+   * session and throw them out of the headset.
+   *
+   * Fade out, tear down, build the new room, re-seat them inside it (the rooms are different
+   * shapes, so the old pose can be inside a wall), bring the windows with them, fade in. A room
+   * that will not load fades back into the one they are still standing in: never leave someone
+   * in the dark, and never leave them somewhere they did not ask to be.
+   */
+  async function switchRoom(roomId: string): Promise<void> {
+    if (roomId === activeRoomId || !roomSwitch.begin()) return;
+    const from = activeRoomId;
+    emitSwitch('switching');
+    interaction.setInert(true); // nothing may be grabbed or deleted into a room on its way out
+    await fade.to1(350);
+    roomSwitch.covering();
+    await flushLayout(); // whatever was still waiting to be saved belongs to the room we are leaving
+    try {
+      await enterRoom(roomId);
+      history.replaceState(null, '', `?room=${roomId}`); // a reload stays where they chose
+    } catch (err) {
+      const reason = (err as Error).message;
+      roomSwitch.fail(reason);
+      say(`Couldn’t open that room: ${reason}. You are still in the one you were in.`);
+      try {
+        await enterRoom(from);
+      } catch {
+        // Both gone: the room on screen is the last one that built, and it is still standing.
+        console.error('The room we came from could not be rebuilt either.');
+      }
+      reseat();
+      roomSwitch.uncovering();
+      await fade.to0(450);
+      roomSwitch.finish();
+      interaction.setInert(false);
+      emitSwitch({ error: reason });
+      throw err;
+    }
+    reseat();
+    roomSwitch.uncovering();
+    await fade.to0(450);
+    roomSwitch.finish();
+    interaction.setInert(false);
+    emitSwitch('idle');
+  }
+
+  /** Moves the player rig so the head is at `position` and looking at `lookAt`, floor-level yaw only. */
+  function rigTo(position: THREE.Vector3, lookAt: THREE.Vector3) {
+    const rig = interaction.rig;
+    rig.position.set(position.x, 0, position.z);
+    const head = new THREE.Vector3();
+    camera.getWorldPosition(head);
+    const want = Math.atan2(lookAt.x - head.x, lookAt.z - head.z);
+    const facing = Math.atan2(
+      new THREE.Vector3(0, 0, -1).applyQuaternion(camera.getWorldQuaternion(new THREE.Quaternion())).x,
+      new THREE.Vector3(0, 0, -1).applyQuaternion(camera.getWorldQuaternion(new THREE.Quaternion())).z,
+    );
+    rig.rotation.y += Math.PI + want - facing;
+  }
+
+  /** Stands the person inside the room that is now up, and brings all three windows with them. */
+  function reseat() {
+    const size = currentRoom?.size ?? { width: 4, depth: 4 };
+    const seat = seatIn(size);
+    rigTo(seat.position, seat.lookAt);
+    const eye = new THREE.Vector3();
+    camera.getWorldPosition(eye);
+    const forward = seat.lookAt.clone().sub(eye).setY(0).normalize();
+    interaction.reseatWindows(eye, forward);
+  }
+
+  // Published for the room picker (apps/xr/src/rooms.ts): it imports these, never this module.
+  roomControl.currentRoomId = currentRoomId;
+  roomControl.switchRoom = switchRoom;
+  roomControl.onSwitchState = onSwitchState;
 
   async function loadManifest() {
     let list: { url: string; name?: string; scale?: number; objectId?: string }[];
@@ -1773,7 +1917,7 @@ async function start() {
    * scene through the same path a dropped scan file uses. Objects already placed stay in
    * the palette; the floor and walls under them change.
    */
-  let activeRoomId: string | null = null;
+  let phoneRoomId: string | null = null;
   async function followPhoneRoom() {
     let picked: string | null;
     try {
@@ -1781,17 +1925,17 @@ async function start() {
     } catch {
       return;
     }
-    if (!picked || picked === activeRoomId) return;
+    if (!picked || picked === phoneRoomId) return;
     try {
       // Live first (a room built on the phone exists only there); the stub second, which is
       // where the committed demo room lives.
       const scan = await getRoomLive(picked).catch(() => getRoom(picked));
-      activeRoomId = picked;
+      phoneRoomId = picked;
       showScan(scan, `Room ${picked.slice(0, 8)}… picked on the phone`);
       setConnection('server');
       say('Now in the room you picked on the phone.');
     } catch (err) {
-      activeRoomId = picked; // do not retry a room the server cannot give us every 3 s
+      phoneRoomId = picked; // do not retry a room the server cannot give us every 3 s
       say(`Couldn’t load the room picked on the phone: ${(err as Error).message}`);
     }
   }
@@ -1808,14 +1952,8 @@ async function start() {
   if (VERSION_ID) {
     getVersion(VERSION_ID).then(applyVersion).catch((err) => say(`Version ${VERSION_ID}: ${(err as Error).message}`));
   }
-  if (!SCAN_URL && SERVER_ROOM_ID) {
-    watchRoom(ROOM_ID, {
-      object: (obj) => void addServerObject(obj),
-      version: (v) => void getVersion(v.versionId).then(applyVersion).catch((err) => console.warn('Version event:', err)),
-      fit: showFit,
-      status: setConnection,
-    });
-  }
+  // The live feed is opened by enterRoom, and closed by it again on a switch: one subscription,
+  // to the room you are actually standing in.
 
   // ---------- panel actions ----------
 
@@ -1883,6 +2021,7 @@ async function start() {
     thumbs.update(); // at most one tile picture drawn per frame, and only for the page on screen
     findPanel.place(renderer.xr.isPresenting ? renderer.xr.getCamera() : camera);
     if (!renderer.xr.isPresenting) controls.update();
+    fade.update();
     renderer.render(scene, camera);
   });
 }
