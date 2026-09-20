@@ -1,0 +1,362 @@
+[
+  {
+    "title": "Cocoon Throw Blanket",
+    "handle": "big-recycled-faux-fur-throw",
+    "product_type": "Blanket",
+    "images": [
+      "https://cdn.shopify.com/s/files/1/0332/0384/7212/files/recycled-faux-fur-pampas-flow-poof-hero-lifestyle-pdp1.jpg?v=1787065064",
+      "https://cdn.shopify.com/s/files/1/0332/0384/7212/files/recycled-faux-fur-blanket-pampas-flow-product-big-pdp2.jpg?v=1788442770",
+      "https://cdn.shopify.com/s/files/1/0332/0384/7212/files/recycled-faux-fur-blanket-dandelion-poof-product-big-pdp3.jpg?v=1788442789"
+    ],
+    "tags": [
+      "Bundle|RFFThrow"
+    ],
+    "body_html": "Unfathomably soft\u2014the kind of blanket that makes people trail off mid-sentence\u2014our faux fur is spun entirely from recycled material, which means the coziest thing in your home asked nothing new of the world to exist. Yesterday\u2019s plastic, reborn as the blanket everyone in the house quietly fights over.",
+    "variants": [
+      {
+        "title": "Recycled Faux Fur Dandelion Poof"
+      },
+      {
+        "title": "Recycled Faux Fur Pampas Flow"
+      },
+      {
+        "title": "Recycled Faux Fur Kiwi Fuzz"
+      }
+    ],
+    "options": [
+      {
+        "name": "Material/Color Name",
+        "position": 1,
+        "values": [
+          "Recycled Faux Fur Dandelion Poof",
+          "Recycled Faux Fur Pampas Flow",
+          "Recycled Faux Fur Kiwi Fuzz"
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Cocoon Throw Blanket",
+    "handle": "bigger-recycled-faux-fur-throw",
+    "product_type": "Blanket",
+    "images": [
+      "https://cdn.shopify.com/s/files/1/0332/0384/7212/files/recycled-faux-fur-pampas-flow-poof-hero-lifestyle-pdp1.jpg?v=1787065064",
+      "https://cdn.shopify.com/s/files/1/0332/0384/7212/files/recycled-faux-fur-blanket-pampas-flow-product-bigger-pdp2.jpg?v=1788442726",
+      "https://cdn.shopify.com/s/files/1/0332/0384/7212/files/recycled-faux-fur-blanket-dandelion-poof-product-bigger-pdp4.jpg?v=1788442805"
+    ],
+    "tags": [
+      "Bundle|RFFThrow"
+    ],
+    "body_html": "Unfathomably soft\u2014the kind of blanket that makes people trail off mid-sentence\u2014our faux fur is spun entirely from recycled material, which means the coziest thing in your home asked nothing new of the world to exist. Yesterday\u2019s plastic, reborn as the blanket everyone in the house quietly fights over.",
+    "variants": [
+      {
+        "title": "Recycled Faux Fur Dandelion Poof"
+      },
+      {
+        "title": "Recycled Faux Fur Pampas Flow"
+      },
+      {
+        "title": "Recycled Faux Fur Kiwi Fuzz"
+      }
+    ],
+    "options": [
+      {
+        "name": "Material/Color Name",
+        "position": 1,
+        "values": [
+          "Recycled Faux Fur Dandelion Poof",
+          "Recycled Faux Fur Pampas Flow",
+          "Recycled Faux Fur Kiwi Fuzz"
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Rain Drop",
+    "handle": "rain-drop",
+    "product_type": "Swatch",
+    "images": [
+      "https://cdn.shopify.com/s/files/1/0332/0384/7212/files/swatch-fabric-recycled-poly-weave-rain-drop.jpg?v=1722895690",
+      "https://cdn.shopify.com/s/files/1/0332/0384/7212/files/swatch-lifestyle-recycled-poly-weave-rain-drop.jpg?v=1723141601"
+    ],
+    "tags": [
+      "Material|Fabric"
+    ],
+    "body_html": "",
+    "variants": [
+      {
+        "title": "Default Title"
+      }
+    ],
+    "options": [
+      {
+        "name": "Title",
+        "position": 1,
+        "values": [
+          "Default Title"
+        ]
+      }
+    ]
+  },
+  {
+    "title": "First Light",
+    "handle": "first-light",
+    "product_type": "Swatch",
+    "images": [
+      "https://cdn.shopify.com/s/files/1/0332/0384/7212/files/swatch-fabric-recycled-poly-weave-first-light.jpg?v=1722895439",
+      "https://cdn.shopify.com/s/files/1/0332/0384/7212/files/swatch-lifestyle-recycled-poly-weave-first-light.jpg?v=1723141618"
+    ],
+    "tags": [
+      "Material|Fabric"
+    ],
+    "body_html": "",
+    "variants": [
+      {
+        "title": "Default Title"
+      }
+    ],
+    "options": [
+      {
+        "name": "Title",
+        "position": 1,
+        "values": [
+          "Default Title"
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Willow Rug",
+    "handle": "willow-rug",
+    "product_type": "",
+    "images": [
+      "https://cdn.shopify.com/s/files/1/0332/0384/7212/files/willow-handknotted-wool-crane-lifestyle.png?v=1771349034",
+      "https://cdn.shopify.com/s/files/1/0332/0384/7212/files/willow-crane-pdp-6x9.jpg?v=1773087275",
+      "https://cdn.shopify.com/s/files/1/0332/0384/7212/files/willow-crane-pdp-8x10.jpg?v=1773087275"
+    ],
+    "tags": [
+      "collection:rugs",
+      "count-option:size",
+      "live"
+    ],
+    "body_html": "<p><span>Hand-knotted of 100% New Zealand wool, and designed to capture unexpected perspectives on nature in bloom. Willow's reedy canopy offers layered texture\u2014like glimmers of light passing through a swaying field.</span></p>",
+    "variants": [
+      {
+        "title": "Willow Hand-knotted Wool Willow Crane / 6' x 9'"
+      },
+      {
+        "title": "Willow Hand-knotted Wool Willow Mallard / 6' x 9'"
+      },
+      {
+        "title": "Willow Hand-knotted Wool Willow Crane / 8' x 10'"
+      },
+      {
+        "title": "Willow Hand-knotted Wool Willow Mallard / 8' x 10'"
+      },
+      {
+        "title": "Willow Hand-knotted Wool Willow Crane / 9' x 12'"
+      },
+      {
+        "title": "Willow Hand-knotted Wool Willow Mallard / 9' x 12'"
+      },
+      {
+        "title": "Willow Hand-knotted Wool Willow Crane / 10' x 14'"
+      },
+      {
+        "title": "Willow Hand-knotted Wool Willow Mallard / 10' x 14'"
+      },
+      {
+        "title": "Willow Hand-knotted Wool Willow Crane / 12' x 15'"
+      },
+      {
+        "title": "Willow Hand-knotted Wool Willow Mallard / 12' x 15'"
+      }
+    ],
+    "options": [
+      {
+        "name": "Material/Color Name",
+        "position": 1,
+        "values": [
+          "Willow Hand-knotted Wool Willow Crane",
+          "Willow Hand-knotted Wool Willow Mallard"
+        ]
+      },
+      {
+        "name": "Size",
+        "position": 2,
+        "values": [
+          "6' x 9'",
+          "8' x 10'",
+          "9' x 12'",
+          "10' x 14'",
+          "12' x 15'"
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Wander Rug",
+    "handle": "wander-rug",
+    "product_type": "",
+    "images": [
+      "https://cdn.shopify.com/s/files/1/0332/0384/7212/files/wander-handknotted-wool-cardinal-lifestyle.png?v=1771349495",
+      "https://cdn.shopify.com/s/files/1/0332/0384/7212/files/wander-cardinal-pdp-6x9-1.jpg?v=1773078807",
+      "https://cdn.shopify.com/s/files/1/0332/0384/7212/files/wander-cardinal-pdp-9x12-1.jpg?v=1773083488"
+    ],
+    "tags": [
+      "collection:rugs",
+      "count-option:size",
+      "live"
+    ],
+    "body_html": "Wander Rug",
+    "variants": [
+      {
+        "title": "Crane / 6' x 9'"
+      },
+      {
+        "title": "Cardinal / 6' x 9'"
+      },
+      {
+        "title": "Crane / 8' x 10'"
+      },
+      {
+        "title": "Cardinal / 8' x 10'"
+      },
+      {
+        "title": "Crane / 9' x 12'"
+      },
+      {
+        "title": "Cardinal / 9' x 12'"
+      },
+      {
+        "title": "Crane / 10' x 14'"
+      },
+      {
+        "title": "Cardinal / 10' x 14'"
+      },
+      {
+        "title": "Crane / 12' x 15'"
+      },
+      {
+        "title": "Cardinal / 12' x 15'"
+      }
+    ],
+    "options": [
+      {
+        "name": "Material/Color Name",
+        "position": 1,
+        "values": [
+          "Crane",
+          "Cardinal"
+        ]
+      },
+      {
+        "name": "Size",
+        "position": 2,
+        "values": [
+          "6' x 9'",
+          "8' x 10'",
+          "9' x 12'",
+          "10' x 14'",
+          "12' x 15'"
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Blossom Rug",
+    "handle": "blossom-rug",
+    "product_type": "",
+    "images": [
+      "https://cdn.shopify.com/s/files/1/0332/0384/7212/files/blossom-cardinal-pdp.png?v=1773071269",
+      "https://cdn.shopify.com/s/files/1/0332/0384/7212/files/blossom-cardinal-pdp-6x9-1.jpg?v=1773071326",
+      "https://cdn.shopify.com/s/files/1/0332/0384/7212/files/blossom-cardinal-pdp-10x14-1.jpg?v=1773082327"
+    ],
+    "tags": [
+      "collection:rugs",
+      "count-option:size",
+      "live"
+    ],
+    "body_html": "Blossom Rug",
+    "variants": [
+      {
+        "title": "Blossom Hand-knotted Wool Blossom Cardinal / 6' x 9'"
+      },
+      {
+        "title": "Blossom Hand-knotted Wool Blossom Monarch / 6' x 9'"
+      },
+      {
+        "title": "Blossom Hand-knotted Wool Blossom Cardinal / 8' x 10'"
+      },
+      {
+        "title": "Blossom Hand-knotted Wool Blossom Monarch / 8' x 10'"
+      },
+      {
+        "title": "Blossom Hand-knotted Wool Blossom Cardinal / 9' x 12'"
+      },
+      {
+        "title": "Blossom Hand-knotted Wool Blossom Monarch / 9' x 12'"
+      },
+      {
+        "title": "Blossom Hand-knotted Wool Blossom Cardinal / 10' x 14'"
+      },
+      {
+        "title": "Blossom Hand-knotted Wool Blossom Monarch / 10' x 14'"
+      },
+      {
+        "title": "Blossom Hand-knotted Wool Blossom Cardinal / 12' x 15'"
+      },
+      {
+        "title": "Blossom Hand-knotted Wool Blossom Monarch / 12' x 15'"
+      }
+    ],
+    "options": [
+      {
+        "name": "Material/Color Name",
+        "position": 1,
+        "values": [
+          "Blossom Hand-knotted Wool Blossom Cardinal",
+          "Blossom Hand-knotted Wool Blossom Monarch"
+        ]
+      },
+      {
+        "name": "Size",
+        "position": 2,
+        "values": [
+          "6' x 9'",
+          "8' x 10'",
+          "9' x 12'",
+          "10' x 14'",
+          "12' x 15'"
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Willow Crane",
+    "handle": "willow-crane",
+    "product_type": "Swatch",
+    "images": [
+      "https://cdn.shopify.com/s/files/1/0332/0384/7212/files/Willow-crane-detail-pdp3.jpg?v=1771349034",
+      "https://cdn.shopify.com/s/files/1/0332/0384/7212/files/willow-resize-lifestyle2.png?v=1771347186"
+    ],
+    "tags": [
+      "Material|Rugs"
+    ],
+    "body_html": "",
+    "variants": [
+      {
+        "title": "Default Title"
+      }
+    ],
+    "options": [
+      {
+        "name": "Title",
+        "position": 1,
+        "values": [
+          "Default Title"
+        ]
+      }
+    ]
+  }
+]

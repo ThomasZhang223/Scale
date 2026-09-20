@@ -1,0 +1,2228 @@
+[
+  {
+    "title": "Pillar Stool - CL",
+    "handle": "pillar-stool-1",
+    "product_type": "Stools",
+    "images": [
+      "https://cdn.shopify.com/s/files/1/2448/0687/files/thuma-pillar-stool-walnut-1B-2K_1_6eab4928-adbf-4d4d-9ec3-d1e8f305012b.png?v=1723143878",
+      "https://cdn.shopify.com/s/files/1/2448/0687/files/thuma-pillar-stool-walnut-cushion-charcoal-1_f64ea9a7-327f-4f9f-9667-eb93de7f2c11.png?v=1742484793"
+    ],
+    "tags": [
+      "white-glove-sometimes",
+      "YGroup_PillarStool"
+    ],
+    "body_html": null,
+    "variants": [
+      {
+        "title": "Pillar Stool / Walnut"
+      },
+      {
+        "title": "Pillar Stool / Natural"
+      },
+      {
+        "title": "Pillar Stool / Oak"
+      },
+      {
+        "title": "Pillar Stool / Espresso"
+      },
+      {
+        "title": "Pillar Stool / Grey"
+      },
+      {
+        "title": "Pillar Stool + Cushion / Walnut / Charcoal"
+      },
+      {
+        "title": "Pillar Stool + Cushion / Walnut / Natural"
+      },
+      {
+        "title": "Pillar Stool + Cushion / Walnut / Alabaster"
+      },
+      {
+        "title": "Pillar Stool + Cushion / Walnut / Saddle"
+      },
+      {
+        "title": "Pillar Stool + Cushion / Walnut / Cocoa"
+      },
+      {
+        "title": "Pillar Stool + Cushion / Natural / Charcoal"
+      },
+      {
+        "title": "Pillar Stool + Cushion / Natural / Natural"
+      },
+      {
+        "title": "Pillar Stool + Cushion / Natural / Alabaster"
+      },
+      {
+        "title": "Pillar Stool + Cushion / Natural / Saddle"
+      },
+      {
+        "title": "Pillar Stool + Cushion / Natural / Cocoa"
+      },
+      {
+        "title": "Pillar Stool + Cushion / Oak / Charcoal"
+      },
+      {
+        "title": "Pillar Stool + Cushion / Oak / Natural"
+      },
+      {
+        "title": "Pillar Stool + Cushion / Oak / Alabaster"
+      },
+      {
+        "title": "Pillar Stool + Cushion / Oak / Saddle"
+      },
+      {
+        "title": "Pillar Stool + Cushion / Oak / Cocoa"
+      },
+      {
+        "title": "Pillar Stool + Cushion / Espresso / Charcoal"
+      },
+      {
+        "title": "Pillar Stool + Cushion / Espresso / Natural"
+      },
+      {
+        "title": "Pillar Stool + Cushion / Espresso / Alabaster"
+      },
+      {
+        "title": "Pillar Stool + Cushion / Espresso / Saddle"
+      },
+      {
+        "title": "Pillar Stool + Cushion / Espresso / Cocoa"
+      },
+      {
+        "title": "Pillar Stool + Cushion / Grey / Charcoal"
+      },
+      {
+        "title": "Pillar Stool + Cushion / Grey / Natural"
+      },
+      {
+        "title": "Pillar Stool + Cushion / Grey / Alabaster"
+      },
+      {
+        "title": "Pillar Stool + Cushion / Grey / Saddle"
+      },
+      {
+        "title": "Pillar Stool + Cushion / Grey / Cocoa"
+      }
+    ],
+    "options": [
+      {
+        "name": "Option",
+        "position": 1,
+        "values": [
+          "Pillar Stool",
+          "Pillar Stool + Cushion"
+        ]
+      },
+      {
+        "name": "Finish",
+        "position": 2,
+        "values": [
+          "Walnut",
+          "Natural",
+          "Oak",
+          "Espresso",
+          "Grey"
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Pillar Bench - CL",
+    "handle": "pillar-bench-cl",
+    "product_type": "Benches",
+    "images": [
+      "https://cdn.shopify.com/s/files/1/2448/0687/files/thuma-pillar-bench-60in-walnut-1-2K.png?v=1745512800"
+    ],
+    "tags": [
+      "white-glove-sometimes"
+    ],
+    "body_html": null,
+    "variants": [
+      {
+        "title": "Pillar Bench / Walnut / 48\""
+      },
+      {
+        "title": "Pillar Bench / Walnut / 60\""
+      },
+      {
+        "title": "Pillar Bench / Walnut / 64\""
+      },
+      {
+        "title": "Pillar Bench / Walnut / 88\""
+      },
+      {
+        "title": "Pillar Bench / Natural / 48\""
+      },
+      {
+        "title": "Pillar Bench / Natural / 60\""
+      },
+      {
+        "title": "Pillar Bench / Natural / 64\""
+      },
+      {
+        "title": "Pillar Bench / Natural / 88\""
+      },
+      {
+        "title": "Pillar Bench / Oak / 48\""
+      },
+      {
+        "title": "Pillar Bench / Oak / 60\""
+      },
+      {
+        "title": "Pillar Bench / Oak / 64\""
+      },
+      {
+        "title": "Pillar Bench / Oak / 88\""
+      },
+      {
+        "title": "Pillar Bench / Espresso / 48\""
+      },
+      {
+        "title": "Pillar Bench / Espresso / 60\""
+      },
+      {
+        "title": "Pillar Bench / Espresso / 64\""
+      },
+      {
+        "title": "Pillar Bench / Espresso / 88\""
+      },
+      {
+        "title": "Pillar Bench / Grey / 48\""
+      },
+      {
+        "title": "Pillar Bench / Grey / 60\""
+      },
+      {
+        "title": "Pillar Bench + Cushion / Charcoal / Walnut / 48\""
+      },
+      {
+        "title": "Pillar Bench + Cushion / Charcoal / Walnut / 60\""
+      },
+      {
+        "title": "Pillar Bench + Cushion / Charcoal / Natural / 48\""
+      },
+      {
+        "title": "Pillar Bench + Cushion / Charcoal / Natural / 60\""
+      },
+      {
+        "title": "Pillar Bench + Cushion / Charcoal / Oak / 48\""
+      },
+      {
+        "title": "Pillar Bench + Cushion / Charcoal / Oak / 60\""
+      },
+      {
+        "title": "Pillar Bench + Cushion / Charcoal / Espresso / 48\""
+      },
+      {
+        "title": "Pillar Bench + Cushion / Charcoal / Espresso / 60\""
+      },
+      {
+        "title": "Pillar Bench + Cushion / Charcoal / Grey / 48\""
+      },
+      {
+        "title": "Pillar Bench + Cushion / Charcoal / Grey / 60\""
+      },
+      {
+        "title": "Pillar Bench + Cushion / Natural / Walnut / 48\""
+      },
+      {
+        "title": "Pillar Bench + Cushion / Natural / Walnut / 60\""
+      },
+      {
+        "title": "Pillar Bench + Cushion / Natural / Natural / 48\""
+      },
+      {
+        "title": "Pillar Bench + Cushion / Natural / Natural / 60\""
+      },
+      {
+        "title": "Pillar Bench + Cushion / Natural / Oak / 48\""
+      },
+      {
+        "title": "Pillar Bench + Cushion / Natural / Oak / 60\""
+      },
+      {
+        "title": "Pillar Bench + Cushion / Natural / Espresso / 48\""
+      },
+      {
+        "title": "Pillar Bench + Cushion / Natural / Espresso / 60\""
+      },
+      {
+        "title": "Pillar Bench + Cushion / Natural / Grey / 48\""
+      },
+      {
+        "title": "Pillar Bench + Cushion / Natural / Grey / 60\""
+      },
+      {
+        "title": "Pillar Bench + Cushion / Alabaster / Walnut / 48\""
+      },
+      {
+        "title": "Pillar Bench + Cushion / Alabaster / Walnut / 60\""
+      },
+      {
+        "title": "Pillar Bench + Cushion / Alabaster / Natural / 48\""
+      },
+      {
+        "title": "Pillar Bench + Cushion / Alabaster / Natural / 60\""
+      },
+      {
+        "title": "Pillar Bench + Cushion / Alabaster / Oak / 48\""
+      },
+      {
+        "title": "Pillar Bench + Cushion / Alabaster / Oak / 60\""
+      },
+      {
+        "title": "Pillar Bench + Cushion / Alabaster / Espresso / 48\""
+      },
+      {
+        "title": "Pillar Bench + Cushion / Alabaster / Espresso / 60\""
+      },
+      {
+        "title": "Pillar Bench + Cushion / Alabaster / Grey / 48\""
+      },
+      {
+        "title": "Pillar Bench + Cushion / Alabaster / Grey / 60\""
+      },
+      {
+        "title": "Pillar Bench + Cushion / Saddle / Walnut / 48\""
+      },
+      {
+        "title": "Pillar Bench + Cushion / Saddle / Walnut / 64\""
+      },
+      {
+        "title": "Pillar Bench + Cushion / Saddle / Walnut / 88\""
+      },
+      {
+        "title": "Pillar Bench + Cushion / Saddle / Natural / 48\""
+      },
+      {
+        "title": "Pillar Bench + Cushion / Saddle / Natural / 64\""
+      },
+      {
+        "title": "Pillar Bench + Cushion / Saddle / Natural / 88\""
+      },
+      {
+        "title": "Pillar Bench + Cushion / Saddle / Oak / 48\""
+      },
+      {
+        "title": "Pillar Bench + Cushion / Saddle / Oak / 64\""
+      },
+      {
+        "title": "Pillar Bench + Cushion / Saddle / Oak / 88\""
+      },
+      {
+        "title": "Pillar Bench + Cushion / Saddle / Espresso / 48\""
+      },
+      {
+        "title": "Pillar Bench + Cushion / Saddle / Espresso / 64\""
+      },
+      {
+        "title": "Pillar Bench + Cushion / Saddle / Espresso / 88\""
+      },
+      {
+        "title": "Pillar Bench + Cushion / Cocoa / Walnut / 48\""
+      },
+      {
+        "title": "Pillar Bench + Cushion / Cocoa / Walnut / 64\""
+      },
+      {
+        "title": "Pillar Bench + Cushion / Cocoa / Walnut / 88\""
+      },
+      {
+        "title": "Pillar Bench + Cushion / Cocoa / Natural / 48\""
+      },
+      {
+        "title": "Pillar Bench + Cushion / Cocoa / Natural / 64\""
+      },
+      {
+        "title": "Pillar Bench + Cushion / Cocoa / Natural / 88\""
+      },
+      {
+        "title": "Pillar Bench + Cushion / Cocoa / Oak / 48\""
+      },
+      {
+        "title": "Pillar Bench + Cushion / Cocoa / Oak / 64\""
+      },
+      {
+        "title": "Pillar Bench + Cushion / Cocoa / Oak / 88\""
+      },
+      {
+        "title": "Pillar Bench + Cushion / Cocoa / Espresso / 48\""
+      },
+      {
+        "title": "Pillar Bench + Cushion / Cocoa / Espresso / 64\""
+      },
+      {
+        "title": "Pillar Bench + Cushion / Cocoa / Espresso / 88\""
+      }
+    ],
+    "options": [
+      {
+        "name": "Option",
+        "position": 1,
+        "values": [
+          "Pillar Bench + Cushion",
+          "Pillar Bench"
+        ]
+      },
+      {
+        "name": "Finish",
+        "position": 2,
+        "values": [
+          "Walnut",
+          "Natural",
+          "Oak",
+          "Espresso",
+          "Grey"
+        ]
+      },
+      {
+        "name": "Size",
+        "position": 3,
+        "values": [
+          "48\"",
+          "60\"",
+          "64\"",
+          "88\""
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Essential Headboard - CL",
+    "handle": "essential-headboard-cl",
+    "product_type": "Headboards",
+    "images": [
+      "https://cdn.shopify.com/s/files/1/2448/0687/files/thuma-essential-upholstered-headboard-queen-ivory-front.webp?v=1780413285",
+      "https://cdn.shopify.com/s/files/1/2448/0687/files/thuma-essential-headboard-twin-walnut-headboard-cushion-charcoal-1.png?v=1752170171"
+    ],
+    "tags": [
+      "white-glove-sometimes"
+    ],
+    "body_html": null,
+    "variants": [
+      {
+        "title": "Headboard / Walnut / Twin"
+      },
+      {
+        "title": "Headboard / Walnut / Full"
+      },
+      {
+        "title": "Headboard / Walnut / Queen"
+      },
+      {
+        "title": "Headboard / Walnut / King"
+      },
+      {
+        "title": "Headboard / Walnut / Cali King"
+      },
+      {
+        "title": "Headboard / Natural / Twin"
+      },
+      {
+        "title": "Headboard / Natural / Full"
+      },
+      {
+        "title": "Headboard / Natural / Queen"
+      },
+      {
+        "title": "Headboard / Natural / King"
+      },
+      {
+        "title": "Headboard / Natural / Cali King"
+      },
+      {
+        "title": "Headboard / Oak / Twin"
+      },
+      {
+        "title": "Headboard / Oak / Full"
+      },
+      {
+        "title": "Headboard / Oak / Queen"
+      },
+      {
+        "title": "Headboard / Oak / King"
+      },
+      {
+        "title": "Headboard / Oak / Cali King"
+      },
+      {
+        "title": "Headboard / Espresso / Twin"
+      },
+      {
+        "title": "Headboard / Espresso / Full"
+      },
+      {
+        "title": "Headboard / Espresso / Queen"
+      },
+      {
+        "title": "Headboard / Espresso / King"
+      },
+      {
+        "title": "Headboard / Espresso / Cali King"
+      },
+      {
+        "title": "Headboard / Grey / Twin"
+      },
+      {
+        "title": "Headboard / Grey / Full"
+      },
+      {
+        "title": "Headboard / Grey / Queen"
+      },
+      {
+        "title": "Headboard / Grey / King"
+      },
+      {
+        "title": "Headboard / Grey / Cali King"
+      },
+      {
+        "title": "Headboard + Cushion / Charcoal / Walnut / Twin"
+      },
+      {
+        "title": "Headboard + Cushion / Charcoal / Walnut / Full"
+      },
+      {
+        "title": "Headboard + Cushion / Charcoal / Walnut / Queen"
+      },
+      {
+        "title": "Headboard + Cushion / Charcoal / Walnut / King"
+      },
+      {
+        "title": "Headboard + Cushion / Charcoal / Walnut / Cali King"
+      },
+      {
+        "title": "Headboard + Cushion / Charcoal / Natural / Twin"
+      },
+      {
+        "title": "Headboard + Cushion / Charcoal / Natural / Full"
+      },
+      {
+        "title": "Headboard + Cushion / Charcoal / Natural / Queen"
+      },
+      {
+        "title": "Headboard + Cushion / Charcoal / Natural / King"
+      },
+      {
+        "title": "Headboard + Cushion / Charcoal / Natural / Cali King"
+      },
+      {
+        "title": "Headboard + Cushion / Charcoal / Oak / Twin"
+      },
+      {
+        "title": "Headboard + Cushion / Charcoal / Oak / Full"
+      },
+      {
+        "title": "Headboard + Cushion / Charcoal / Oak / Queen"
+      },
+      {
+        "title": "Headboard + Cushion / Charcoal / Oak / King"
+      },
+      {
+        "title": "Headboard + Cushion / Charcoal / Oak / Cali King"
+      },
+      {
+        "title": "Headboard + Cushion / Charcoal / Espresso / Twin"
+      },
+      {
+        "title": "Headboard + Cushion / Charcoal / Espresso / Full"
+      },
+      {
+        "title": "Headboard + Cushion / Charcoal / Espresso / Queen"
+      },
+      {
+        "title": "Headboard + Cushion / Charcoal / Espresso / King"
+      },
+      {
+        "title": "Headboard + Cushion / Charcoal / Espresso / Cali King"
+      },
+      {
+        "title": "Headboard + Cushion / Charcoal / Grey / Twin"
+      },
+      {
+        "title": "Headboard + Cushion / Charcoal / Grey / Full"
+      },
+      {
+        "title": "Headboard + Cushion / Charcoal / Grey / Queen"
+      },
+      {
+        "title": "Headboard + Cushion / Charcoal / Grey / King"
+      },
+      {
+        "title": "Headboard + Cushion / Charcoal / Grey / Cali King"
+      },
+      {
+        "title": "Headboard + Cushion / Light Grey / Walnut / Twin"
+      },
+      {
+        "title": "Headboard + Cushion / Light Grey / Walnut / Full"
+      },
+      {
+        "title": "Headboard + Cushion / Light Grey / Walnut / Queen"
+      },
+      {
+        "title": "Headboard + Cushion / Light Grey / Walnut / King"
+      },
+      {
+        "title": "Headboard + Cushion / Light Grey / Walnut / Cali King"
+      },
+      {
+        "title": "Headboard + Cushion / Light Grey / Natural / Twin"
+      },
+      {
+        "title": "Headboard + Cushion / Light Grey / Natural / Full"
+      },
+      {
+        "title": "Headboard + Cushion / Light Grey / Natural / Queen"
+      },
+      {
+        "title": "Headboard + Cushion / Light Grey / Natural / King"
+      },
+      {
+        "title": "Headboard + Cushion / Light Grey / Natural / Cali King"
+      },
+      {
+        "title": "Headboard + Cushion / Light Grey / Oak / Twin"
+      },
+      {
+        "title": "Headboard + Cushion / Light Grey / Oak / Full"
+      },
+      {
+        "title": "Headboard + Cushion / Light Grey / Oak / Queen"
+      },
+      {
+        "title": "Headboard + Cushion / Light Grey / Oak / King"
+      },
+      {
+        "title": "Headboard + Cushion / Light Grey / Oak / Cali King"
+      },
+      {
+        "title": "Headboard + Cushion / Light Grey / Espresso / Twin"
+      },
+      {
+        "title": "Headboard + Cushion / Light Grey / Espresso / Full"
+      },
+      {
+        "title": "Headboard + Cushion / Light Grey / Espresso / Queen"
+      },
+      {
+        "title": "Headboard + Cushion / Light Grey / Espresso / King"
+      },
+      {
+        "title": "Headboard + Cushion / Light Grey / Espresso / Cali King"
+      },
+      {
+        "title": "Headboard + Cushion / Light Grey / Grey / Twin"
+      },
+      {
+        "title": "Headboard + Cushion / Light Grey / Grey / Full"
+      },
+      {
+        "title": "Headboard + Cushion / Light Grey / Grey / Queen"
+      },
+      {
+        "title": "Headboard + Cushion / Light Grey / Grey / King"
+      },
+      {
+        "title": "Headboard + Cushion / Light Grey / Grey / Cali King"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / Walnut / Twin"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / Walnut / Full"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / Walnut / Queen"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / Walnut / King"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / Walnut / Cali King"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / Natural / Twin"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / Natural / Full"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / Natural / Queen"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / Natural / King"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / Natural / Cali King"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / Oak / Twin"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / Oak / Full"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / Oak / Queen"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / Oak / King"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / Oak / Cali King"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / Espresso / Twin"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / Espresso / Full"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / Espresso / Queen"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / Espresso / King"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / Espresso / Cali King"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / Grey / Twin"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / Grey / Full"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / Grey / Queen"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / Grey / King"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / Grey / Cali King"
+      },
+      {
+        "title": "Headboard + Cushion / Alabaster / Walnut / Twin"
+      },
+      {
+        "title": "Headboard + Cushion / Alabaster / Walnut / Full"
+      },
+      {
+        "title": "Headboard + Cushion / Alabaster / Walnut / Queen"
+      },
+      {
+        "title": "Headboard + Cushion / Alabaster / Walnut / King"
+      },
+      {
+        "title": "Headboard + Cushion / Alabaster / Walnut / Cali King"
+      },
+      {
+        "title": "Headboard + Cushion / Alabaster / Natural / Twin"
+      },
+      {
+        "title": "Headboard + Cushion / Alabaster / Natural / Full"
+      },
+      {
+        "title": "Headboard + Cushion / Alabaster / Natural / Queen"
+      },
+      {
+        "title": "Headboard + Cushion / Alabaster / Natural / King"
+      },
+      {
+        "title": "Headboard + Cushion / Alabaster / Natural / Cali King"
+      },
+      {
+        "title": "Headboard + Cushion / Alabaster / Oak / Twin"
+      },
+      {
+        "title": "Headboard + Cushion / Alabaster / Oak / Full"
+      },
+      {
+        "title": "Headboard + Cushion / Alabaster / Oak / Queen"
+      },
+      {
+        "title": "Headboard + Cushion / Alabaster / Oak / King"
+      },
+      {
+        "title": "Headboard + Cushion / Alabaster / Oak / Cali King"
+      },
+      {
+        "title": "Headboard + Cushion / Alabaster / Espresso / Twin"
+      },
+      {
+        "title": "Headboard + Cushion / Alabaster / Espresso / Full"
+      },
+      {
+        "title": "Headboard + Cushion / Alabaster / Espresso / Queen"
+      },
+      {
+        "title": "Headboard + Cushion / Alabaster / Espresso / King"
+      },
+      {
+        "title": "Headboard + Cushion / Alabaster / Espresso / Cali King"
+      },
+      {
+        "title": "Headboard + Cushion / Alabaster / Grey / Twin"
+      },
+      {
+        "title": "Headboard + Cushion / Alabaster / Grey / Full"
+      },
+      {
+        "title": "Headboard + Cushion / Alabaster / Grey / Queen"
+      },
+      {
+        "title": "Headboard + Cushion / Alabaster / Grey / King"
+      },
+      {
+        "title": "Headboard + Cushion / Alabaster / Grey / Cali King"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Charcoal / Walnut / Twin"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Charcoal / Walnut / Full"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Charcoal / Walnut / Queen"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Charcoal / Walnut / King"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Charcoal / Walnut / Cali King"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Charcoal / Natural / Twin"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Charcoal / Natural / Full"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Charcoal / Natural / Queen"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Charcoal / Natural / King"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Charcoal / Natural / Cali King"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Charcoal / Oak / Twin"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Charcoal / Oak / Full"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Charcoal / Oak / Queen"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Charcoal / Oak / King"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Charcoal / Oak / Cali King"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Charcoal / Espresso / Twin"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Charcoal / Espresso / Full"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Charcoal / Espresso / Queen"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Charcoal / Espresso / King"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Charcoal / Espresso / Cali King"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Charcoal / Grey / Twin"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Charcoal / Grey / Full"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Charcoal / Grey / Queen"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Charcoal / Grey / King"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Charcoal / Grey / Cali King"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Grey / Walnut / Twin"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Grey / Walnut / Full"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Grey / Walnut / Queen"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Grey / Walnut / King"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Grey / Walnut / Cali King"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Grey / Natural / Twin"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Grey / Natural / Full"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Grey / Natural / Queen"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Grey / Natural / King"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Grey / Natural / Cali King"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Grey / Oak / Twin"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Grey / Oak / Full"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Grey / Oak / Queen"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Grey / Oak / King"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Grey / Oak / Cali King"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Grey / Espresso / Twin"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Grey / Espresso / Full"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Grey / Espresso / Queen"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Grey / Espresso / King"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Grey / Espresso / Cali King"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Grey / Grey / Twin"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Grey / Grey / Full"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Grey / Grey / Queen"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Grey / Grey / King"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Grey / Grey / Cali King"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Mocha / Walnut / Twin"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Mocha / Walnut / Full"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Mocha / Walnut / Queen"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Mocha / Walnut / King"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Mocha / Walnut / Cali King"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Mocha / Natural / Twin"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Mocha / Natural / Full"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Mocha / Natural / Queen"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Mocha / Natural / King"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Mocha / Natural / Cali King"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Mocha / Oak / Twin"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Mocha / Oak / Full"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Mocha / Oak / Queen"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Mocha / Oak / King"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Mocha / Oak / Cali King"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Mocha / Espresso / Twin"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Mocha / Espresso / Full"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Mocha / Espresso / Queen"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Mocha / Espresso / King"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Mocha / Espresso / Cali King"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Mocha / Grey / Twin"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Mocha / Grey / Full"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Mocha / Grey / Queen"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Mocha / Grey / King"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Mocha / Grey / Cali King"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Oatmeal / Walnut / Twin"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Oatmeal / Walnut / Full"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Oatmeal / Walnut / Queen"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Oatmeal / Walnut / King"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Oatmeal / Walnut / Cali King"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Oatmeal / Natural / Twin"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Oatmeal / Natural / Full"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Oatmeal / Natural / Queen"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Oatmeal / Natural / King"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Oatmeal / Natural / Cali King"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Oatmeal / Oak / Twin"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Oatmeal / Oak / Full"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Oatmeal / Oak / Queen"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Oatmeal / Oak / King"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Oatmeal / Oak / Cali King"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Oatmeal / Espresso / Twin"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Oatmeal / Espresso / Full"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Oatmeal / Espresso / Queen"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Oatmeal / Espresso / King"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Oatmeal / Espresso / Cali King"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Oatmeal / Grey / Twin"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Oatmeal / Grey / Full"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Oatmeal / Grey / Queen"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Oatmeal / Grey / King"
+      },
+      {
+        "title": "Headboard + Cushion / Heathered Oatmeal / Grey / Cali King"
+      },
+      {
+        "title": "Upholstered Headboard / Ivory / Queen"
+      },
+      {
+        "title": "Upholstered Headboard / Ivory / King"
+      },
+      {
+        "title": "Upholstered Headboard / Carbon / Queen"
+      },
+      {
+        "title": "Upholstered Headboard / Carbon / King"
+      },
+      {
+        "title": "Upholstered Headboard / Carbon / Cali King"
+      },
+      {
+        "title": "Upholstered Headboard / Natural / Queen"
+      },
+      {
+        "title": "Upholstered Headboard / Natural / King"
+      },
+      {
+        "title": "Upholstered Headboard / Natural / Cali King"
+      },
+      {
+        "title": "Upholstered Headboard / Heathered Oatmeal / Queen"
+      },
+      {
+        "title": "Upholstered Headboard / Heathered Oatmeal / King"
+      },
+      {
+        "title": "Upholstered Headboard / Heathered Mocha / Queen"
+      },
+      {
+        "title": "Upholstered Headboard / Heathered Mocha / King"
+      }
+    ],
+    "options": [
+      {
+        "name": "Configuration",
+        "position": 1,
+        "values": [
+          "Headboard",
+          "Headboard + Cushion",
+          "Upholstered Headboard"
+        ]
+      },
+      {
+        "name": "Finish",
+        "position": 2,
+        "values": [
+          "Walnut",
+          "Natural",
+          "Oak",
+          "Espresso",
+          "Grey"
+        ]
+      },
+      {
+        "name": "Size",
+        "position": 3,
+        "values": [
+          "Twin",
+          "Full",
+          "Queen",
+          "King",
+          "Cali King"
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Classic Headboard - CL",
+    "handle": "classic-headboard-cl",
+    "product_type": "Headboards",
+    "images": [
+      "https://cdn.shopify.com/s/files/1/2448/0687/products/220919_The-Headboard_Walnut_2_PDP.jpg?v=1664384103",
+      "https://cdn.shopify.com/s/files/1/2448/0687/files/thuma-classic-headboard-walnut-headboard-cushion-charcoal-1_1.png?v=1745512667"
+    ],
+    "tags": [
+      "white-glove-sometimes",
+      "YGroup_ClassicHeadboard"
+    ],
+    "body_html": null,
+    "variants": [
+      {
+        "title": "Headboard / Walnut / Twin"
+      },
+      {
+        "title": "Headboard / Walnut / Full"
+      },
+      {
+        "title": "Headboard / Walnut / Queen"
+      },
+      {
+        "title": "Headboard / Walnut / King"
+      },
+      {
+        "title": "Headboard / Walnut / Cali King"
+      },
+      {
+        "title": "Headboard / Natural / Twin"
+      },
+      {
+        "title": "Headboard / Natural / Full"
+      },
+      {
+        "title": "Headboard / Natural / Queen"
+      },
+      {
+        "title": "Headboard / Natural / King"
+      },
+      {
+        "title": "Headboard / Natural / Cali King"
+      },
+      {
+        "title": "Headboard / Oak / Twin"
+      },
+      {
+        "title": "Headboard / Oak / Full"
+      },
+      {
+        "title": "Headboard / Oak / Queen"
+      },
+      {
+        "title": "Headboard / Oak / King"
+      },
+      {
+        "title": "Headboard / Oak / Cali King"
+      },
+      {
+        "title": "Headboard / Espresso / Twin"
+      },
+      {
+        "title": "Headboard / Espresso / Full"
+      },
+      {
+        "title": "Headboard / Espresso / Queen"
+      },
+      {
+        "title": "Headboard / Espresso / King"
+      },
+      {
+        "title": "Headboard / Espresso / Cali King"
+      },
+      {
+        "title": "Headboard / Grey / Twin"
+      },
+      {
+        "title": "Headboard / Grey / Full"
+      },
+      {
+        "title": "Headboard / Grey / Queen"
+      },
+      {
+        "title": "Headboard / Grey / King"
+      },
+      {
+        "title": "Headboard / Grey / Cali King"
+      },
+      {
+        "title": "Headboard + Cushion / Walnut / Twin / Charcoal"
+      },
+      {
+        "title": "Headboard + Cushion / Walnut / Twin / Light Grey"
+      },
+      {
+        "title": "Headboard + Cushion / Walnut / Twin / Natural"
+      },
+      {
+        "title": "Headboard + Cushion / Walnut / Twin / Alabaster"
+      },
+      {
+        "title": "Headboard + Cushion / Walnut / Twin / Heathered Charcoal"
+      },
+      {
+        "title": "Headboard + Cushion / Walnut / Twin / Heathered Grey"
+      },
+      {
+        "title": "Headboard + Cushion / Walnut / Twin / Heathered Mocha"
+      },
+      {
+        "title": "Headboard + Cushion / Walnut / Twin / Heathered Oatmeal"
+      },
+      {
+        "title": "Headboard + Cushion / Walnut / Full / Charcoal"
+      },
+      {
+        "title": "Headboard + Cushion / Walnut / Full / Light Grey"
+      },
+      {
+        "title": "Headboard + Cushion / Walnut / Full / Natural"
+      },
+      {
+        "title": "Headboard + Cushion / Walnut / Full / Alabaster"
+      },
+      {
+        "title": "Headboard + Cushion / Walnut / Full / Heathered Charcoal"
+      },
+      {
+        "title": "Headboard + Cushion / Walnut / Full / Heathered Grey"
+      },
+      {
+        "title": "Headboard + Cushion / Walnut / Full / Heathered Mocha"
+      },
+      {
+        "title": "Headboard + Cushion / Walnut / Full / Heathered Oatmeal"
+      },
+      {
+        "title": "Headboard + Cushion / Walnut / Queen / Charcoal"
+      },
+      {
+        "title": "Headboard + Cushion / Walnut / Queen / Light Grey"
+      },
+      {
+        "title": "Headboard + Cushion / Walnut / Queen / Natural"
+      },
+      {
+        "title": "Headboard + Cushion / Walnut / Queen / Alabaster"
+      },
+      {
+        "title": "Headboard + Cushion / Walnut / Queen / Heathered Charcoal"
+      },
+      {
+        "title": "Headboard + Cushion / Walnut / Queen / Heathered Grey"
+      },
+      {
+        "title": "Headboard + Cushion / Walnut / Queen / Heathered Mocha"
+      },
+      {
+        "title": "Headboard + Cushion / Walnut / Queen / Heathered Oatmeal"
+      },
+      {
+        "title": "Headboard + Cushion / Walnut / Queen / Dark Olive"
+      },
+      {
+        "title": "Headboard + Cushion / Walnut / Queen / Dark Navy"
+      },
+      {
+        "title": "Headboard + Cushion / Walnut / Queen / Tobacco"
+      },
+      {
+        "title": "Headboard + Cushion / Walnut / King / Charcoal"
+      },
+      {
+        "title": "Headboard + Cushion / Walnut / King / Light Grey"
+      },
+      {
+        "title": "Headboard + Cushion / Walnut / King / Natural"
+      },
+      {
+        "title": "Headboard + Cushion / Walnut / King / Alabaster"
+      },
+      {
+        "title": "Headboard + Cushion / Walnut / King / Heathered Charcoal"
+      },
+      {
+        "title": "Headboard + Cushion / Walnut / King / Heathered Grey"
+      },
+      {
+        "title": "Headboard + Cushion / Walnut / King / Heathered Mocha"
+      },
+      {
+        "title": "Headboard + Cushion / Walnut / King / Heathered Oatmeal"
+      },
+      {
+        "title": "Headboard + Cushion / Walnut / King / Dark Olive"
+      },
+      {
+        "title": "Headboard + Cushion / Walnut / King / Dark Navy"
+      },
+      {
+        "title": "Headboard + Cushion / Walnut / King / Tobacco"
+      },
+      {
+        "title": "Headboard + Cushion / Walnut / Cali King / Charcoal"
+      },
+      {
+        "title": "Headboard + Cushion / Walnut / Cali King / Light Grey"
+      },
+      {
+        "title": "Headboard + Cushion / Walnut / Cali King / Natural"
+      },
+      {
+        "title": "Headboard + Cushion / Walnut / Cali King / Alabaster"
+      },
+      {
+        "title": "Headboard + Cushion / Walnut / Cali King / Heathered Charcoal"
+      },
+      {
+        "title": "Headboard + Cushion / Walnut / Cali King / Heathered Grey"
+      },
+      {
+        "title": "Headboard + Cushion / Walnut / Cali King / Heathered Mocha"
+      },
+      {
+        "title": "Headboard + Cushion / Walnut / Cali King / Heathered Oatmeal"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / Twin / Charcoal"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / Twin / Light Grey"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / Twin / Natural"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / Twin / Alabaster"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / Twin / Heathered Charcoal"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / Twin / Heathered Grey"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / Twin / Heathered Mocha"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / Twin / Heathered Oatmeal"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / Full / Charcoal"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / Full / Light Grey"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / Full / Natural"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / Full / Alabaster"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / Full / Heathered Charcoal"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / Full / Heathered Grey"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / Full / Heathered Mocha"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / Full / Heathered Oatmeal"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / Queen / Charcoal"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / Queen / Light Grey"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / Queen / Natural"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / Queen / Alabaster"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / Queen / Heathered Charcoal"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / Queen / Heathered Grey"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / Queen / Heathered Mocha"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / Queen / Heathered Oatmeal"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / Queen / Dark Olive"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / Queen / Dark Navy"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / Queen / Tobacco"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / King / Charcoal"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / King / Light Grey"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / King / Natural"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / King / Alabaster"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / King / Heathered Charcoal"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / King / Heathered Grey"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / King / Heathered Mocha"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / King / Heathered Oatmeal"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / King / Dark Olive"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / King / Dark Navy"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / King / Tobacco"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / Cali King / Charcoal"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / Cali King / Light Grey"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / Cali King / Natural"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / Cali King / Alabaster"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / Cali King / Heathered Charcoal"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / Cali King / Heathered Grey"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / Cali King / Heathered Mocha"
+      },
+      {
+        "title": "Headboard + Cushion / Natural / Cali King / Heathered Oatmeal"
+      },
+      {
+        "title": "Headboard + Cushion / Oak / Twin / Charcoal"
+      },
+      {
+        "title": "Headboard + Cushion / Oak / Twin / Light Grey"
+      },
+      {
+        "title": "Headboard + Cushion / Oak / Twin / Natural"
+      },
+      {
+        "title": "Headboard + Cushion / Oak / Twin / Alabaster"
+      },
+      {
+        "title": "Headboard + Cushion / Oak / Twin / Heathered Charcoal"
+      },
+      {
+        "title": "Headboard + Cushion / Oak / Twin / Heathered Grey"
+      },
+      {
+        "title": "Headboard + Cushion / Oak / Twin / Heathered Mocha"
+      },
+      {
+        "title": "Headboard + Cushion / Oak / Twin / Heathered Oatmeal"
+      },
+      {
+        "title": "Headboard + Cushion / Oak / Full / Charcoal"
+      },
+      {
+        "title": "Headboard + Cushion / Oak / Full / Light Grey"
+      },
+      {
+        "title": "Headboard + Cushion / Oak / Full / Natural"
+      },
+      {
+        "title": "Headboard + Cushion / Oak / Full / Alabaster"
+      },
+      {
+        "title": "Headboard + Cushion / Oak / Full / Heathered Charcoal"
+      },
+      {
+        "title": "Headboard + Cushion / Oak / Full / Heathered Grey"
+      },
+      {
+        "title": "Headboard + Cushion / Oak / Full / Heathered Mocha"
+      },
+      {
+        "title": "Headboard + Cushion / Oak / Full / Heathered Oatmeal"
+      },
+      {
+        "title": "Headboard + Cushion / Oak / Queen / Charcoal"
+      },
+      {
+        "title": "Headboard + Cushion / Oak / Queen / Light Grey"
+      },
+      {
+        "title": "Headboard + Cushion / Oak / Queen / Natural"
+      },
+      {
+        "title": "Headboard + Cushion / Oak / Queen / Alabaster"
+      },
+      {
+        "title": "Headboard + Cushion / Oak / Queen / Heathered Charcoal"
+      },
+      {
+        "title": "Headboard + Cushion / Oak / Queen / Heathered Grey"
+      },
+      {
+        "title": "Headboard + Cushion / Oak / Queen / Heathered Mocha"
+      },
+      {
+        "title": "Headboard + Cushion / Oak / Queen / Heathered Oatmeal"
+      },
+      {
+        "title": "Headboard + Cushion / Oak / Queen / Dark Olive"
+      },
+      {
+        "title": "Headboard + Cushion / Oak / Queen / Dark Navy"
+      },
+      {
+        "title": "Headboard + Cushion / Oak / Queen / Tobacco"
+      },
+      {
+        "title": "Headboard + Cushion / Oak / King / Charcoal"
+      },
+      {
+        "title": "Headboard + Cushion / Oak / King / Light Grey"
+      },
+      {
+        "title": "Headboard + Cushion / Oak / King / Natural"
+      },
+      {
+        "title": "Headboard + Cushion / Oak / King / Alabaster"
+      },
+      {
+        "title": "Headboard + Cushion / Oak / King / Heathered Charcoal"
+      },
+      {
+        "title": "Headboard + Cushion / Oak / King / Heathered Grey"
+      },
+      {
+        "title": "Headboard + Cushion / Oak / King / Heathered Mocha"
+      },
+      {
+        "title": "Headboard + Cushion / Oak / King / Heathered Oatmeal"
+      },
+      {
+        "title": "Headboard + Cushion / Oak / King / Dark Olive"
+      },
+      {
+        "title": "Headboard + Cushion / Oak / King / Dark Navy"
+      },
+      {
+        "title": "Headboard + Cushion / Oak / King / Tobacco"
+      },
+      {
+        "title": "Headboard + Cushion / Oak / Cali King / Charcoal"
+      },
+      {
+        "title": "Headboard + Cushion / Oak / Cali King / Light Grey"
+      },
+      {
+        "title": "Headboard + Cushion / Oak / Cali King / Natural"
+      },
+      {
+        "title": "Headboard + Cushion / Oak / Cali King / Alabaster"
+      },
+      {
+        "title": "Headboard + Cushion / Oak / Cali King / Heathered Charcoal"
+      },
+      {
+        "title": "Headboard + Cushion / Oak / Cali King / Heathered Grey"
+      },
+      {
+        "title": "Headboard + Cushion / Oak / Cali King / Heathered Mocha"
+      },
+      {
+        "title": "Headboard + Cushion / Oak / Cali King / Heathered Oatmeal"
+      },
+      {
+        "title": "Headboard + Cushion / Espresso / Twin / Charcoal"
+      },
+      {
+        "title": "Headboard + Cushion / Espresso / Twin / Light Grey"
+      },
+      {
+        "title": "Headboard + Cushion / Espresso / Twin / Natural"
+      },
+      {
+        "title": "Headboard + Cushion / Espresso / Twin / Alabaster"
+      },
+      {
+        "title": "Headboard + Cushion / Espresso / Twin / Heathered Charcoal"
+      },
+      {
+        "title": "Headboard + Cushion / Espresso / Twin / Heathered Grey"
+      },
+      {
+        "title": "Headboard + Cushion / Espresso / Twin / Heathered Mocha"
+      },
+      {
+        "title": "Headboard + Cushion / Espresso / Twin / Heathered Oatmeal"
+      },
+      {
+        "title": "Headboard + Cushion / Espresso / Full / Charcoal"
+      },
+      {
+        "title": "Headboard + Cushion / Espresso / Full / Light Grey"
+      },
+      {
+        "title": "Headboard + Cushion / Espresso / Full / Natural"
+      },
+      {
+        "title": "Headboard + Cushion / Espresso / Full / Alabaster"
+      },
+      {
+        "title": "Headboard + Cushion / Espresso / Full / Heathered Charcoal"
+      },
+      {
+        "title": "Headboard + Cushion / Espresso / Full / Heathered Grey"
+      },
+      {
+        "title": "Headboard + Cushion / Espresso / Full / Heathered Mocha"
+      },
+      {
+        "title": "Headboard + Cushion / Espresso / Full / Heathered Oatmeal"
+      },
+      {
+        "title": "Headboard + Cushion / Espresso / Queen / Charcoal"
+      },
+      {
+        "title": "Headboard + Cushion / Espresso / Queen / Light Grey"
+      },
+      {
+        "title": "Headboard + Cushion / Espresso / Queen / Natural"
+      },
+      {
+        "title": "Headboard + Cushion / Espresso / Queen / Alabaster"
+      },
+      {
+        "title": "Headboard + Cushion / Espresso / Queen / Heathered Charcoal"
+      },
+      {
+        "title": "Headboard + Cushion / Espresso / Queen / Heathered Grey"
+      },
+      {
+        "title": "Headboard + Cushion / Espresso / Queen / Heathered Mocha"
+      },
+      {
+        "title": "Headboard + Cushion / Espresso / Queen / Heathered Oatmeal"
+      },
+      {
+        "title": "Headboard + Cushion / Espresso / Queen / Dark Olive"
+      },
+      {
+        "title": "Headboard + Cushion / Espresso / Queen / Dark Navy"
+      },
+      {
+        "title": "Headboard + Cushion / Espresso / Queen / Tobacco"
+      },
+      {
+        "title": "Headboard + Cushion / Espresso / King / Charcoal"
+      },
+      {
+        "title": "Headboard + Cushion / Espresso / King / Light Grey"
+      },
+      {
+        "title": "Headboard + Cushion / Espresso / King / Natural"
+      },
+      {
+        "title": "Headboard + Cushion / Espresso / King / Alabaster"
+      },
+      {
+        "title": "Headboard + Cushion / Espresso / King / Heathered Charcoal"
+      },
+      {
+        "title": "Headboard + Cushion / Espresso / King / Heathered Grey"
+      },
+      {
+        "title": "Headboard + Cushion / Espresso / King / Heathered Mocha"
+      },
+      {
+        "title": "Headboard + Cushion / Espresso / King / Heathered Oatmeal"
+      },
+      {
+        "title": "Headboard + Cushion / Espresso / King / Dark Olive"
+      },
+      {
+        "title": "Headboard + Cushion / Espresso / King / Dark Navy"
+      },
+      {
+        "title": "Headboard + Cushion / Espresso / King / Tobacco"
+      },
+      {
+        "title": "Headboard + Cushion / Espresso / Cali King / Charcoal"
+      },
+      {
+        "title": "Headboard + Cushion / Espresso / Cali King / Light Grey"
+      },
+      {
+        "title": "Headboard + Cushion / Espresso / Cali King / Natural"
+      },
+      {
+        "title": "Headboard + Cushion / Espresso / Cali King / Alabaster"
+      },
+      {
+        "title": "Headboard + Cushion / Espresso / Cali King / Heathered Charcoal"
+      },
+      {
+        "title": "Headboard + Cushion / Espresso / Cali King / Heathered Grey"
+      },
+      {
+        "title": "Headboard + Cushion / Espresso / Cali King / Heathered Mocha"
+      },
+      {
+        "title": "Headboard + Cushion / Espresso / Cali King / Heathered Oatmeal"
+      },
+      {
+        "title": "Headboard + Cushion / Grey / Twin / Charcoal"
+      },
+      {
+        "title": "Headboard + Cushion / Grey / Twin / Light Grey"
+      },
+      {
+        "title": "Headboard + Cushion / Grey / Twin / Natural"
+      },
+      {
+        "title": "Headboard + Cushion / Grey / Twin / Alabaster"
+      },
+      {
+        "title": "Headboard + Cushion / Grey / Twin / Heathered Charcoal"
+      },
+      {
+        "title": "Headboard + Cushion / Grey / Twin / Heathered Grey"
+      },
+      {
+        "title": "Headboard + Cushion / Grey / Twin / Heathered Mocha"
+      },
+      {
+        "title": "Headboard + Cushion / Grey / Twin / Heathered Oatmeal"
+      },
+      {
+        "title": "Headboard + Cushion / Grey / Full / Charcoal"
+      },
+      {
+        "title": "Headboard + Cushion / Grey / Full / Light Grey"
+      },
+      {
+        "title": "Headboard + Cushion / Grey / Full / Natural"
+      },
+      {
+        "title": "Headboard + Cushion / Grey / Full / Alabaster"
+      },
+      {
+        "title": "Headboard + Cushion / Grey / Full / Heathered Charcoal"
+      },
+      {
+        "title": "Headboard + Cushion / Grey / Full / Heathered Grey"
+      },
+      {
+        "title": "Headboard + Cushion / Grey / Full / Heathered Mocha"
+      },
+      {
+        "title": "Headboard + Cushion / Grey / Full / Heathered Oatmeal"
+      },
+      {
+        "title": "Headboard + Cushion / Grey / Queen / Charcoal"
+      },
+      {
+        "title": "Headboard + Cushion / Grey / Queen / Light Grey"
+      },
+      {
+        "title": "Headboard + Cushion / Grey / Queen / Natural"
+      },
+      {
+        "title": "Headboard + Cushion / Grey / Queen / Alabaster"
+      },
+      {
+        "title": "Headboard + Cushion / Grey / Queen / Heathered Charcoal"
+      },
+      {
+        "title": "Headboard + Cushion / Grey / Queen / Heathered Grey"
+      },
+      {
+        "title": "Headboard + Cushion / Grey / Queen / Heathered Mocha"
+      },
+      {
+        "title": "Headboard + Cushion / Grey / Queen / Heathered Oatmeal"
+      },
+      {
+        "title": "Headboard + Cushion / Grey / King / Charcoal"
+      },
+      {
+        "title": "Headboard + Cushion / Grey / King / Light Grey"
+      },
+      {
+        "title": "Headboard + Cushion / Grey / King / Natural"
+      },
+      {
+        "title": "Headboard + Cushion / Grey / King / Alabaster"
+      },
+      {
+        "title": "Headboard + Cushion / Grey / King / Heathered Charcoal"
+      },
+      {
+        "title": "Headboard + Cushion / Grey / King / Heathered Grey"
+      },
+      {
+        "title": "Headboard + Cushion / Grey / King / Heathered Mocha"
+      },
+      {
+        "title": "Headboard + Cushion / Grey / King / Heathered Oatmeal"
+      },
+      {
+        "title": "Headboard + Cushion / Grey / Cali King / Charcoal"
+      },
+      {
+        "title": "Headboard + Cushion / Grey / Cali King / Light Grey"
+      },
+      {
+        "title": "Headboard + Cushion / Grey / Cali King / Natural"
+      },
+      {
+        "title": "Headboard + Cushion / Grey / Cali King / Alabaster"
+      },
+      {
+        "title": "Headboard + Cushion / Grey / Cali King / Heathered Charcoal"
+      },
+      {
+        "title": "Headboard + Cushion / Grey / Cali King / Heathered Grey"
+      },
+      {
+        "title": "Headboard + Cushion / Grey / Cali King / Heathered Mocha"
+      },
+      {
+        "title": "Headboard + Cushion / Grey / Cali King / Heathered Oatmeal"
+      }
+    ],
+    "options": [
+      {
+        "name": "Configuration",
+        "position": 1,
+        "values": [
+          "Headboard",
+          "Headboard + Cushion"
+        ]
+      },
+      {
+        "name": "Finish",
+        "position": 2,
+        "values": [
+          "Walnut",
+          "Natural",
+          "Oak",
+          "Espresso",
+          "Grey"
+        ]
+      },
+      {
+        "name": "Size",
+        "position": 3,
+        "values": [
+          "Twin",
+          "Full",
+          "Queen",
+          "King",
+          "Cali King"
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Studio Dining Chair + Cushion",
+    "handle": "studio-dining-chair-cushion",
+    "product_type": "Dining",
+    "images": [],
+    "tags": [
+      "welcomeoffer",
+      "white-glove-sometimes"
+    ],
+    "body_html": "<p><meta charset=\"utf-8\"><meta charset=\"utf-8\"><span></span><span></span><span>The Studio Dining Chair balances sculptural simplicity with exceptional durability. Its backrest and seat are angled to provide optimal support, with integrated bridle joinery and solid wood construction for strength and stability. Arrives fully assembled with pre-installed slides to protect floors.</span><br><span> </span><br><span>Compatible with the Pillar Rectangular Dining Table and Pillar Round Dining Table.</span><br></p>",
+    "variants": [
+      {
+        "title": "Studio Dining Chair + Cushion / Saddle / Walnut / Individual"
+      },
+      {
+        "title": "Studio Dining Chair + Cushion / Saddle / Walnut / Set of 2"
+      },
+      {
+        "title": "Studio Dining Chair + Cushion / Saddle / Oak / Individual"
+      },
+      {
+        "title": "Studio Dining Chair + Cushion / Saddle / Oak / Set of 2"
+      },
+      {
+        "title": "Studio Dining Chair + Cushion / Saddle / Espresso / Individual"
+      },
+      {
+        "title": "Studio Dining Chair + Cushion / Saddle / Espresso / Set of 2"
+      },
+      {
+        "title": "Studio Dining Chair + Cushion / Cocoa / Walnut / Individual"
+      },
+      {
+        "title": "Studio Dining Chair + Cushion / Cocoa / Walnut / Set of 2"
+      },
+      {
+        "title": "Studio Dining Chair + Cushion / Cocoa / Oak / Individual"
+      },
+      {
+        "title": "Studio Dining Chair + Cushion / Cocoa / Oak / Set of 2"
+      },
+      {
+        "title": "Studio Dining Chair + Cushion / Cocoa / Espresso / Individual"
+      },
+      {
+        "title": "Studio Dining Chair + Cushion / Cocoa / Espresso / Set of 2"
+      }
+    ],
+    "options": [
+      {
+        "name": "Configuration",
+        "position": 1,
+        "values": [
+          "Studio Dining Chair",
+          "Studio Dining Chair + Cushion"
+        ]
+      },
+      {
+        "name": "Fabric",
+        "position": 2,
+        "values": [
+          "Saddle",
+          "Cocoa"
+        ]
+      },
+      {
+        "name": "Finish",
+        "position": 3,
+        "values": [
+          "Walnut",
+          "Oak",
+          "Espresso"
+        ]
+      },
+      {
+        "name": "Quantity",
+        "position": 4,
+        "values": [
+          "Individual",
+          "Set of 2"
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Studio Dining Chair",
+    "handle": "studio-dining-chair",
+    "product_type": "Dining",
+    "images": [],
+    "tags": [
+      "welcomeoffer",
+      "white-glove-sometimes"
+    ],
+    "body_html": "<p><meta charset=\"utf-8\"><meta charset=\"utf-8\"><span></span><span></span><span>The Studio Dining Chair balances sculptural simplicity with exceptional durability. Its backrest and seat are angled to provide optimal support, with integrated bridle joinery and solid wood construction for strength and stability. Arrives fully assembled with pre-installed slides to protect floors.</span><br><span> </span><br><span>Compatible with the Pillar Rectangular Dining Table and Pillar Round Dining Table.</span><br></p>",
+    "variants": [
+      {
+        "title": "Studio Dining Chair / Walnut / Individual"
+      },
+      {
+        "title": "Studio Dining Chair / Walnut / Set of 2"
+      },
+      {
+        "title": "Studio Dining Chair / Oak / Individual"
+      },
+      {
+        "title": "Studio Dining Chair / Oak / Set of 2"
+      },
+      {
+        "title": "Studio Dining Chair / Espresso / Individual"
+      },
+      {
+        "title": "Studio Dining Chair / Espresso / Set of 2"
+      }
+    ],
+    "options": [
+      {
+        "name": "Configuration",
+        "position": 1,
+        "values": [
+          "Studio Dining Chair",
+          "Studio Dining Chair + Cushion"
+        ]
+      },
+      {
+        "name": "Finish",
+        "position": 2,
+        "values": [
+          "Walnut",
+          "Oak",
+          "Espresso"
+        ]
+      },
+      {
+        "name": "Quantity",
+        "position": 3,
+        "values": [
+          "Individual",
+          "Set of 2"
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Studio Armchair + Cushion",
+    "handle": "studio-armchair-cushion",
+    "product_type": "Dining",
+    "images": [],
+    "tags": [
+      "welcomeoffer",
+      "white-glove-sometimes"
+    ],
+    "body_html": "<p dir=\"ltr\"><span>The Studio Armchair balances sculptural simplicity with thoughtful functionality. Its backrest and seat are angled to provide optimal support, with integrated bridle joinery and solid wood construction for strength and stability. Armrests enhance its supportive design and sleek symmetry. Arrives fully assembled with pre-installed slides to protect floors.</span></p>\n<p><b><br></b></p>\n<p dir=\"ltr\"><span>Compatible with the </span><span>Pillar Rectangular Dining Table.</span></p>",
+    "variants": [
+      {
+        "title": "Studio Armchair + Cushion / Saddle / Walnut / Individual"
+      },
+      {
+        "title": "Studio Armchair + Cushion / Saddle / Walnut / Set of 2"
+      },
+      {
+        "title": "Studio Armchair + Cushion / Saddle / Oak / Individual"
+      },
+      {
+        "title": "Studio Armchair + Cushion / Saddle / Oak / Set of 2"
+      },
+      {
+        "title": "Studio Armchair + Cushion / Saddle / Espresso / Individual"
+      },
+      {
+        "title": "Studio Armchair + Cushion / Saddle / Espresso / Set of 2"
+      },
+      {
+        "title": "Studio Armchair + Cushion / Cocoa / Walnut / Individual"
+      },
+      {
+        "title": "Studio Armchair + Cushion / Cocoa / Walnut / Set of 2"
+      },
+      {
+        "title": "Studio Armchair + Cushion / Cocoa / Oak / Individual"
+      },
+      {
+        "title": "Studio Armchair + Cushion / Cocoa / Oak / Set of 2"
+      },
+      {
+        "title": "Studio Armchair + Cushion / Cocoa / Espresso / Individual"
+      },
+      {
+        "title": "Studio Armchair + Cushion / Cocoa / Espresso / Set of 2"
+      }
+    ],
+    "options": [
+      {
+        "name": "Configuration",
+        "position": 1,
+        "values": [
+          "Studio Armchair",
+          "Studio Armchair + Cushion"
+        ]
+      },
+      {
+        "name": "Fabric",
+        "position": 2,
+        "values": [
+          "Saddle",
+          "Cocoa"
+        ]
+      },
+      {
+        "name": "Finish",
+        "position": 3,
+        "values": [
+          "Walnut",
+          "Oak",
+          "Espresso"
+        ]
+      },
+      {
+        "name": "Quantity",
+        "position": 4,
+        "values": [
+          "Individual",
+          "Set of 2"
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Studio Armchair",
+    "handle": "studio-armchair",
+    "product_type": "Dining",
+    "images": [],
+    "tags": [
+      "welcomeoffer",
+      "white-glove-sometimes"
+    ],
+    "body_html": "<p dir=\"ltr\"><span>The Studio Armchair balances sculptural simplicity with thoughtful functionality. Its backrest and seat are angled to provide optimal support, with integrated bridle joinery and solid wood construction for strength and stability. Armrests enhance its supportive design and sleek symmetry. Arrives fully assembled with pre-installed slides to protect floors.</span></p>\n<p><b><br></b></p>\n<p dir=\"ltr\"><span>Compatible with the </span><span>Pillar Rectangular Dining Table.</span></p>",
+    "variants": [
+      {
+        "title": "Studio Armchair / Walnut / Individual"
+      },
+      {
+        "title": "Studio Armchair / Walnut / Set of 2"
+      },
+      {
+        "title": "Studio Armchair / Oak / Individual"
+      },
+      {
+        "title": "Studio Armchair / Oak / Set of 2"
+      },
+      {
+        "title": "Studio Armchair / Espresso / Individual"
+      },
+      {
+        "title": "Studio Armchair / Espresso / Set of 2"
+      }
+    ],
+    "options": [
+      {
+        "name": "Configuration",
+        "position": 1,
+        "values": [
+          "Studio Armchair",
+          "Studio Armchair + Cushion"
+        ]
+      },
+      {
+        "name": "Finish",
+        "position": 2,
+        "values": [
+          "Walnut",
+          "Oak",
+          "Espresso"
+        ]
+      },
+      {
+        "name": "Quantity",
+        "position": 3,
+        "values": [
+          "Individual",
+          "Set of 2"
+        ]
+      }
+    ]
+  }
+]

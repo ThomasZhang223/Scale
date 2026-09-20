@@ -35,7 +35,12 @@ from .ai_extract import OpenAIConfig, extract_with_llm, extract_with_vlm
 from .auth import require_upstream_token
 from .browserbase import BrowserbaseFetch, CachedFetch, FetchError
 from .dimensions import extract
+from .fit import fit_bounds_mm, passes_fit
 from .page_extract import extract_from_page, product_url
+from .product_search import (
+    drop_unplaceable, handles_from_search_page, normalise_query, products_by_handle,
+    relevance, search_url,
+)
 from .validate import validate
 
 app = FastAPI(title="ingest")
@@ -126,6 +131,113 @@ async def crawl(request: Request):
     return {"storefront": storefront, "count": len(products), "products": products}
 
 
+@app.post("/find", dependencies=[Depends(require_upstream_token)])
+async def find_products(request: Request):
+    """Prompt -> candidate products from one storefront, best match first.
+
+      POST /find  { storefront, query, limit?, merchant? }
+                  -> { query, searchedFor, count, handles, products }
+
+    The front half the pipeline was missing. Everything else here is merchant-driven — crawl a
+    catalogue, extract all of it — which pre-generates assets fine but cannot answer "find me a
+    red chair" live.
+
+    Relevance is the merchant's, not ours. Their search already knows a "Cloud" is a chair and
+    that "sectional" means sofa, which title matching never will, so this renders their own
+    /search page through Browserbase and reads the order off it. Rendering rather than fetching
+    is what makes stores with client-side search work, the same reason step 2.5 exists.
+
+    Returns raw products, not Object v1: measuring them is /extract's job, and keeping the two
+    apart means a caller can cache this and re-extract without paying for the page again —
+    exactly the split /crawl and /extract already have.
+
+    `query` is expected to already describe a PRODUCT. Pulling the product out of an utterance
+    — "a bookshelf beside my desk" is a search for a bookshelf, not a desk — belongs to the
+    voice agent, which splits it into find_anchor and search_objects before anything reaches
+    here. This endpoint only strips leftover imperative and article noise; it does not parse
+    intent, because two places doing that is how they drift apart.
+    """
+    body = await request.json()
+    storefront = (body.get("storefront") or "").strip()
+    raw_query = (body.get("query") or "").strip()
+    if not storefront:
+        return _err(422, "missing_storefront", "storefront is required")  # standing rule 4
+    if not raw_query:
+        return _err(422, "missing_query", "query is required")            # standing rule 4
+
+    limit = min(int(body.get("limit") or 12), 50)
+    query = normalise_query(raw_query)
+
+    # Never a silent skip: without a key this endpoint cannot work at all, and returning an
+    # empty list would look exactly like a merchant having nothing that matches.
+    try:
+        fetcher = CachedFetch(PAGE_CACHE, upstream=BrowserbaseFetch())
+    except ValueError as e:
+        return _err(503, "browserbase_unconfigured", str(e))
+
+    url = search_url(storefront, query)
+    try:
+        res = await asyncio.to_thread(fetcher.fetch, url)
+    except FetchError as e:
+        return _err(502, "search_page_unreachable", f"{url}: {e}")
+
+    handles = handles_from_search_page(res.content, limit=limit)
+    if not handles:
+        # A real, reportable outcome — not an error. Say which URL was read so the caller can
+        # look at the same page rather than guess whether the search or the parse came up dry.
+        return {"query": raw_query, "searchedFor": query, "searchUrl": url,
+                "count": 0, "handles": [], "products": []}
+
+    # The search page gives a title, a thumbnail and a link. The catalogue gives variants,
+    # body_html and the full image list — which is what the extraction pipeline takes — so
+    # join back to it rather than fetching every product again.
+    catalogue: list[dict] = []
+    async with httpx.AsyncClient(headers={"User-Agent": USER_AGENT},
+                                 timeout=CRAWL_TIMEOUT_S, follow_redirects=True) as client:
+        for page in range(1, MAX_PAGES + 1):
+            try:
+                r = await client.get(
+                    f"{storefront.rstrip('/')}/products.json?limit=250&page={page}")
+                r.raise_for_status()
+            except httpx.HTTPError as e:
+                return _err(502, "storefront_unreachable", f"{type(e).__name__}: {e}")
+            batch = (r.json() or {}).get("products") or []
+            catalogue.extend(batch)
+            if len(batch) < 250 or len({h for h in handles} - {
+                    (x.get("handle") or "").lower() for x in catalogue}) == 0:
+                break
+
+    matched = products_by_handle(catalogue, handles)
+    products = drop_unplaceable(matched)
+    hits, ratio = relevance(query, products)
+
+    # A store whose search finds nothing may serve its popular products instead, and that page
+    # is indistinguishable from a real result set — Floyd answers "red chair" with twelve beds.
+    # Returning those unflagged is the worst outcome available: a confident answer to a
+    # question nobody asked. Flagged rather than emptied, because the caller knows whether it
+    # would rather show something loosely related or say it found nothing.
+    fallback = bool(products) and hits == 0
+
+    return {
+        "query": raw_query,
+        "searchedFor": query,
+        "searchUrl": url,
+        "count": len(products),
+        "handles": handles,
+        # Handles the catalogue does not serve cannot be measured, so they are reported rather
+        # than quietly dropped — a caller comparing count to handles should see why.
+        "missing": [h for h in handles if h not in {
+            (x.get("handle") or "").lower() for x in matched}],
+        "relevance": {"matched": hits, "ratio": round(ratio, 2)},
+        "fallbackSuspected": fallback,
+        "warning": (
+            f"no result matches any word of {query!r} — this storefront most likely has "
+            f"nothing for that query and served popular products instead"
+        ) if fallback else None,
+        "products": products,
+    }
+
+
 def _object_v1(merchant: str, storefront: str, p: dict, bbox: dict, verdict, method_src: str,
                via: str) -> dict:
     """One row in the contracts.md Object v1 shape, state "measured"."""
@@ -186,6 +298,15 @@ async def extract_products(request: Request):
     use_llm = bool(body.get("llm")) and cfg.configured
     use_vlm = bool(body.get("vlm")) and cfg.configured
     ai_limit = int(body.get("aiLimit") or 40)
+
+    # Optional, and only meaningful here — /find has no sizes yet, so a fit filter can only be
+    # applied once something has been measured. Two callers want different things: a person
+    # browsing for a red chair wants every red chair, an agent putting one in an 0.8 m gap
+    # wants only the ones that go there.
+    try:
+        bounds = fit_bounds_mm(body.get("fit"))
+    except (ValueError, TypeError) as e:
+        return _err(422, "bad_fit", str(e))  # standing rule 4: never filter nothing silently
     fetcher = None
     if use_pages:
         try:
@@ -198,7 +319,9 @@ async def extract_products(request: Request):
     objects: list[dict] = []
     stats = {"products": len(products), "from_api": 0, "from_llm": 0, "from_page": 0,
              "from_vlm": 0, "pages_fetched": 0, "page_failures": 0,
-             "rejected": 0, "unverified": 0}
+             "rejected": 0, "unverified": 0,
+             # Only meaningful when a fit was asked for; with none, everything fits.
+             "fitting": 0, "too_big": 0}
     if body.get("llm") and not cfg.configured:
         stats["llm_skipped"] = "OPENAI_API_KEY / OPENAI_MODEL not configured"
     needs_page: list[dict] = []
@@ -216,7 +339,14 @@ async def extract_products(request: Request):
             return False
         stats[counter] += 1
         stats["unverified"] += int(v.unverified)
-        objects.append(_object_v1(merchant, storefront, p, bbox, v, hit.source_field, via))
+        obj = _object_v1(merchant, storefront, p, bbox, v, hit.source_field, via)
+        # Flagged, not dropped. The caller knows whether it is placing or browsing, and an
+        # object that misses by a centimetre is worth showing with that said out loud rather
+        # than vanishing with no explanation.
+        fits = passes_fit(bbox, bounds)
+        obj["extraction"]["fits"] = fits
+        stats["fitting" if fits else "too_big"] += 1
+        objects.append(obj)
         return True
 
     needs_ai: list[dict] = []
