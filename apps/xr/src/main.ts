@@ -2,7 +2,6 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { VRButton } from 'three/examples/jsm/webxr/VRButton.js';
 import { buildRoomFromScan, type BuiltRoom, type ScannedObject } from './roomScan';
-import { Hud, type HudLine, type Tone } from './hud';
 import { ObjectLoader, type LoadedObject } from './objects';
 import { createPhysics } from './physics';
 import { Interaction } from './interaction';
@@ -115,16 +114,10 @@ const room = new THREE.Group();
 scene.add(room);
 const fitOverlay = new FitOverlay();
 scene.add(fitOverlay.group);
-// The transcript panel: its own module, standing behind the phone on the left hand (placed
-// every frame in the loop below, from the head through the phone).
-const hud = new Hud();
-hud.attachTo(scene);
-// Merchant listings get their own card, to the right of the design card, so a redesign's
-// reasons and a shop's "mesh job queued" never share a page.
-const listingsHud = new Hud({ side: 0.8, drop: 0.42 });
-listingsHud.attachTo(scene);
-renderer.xr.addEventListener('sessionstart', () => { hud.setPresenting(true); listingsHud.setPresenting(true); });
-renderer.xr.addEventListener('sessionend', () => { hud.setPresenting(false); listingsHud.setPresenting(false); });
+// No transcript card and no listings card: the headset shows no dialogue and no subtitles.
+// What was heard is never written down, and the designer's reasoning is spoken, not drawn.
+// The decision the user must act on (Keep / Put back / Ask again, and the fit counts) lives
+// on the tablet's Designer page instead, where a ray can reach it.
 
 // The find panel: head-locked ahead and to the right, showing per-store Browserbase progress
 // and then the listing cards. Its own module (findpanel.ts), like hud.ts.
@@ -162,21 +155,16 @@ const micButton = document.getElementById('agent-mic') as HTMLButtonElement;
 panel.hidden = !SHOW_PANEL;
 const say = (text: string) => (note.textContent = text);
 
-// The transcript: what was heard and what was answered, shown in full on its own panel behind
-// the phone (hud.ts). The phone keeps the buttons; the reasons live on the panel.
-const TRANSCRIPT_KEEP = 8;
-const transcript: HudLine[] = [];
-const listingsTranscript: HudLine[] = [];
-type Channel = 'design' | 'listings';
-function tell(text: string, tone: Tone = 'info', channel: Channel = 'design') {
+/**
+ * One line to the laptop's note strip. It used to fan out to a transcript card in the
+ * headset as well; that card is gone (no dialogue, no subtitles), so the severity and the
+ * channel it carried have no reader left and are not taken any more.
+ */
+function tell(text: string) {
   say(text);
-  const lines = channel === 'listings' ? listingsTranscript : transcript;
-  lines.push({ text, tone });
-  if (lines.length > TRANSCRIPT_KEEP) lines.splice(0, lines.length - TRANSCRIPT_KEEP);
-  (channel === 'listings' ? listingsHud : hud).set(lines);
 }
 
-/** Spoken output is one sentence: the card carries the rest. */
+/** Spoken output is one sentence: the rest is never written down. */
 function concise(text: string, maxChars = 140): string {
   const first = text.trim().split(/(?<=[.!?])\s+/)[0] ?? '';
   return first.length > maxChars ? `${first.slice(0, maxChars - 1).replace(/\s+\S*$/, '')}…` : first;
@@ -203,7 +191,6 @@ let currentVersionId: string | null = null; // parent for the next version we pu
 let lastFitReport: FitReport | null = null;
 let undoAvailable = false;
 let lastTouchedId: string | null = null; // what the turn buttons act on when nothing is held
-let showRules = false; // the Rearrange guidelines, expanded on the wrist
 let selectedStyle: string | null = null; // the whole-room style Rearrange will use; none picked → Rearrange is disabled
 let listings: ListingsResult | null = null; // the last recommendation set, shown on the wrist and the laptop
 let listingsNeed: Need | null = null;
@@ -212,18 +199,6 @@ let stageLines: string[] = []; // per-store Browserbase progress, mirrored on th
 let voiceState: VoiceState = 'idle';
 let lastHeard: string | null = null;
 
-/** What Rearrange does with each kind of object (mirrors services/agent generatedPlan). */
-const REARRANGE_RULES: [string, string][] = [
-  ['sofa', 'wall, facing in; faces the TV'],
-  ['TV / storage / shelf', 'against a wall'],
-  ['bed', 'wall, away from the door'],
-  ['desk', 'wall, near a window'],
-  ['dining table', 'middle of the room'],
-  ['chairs', 'at the table, facing it; else with the sofa'],
-  ['coffee table', 'in front of the sofa'],
-  ['lamps / other', 'a wall, out of the way'],
-  ['always', '90 cm walkways; doors and windows clear'],
-];
 /** Whole-room styles: [button label, agent preset]. Each is a different set of rules in services/agent STYLES. */
 const STYLES: [string, string][] = [
   ['Cozy', 'cozy'],
@@ -261,8 +236,6 @@ async function start() {
     onChange: onAgentChange,
   });
   const interaction = new Interaction(renderer, scene, camera, controls, physics, palette, spawn, onAction, layoutChanged, onGrab, (r) => {
-    if (hud.hitTest(r)) return 'hud:close';
-    if (listingsHud.hitTest(r)) return 'hud:close:listings';
     const hit = findPanel.hitTest(r);
     if (!hit) return null;
     return hit.kind === 'close' ? 'find:close' : `find:pick:${hit.objectId}`;
@@ -273,12 +246,7 @@ async function start() {
   renderAgentPanel(agent.snapshot);
 
   function onAction(action: string) {
-    if (action === 'hud:close') hud.dismiss();
-    if (action === 'hud:close:listings') listingsHud.dismiss();
-    if (action === 'listings:show') {
-      listingsHud.reopen();
-      findPanel.reopen();
-    }
+    if (action === 'listings:show') findPanel.reopen();
     if (action === 'find:close') findPanel.dismiss();
     if (action.startsWith('find:pick:')) void pickListing(action.slice(10));
     if (action === 'reset' && lastScan) showScan(lastScan, 'Room reset');
@@ -296,10 +264,6 @@ async function start() {
     if (action === 'turn:left') turnLast(Math.PI / 2);
     if (action === 'turn:right') turnLast(-Math.PI / 2);
     if (action === 'remove') removeLast();
-    if (action === 'rules') {
-      showRules = !showRules;
-      showPalette();
-    }
     if (action === 'accept') void acceptProposal();
     if (action === 'reject') void rejectProposal();
     if (action === 'ask_again') void agent.askAgain();
@@ -396,10 +360,10 @@ async function start() {
     // The card: one short line per listing, nothing else. The voice reads each one out.
     const shown = listings.recommendations.slice(0, 6);
     if (!top) {
-      tell(`Nothing for sale fits ${what}.`, 'warn', 'listings');
+      tell(`Nothing for sale fits ${what}.`);
     } else {
-      tell(`${listings.recommendations.length} listings ${what}`, 'info', 'listings');
-      shown.forEach((r, i) => tell(`${i + 1}. ${r.listing.name} — ${r.listing.merchant ?? 'catalogue'}`, 'info', 'listings'));
+      tell(`${listings.recommendations.length} listings ${what}`);
+      shown.forEach((r, i) => tell(`${i + 1}. ${r.listing.name} — ${r.listing.merchant ?? 'catalogue'}`));
     }
     if (need.text && lastHeard === need.text) {
       const readout = top
@@ -456,7 +420,7 @@ async function start() {
     const l = rec.listing;
     const placedId = await addListing(objectId); // the measured box, placed where it belongs
     const placed = placedId ? objects.get(placedId) : undefined;
-    if (!placed) return tell(`${l.name}: no room to place it.`, 'warn', 'listings');
+    if (!placed) return tell(`${l.name}: no room to place it.`);
     // Already has a real mesh — addListing loaded it, there's nothing left to generate.
     if (l.state === 'ready' && l.glbUrl) {
       findPanel.setProgress(objectId, 'Mesh placed at true scale');
@@ -468,7 +432,7 @@ async function start() {
       job = await postListingsGenerate(l, SERVER_ROOM_ID);
     } catch (err) {
       findPanel.setProgress(objectId, `Couldn’t queue the mesh: ${(err as Error).message}`);
-      return tell(`${l.name}: 3D request failed — ${concise((err as Error).message, 80)}`, 'error', 'listings');
+      return tell(`${l.name}: 3D request failed — ${concise((err as Error).message, 80)}`);
     }
     // The server mints a stable id; the placed box keeps tracking it so SSE dedupe works.
     placed.objectId = job.objectId;
@@ -482,11 +446,11 @@ async function start() {
         findPanel.setProgress(objectId, 'Mesh placed at true scale');
       } catch (err) {
         findPanel.setProgress(objectId, `Mesh failed to load: ${(err as Error).message}`);
-        tell(`${l.name}: ${concise((err as Error).message, 80)}`, 'error', 'listings');
+        tell(`${l.name}: ${concise((err as Error).message, 80)}`);
       }
       return;
     }
-    tell(`${l.name}: in the room as a box, 3D on the way.`, 'info', 'listings');
+    tell(`${l.name}: in the room as a box, 3D on the way.`);
     const started = Date.now();
     // ceiling: 3 s polling for up to 10 min. The SSE `object` event usually lands first; when it
     // does, addServerObject's own dedupe guard (matching objects by objectId) skips placing a
@@ -503,24 +467,24 @@ async function start() {
           const item = objectToItem(obj);
           const loaded = await loader.load(item.url, 1); // scale 1: the mesh normalisation contract
           const mismatch = boundsMismatch(loaded.size, item.expected);
-          if (mismatch) tell(`${item.name}: ${mismatch}.`, 'warn');
+          if (mismatch) tell(`${item.name}: ${mismatch}.`);
           if (objects.has(placed.id)) {
             swapLoaded(placed, loaded);
             findPanel.setProgress(objectId, 'Mesh placed at true scale');
-            tell(`${l.name}: 3D ready.`, 'info', 'listings');
+            tell(`${l.name}: 3D ready.`);
           } else {
             findPanel.setProgress(objectId, 'Mesh ready, but the box was removed');
-            tell(`${l.name}: 3D ready; add it again from the tablet.`, 'warn', 'listings');
+            tell(`${l.name}: 3D ready; add it again from the tablet.`);
           }
         } catch (err) {
           findPanel.setProgress(objectId, `Mesh failed to load: ${(err as Error).message}`);
-          tell(`${l.name}: ${(err as Error).message}`, 'error', 'listings');
+          tell(`${l.name}: ${(err as Error).message}`);
         }
         return;
       }
       if (j.state === 'failed') {
         findPanel.setProgress(objectId, `Generation failed: ${j.error ?? 'unknown'}`);
-        return tell(`${l.name}: 3D failed, the box stays.`, 'error', 'listings');
+        return tell(`${l.name}: 3D failed, the box stays.`);
       }
       const waiting = j.state === 'queued' && elapsed > 20_000;
       findPanel.setProgress(objectId, waiting ? 'Waiting on Baseten — box placed at true size' : `Generating mesh ${j.progressPct}%`);
@@ -695,7 +659,7 @@ async function start() {
     if (!text) return;
     lastHeard = text;
     agentText.value = text;
-    tell(`“${text}”`, 'heard');
+    tell(`“${text}”`);
     showPalette();
     await routeRequest(text);
   }
@@ -703,11 +667,7 @@ async function start() {
   /** Spoken output; a failure here is shown, never thrown, so voice never blocks the layout work. */
   function speak(text: string) {
     if (!voice.supported || !text) return;
-    // The card lingers while the reply is spoken, then goes on its own.
-    voice
-      .speak(text)
-      .then(() => hud.speechEnded())
-      .catch((err) => console.warn('Voice:', err));
+    voice.speak(text).catch((err) => console.warn('Voice:', err));
   }
 
   // Laptop: hold the mic button. The first press also asks for microphone permission.
@@ -732,10 +692,12 @@ async function start() {
         return [label(s.status || 'Working…'), ...s.log.slice(-3).map((e) => label(e.message, e.severity))];
       case 'proposed': {
         const p = s.proposal!;
-        // The summary, the reasons and the trade-off are on the transcript card in front of
-        // the eyes (onAgentChange); the wrist keeps only the decision.
+        // There is no transcript card any more, so what the user must know before pressing
+        // Keep has to be here: one line of summary, and the fit counts, which are a warning
+        // and not dialogue. The explanation and the trade-off are spoken and not written.
         return [
           ...(s.offline ? [label('Offline: sample proposal', 'warn')] : []),
+          label(p.summary),
           ...(p.fit.red || p.fit.amber ? [label(`Fit: ${p.fit.red} red, ${p.fit.amber} amber`, p.fit.red ? 'warn' : 'info')] : []),
           // The furniture is already gliding (previewProposal); the decision comes once it has landed.
           ...(applier.active ? [label('Moving…')] : [tile('Keep', 'accept', true), tile('Put back', 'reject'), tile('Ask again', 'ask_again')]),
@@ -754,11 +716,10 @@ async function start() {
           ...(objects.size ? [tile('Remove', 'remove')] : []),
           // Rearrange needs a style picked first (see STYLES in services/agent): the style tiles
           // select, and only the selected one is filled; Rearrange appears once one is chosen.
-          ...(objects.size ? (selectedStyle ? [tile('Rearrange', 'rearrange', true)] : [label('Pick a style, then Rearrange')]) : []),
+          // The style tiles sit right below it, so the gate needs no line of prose to explain it.
+          ...(objects.size && selectedStyle ? [tile('Rearrange', 'rearrange', true)] : []),
           ...(objects.size ? STYLES.map(([name, preset]) => ({ ...tile(selectedStyle === preset ? `● ${name}` : name, `style:${preset}`, selectedStyle === preset), section: 'Style' })) : []),
           ...(undoAvailable ? [tile('Undo', 'undo')] : []),
-          tile(showRules ? 'Hide rules' : 'Rules', 'rules'),
-          ...(showRules ? REARRANGE_RULES.map(([kind, rule]) => label(`${kind}: ${rule}`)) : []),
         ];
     }
   }
@@ -773,17 +734,17 @@ async function start() {
         spokenFor = key;
         const p = s.proposal;
         // Everything in writing, in front of the eyes; one sentence aloud.
-        tell(p.summary, 'info');
-        if (p.explanation) tell(p.explanation, 'info');
-        if (p.tradeoffs[0]) tell(`Trade-off: ${p.tradeoffs[0]}`, 'warn');
-        if (p.fit.red || p.fit.amber) tell(`Fit: ${p.fit.red} red, ${p.fit.amber} amber.`, p.fit.red ? 'error' : 'warn');
+        tell(p.summary);
+        if (p.explanation) tell(p.explanation);
+        if (p.tradeoffs[0]) tell(`Trade-off: ${p.tradeoffs[0]}`);
+        if (p.fit.red || p.fit.amber) tell(`Fit: ${p.fit.red} red, ${p.fit.amber} amber.`);
         // Aloud: the summary and the reasoning behind it. The trade-off and the fit counts stay
         // written only, so the voice stops while the furniture is still gliding.
         speak([p.summary, p.explanation].filter(Boolean).join(' '));
       }
     } else if (s.state === 'failed' && s.error && spokenFor !== `failed:${s.error}`) {
       spokenFor = `failed:${s.error}`;
-      tell(s.error, 'error');
+      tell(s.error);
       speak(`That didn't work. ${concise(s.error)}`);
     }
     if (s.state === 'proposed' && s.proposal) previewProposal(s.proposal);
@@ -1168,7 +1129,7 @@ async function start() {
     fitOverlay.show(report);
     if (report.ok || !report.violations.length) return;
     const blocks = report.violations.filter((v) => v.severity === 'block').length;
-    for (const v of report.violations) tell(v.message, v.severity === 'block' ? 'error' : 'warn');
+    for (const v of report.violations) tell(v.message);
     say(`Fit: ${report.violations.map((v) => v.message).join('; ')} (${blocks} blocking).`);
   }
 
@@ -1304,7 +1265,7 @@ async function start() {
         objects.set(placed.id, placed);
         if (currentRoom && rise >= 1) place(placed); // otherwise placed when the walls are up
         const cm = (m: number) => Math.round(m * 100);
-        tell(`${name}: measured on the phone, ${cm(obj.bboxMeters.w)} × ${cm(obj.bboxMeters.h)} × ${cm(obj.bboxMeters.d)} cm. Shown as a box until its mesh is generated.`, 'info');
+        tell(`${name}: measured on the phone, ${cm(obj.bboxMeters.w)} × ${cm(obj.bboxMeters.h)} × ${cm(obj.bboxMeters.d)} cm. Shown as a box until its mesh is generated.`);
         showPalette();
         return;
       }
@@ -1327,11 +1288,11 @@ async function start() {
       const mismatch = boundsMismatch(loaded.size, item.expected);
       if (mismatch) {
         console.warn(`${item.name}: ${mismatch}`);
-        tell(`${item.name}: ${mismatch}.`, 'warn');
+        tell(`${item.name}: ${mismatch}.`);
       }
     } catch (err) {
       console.error(`Loading ${item.name} from ${item.url} failed:`, err);
-      tell(`Couldn’t load ${item.name} from the server: ${(err as Error).message}`, 'error');
+      tell(`Couldn’t load ${item.name} from the server: ${(err as Error).message}`);
     }
   }
 
@@ -1458,7 +1419,7 @@ async function start() {
       }
     } catch (err) {
       console.warn('The furniture list could not be read:', err);
-      tell(`Built-in furniture unavailable: ${(err as Error).message}`, 'warn');
+      tell(`Built-in furniture unavailable: ${(err as Error).message}`);
       return;
     }
     for (const o of list) catalog.push({ url: o.url, name: o.name ?? o.url.split('/').pop()!, scale: o.scale, objectId: o.objectId, section: 'Furniture' });
@@ -1648,8 +1609,6 @@ async function start() {
     interaction.update(dt);
     applier.update(dt);
     physics.step(dt);
-    hud.place(renderer.xr.isPresenting ? renderer.xr.getCamera() : camera, dt);
-    listingsHud.place(renderer.xr.isPresenting ? renderer.xr.getCamera() : camera, dt);
     findPanel.place(renderer.xr.isPresenting ? renderer.xr.getCamera() : camera);
     if (!renderer.xr.isPresenting) controls.update();
     renderer.render(scene, camera);
