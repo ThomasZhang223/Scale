@@ -251,9 +251,11 @@ export class Palette {
     const frame = plate(frameW, frameH, RADIUS_FRAME, C.frame, -0.0025);
     this.group.add(frame);
     this.group.add(plate(SCREEN_W, screenH, RADIUS_SCREEN, C.screen, -0.0015));
-    // The stick does three things now (controls.ts stickUse), so this line no longer claims
-    // it only pushes windows. It stays one line: a title plate is read at a glance or not read.
-    const tab = text('Full Scale  ·  drag the bar to move  ·  stick pushes a window, turns an object', ROW_W, TAB_H, { font: 'footnote', color: C.secondary, background: C.island, padding: 20 });
+    // The only line of instructions anywhere in the headset, so it carries the controls a
+    // person cannot discover by trying: dragging, what the stick does, and the destructive one.
+    // Delete earns its place over the others — it is the only control that is expensive to get
+    // wrong — and it says "twice" because arming is the part nobody would guess (controls.ts).
+    const tab = text('Full Scale  ·  drag the bar to move  ·  stick pushes a window, turns an object  ·  A twice to delete', ROW_W, TAB_H, { font: 'footnote', color: C.secondary, background: C.island, padding: 20 });
     tab.position.set(0, screenH / 2 - TAB_H / 2 - 0.002, -0.0005);
     this.group.add(tab);
     const bar = plate(BAR.w, BAR.h, BAR.h / 2, 'rgba(235,235,245,0.85)', 0);
