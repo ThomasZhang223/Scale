@@ -46,7 +46,10 @@ enum ObjectMeasurer {
     normalizedTapPoint: CGPoint,
     viewSize: CGSize
   ) -> ObjectSeed? {
-    let size = viewSize.width > 0 && viewSize.height > 0 ? viewSize : UIScreen.main.bounds.size
+    // No guessed viewport: a wrong size puts the box a quarter turn from the finger. The caller
+    // turns nil into ObjectMeasureError.raycastFailed.
+    guard viewSize.width > 0, viewSize.height > 0 else { return nil }
+    let size = viewSize
     let imagePoint = normalizedTapPoint.applying(
       frame.displayTransform(for: .portrait, viewportSize: size).inverted()
     )

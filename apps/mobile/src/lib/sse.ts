@@ -59,7 +59,9 @@ function requireApiBase(): string {
       "EXPO_PUBLIC_API_BASE is not set — create apps/mobile/.env.local, see apps/mobile/README.md"
     );
   }
-  return API_BASE;
+  // Same normalisation as api.ts's requireApiBase(): this file appends /v1 itself, so a base
+  // that already ends in /v1 (or /) must not double it.
+  return API_BASE.replace(/\/+$/, "").replace(/\/v1$/, "");
 }
 
 export function subscribeRoomSync(

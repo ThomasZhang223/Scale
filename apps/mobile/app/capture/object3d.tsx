@@ -125,7 +125,9 @@ export default function CaptureObject3DScreen() {
         name: "Captured object",
         category: "unknown",
         bboxMeters: result.bboxMeters,
-        measure: { method: "lidar", confidence: 1 },
+        // ceiling: confidence 1 is exact, not estimated — bboxMeters IS this mesh's AABB
+        // (ObjectCaptureController.reconstruct, from GLBExporter.export). If a future path estimates instead, this must stop being 1.
+        measure: { method: "declared", confidence: 1 },
       });
       // The phone keeps the USDZ for its own preview and AR; the server gets the GLB.
       try {
@@ -135,10 +137,13 @@ export default function CaptureObject3DScreen() {
         // Preview and AR fall back to the measured box for this object.
       }
       const { key, putUrl } = await postJSON<{ key: string; putUrl: string }>("/uploads", {
-        kind: "objectMesh",
+        kind: "scanMesh",
         objectId: object.objectId,
       });
       await putUpload(result.glbPath, putUrl, "model/gltf-binary");
+      // ceiling: no roomId on this screen, so POST /mesh cannot emit the SSE `object` event
+      // (postObjectMesh in workers/src/routes/index.ts) and the headset is not told. Upgrade path: carry the
+      // active roomId into the capture route and pass it here. Never guess one.
       try {
         await postJSON(`/objects/${object.objectId}/mesh`, { key });
       } catch (e) {

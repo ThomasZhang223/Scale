@@ -70,6 +70,10 @@ async function request<T>(
   if (!res.ok) {
     throw new ApiError(`${path} -> HTTP ${res.status}`);
   }
+  // 204 No Content: POST /v1/push answers this (noContent() in workers/src/routes/index.ts),
+  // and res.json() on an empty body throws SyntaxError — which the Headset tab was reporting
+  // as "Failed to push" on a successful push.
+  if (res.status === 204) return undefined as T;
   const doc = (await res.json()) as T;
   if (opts.schemaLabel) {
     assertSchema(doc as { schemaVersion?: number }, opts.schemaLabel);
