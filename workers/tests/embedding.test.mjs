@@ -16,7 +16,7 @@ registerHooks({ resolve(specifier, context, next) {
 const { embedInput, indexObject } = await import("../src/lib/embedding.ts");
 const { consumeMeshJobs } = await import("../src/lib/queue.ts");
 const { GenerateMeshWorkflow } = await import("../src/workflows/generate-mesh.ts");
-const { postSearch, postGenerate, postObjectMesh, postObjectIndex, postUpload, postIngestMerchant, postSolve, postScout } = await import("../src/routes/index.ts");
+const { postSearch, postGenerate, postObjectMesh, postObjectIndex, postUpload, postIngestMerchant, postSolve, postScout, getAsset } = await import("../src/routes/index.ts");
 const { RoomAgent } = await import("../src/agents/room-agent.ts");
 const { ScoutAgent } = await import("../src/agents/scout-agent.ts");
 import { readFileSync } from "node:fs";
@@ -712,4 +712,33 @@ test("POST /v1/objects/{id}/index answers 400 bad_image_key for a foreign key", 
   await assert.rejects(postObjectIndex(new Request("https://api.example/v1/objects/object/index", {
     method: "POST", headers: { "x-upstream-token": "secret" }, body: JSON.stringify({ imageKey: "random/not/a/key.jpg" }) }),
     env, "object", "https://api.example"), error => error.status === 400 && error.code === "bad_image_key");
+});
+
+// --- F-9: the content-type follows the bytes of a catalogue photo ---------------------------------------
+
+async function assetType(key, bytes, stored) {
+  const env = { BUCKET: { get: async () => ({ body: null, httpEtag: '"e"', httpMetadata: stored ? { contentType: stored } : undefined,
+    arrayBuffer: async () => bytes.buffer }) } };
+  const response = await getAsset(env, `/v1/assets/${key}`);
+  return { type: response.headers.get("content-type"), body: new Uint8Array(await response.arrayBuffer()) };
+}
+
+test("a catalogue photo is served with the type its bytes have, not the .jpg it is named", async () => {
+  const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2]);
+  const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2]);
+  const key = "catalog/Floyd_Home/9246282842274/source.jpg";
+  const asPng = await assetType(key, png, "image/jpeg"); // the upload also stamped image/jpeg
+  assert.equal(asPng.type, "image/png");
+  assert.deepEqual(asPng.body, png);
+  assert.equal((await assetType(key, jpeg)).type, "image/jpeg");
+  assert.equal((await assetType("catalog/M/1/source.png", jpeg)).type, "image/jpeg");
+});
+
+test("unrecognised catalogue bytes and every other key keep the type they had", async () => {
+  const other = new Uint8Array([1, 2, 3, 4]);
+  assert.equal((await assetType("catalog/M/1/source.jpg", other)).type, "image/jpeg");
+  // A key that is not a catalogue photo is never sniffed: a GLB stays a GLB.
+  const glb = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
+  assert.equal((await assetType("objects/id/mesh.glb", glb)).type, "model/gltf-binary");
+  assert.equal((await assetType("objects/id/frames/0.jpg", glb)).type, "image/jpeg");
 });

@@ -6,7 +6,7 @@
 
 import { HttpError, json, noContent, readJson } from "../lib/http";
 import { contentHash, nowIso, token, uuid } from "../lib/ids";
-import { R2Keys, contentTypeFor, keyFromAssetPath } from "../lib/keys";
+import { R2Keys, contentTypeFor, isCatalogSourceKey, keyFromAssetPath, sniffImageType } from "../lib/keys";
 import { callUpstream, callUpstreamRaw, upstreamOrigin } from "../lib/config";
 import { embedInput, indexObject, type Embedding } from "../lib/embedding";
 import { enqueueMesh } from "../lib/mesh-dispatch";
@@ -233,9 +233,19 @@ export async function getAsset(env: Env, pathname: string): Promise<Response> {
   const obj = await env.BUCKET.get(key);
   if (!obj) throw new HttpError(404, "asset_not_found", `Nothing stored at ${key}.`);
 
-  return new Response(obj.body, {
+  let contentType = obj.httpMetadata?.contentType ?? contentTypeFor(key);
+  let body: BodyInit | null = obj.body;
+  if (isCatalogSourceKey(key)) {
+    // The header must match the bytes. ceiling: the photo is buffered to look at its first bytes;
+    // catalogue photos are small (embedInput refuses anything over 10 MiB).
+    const bytes = new Uint8Array(await obj.arrayBuffer());
+    contentType = sniffImageType(bytes) ?? contentType;
+    body = bytes;
+  }
+
+  return new Response(body, {
     headers: {
-      "content-type": obj.httpMetadata?.contentType ?? contentTypeFor(key),
+      "content-type": contentType,
       etag: obj.httpEtag,
       // A key is derived from an immutable id, so the bytes at a key never change. The Quest
       // reloading a room should not refetch a 4 MB mesh it already has.
