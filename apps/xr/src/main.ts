@@ -1191,7 +1191,8 @@ async function start() {
    * rule 2: nothing downstream rescales). Loaded after the manifest so the palette order is
    * stable: designer, scanned pieces, listings, my scans, furniture.
    */
-  async function loadMyScans() {
+  const knownScans = new Set<string>();
+  async function loadMyScans(announce = false) {
     let scans;
     try {
       scans = await listScans();
@@ -1199,8 +1200,10 @@ async function start() {
       console.warn('My scans unavailable:', err);
       return;
     }
-    if (!scans.length) return;
-    const items: PaletteItem[] = scans.map((o) => ({
+    const fresh = scans.filter((o) => !knownScans.has(o.objectId));
+    if (!fresh.length) return;
+    for (const o of fresh) knownScans.add(o.objectId);
+    const items: PaletteItem[] = fresh.map((o) => ({
       url: sameOrigin(o.glbUrl!),
       name: o.name || 'Captured object',
       scale: 1,
@@ -1215,7 +1218,7 @@ async function start() {
         try {
           const loaded = await loader.load(item.url, 1);
           item.size = loaded.size;
-          const expected = scans.find((o) => o.objectId === item.objectId)?.bboxMeters;
+          const expected = fresh.find((o) => o.objectId === item.objectId)?.bboxMeters;
           const mismatch = expected ? boundsMismatch(loaded.size, expected) : null;
           if (mismatch) console.warn(`${item.name}: ${mismatch}`);
         } catch (err) {
@@ -1226,10 +1229,15 @@ async function start() {
     );
     showPalette();
     renderCatalog();
+    if (announce) say(fresh.length === 1 ? `New scan from the phone: ${items[0].name}. It's on your wrist.` : `${fresh.length} new scans from the phone are on your wrist.`);
   }
 
   await loadRoom();
-  void loadManifest().then(loadMyScans);
+  // Phone captures arrive while the headset is on. Poll rather than SSE: the sync feed is
+  // per room and stubbed by default, while this list is always the live table. Ten seconds
+  // is invisible next to the minutes a capture takes.
+  void loadManifest().then(() => loadMyScans(false));
+  setInterval(() => void loadMyScans(true), 10_000);
   await loadServerObjects();
   void checkFit();
   if (VERSION_ID) {
