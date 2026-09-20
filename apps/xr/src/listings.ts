@@ -117,7 +117,7 @@ export const STOREFRONTS: readonly { merchant: string; storefront: string }[] = 
   { merchant: 'Sabai Design', storefront: 'https://sabai.design/' },
 ];
 
-const IMPERATIVE = /^\s*(?:(?:please|can you|could you)\s+)?(?:find|show|get|recommend|suggest|search(?: for)?|look for|buy|shop for)\s+(?:me\s+)?(?:a|an|some|the)?\s*/i;
+const IMPERATIVE = /^\s*(?:(?:please|can you|could you)\s+)?(?:find|show|get|recommend|suggest|search(?: for)?|look for|buy|shop for)\s+(?:me\s+)?(?:(?:a|an|some|the)\b)?\s*/i;
 const LENGTH_PHRASE = /\b(?:under|below|less than|no more than|up to|max(?:imum)?|at most|no (?:wider|deeper|taller) than)?\s*\d+(?:\.\d+)?\s*(?:cm|centimet\w*|m|metres?|meters?|mm|millimet\w*|in|inch\w*|"|ft|feet|foot|')\s*(?:wide|deep|tall|high|long)?\b/gi;
 const GAP_PHRASE = /\b(?:for|in|into)\s+the\s+gap\b/gi;
 

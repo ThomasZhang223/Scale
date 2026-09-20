@@ -91,6 +91,8 @@ test('productQuery strips the imperative and the length phrases, keeping the pro
   assert.equal(productQuery('Find a red chair for the 80 cm gap beside my desk'), 'red chair beside my desk');
   assert.equal(productQuery('recommend some floor lamps'), 'floor lamps');
   assert.equal(productQuery('lamp'), 'lamp');
+  assert.equal(productQuery('show me something 1 m wide'), 'something');
+  assert.equal(productQuery('find another lamp'), 'another lamp');
 });
 
 test('findLive posts one /find per storefront in parallel, reports stages, and merges listings', async () => {
