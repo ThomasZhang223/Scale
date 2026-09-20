@@ -606,7 +606,9 @@ async function queryEmbedding(env: Env, body: SearchBody): Promise<Embedding | n
 }
 
 async function d1Search(env: Env, body: SearchBody, limit: number, origin: string) {
-  const where: string[] = ["state IN ('measured','ready')"];
+  // Same filter as listObjects (store.ts), so the phone's fallback path returns the same rows as
+  // its primary one.
+  const where: string[] = ["state != 'failed'"];
   const binds: (string | number)[] = [];
 
   if (body.text) {
