@@ -7,7 +7,7 @@ registerHooks({ resolve(specifier, context, next) {
   const stubs = {
     "cloudflare:workers": "export class WorkflowEntrypoint { constructor(_ctx, env) { this.env = env; } }",
     "cloudflare:workflows": "export class NonRetryableError extends Error {}",
-    "agents": "export function getAgentByName() { throw Error('Agent outside test scope'); }",
+    "agents": "export function getAgentByName(namespace) { return namespace.stub; }",
   };
   if (stubs[specifier]) return { url: `data:text/javascript,${encodeURIComponent(stubs[specifier])}`, shortCircuit: true };
   if (specifier.startsWith(".") && !/\.[a-z]+$/.test(specifier)) specifier += ".ts";
@@ -123,12 +123,12 @@ function pipelineEnvironment() {
   return { env, row, writes };
 }
 
-test("mesh workflow indexes a catalog image before marking D1 ready", async t => {
+test("mesh workflow publishes D1 ready before indexing a catalog image", async t => {
   const { env, writes } = pipelineEnvironment();
   env.BASETEN_URL = "https://gpu.example/predict";
   const indexed = [];
   env.OBJECTS_INDEX = { upsert: async vectors => {
-    assert.equal(writes.some(w => w.sql.includes("state = 'ready'")), false);
+    assert.equal(writes.some(w => w.sql.includes("state = 'ready'")), true);
     indexed.push(...vectors);
     return { mutationId: "async-index-write" };
   } };
@@ -215,7 +215,7 @@ test("large inline GLB is saved before checkpointing, and an encoder outage keep
     },
   });
   assert.equal(result.glbKey, "objects/object/mesh.glb");
-  assert.ok(writes.some(w => w.sql.includes("UPDATE jobs") && w.args[0] === "done" && w.args[2].includes("embedding failed")));
+  assert.ok(writes.some(w => w.sql.includes("UPDATE jobs") && w.args[0] === "done" && w.args[2]?.includes("embedding failed")));
 });
 
 test("raw SF3D responses fail explicitly and cannot mark an object ready", async t => {
@@ -223,5 +223,53 @@ test("raw SF3D responses fail explicitly and cannot mark an object ready", async
   t.mock.method(globalThis, "fetch", async () => Response.json({ kind: "raw_sf3d_unscaled", glb_base64: "invalid" }));
   await assert.rejects(new GenerateMeshWorkflow({}, env).run({ payload: { jobId: "job", objectId: "object", tier: "live", apiOrigin: "https://api.example", roomId: null } },
     { do: async (...args) => args.at(-1)() }), /raw SF3D/);
+  assert.equal(writes.some(w => w.sql.includes("state = 'ready'")), false);
+});
+
+
+test("stored mesh and ready notification are visible while indexing is blocked", async t => {
+  const { env, writes } = pipelineEnvironment();
+  env.BASETEN_URL = "https://gpu.example/predict";
+  let release, enter, notified = false, validated = false;
+  const blocked = new Promise(resolve => { release = resolve; });
+  const entered = new Promise(resolve => { enter = resolve; });
+  const get = env.BUCKET.get;
+  env.BUCKET.get = async key => {
+    const result = await get(key);
+    if (key.endsWith("mesh.glb")) validated = true;
+    return result;
+  };
+  env.ROOM_AGENT = { stub: { fetch: async () => {
+    assert.equal(validated, true);
+    assert.ok(writes.some(w => w.sql.includes("state = 'ready'")));
+    notified = true; return Response.json({ delivered: 1 });
+  } } };
+  t.mock.method(globalThis, "fetch", async url => {
+    if (url === env.BASETEN_URL) return Response.json({ glbKey: "objects/object/mesh.glb" });
+    enter(); await blocked;
+    throw Error("encoder outage");
+  });
+  const run = new GenerateMeshWorkflow({}, env).run({ payload: {
+    jobId: "job", objectId: "object", tier: "live", apiOrigin: "https://api.example", roomId: "room",
+  } }, { do: async (...args) => args.at(-1)() });
+  await entered;
+  assert.equal(notified, true);
+  assert.ok(writes.some(w => w.sql.includes("UPDATE jobs") && w.args[0] === "done"));
+  release(); await run;
+  assert.equal(writes.some(w => w.sql.includes("state = 'failed'")), false);
+});
+
+test("missing stored GLB cannot publish ready or start indexing", async t => {
+  const { env, writes } = pipelineEnvironment();
+  env.BASETEN_URL = "https://gpu.example/predict";
+  env.BUCKET.get = async () => null;
+  let calls = 0;
+  t.mock.method(globalThis, "fetch", async () => {
+    calls++; return Response.json({ glbKey: "objects/object/mesh.glb" });
+  });
+  await assert.rejects(new GenerateMeshWorkflow({}, env).run({ payload: {
+    jobId: "job", objectId: "object", tier: "live", apiOrigin: "https://api.example", roomId: null,
+  } }, { do: async (...args) => args.at(-1)() }), /nothing is stored/);
+  assert.equal(calls, 1);
   assert.equal(writes.some(w => w.sql.includes("state = 'ready'")), false);
 });

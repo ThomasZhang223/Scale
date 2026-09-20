@@ -228,8 +228,23 @@ export class GenerateMeshWorkflow extends WorkflowEntrypoint<Env, GenerateMeshPa
         return key;
       });
 
+      await step.do("finalize", async () => {
+        await markObjectReady(this.env, p.objectId, {
+          glbKey,
+          caption: generated.caption ?? null,
+          palette: generated.palette ?? null,
+        });
+        await advanceJob(this.env, p.jobId, "done", 100, null, nowIso());
+
+        // The perceived-latency contract closes here: the phone has been showing a measured
+        // box with real numbers since second one, and this is the event that swaps in the mesh.
+        if (p.roomId) {
+          await emitToRoom(this.env, p.roomId, "object", await getObject(this.env, p.objectId, p.apiOrigin));
+        }
+        return { ok: true };
+      });
+
       const indexing = await step.do("index-embedding", { retries: { limit: 2, delay: "5 seconds" }, timeout: "45 seconds" }, async (): Promise<{ indexed: boolean; error: string | null }> => {
-        await advanceJob(this.env, p.jobId, "running", 85, null, nowIso());
         const embedding = await embedInput(this.env, { imageKey: meta.frameKeys[0] });
         await this.env.OBJECTS_INDEX.upsert([
           {
@@ -252,21 +267,12 @@ export class GenerateMeshWorkflow extends WorkflowEntrypoint<Env, GenerateMeshPa
         return { indexed: true, error: null };
       }).catch((error: unknown) => ({ indexed: false, error: `Mesh saved; embedding failed: ${String(error).slice(0, 300)}` }));
 
-      await step.do("finalize", async () => {
-        await markObjectReady(this.env, p.objectId, {
-          glbKey,
-          caption: generated.caption ?? null,
-          palette: generated.palette ?? null,
-        });
-        await advanceJob(this.env, p.jobId, "done", 100, indexing.error, nowIso());
-
-        // The perceived-latency contract closes here: the phone has been showing a measured
-        // box with real numbers since second one, and this is the event that swaps in the mesh.
-        if (p.roomId) {
-          await emitToRoom(this.env, p.roomId, "object", await getObject(this.env, p.objectId, p.apiOrigin));
-        }
-        return { ok: true };
-      });
+      if (indexing.error) {
+        await step.do("record-index-warning", async () => {
+          await advanceJob(this.env, p.jobId, "done", 100, indexing.error, nowIso());
+          return { ok: true };
+        }).catch(() => {});
+      }
 
       return { objectId: p.objectId, glbKey };
     } catch (err) {
