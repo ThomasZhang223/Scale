@@ -38,6 +38,7 @@ import {
 import { SCHEMA_VERSION } from "../lib/contracts";
 import { assertFindBody, runFind, type FindResult } from "../lib/find";
 import { failedFindResult, readyOnly, restrictFindToReady } from "../lib/find-ready";
+export { postIntent } from "../lib/intent";
 import { enqueueCatalogItem, normalizeCatalogItem } from "../lib/catalog-ingest";
 import type {
   FitReportV1,
