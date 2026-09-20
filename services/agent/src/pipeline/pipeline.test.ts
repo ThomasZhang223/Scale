@@ -205,3 +205,44 @@ test('planner offline: the preset falls back to the built-in plan and says so', 
   assert.ok(d.entries.some((e) => /Planner offline: using the built-in plan for 'Clear the door'/.test(e.message)));
   assert.equal(proposal.summary, 'Clear the door');
 });
+
+/* From live transcripts (2026-09-19): three ways a request ended with nothing moving. */
+
+test('against_wall with a window or door reference resolves to that opening\'s wall side', () => {
+  const state = sampleState();
+  const geo = readRoom(state.room);
+  const cleaned = cleanState(state, geo, [], 'bed by the window');
+  const facts = roomFacts({ state, geo, pins: [], preferences: [], request: 'bed by the window', movable: cleaned.objects });
+  const win = facts.room.windows[0];
+  const door = facts.room.doors[0];
+  const plan: Plan = {
+    summary: 'sofa against the window wall, chair against the door wall',
+    rules: [
+      { id: 'r1', type: 'against_wall', a: 'obj_sofa', wall: `window:${win.id}`, priority: 'must' },
+      { id: 'r2', type: 'against_wall', a: 'obj_chair', wall: `door:${door.id}`, priority: 'should', weight: 5 },
+    ],
+  };
+  assert.deepEqual(validatePlan(plan, facts), []);
+  const rules = resolvePlan(plan, facts, geo, 60);
+  assert.equal(rules[0].wall, win.wall);
+  assert.equal(rules[1].wall, door.wall);
+  assert.notEqual(rules[0].wall, `window:${win.id}`);
+});
+
+test('a plan that pins the object it also moves is rejected with a precise error', () => {
+  const state = sampleState();
+  const geo = readRoom(state.room);
+  const cleaned = cleanState(state, geo, [], 'bed near the window');
+  const facts = roomFacts({ state, geo, pins: [], preferences: [], request: 'sofa near the window', movable: cleaned.objects });
+  const win = facts.room.windows[0];
+  const plan: Plan = {
+    summary: 'sofa stays, near the window',
+    rules: [
+      { id: 'r1', type: 'pin', a: 'obj_sofa', priority: 'must' },
+      { id: 'r2', type: 'near', a: 'obj_sofa', b: `window:${win.id}`, maxCm: 100, priority: 'should', weight: 5 },
+    ],
+  };
+  const errors = validatePlan(plan, facts);
+  assert.equal(errors.length, 1);
+  assert.match(errors[0], /r2: obj_sofa is pinned by another rule/);
+});
