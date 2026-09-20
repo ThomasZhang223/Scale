@@ -20,7 +20,7 @@ import { Palette, type PaletteItem } from './palette';
 import { matchDetected } from './placement';
 import { measuredBox } from './objects';
 import { Voice, type VoiceState } from './voice';
-import { findListings, needFromDetected, needFromText, isShoppingRequest, productQuery, STOREFRONTS, type Listing, type ListingsResult, type Need, type StageInfo } from './listings';
+import { findListings, needFromDetected, needFromText, classifyUtterance, productQuery, STOREFRONTS, type Listing, type ListingsResult, type Need, type Recommendation, type StageInfo } from './listings';
 import { FindPanel } from './findpanel';
 import { Outdoors } from './outdoors';
 import roomH from '../../../fixtures/room-h.json';
@@ -60,6 +60,15 @@ const OBJECT_IDS = params.get('object')?.split(',').filter(Boolean) ?? [];
 // How many of the newest phone scans to bring into the room on load (?scans=N; 0 turns it off).
 // The scan list is shared by the whole team, so "all of them" would fill the room with test rows.
 const RECENT_SCANS = Number(params.get('scans') ?? 6);
+/**
+ * A voice request puts its top result in the room by itself. A person who says "find me a lamp"
+ * to a headset expects a lamp to appear, not a list to read.
+ *
+ * ceiling: always on, and only for voice — a typed search and a hand pick are untouched. Set
+ * this to false to make every voice result list-only; that is the switch the popout redesign
+ * flips if it would rather the user chose.
+ */
+const VOICE_AUTO_ADD_TOP = true;
 const VERSION_ID = params.get('version'); // a stored layout to apply after the room loads
 const AGENT_STUB = params.get('agentstub') === '1' || import.meta.env.VITE_AGENT_STUB === '1'; // the agent's fixture timeline
 
@@ -358,7 +367,7 @@ async function start() {
   }
 
   /** Runs a search, keeps the result, and redraws both surfaces. Live first, bundled with a note. */
-  async function findFor(need: Need) {
+  async function findFor(need: Need, opts: { autoAdd?: boolean } = {}) {
     listingsNeed = need;
     listingsBusy = true;
     stageLines = [];
@@ -378,10 +387,11 @@ async function start() {
     } finally {
       listingsBusy = false;
     }
-    findPanel.showResults(listings.recommendations, listings.note);
-    showPalette();
-    renderListings();
+    presentResults({ mode: 'shop', query, rows: listings.recommendations, note: listings.note });
     const top = listings.recommendations[0];
+    // Asked by voice, so something has to appear: the top row goes in through the same pick a
+    // hand would make. Placement, generation and dedupe stay entirely that code's business.
+    if (opts.autoAdd && top) void pickListing(top.listing.objectId);
     const what = need.replaces ? `for the ${need.replaces.category}` : need.text ? `for "${need.text}"` : '';
     // The card: one short line per listing, nothing else. The voice reads each one out.
     const shown = listings.recommendations.slice(0, 6);
@@ -996,13 +1006,108 @@ async function start() {
     if (text) void routeRequest(text);
   });
 
-  /** A sentence from the keyboard or the microphone: shopping goes to listings, everything else to the designer. */
+  /**
+   * A sentence from the keyboard or the microphone, routed to one of three handlers by one pure
+   * function (listings.ts `classifyUtterance`), never by a model.
+   *
+   *   mine    the user's own phone scans
+   *   shop    the merchants, through /v1/find
+   *   design  the layout agent, unchanged
+   *
+   * Until 2026-09-20 only the shop test existed, and it tested a narrower verb list than
+   * productQuery could parse, so ordinary speech ("show me some lamps") fell through here to the
+   * agent — which is why voice appeared to do nothing but rearrange.
+   */
   function routeRequest(text: string) {
-    if (isShoppingRequest(text)) {
+    const intent = classifyUtterance(text);
+    if (intent.kind === 'mine') return findMine(text, intent);
+    if (intent.kind === 'shop') {
       listingText.value = text;
-      return findFor(needFromText(text));
+      return findFor(needFromText(text), { autoAdd: VOICE_AUTO_ADD_TOP });
     }
     return askAgent({ text });
+  }
+
+  /**
+   * Intent (a): the user's own captures. Answers from the scan library, never from a merchant,
+   * and never falls through to the agent — a person who asked for their own thing is not asking
+   * for the room to be rearranged. `source:"scan"` only: no catalogue row and no primitive can
+   * reach this list.
+   *
+   * What it will and will not add is deliberate. Every scan row on the server today is called
+   * "Captured object" with category "unknown", so a noun in the sentence has nothing to match
+   * against and picking one anyway would be a guess (standing rule 4). So: a sentence that names
+   * the newest adds the newest, a library of exactly one adds that one, and anything else is
+   * listed for a hand to choose from.
+   */
+  async function findMine(text: string, intent: ReturnType<typeof classifyUtterance>) {
+    listingsNeed = null;
+    listingsBusy = true;
+    showPalette();
+    let scans: ObjectV1[];
+    try {
+      scans = await listScans();
+    } catch (err) {
+      return sayAloud(`Couldn't reach your scans: ${(err as Error).message}`);
+    } finally {
+      listingsBusy = false;
+    }
+
+    if (!scans.length) {
+      // Nothing to show and nothing to guess. Never hand this to the agent.
+      presentResults({ mode: 'scans', query: text, rows: [], note: 'No finished scans yet.' });
+      return sayAloud('You have no finished scans yet. Capture something on the phone first.');
+    }
+
+    // ceiling: matches on the name and category the phone sent. Those are "Captured object" and
+    // "unknown" for every row today, so this finds nothing and the count rules below decide
+    // instead. It starts working by itself the day the phone names a capture — the real fix is
+    // upstream, on the phone's Save screen, or a caption written at index time.
+    const need = needFromText(text);
+    const named = need.categoryWords
+      ? scans.filter((o) => need.categoryWords!.some((w) => `${o.name ?? ''} ${o.category ?? ''}`.toLowerCase().includes(w)))
+      : [];
+    const shown = named.length ? named : scans;
+
+    presentResults({
+      mode: 'scans',
+      query: text,
+      rows: shown.map((o) => ({ listing: o as Listing, score: 0, reasons: ['scanned on your phone'] })),
+      note: null,
+    });
+
+    const one = named.length === 1 ? named[0]
+      : intent.newest ? shown[0]
+      : shown.length === 1 ? shown[0]
+      : null;
+    if (intent.listOnly || !one) {
+      const what = named.length ? `${named.length} that match` : `${scans.length} scan${scans.length === 1 ? '' : 's'}`;
+      return sayAloud(`You have ${what}. Pick one to place it.`);
+    }
+    if ([...objects.values()].some((o) => o.objectId === one.objectId)) {
+      return sayAloud(`${one.name || 'That scan'} is already in the room.`);
+    }
+    if (!VOICE_AUTO_ADD_TOP) return sayAloud(`${one.name || 'Your scan'} is in the list. Pick it to place it.`);
+    await addServerObject(one); // the scan library's own add path: it places, dedupes and reports
+    return sayAloud(`Placed ${one.name || 'your scan'} at its measured size.`);
+  }
+
+  /**
+   * The one seam between intent and presentation. This file decides WHICH rows; the panel decides
+   * how they look. Today it drives the existing FindPanel, so nothing regresses before the popout
+   * lands. `mode` says which library the rows came from: merchants, or the user's own scans.
+   */
+  function presentResults(res: { mode: 'shop' | 'scans'; query: string; rows: Recommendation[]; note: string | null }) {
+    listings = { recommendations: res.rows, source: 'live', note: res.note };
+    findPanel.showResults(res.rows, res.note);
+    showPalette();
+    renderListings();
+  }
+
+  /** Spoken only, and only when the request was spoken. No on-screen text: the panel is the UI. */
+  function sayAloud(line: string) {
+    if (lastHeard) speak(concise(line));
+    else console.info(line);
   }
   agentText.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') document.getElementById('agent-ask')!.click();
