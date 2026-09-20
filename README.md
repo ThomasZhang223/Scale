@@ -176,8 +176,15 @@ pipeline; `services/search`'s ranking service; and the phone's voice loop
 
 ## Credits and licences
 
-The built-in furniture library uses 3D models from [Poly Haven](https://polyhaven.com), each
-published under **CC0 1.0** (public domain — no attribution required, credited anyway). Per-model
-credits are in `fixtures/library-models.ATTRIBUTION.md`.
+The built-in furniture library (100 models) is mostly [Poly Haven](https://polyhaven.com) — 99
+models, each published under **CC0 1.0** (public domain — no attribution required, credited
+anyway) — plus one model under a licence that does require attribution:
+
+- **Arc floor lamp** — [LightsPunctualLamp](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/LightsPunctualLamp),
+  Khronos glTF-Sample-Assets. © 2021, DGG. Author: Teresa González Viegas. Licence:
+  [CC-BY-4.0](https://creativecommons.org/licenses/by/4.0/legalcode). Changes made: repacked to a
+  single GLB with 1k textures; geometry unchanged, never rescaled.
+
+`fixtures/library-models.ATTRIBUTION.md` is the authoritative per-model list.
 
 The full design doc and its reasoning are in `BUILD_DOC.md`.
