@@ -55,6 +55,11 @@ const WINDOW_DROP = 0.2;         // metres below eye level (window centre)
 const BAR = { w: 0.14, h: 0.012, gap: 0.014 }; // the drag bar under the window, Quest-style
 const GAP_X = 0.006;
 const ROW_H = 0.037;
+// An object cell is more than twice a row, because it carries a picture of the thing itself.
+// Every finished phone scan is called "Captured object", so the picture is the only way to
+// tell two of them apart — it gets the top two thirds of the cell and the words get the rest.
+const CELL_H = 0.096;
+const CELL_THUMB = 0.052;
 const HEADER_H = 0.022;
 const GROUP_GAP = 0.012;
 const MARGIN = 0.012;
@@ -70,7 +75,7 @@ const PAGE_TAB_GAP = 0.004;
 // A one-tile page would otherwise draw a window a few centimetres tall, which reads as broken
 // rather than as empty. ceiling: a page taller than the eye box is not split into sub-pages
 // yet; the upgrade is to slice `slots` at this height and add a "‹ 1 of 3 ›" footer row.
-const MIN_CONTENT_H = 0.12;
+const MIN_CONTENT_H = 0.10;
 const PAGE_KEY = 'fullscale.tablet.page'; // the page this session was last left on
 const ROW_W = COLS * COL_W + (COLS - 1) * GAP_X;
 const SCREEN_W = ROW_W + 2 * MARGIN;
@@ -79,6 +84,9 @@ const RADIUS_SCREEN = 0.014;
 const RADIUS_FRAME = RADIUS_SCREEN + BEZEL;
 const LABEL_LINE_H = 0.0145; // one wrapped footnote line; a label row grows by this per extra line
 const LABEL_PAD = 64; // canvas px, the leading text inset of a row
+// Canvas px a line of each font occupies, used to stack an object cell's two lines.
+const BODY_LINE = 17 * 3.4;
+const FOOTNOTE_LINE = 13 * 3.4;
 
 interface Slot {
   item: PaletteItem;
@@ -111,6 +119,13 @@ export class Palette {
   private hovered: THREE.Mesh | null = null;
   private items: PaletteItem[] = [];
   private page: string | null = null;
+  /**
+   * Where an object cell's picture comes from. The palette pulls, rather than being handed a
+   * picture per item, so only the cells on the page you are looking at ever ask for one —
+   * which is what keeps the thumbnail work off every other page by construction. null while
+   * the mesh is still loading, and the cell draws a placeholder.
+   */
+  thumbFor: ((item: PaletteItem) => CanvasImageSource | null) | null = null;
 
   constructor() {
     this.group.name = 'palette';
@@ -218,7 +233,7 @@ export class Palette {
       }
       const tile = new THREE.Mesh(
         new THREE.PlaneGeometry(s.w, s.h),
-        new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, transparent: true, map: draw(s) }),
+        new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, transparent: true, map: draw(s, this.thumbFor?.(s.item) ?? null) }),
       );
       tile.position.set(s.x, top - s.y, 0);
       tile.userData.item = s.item;
@@ -314,11 +329,11 @@ function layout(items: PaletteItem[], pageName?: string | null): Slot[] {
       for (let k = i; k < i + COLS && !groupEnd(k) && isObject(items[k]); k++) row.push(items[k]);
       row.forEach((p, col) => {
         slots.push({
-          item: p, x: (col - (COLS - 1) / 2) * (COL_W + GAP_X), y: y + ROW_H / 2, w: COL_W, h: ROW_H,
+          item: p, x: (col - (COLS - 1) / 2) * (COL_W + GAP_X), y: y + CELL_H / 2, w: COL_W, h: CELL_H,
           corners: [true, true, true, true], separator: false, header: col === 0 ? header : undefined,
         });
       });
-      y += ROW_H + GAP_X;
+      y += CELL_H + GAP_X;
       i += row.length;
       continue;
     }
@@ -407,7 +422,7 @@ function text(str: string, w: number, h: number, o: { font: Font; color: string;
 }
 
 /** One row or widget cell, iOS-style. */
-function draw(s: Slot): THREE.Texture | null {
+function draw(s: Slot, thumb: CanvasImageSource | null): THREE.Texture | null {
   const c = canvasFor(s.w, s.h);
   if (!c) return null;
   const { canvas, ctx } = c;
@@ -446,19 +461,42 @@ function draw(s: Slot): THREE.Texture | null {
       ctx.fillText(fitText(ctx, it.name, W - 2 * pad - 40), pad, H / 2 + 4);
     }
   } else {
-    // Furniture cell: name, size in the footnote, a trailing chevron.
+    // Object cell: the thing itself on top, then its name and its size in metres. The
+    // picture is what tells two captures apart, so it gets the room.
+    const inset = pad * 0.5;
+    const band = CELL_THUMB * PX;
+    // A lighter plate under the picture. The render is transparent, and a dark scan on the
+    // cell's own near-black would disappear.
+    ctx.fillStyle = C.frame;
+    ctx.beginPath();
+    ctx.roundRect(inset, inset, W - 2 * inset, band, RADIUS_CELL * PX);
+    ctx.fill();
+    if (thumb) {
+      // "Contain", never "cover": a mesh framed to its own bounding box must not be cropped,
+      // or a tall lamp and a wide table start to look alike.
+      const sw = Number((thumb as { width: number }).width) || band;
+      const sh = Number((thumb as { height: number }).height) || band;
+      const k = Math.min((W - 2 * inset) / sw, band / sh);
+      ctx.drawImage(thumb, (W - sw * k) / 2, inset + (band - sh * k) / 2, sw * k, sh * k);
+    }
+    // No else: with no mesh yet, or none at all, the bare plate is the placeholder. A tile
+    // never borrows another object's picture to look finished.
+    // Two baselines measured from the line heights, not from fractions of the cell: the name
+    // is a body line and the size a footnote, and at these sizes a fraction puts one on top
+    // of the other.
+    const nameY = inset + band + 0.5 * BODY_LINE + 6;
+    const sizeY = nameY + 0.5 * BODY_LINE + 0.5 * FOOTNOTE_LINE;
     ctx.font = FONT.body;
     ctx.fillStyle = C.label;
-    const nameY = it.size ? H * 0.36 : H / 2;
-    ctx.fillText(fitText(ctx, it.name, W - 2 * pad - 30), pad * 0.6, nameY + 4);
+    ctx.fillText(fitText(ctx, it.name, W - 2 * inset - 30), inset, nameY);
     if (it.size) {
       ctx.font = FONT.footnote;
       ctx.fillStyle = C.secondary;
-      ctx.fillText(`${it.size.x.toFixed(2)} × ${it.size.y.toFixed(2)} × ${it.size.z.toFixed(2)} m`, pad * 0.6, H * 0.72 + 4);
+      ctx.fillText(`${it.size.x.toFixed(2)} × ${it.size.y.toFixed(2)} × ${it.size.z.toFixed(2)} m`, inset, sizeY);
     }
     ctx.font = FONT.headline;
     ctx.fillStyle = C.tertiary;
-    ctx.fillText('›', W - pad * 0.75, H / 2 + 4);
+    ctx.fillText('›', W - pad * 0.75, nameY);
   }
   return texture(canvas);
 }

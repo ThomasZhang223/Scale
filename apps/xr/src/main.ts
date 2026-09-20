@@ -16,6 +16,7 @@ import { ProposalApplier } from './apply';
 import { Ghosts, type GhostTarget } from './ghosts';
 import offlineProposal from '../../../services/agent/fixtures/pipeline/proposal.json';
 import { Palette, type PaletteItem } from './palette';
+import { Thumbnails } from './thumbs';
 import { matchDetected } from './placement';
 import { measuredBox } from './objects';
 import { Voice, type VoiceState } from './voice';
@@ -227,6 +228,10 @@ async function start() {
   const physics = await createPhysics(scene);
   const loader = new ObjectLoader(renderer);
   const palette = new Palette();
+  // A tile's picture of the mesh it stands for. The palette pulls one per visible object
+  // cell; thumbs.ts draws each mesh once, off to the side, and hands back a canvas.
+  const thumbs = new Thumbnails(loader, () => showPalette());
+  palette.thumbFor = (item) => (item.url ? thumbs.get(item.objectId ?? item.url, item.url, item.scale) : null);
   const applier = new ProposalApplier(physics);
   // Built before the first showPalette(): the talk row reads voice.supported.
   const voice = new Voice({
@@ -1662,6 +1667,7 @@ async function start() {
     interaction.update(dt);
     applier.update(dt);
     physics.step(dt);
+    thumbs.update(); // at most one tile picture drawn per frame, and only for the page on screen
     findPanel.place(renderer.xr.isPresenting ? renderer.xr.getCamera() : camera);
     if (!renderer.xr.isPresenting) controls.update();
     renderer.render(scene, camera);
