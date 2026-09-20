@@ -11,6 +11,7 @@
     "test:embedding": "node --experimental-transform-types --test tests/embedding.test.mjs",
     "test:solve": "node --experimental-transform-types --test tests/solve-translate.test.mjs",
     "test:find": "node --experimental-transform-types --test tests/find.test.mjs",
+    "test:intent": "node --experimental-transform-types --test tests/intent.test.mjs",
     "test:scan-thumb": "node --experimental-transform-types --test tests/scan-thumb.test.mjs",
     "types": "wrangler types",
     "dev": "wrangler dev",
