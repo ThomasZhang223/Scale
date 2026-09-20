@@ -1,0 +1,395 @@
+[
+  {
+    "title": "Wallowa Floral Sheet Set",
+    "handle": "wallowa-floral-sheet-set",
+    "product_type": "Sheeting",
+    "images": [
+      "https://cdn.shopify.com/s/files/1/0766/2187/3304/files/SH125526-CE_001.jpg?v=1789564722",
+      "https://cdn.shopify.com/s/files/1/0766/2187/3304/files/SH_Lifestyle_0161_e1f5b8f9-ebaf-4aed-8218-1e47d52083d0.jpg?v=1789564723",
+      "https://cdn.shopify.com/s/files/1/0766/2187/3304/files/SH_Lifestyle_0075_5b184739-5e2a-478e-8975-e89f0da4eb9e.jpg?v=1789564722"
+    ],
+    "tags": [
+      "bed-bath"
+    ],
+    "body_html": "Inspired by wildflower strolls through Oregon\u2019s Wallowa Mountains, the Wallowa Floral Sheet Set is a quaint pattern with endless mix-and-match potential. Beautiful yet subtle, these sweet patterned sheets will add an air of elegance to any space, from a children\u2019s bed to the guest room. Printed on 100% cotton percale for a clean look and soft, lived-in feel. Made in Portugal.",
+    "variants": [
+      {
+        "title": "Wallowa Chamomile / Full"
+      },
+      {
+        "title": "Wallowa Multicolor / Full"
+      },
+      {
+        "title": "Wallowa Chamomile / King"
+      },
+      {
+        "title": "Wallowa Multicolor / King"
+      },
+      {
+        "title": "Wallowa Chamomile / Queen"
+      },
+      {
+        "title": "Wallowa Multicolor / Queen"
+      },
+      {
+        "title": "Wallowa Chamomile / Twin"
+      },
+      {
+        "title": "Wallowa Multicolor / Twin"
+      }
+    ],
+    "options": [
+      {
+        "name": "Color",
+        "position": 1,
+        "values": [
+          "Wallowa Chamomile",
+          "Wallowa Multicolor"
+        ]
+      },
+      {
+        "name": "Size",
+        "position": 2,
+        "values": [
+          "Full",
+          "King",
+          "Queen",
+          "Twin"
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Shelburne Coverlet",
+    "handle": "shelburne-coverlet",
+    "product_type": "Coverlet",
+    "images": [
+      "https://cdn.shopify.com/s/files/1/0766/2187/3304/files/SH125515-RDBL_001.jpg?v=1789564720",
+      "https://cdn.shopify.com/s/files/1/0766/2187/3304/files/SH_Lifestyle_0035.jpg?v=1789564720",
+      "https://cdn.shopify.com/s/files/1/0766/2187/3304/files/SH_Lifestyle_0468_7462141f-6914-4b5e-8211-ed4d87f712cd.jpg?v=1789564720"
+    ],
+    "tags": [
+      "bed-bath"
+    ],
+    "body_html": "Lovingly named after a quaint East Coast town where this particular weaving style was born, the Shelburne Cotton Coverlet\u2019s distinct design blends and layers color to create a unique, geometric pattern while double-woven cotton grants a soft yet substantial texture allowing for easy reversibility. Ideal for adding character to your space, this early American weaving-inspired coverlet makes for an excellent addition to your home no matter the season.",
+    "variants": [
+      {
+        "title": "Persimmon w/ BLUE / Full/Queen"
+      },
+      {
+        "title": "Persimmon w/ BLUE / King"
+      },
+      {
+        "title": "Persimmon w/ BLUE / Twin"
+      }
+    ],
+    "options": [
+      {
+        "name": "Color",
+        "position": 1,
+        "values": [
+          "Persimmon w/ BLUE"
+        ]
+      },
+      {
+        "name": "Size",
+        "position": 2,
+        "values": [
+          "Full/Queen",
+          "King",
+          "Twin"
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Albright Sham",
+    "handle": "albright-sham",
+    "product_type": "Sham",
+    "images": [
+      "https://cdn.shopify.com/s/files/1/0766/2187/3304/files/SH148131-BL_001.jpg?v=1789564454",
+      "https://cdn.shopify.com/s/files/1/0766/2187/3304/files/SH148133-BL_003.jpg?v=1789564455",
+      "https://cdn.shopify.com/s/files/1/0766/2187/3304/files/SH148132-BL_001.jpg?v=1789564454"
+    ],
+    "tags": [
+      "bed-bath"
+    ],
+    "body_html": "A nod to timeless patterns with a scholarly twist. Inspired by the Albright Residence Hall at Smith College in Massachusetts, this pieced quilt blends academic charm with artful craftsmanship. Referencing classic menswear and vintage tie motifs, the design combines small-scale patterns with a composition informed by Parisian tilework. Crafted in India with hand screen-printed fabrics, authentic hand stitching, and 100% cotton batting, each quilt is thoughtfully pieced together for heirloom quality. Preppy yet refined, it\u2019s made to layer beautifully and last for generations.",
+    "variants": [
+      {
+        "title": "Blue / Euro"
+      },
+      {
+        "title": "Blue / King"
+      },
+      {
+        "title": "Blue / Standard"
+      }
+    ],
+    "options": [
+      {
+        "name": "Color",
+        "position": 1,
+        "values": [
+          "Blue"
+        ]
+      },
+      {
+        "name": "Size",
+        "position": 2,
+        "values": [
+          "Euro",
+          "King",
+          "Standard"
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Albright Quilt",
+    "handle": "albright-quilt",
+    "product_type": "Quilt",
+    "images": [
+      "https://cdn.shopify.com/s/files/1/0766/2187/3304/files/SH148128-BL_001.jpg?v=1789564452",
+      "https://cdn.shopify.com/s/files/1/0766/2187/3304/files/SH_Lifestyle_0229_eed4a770-8a6b-4784-97e5-e89acdd57883.jpg?v=1789564451",
+      "https://cdn.shopify.com/s/files/1/0766/2187/3304/files/SH_Lifestyle_0275_e240811b-1c2e-4df7-a271-89cb6e1ed102.jpg?v=1789564451"
+    ],
+    "tags": [
+      "bed-bath"
+    ],
+    "body_html": "A nod to timeless patterns with a scholarly twist. Inspired by the Albright Residence Hall at Smith College in Massachusetts, this pieced quilt blends academic charm with artful craftsmanship. Referencing classic menswear and vintage tie motifs, the design combines small-scale patterns with a composition informed by Parisian tilework. Crafted in India with hand screen-printed fabrics, authentic hand stitching, and 100% cotton batting, each quilt is thoughtfully pieced together for heirloom quality. Preppy yet refined, it\u2019s made to layer beautifully and last for generations.",
+    "variants": [
+      {
+        "title": "Blue / Full/Queen"
+      },
+      {
+        "title": "Blue / King"
+      },
+      {
+        "title": "Blue / Twin"
+      }
+    ],
+    "options": [
+      {
+        "name": "Color",
+        "position": 1,
+        "values": [
+          "Blue"
+        ]
+      },
+      {
+        "name": "Size",
+        "position": 2,
+        "values": [
+          "Full/Queen",
+          "King",
+          "Twin"
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Modern Rooftops Quilt",
+    "handle": "modern-rooftops-quilt",
+    "product_type": "Quilt",
+    "images": [
+      "https://cdn.shopify.com/s/files/1/0766/2187/3304/files/SH147874-MULT_001.jpg?v=1789564449",
+      "https://cdn.shopify.com/s/files/1/0766/2187/3304/files/SH_Lifestyle_0164_f0cfd5b3-a54a-4324-b01a-d2676d3a0500.jpg?v=1789564449",
+      "https://cdn.shopify.com/s/files/1/0766/2187/3304/files/SH147874-MULT_005.jpg?v=1789564449"
+    ],
+    "tags": [
+      "bed-bath"
+    ],
+    "body_html": "A fresh spin on a classic craft, the Modern Rooftops Quilt mixes traditional quilting with a bold, graphic pattern for a look that puts the fun in functional. Earthy midtones, a pop of red, and crisp white come together in a playful palette that\u2019s as cozy as it is eye-catching. With channeled stitching and soft cotton, it\u2019s perfect for layering onto your bed or adding some texture to your sofa. Made in India from 100% cotton.",
+    "variants": [
+      {
+        "title": "Multicolor / Full/Queen"
+      },
+      {
+        "title": "Multicolor / King"
+      },
+      {
+        "title": "Multicolor / Twin"
+      }
+    ],
+    "options": [
+      {
+        "name": "Color",
+        "position": 1,
+        "values": [
+          "Multicolor"
+        ]
+      },
+      {
+        "name": "Size",
+        "position": 2,
+        "values": [
+          "Full/Queen",
+          "King",
+          "Twin"
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Peak Stitch Sham",
+    "handle": "peak-stitch-sham",
+    "product_type": "Sham",
+    "images": [
+      "https://cdn.shopify.com/s/files/1/0766/2187/3304/files/SH147382-BLPS_001.jpg?v=1789564446",
+      "https://cdn.shopify.com/s/files/1/0766/2187/3304/files/SH_Lifestyle_0161_e0773053-ea60-411d-b513-c0271b200d08.jpg?v=1789564446",
+      "https://cdn.shopify.com/s/files/1/0766/2187/3304/files/SH147386-BLPS_002.jpg?v=1789564446"
+    ],
+    "tags": [
+      "bed-bath"
+    ],
+    "body_html": "The Peak Stitch Duvet is the perfect harmony of cozy comfort and clean lines. With its yarn-dyed woven matelass\u00e9 fabric, it has a soft, lived-in feel that\u2019s complemented by triangular quilting for just the right amount of loft. The playful red stitching adds a fun pop, nodding to the tradition of quilting with yarn ties. The reverse is crafted from cotton twill in the same rich color, making this duvet as playful as it is comfortable.",
+    "variants": [
+      {
+        "title": "Blue w/ Persimmon / Euro"
+      },
+      {
+        "title": "Olive w/ Persimmon / Euro"
+      },
+      {
+        "title": "Blue w/ Persimmon / King"
+      },
+      {
+        "title": "Olive w/ Persimmon / King"
+      },
+      {
+        "title": "Blue w/ Persimmon / Standard"
+      },
+      {
+        "title": "Olive w/ Persimmon / Standard"
+      }
+    ],
+    "options": [
+      {
+        "name": "Color",
+        "position": 1,
+        "values": [
+          "Blue w/ Persimmon",
+          "Olive w/ Persimmon"
+        ]
+      },
+      {
+        "name": "Size",
+        "position": 2,
+        "values": [
+          "Euro",
+          "King",
+          "Standard"
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Peak Stitch Duvet",
+    "handle": "peak-stitch-duvet",
+    "product_type": "Duvet Covers",
+    "images": [
+      "https://cdn.shopify.com/s/files/1/0766/2187/3304/files/SH147376-BLPS_001.jpg?v=1789564444",
+      "https://cdn.shopify.com/s/files/1/0766/2187/3304/files/SH_Lifestyle_0161.jpg?v=1789564444",
+      "https://cdn.shopify.com/s/files/1/0766/2187/3304/files/SH_Lifestyle_0468_92479c4b-0c1e-4a49-a306-0f6259c7b08d.jpg?v=1789564444"
+    ],
+    "tags": [
+      "bed-bath"
+    ],
+    "body_html": "The Peak Stitch Duvet is the perfect harmony of cozy comfort and clean lines. With its yarn-dyed woven matelass\u00e9 fabric, it has a soft, lived-in feel that\u2019s complemented by triangular quilting for just the right amount of loft. The playful red stitching adds a fun pop, nodding to the tradition of quilting with yarn ties. The reverse is crafted from cotton twill in the same rich color, making this duvet as playful as it is comfortable.",
+    "variants": [
+      {
+        "title": "Blue w/ Persimmon / Full/Queen"
+      },
+      {
+        "title": "Olive w/ Persimmon / Full/Queen"
+      },
+      {
+        "title": "Blue w/ Persimmon / King"
+      },
+      {
+        "title": "Olive w/ Persimmon / King"
+      },
+      {
+        "title": "Blue w/ Persimmon / Twin"
+      },
+      {
+        "title": "Olive w/ Persimmon / Twin"
+      }
+    ],
+    "options": [
+      {
+        "name": "Color",
+        "position": 1,
+        "values": [
+          "Blue w/ Persimmon",
+          "Olive w/ Persimmon"
+        ]
+      },
+      {
+        "name": "Size",
+        "position": 2,
+        "values": [
+          "Full/Queen",
+          "King",
+          "Twin"
+        ]
+      }
+    ]
+  },
+  {
+    "title": "Pintuck Pillow Cover",
+    "handle": "pintuck-pillow-cover",
+    "product_type": "Throw Pillows",
+    "images": [
+      "https://cdn.shopify.com/s/files/1/0766/2187/3304/files/SH147242-SL_001.jpg?v=1789564441",
+      "https://cdn.shopify.com/s/files/1/0766/2187/3304/files/SH147242-SL_002.jpg?v=1789564441",
+      "https://cdn.shopify.com/s/files/1/0766/2187/3304/files/SH147243-CHR_001.jpg?v=1789564441"
+    ],
+    "tags": [],
+    "body_html": "Soft, sun-kissed, and made for lounging. With delicate stripes of pleats and tucks that add just the right amount of texture, the Pintuck Pillow is an easy way to bring depth and dimension to your space. Whether tossed on the couch or layered with crisp bedding, it\u2019s perfect for slow mornings and afternoon naps.",
+    "variants": [
+      {
+        "title": "Slate / 16\"x36\" / Cover Only"
+      },
+      {
+        "title": "Chartreuse / 20\"x20\" / Cover Only"
+      },
+      {
+        "title": "Slate / 16\"x36\" / Cover + Down Insert"
+      },
+      {
+        "title": "Chartreuse / 20\"x20\" / Cover + Down Insert"
+      },
+      {
+        "title": "Slate / 20\"x20\" / Cover + Down Insert"
+      }
+    ],
+    "options": [
+      {
+        "name": "Color",
+        "position": 1,
+        "values": [
+          "Slate",
+          "Chartreuse"
+        ]
+      },
+      {
+        "name": "Size",
+        "position": 2,
+        "values": [
+          "16\"x36\"",
+          "20\"x20\""
+        ]
+      },
+      {
+        "name": "Style",
+        "position": 3,
+        "values": [
+          "Cover Only",
+          "Cover + Down Insert"
+        ]
+      }
+    ]
+  }
+]
