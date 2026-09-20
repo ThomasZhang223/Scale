@@ -78,6 +78,18 @@ coordinate. When a value cannot be determined, the system says so instead of gue
 `docs/SYSTEM_STATE.md` describes exactly what is deployed and how data flows today.
 `.claude/contracts.md` is the authority on every schema and route.
 
+## Sponsor technologies
+
+| | |
+| --- | --- |
+| **Cloudflare** | The backbone, not a hosting choice: 3 Workers (front door API, the WebXR page proxied over service bindings, the designer agent), D1, R2, Vectorize, KV, Durable Objects, Workflows, Queues, Cron Triggers, Workers AI, Browser Rendering, Static Assets, the Agents SDK, Tunnel, and Observability — 16 products, each with the config line that proves it in `docs/architecture/index.html`. |
+| **Shopify** | Storefronts are crawled and extracted for real-world dimensions; the headset's live "find" requests browse three storefronts in parallel, and a listing is only offered once it has a reconstructed mesh. |
+| **Expo** | The iPhone app: native Swift modules (RoomPlan capture, Object Capture, wall and object measurement) wrapped in an Expo Router app. |
+| **Baseten** | SF3D image-to-3D generation for the catalogue, served through a dimension-binding adapter that performs the one scale binding. Currently switched off for the live demo: catalogue meshes were reconstructed ahead of time and are served from cache; live generation is supported by the pipeline but disabled. |
+| **Browserbase** | Drives headless browsing of merchant storefronts for `services/ingest`'s crawl, extract, and find pipeline. |
+| **ElevenLabs** | Voice in the headset: speech in and out for the hold-to-talk loop. |
+| **OpenAI** | The designer agent's planner (`services/agent`), and the catalogue dimension-extraction pass in `services/ingest`. |
+
 ## Repository layout
 
 ```
@@ -139,11 +151,33 @@ runs against stubs with none of the above.
 
 ## Team
 
-| | |
-| --- | --- |
-| Thomas | iOS capture, Expo app, backend, data schemas |
-| Justin | WebXR runtime, glTF, the fit solver, the designer agent |
-| Ani | Baseten image-to-3D, the scale binding, embeddings |
-| Paul | Voice loop, merchant retrieval end to end |
+**Thomas** — iOS native capture modules (RoomPlan room scanning, object measurement) and the
+Expo app around them; the Cloudflare Workers backend, including the mesh
+generation and merchant-ingest workflows, the catalogue and search routes, and the KV/D1/R2/
+Vectorize wiring; `infra/` (Docker, tunnels, deploy and provisioning scripts); `.claude/contracts.md`
+and the fixtures every stub answers; and, in the final integration pass, WebXR interaction and
+palette work (room selection, window/panel handling, voice-driven library answers) alongside Justin.
+
+**Justin** — the WebXR runtime for the Quest (`apps/xr/src`): scene setup, interaction, physics and
+stacking, the HUD, the voice/find panels, and ElevenLabs voice integration; the OR-Tools CP-SAT
+layout solver and its evolution into `services/fit`; the designer agent Worker (`services/agent`)
+and its planning pipeline; the wall-capture and object-capture native modules on the phone; and
+Expo app screens (tabs, capture flow, room detail).
+
+**Ani** — the generation and retrieval pipeline in `services/gen`: the SigLIP 2 embedding service,
+the SF3D image-to-3D deployment on Baseten and its dimension-binding adapter, Shopify-aware
+discovery with verified dimensions, and the Cloudflare-side wiring (mesh job dispatch, indexing)
+that connects generation output back into the Worker.
+
+**Paul** — `services/ingest`: the Shopify crawler and extractor, dimension extraction over
+Browserbase-rendered pages, and the prebaked catalogue (images and manifest) handed to Ani's
+pipeline; `services/search`'s ranking service; and the phone's voice loop
+(`apps/mobile/src/voice`) — intent parsing, the tool schema, and the transport to the agent.
+
+## Credits and licences
+
+The built-in furniture library uses 3D models from [Poly Haven](https://polyhaven.com), each
+published under **CC0 1.0** (public domain — no attribution required, credited anyway). Per-model
+credits are in `fixtures/library-models.ATTRIBUTION.md`.
 
 The full design doc and its reasoning are in `BUILD_DOC.md`.
