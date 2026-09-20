@@ -1,0 +1,15 @@
+# Standalone runtime for the B06 dimension-binding generation adapter
+# (app/generate_server.py), as run by docker-compose's `gen` service.
+#
+# Why this is not requirements-adapters.txt: that file is an OVERLAY, one line, meant to be
+# installed ON TOP of B03's pinned CPU embedding environment (GENERATION_HANDOFF.md, line 8).
+# That environment carries torch and transformers for SigLIP2, which the adapter never imports.
+# This file is the closure of what app/generate_server.py actually needs: the B04 binding
+# environment (requirements-binding.txt, minus pytest) plus the HTTP server, at the same pins
+# the rest of services/gen already uses. Never add SF3D's CUDA stack here; that runs on Baseten.
+numpy==1.26.4
+trimesh==4.4.1
+Pillow==11.1.0
+fastapi==0.116.1
+httpx==0.28.1
+uvicorn==0.34.0

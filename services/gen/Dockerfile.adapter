@@ -1,0 +1,26 @@
+# The B06 dimension-binding generation adapter: Worker -> /generate -> raw SF3D on Baseten
+# -> B04 binding -> BasetenResult. CPU only; the GPU work is Baseten's.
+#
+# 3.12, not the 3.11.9 of the sibling Dockerfile: that one exists to pin B03's SigLIP2
+# environment byte for byte (a hashed lock), which this service does not use. The laptop
+# that runs the edge is on Python 3.14, where several of these wheels do not exist yet,
+# so the container is what makes the adapter runnable at all here.
+FROM python:3.12-slim
+
+WORKDIR /app
+
+COPY requirements-adapter-service.txt .
+RUN pip install --no-cache-dir -r requirements-adapter-service.txt
+
+# app/ is the adapter and the B04 binder; deploy/sf3d/model is the SF3D wire format and the
+# pinned source/weights revisions that SF3DProvider checks every response against.
+COPY app ./app
+COPY deploy ./deploy
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONPATH=/app
+
+EXPOSE 8006
+# One worker: GenerationAttempt holds a per-attempt lock, and Baseten's deployment runs at
+# concurrency_target 1. A second worker would only queue behind the same single replica.
+CMD ["uvicorn", "app.generate_server:app", "--host", "0.0.0.0", "--port", "8006", "--workers", "1"]

@@ -42,6 +42,41 @@ services:
       start_period: 120s
       retries: 5
 
+  gen:
+    # Owner: Ani (services/gen). The B06 dimension-binding generation adapter: the Worker's
+    # BASETEN_URL points HERE, not at Baseten. Worker -> /generate -> raw SF3D on Baseten ->
+    # B04 binding -> bound GLB. The scale binding happens exactly once, in this container.
+    #
+    # Profile "gen", not "local", on purpose — the one place this service breaks the pattern
+    # of the four above. Its three credentials come from ~/.config/full-scale/secrets.env,
+    # which is outside git and is NOT loaded by infra/up.sh. Under profile "local" a bare
+    # `docker compose --profile local up` would start this container with three empty
+    # variables and it would 503 at the first job. Start it with infra/gen-up.sh, which
+    # loads the secrets, refuses to continue without them, and leaves the other four alone.
+    build:
+      context: ./services/gen
+      dockerfile: Dockerfile.adapter
+    ports:
+      - "${GEN_PORT:-8006}:8006"
+    profiles: ["gen"]
+    restart: unless-stopped
+    env_file: infra/.env
+    environment:
+      # secrets.env calls it BASETEN_PREDICT_URL; the adapter calls the same value
+      # SF3D_PREDICT_URL, because the Worker's BASETEN_URL is this adapter, not Baseten.
+      # No default on any of the three: infra/gen-up.sh dies naming the missing one, and
+      # the adapter's own _required() raises rather than guess (standing rule 4).
+      SF3D_PREDICT_URL: ${BASETEN_PREDICT_URL}
+      BASETEN_API_KEY: ${BASETEN_API_KEY}
+      # The token the WORKER presents to this adapter. The Worker holds the same value under
+      # the confusing name BASETEN_API_KEY. Mint with: openssl rand -hex 32.
+      GENERATION_API_KEY: ${GENERATION_API_KEY}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8006/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   ingest:
     # Owner: Paul. Catalog scraper and extractor.
     build: ./services/ingest

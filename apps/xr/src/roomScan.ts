@@ -44,6 +44,7 @@ const COLORS = {
   window: '#9fd3ff',
   opening: '#cfc8bb',
   object: '#9aa5b1',
+  ceiling: '#f2f0ec',
 };
 
 const EXPECTED_SCHEMA_VERSION = 1;
@@ -61,6 +62,7 @@ export function buildRoomFromScan(scan: Json): BuiltRoom {
   const windows = [...surfaces(scan.windows), ...listed.filter((s) => s.kind === 'window')];
   const openings = listed.filter((s) => !s.kind || s.kind === 'opening');
   const objects = surfaces(scan.objects);
+  const appearance = readAppearance(scan, walls);
 
   // ---- find the floor and the center, so we can recenter ----
   const footprint = new THREE.Box3();
@@ -91,11 +93,31 @@ export function buildRoomFromScan(scan: Json): BuiltRoom {
     : { width: footprint.max.x - footprint.min.x, depth: footprint.max.z - footprint.min.z };
 
   const floor = new THREE.Mesh(
+    // rotateX(-90°) sends the plane's u to +X and its v to -Z, so a photo taken pointing
+    // down, held the way the photographer stood, lands the right way up under your feet.
     new THREE.PlaneGeometry(size.width, size.depth).rotateX(-Math.PI / 2),
-    new THREE.MeshStandardMaterial({ color: COLORS.floor }),
+    surfaceMaterial(appearance.get('floor'), COLORS.floor),
   );
   floor.position.set(center.x, floorY, center.z);
   content.add(floor);
+
+  // RoomPlan has no ceiling category, so a capture only has one when somebody photographed or
+  // sampled it. Its height is the tallest wall: there is no other measurement of it.
+  const ceiling = appearance.get('ceiling');
+  if (ceiling) {
+    if (!walls.length) {
+      throw new Error('appearance.surfaces has a ceiling but the capture has no walls, so its height is unknown — ask Thomas');
+    }
+    const height = walls.reduce((h, s) => Math.max(h, s.dims[1]), 0);
+    // rotateX(+90°) faces the plane down and sends u to +X, v to +Z — the opposite of the
+    // floor on both axes, which is why a ceiling photo shot facing the same way needs 180°.
+    const mesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(size.width, size.depth).rotateX(Math.PI / 2),
+      surfaceMaterial(ceiling, COLORS.ceiling),
+    );
+    mesh.position.set(center.x, floorY + height, center.z);
+    content.add(mesh);
+  }
 
   // RoomCapture v1 measures wall thickness; RoomPlan reports 0, so those get a default.
   const wallThickness = (s: Surface) => (s.dims[2] > 0 ? s.dims[2] : WALL_THICKNESS);
@@ -105,9 +127,18 @@ export function buildRoomFromScan(scan: Json): BuiltRoom {
   const cut = new Set<Surface>();
   for (const s of walls) {
     const thickness = wallThickness(s);
-    const holes = [...windows, ...openings].filter((w) => inWall(w, s, thickness));
+    const look = appearance.get(s.identifier);
+    const photo = surfaceTexture(look);
+    // A door or window in a photographed wall is already in the photo, so it is painted, not
+    // cut. ExtrudeGeometry's UVs are not the wall rectangle, so a hole would scramble the
+    // photo across the whole wall.
+    // ceiling: openings are painted while the wall carries a photo. Cutting one needs UVs
+    // built for the wall rectangle, and then a second photo of what is behind the hole.
+    const holes = photo ? [] : [...windows, ...openings].filter((w) => inWall(w, s, thickness));
     holes.forEach((w) => cut.add(w));
-    const wall = holes.length ? wallWithHoles(s, thickness, holes) : slab(s, thickness, COLORS.wall);
+    const wall = holes.length
+      ? wallWithHoles(s, thickness, holes)
+      : wallSlab(s, thickness, look, photo, center);
     content.add(wall);
     // Physics wants a plain box (it reads BoxGeometry.parameters); the visible wall may have holes.
     const collider = holes.length ? slab(s, thickness, COLORS.wall) : wall;
@@ -204,7 +235,116 @@ function readCategory(c: unknown): string {
   return 'unknown';
 }
 
+// ---------- appearance ----------
+//
+// `appearance` is the optional layer in RoomCapture v1 (.claude/contracts.md): one entry per
+// surface, keyed by wall id plus the literal "floor" and "ceiling", carrying a sampled colour
+// and — when the surface was photographed and rectified — the URL of that photo.
+//
+// Appearance is NEVER a source of dimensions. Every rectangle drawn here comes from the walls'
+// own `dimensions`; the photo is stretched onto it, and where the two disagree the wall wins.
+
+export interface SurfaceAppearance {
+  hex?: string | null;
+  textureUrl?: string | null;
+  /** Quarter turn applied to the photo, 0/90/180/270. Which image edge meets which wall. */
+  rotationDeg?: number;
+  /** Mirrors the photo across its own vertical axis. The escape hatch, not the normal case. */
+  mirrored?: boolean;
+}
+
+const QUARTER_TURNS = [0, 90, 180, 270];
+const textureLoader = new THREE.TextureLoader();
+
+function readAppearance(scan: Json, walls: Surface[]): Map<string, SurfaceAppearance> {
+  const out = new Map<string, SurfaceAppearance>();
+  const surfaces = (scan.appearance as { surfaces?: Record<string, SurfaceAppearance> } | undefined)?.surfaces;
+  if (!surfaces) return out;
+  const known = new Set<string>([...walls.map((w) => w.identifier), 'floor', 'ceiling']);
+  for (const [key, surface] of Object.entries(surfaces)) {
+    // A key that names no wall in this capture means the appearance layer and the shell were
+    // written against different rooms. Say which key, rather than drawing five of six surfaces.
+    if (!known.has(key)) {
+      throw new Error(`appearance.surfaces has "${key}", which is neither a wall id in this capture nor "floor" or "ceiling" — ask Thomas`);
+    }
+    const turn = surface.rotationDeg ?? 0;
+    if (!QUARTER_TURNS.includes(turn)) {
+      throw new Error(`appearance.surfaces["${key}"].rotationDeg is ${turn}; a surface photo turns by 0, 90, 180 or 270 only`);
+    }
+    out.set(key, surface);
+  }
+  return out;
+}
+
+/**
+ * One rectified photo, mapped to fill its surface exactly once.
+ *
+ * The photo is a four-point transform of the surface rectangle onto the WHOLE image, so the
+ * image aspect is not the surface aspect. Stretching it to UV 0..1 is what undoes the
+ * transform — it is the correction, not a distortion. Never tiled, never aspect-fitted.
+ */
+function surfaceTexture(look: SurfaceAppearance | undefined): THREE.Texture | null {
+  if (!look?.textureUrl) return null;
+  const texture = textureLoader.load(look.textureUrl);
+  texture.colorSpace = THREE.SRGBColorSpace; // a photo is sRGB; without this the room goes pale
+  texture.wrapS = THREE.ClampToEdgeWrapping;
+  texture.wrapT = THREE.ClampToEdgeWrapping;
+  texture.center.set(0.5, 0.5); // turn about the middle, so the photo still covers the rectangle
+  texture.rotation = THREE.MathUtils.degToRad(look.rotationDeg ?? 0);
+  if (look.mirrored) texture.repeat.x = -1;
+  texture.anisotropy = 4; // the floor is seen at a grazing angle from standing height
+  return texture;
+}
+
+/**
+ * A whole surface: its photo when it has one, its sampled colour when it does not.
+ *
+ * A photographed surface is UNLIT. The photo already contains the room's own light — the
+ * fluorescent tubes, the shadow the whiteboard casts — so lighting it again shades it twice.
+ * It came out dim and green, because a HemisphereLight blends sky and ground by the normal's
+ * y and a vertical wall sits exactly halfway. A flat colour still needs the scene's lights.
+ */
+function surfaceMaterial(look: SurfaceAppearance | undefined, fallback: string): THREE.Material {
+  const map = surfaceTexture(look);
+  return map
+    ? new THREE.MeshBasicMaterial({ map })
+    : new THREE.MeshStandardMaterial({ color: look?.hex ?? fallback });
+}
+
+/**
+ * Which BoxGeometry face of this wall looks into the room: 4 is +Z, 5 is -Z.
+ *
+ * BoxGeometry's own UVs run left to right for a viewer standing OUTSIDE the face they are
+ * looking at, and someone inside the room is outside the wall's inward face. So the photo
+ * reads un-mirrored on either index, and picking the wrong one hides it inside the wall.
+ */
+function inwardFace(wall: Surface, roomCenter: THREE.Vector3): number {
+  const outward = new THREE.Vector3(0, 0, 1).applyQuaternion(wall.quaternion);
+  return outward.dot(roomCenter.clone().sub(wall.position)) > 0 ? 4 : 5;
+}
+
 // ---------- geometry ----------
+
+/** A wall slab whose inward face carries the wall's photo; every other face stays plain. */
+function wallSlab(
+  s: Surface,
+  thickness: number,
+  look: SurfaceAppearance | undefined,
+  photo: THREE.Texture | null,
+  roomCenter: THREE.Vector3,
+): THREE.Mesh {
+  const plain = new THREE.MeshStandardMaterial({ color: look?.hex ?? COLORS.wall });
+  let material: THREE.Material | THREE.Material[] = plain;
+  if (photo) {
+    const faces: THREE.Material[] = [plain, plain, plain, plain, plain, plain];
+    faces[inwardFace(s, roomCenter)] = new THREE.MeshBasicMaterial({ map: photo }); // unlit: see surfaceMaterial
+    material = faces;
+  }
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(s.dims[0], s.dims[1], thickness), material);
+  mesh.position.copy(s.position);
+  mesh.quaternion.copy(s.quaternion);
+  return mesh;
+}
 
 function slab(s: Surface, thickness: number, color: string, opacity = 1): THREE.Mesh {
   const mesh = new THREE.Mesh(

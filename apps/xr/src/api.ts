@@ -76,8 +76,12 @@ export function getJob(jobId: string): Promise<JobV1> {
   return get(`/jobs/${jobId}`);
 }
 
-/** POST /listings/generate: a picked /find row becomes an object and a mesh job. Not in contracts.md yet. */
-export function postListingsGenerate(listing: unknown, roomId: string | null): Promise<{ objectId: string; jobId: string }> {
+/**
+ * POST /listings/generate: a picked /find row becomes an object and a mesh job. Not in
+ * contracts.md yet. `jobId` is null when the object already had its mesh — the Worker starts no
+ * second inference over a finished one, so there is nothing to poll and `glbUrl` is there now.
+ */
+export function postListingsGenerate(listing: unknown, roomId: string | null): Promise<{ objectId: string; jobId: string | null; state?: string; glbUrl?: string | null }> {
   return post('/listings/generate', { listing, roomId });
 }
 

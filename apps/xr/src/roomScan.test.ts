@@ -130,3 +130,70 @@ test('Rapier: the detected chair is solid until a scanned object replaces it', a
   near(after.x, spot.x, 'x after the chair is freed');
   near(after.z, spot.z, 'z after the chair is freed');
 });
+
+// --- the appearance layer: one rectified photo per surface -----------------------------
+
+// three's TextureLoader asks document.createElementNS for an <img>. These tests run in plain
+// node, so the photo never arrives; what is asserted is the texture object built around it.
+(globalThis as { document?: unknown }).document ??= {
+  createElementNS: () => ({ addEventListener() {}, removeEventListener() {}, style: {} }),
+};
+
+// Judging Room H, the demo room: 2.76 x 4.72 x 2.96 m, six surfaces photographed.
+const roomH = JSON.parse(readFileSync(new URL('../../../fixtures/room-h.json', import.meta.url), 'utf-8'));
+
+test('a photographed room is its measured box, with the photo on the face that looks inward', () => {
+  const built = buildRoomFromScan(roomH);
+  near(built.size.width, 2.76, 'width');
+  near(built.size.depth, 4.72, 'depth');
+
+  const walls = roomMeshes(built).filter((m) => m.userData.collider === 'wall');
+  assert.equal(walls.length, 4);
+  for (const wall of walls) {
+    const faces = wall.material as THREE.MeshBasicMaterial[];
+    assert.ok(Array.isArray(faces), 'a photographed wall carries one material per face');
+    const textured = faces.map((m, i) => (m.map ? i : -1)).filter((i) => i >= 0);
+    assert.deepEqual(textured.length, 1, 'exactly one face carries the photo');
+    // The room is centered on the origin, so the inward normal is the one pointing at it.
+    const outward = new THREE.Vector3(0, 0, 1).applyQuaternion(wall.quaternion);
+    const inward = textured[0] === 4 ? outward : outward.negate();
+    assert.ok(inward.dot(worldPosition(wall).clone().negate()) > 0, 'the photo faces the room, not the corridor');
+    assert.equal(faces[textured[0]].map!.colorSpace, THREE.SRGBColorSpace);
+  }
+});
+
+test('the ceiling is drawn at the wall height, facing down, turned as the capture says', () => {
+  const built = buildRoomFromScan(roomH);
+  // The turn is baked into the geometry, not the object, so find it by height: the only mesh
+  // at the top of the walls. Its normal points down, which the render check in the report shows.
+  const ceiling = roomMeshes(built).find((m) => Math.abs(worldPosition(m).y - 2.96) < 1e-6);
+  assert.ok(ceiling, 'a ceiling mesh sits at the wall height');
+  near(ceiling.geometry.attributes.normal.getY(0), -1, 'it faces the floor');
+  const map = (ceiling.material as THREE.MeshBasicMaterial).map!;
+  near(map.rotation, Math.PI, 'the ceiling photo is turned 180°, per appearance.rotationDeg');
+  assert.equal(map.repeat.x, 1, 'not mirrored');
+});
+
+test('an appearance key that names no wall fails loud', () => {
+  const broken = { ...roomH, appearance: { surfaces: { 'not-a-wall': { hex: '#ffffff' } } } };
+  assert.throws(() => buildRoomFromScan(broken), /not-a-wall/);
+});
+
+test('a photographed wall keeps its openings painted rather than cut', () => {
+  // The same opening, in a wall with a photo and in the same wall without one. A cut wall is an
+  // extrusion; the invisible collider beside it stays a box either way, so count extrusions.
+  const withOpening = {
+    ...roomH,
+    openings: [{
+      id: 'f1f5a0aa-0f27-4f4b-96e1-5c1eb2a0f3c1', kind: 'opening', wallId: roomH.walls[1].id,
+      transform: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 1.38, 1.05, 4.72, 1],
+      dimensions: [0.9, 2.1, 0],
+    }],
+  };
+  const extrusions = (scan: unknown) =>
+    roomMeshes(buildRoomFromScan(scan as Record<string, unknown>))
+      .filter((m) => m.geometry.type === 'ExtrudeGeometry').length;
+
+  assert.equal(extrusions(withOpening), 0, 'a photographed wall is drawn whole');
+  assert.equal(extrusions({ ...withOpening, appearance: undefined }), 1, 'an unphotographed wall is still cut');
+});

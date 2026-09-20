@@ -6,7 +6,7 @@
 
 import { HttpError, json, noContent, readJson } from "../lib/http";
 import { contentHash, nowIso, token, uuid } from "../lib/ids";
-import { R2Keys, contentTypeFor, isCatalogSourceKey, keyFromAssetPath, sniffImageType } from "../lib/keys";
+import { R2Keys, assetUrl, contentTypeFor, isCatalogSourceKey, keyFromAssetPath, sniffImageType } from "../lib/keys";
 import { callUpstream, callUpstreamRaw, upstreamOrigin } from "../lib/config";
 import { embedInput, indexObject, type Embedding } from "../lib/embedding";
 import { enqueueMesh } from "../lib/mesh-dispatch";
@@ -36,7 +36,8 @@ import {
   required,
 } from "../lib/validate";
 import { SCHEMA_VERSION } from "../lib/contracts";
-import { assertFindBody, runFind } from "../lib/find";
+import { assertFindBody, runFind, type FindResult } from "../lib/find";
+import { failedFindResult, readyOnly, restrictFindToReady } from "../lib/find-ready";
 import { enqueueCatalogItem, normalizeCatalogItem } from "../lib/catalog-ingest";
 import type {
   FitReportV1,
@@ -67,8 +68,30 @@ export async function postRoom(req: Request, env: Env): Promise<Response> {
   return json({ roomId });
 }
 
-export async function getRoom(env: Env, roomId: string): Promise<Response> {
-  return json(await loadRoomCapture(env, roomId));
+export async function getRoom(env: Env, roomId: string, origin: string): Promise<Response> {
+  const capture = (await loadRoomCapture(env, roomId)) as RoomCaptureV1;
+  return json(withTextureUrls(capture, origin));
+}
+
+/**
+ * Key in the database, URL in the API (lib/keys.ts), applied to the appearance layer.
+ *
+ * A stored capture carries `textureKey` — the R2 key of that surface's rectified photo — and a
+ * null `textureUrl`. The client never resolves a key, so the conversion happens here, in the one
+ * response that carries it. A surface with no `textureKey` is returned untouched: appearance is
+ * optional per surface, and an absent texture is not a missing one.
+ */
+function withTextureUrls(capture: RoomCaptureV1, origin: string): RoomCaptureV1 {
+  const surfaces = (capture.appearance as { surfaces?: Record<string, { textureKey?: string }> } | undefined)
+    ?.surfaces;
+  if (!surfaces) return capture;
+  const resolved = Object.fromEntries(
+    Object.entries(surfaces).map(([key, surface]) => [
+      key,
+      surface?.textureKey ? { ...surface, textureUrl: assetUrl(origin, surface.textureKey) } : surface,
+    ]),
+  );
+  return { ...capture, appearance: { ...(capture.appearance as object), surfaces: resolved } };
 }
 
 // --- Versions ------------------------------------------------------------------------------
@@ -706,11 +729,36 @@ async function d1Search(env: Env, body: SearchBody, limit: number, origin: strin
 // (/find via Browserbase, then /extract) with the upstream token the browser must never hold.
 // One call per storefront; the headset runs three in parallel and shows each as a stage row.
 // Not in contracts.md yet — see workers/DEPLOY.md "Schema proposals".
-export async function postFind(req: Request, env: Env): Promise<Response> {
+export async function postFind(req: Request, env: Env, origin: string): Promise<Response> {
   const body = assertFindBody(await readJson<unknown>(req));
   const call = <T>(path: string, payload: unknown, timeoutMs?: number) =>
     callUpstream<T>(env, "ingest", path, payload, timeoutMs);
-  return json(await runFind(call, body));
+  if (!readyOnly(env)) return json(await runFind(call, body));
+
+  // Ready-only: the storefront query still runs and is still the merchant's own search. What
+  // changes is that a row nobody can render yet never reaches the wrist menu. See lib/find-ready.ts.
+  let live: FindResult;
+  try {
+    live = await runFind(call, body);
+  } catch (err) {
+    live = failedFindResult(body, err);
+  }
+  const { result, header } = await restrictFindToReady(env, origin, body, live, async (search) => {
+    // In-process: a Worker cannot fetch its own *.workers.dev URL (SYSTEM_STATE.md). This is the
+    // real /v1/search — Paul's ranker or Vectorize, whichever is configured — not a copy of it.
+    const res = await postSearch(
+      new Request("https://find.local/v1/search", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(search),
+      }),
+      env,
+      origin,
+    );
+    const hits = (await res.json()) as { objectId?: string }[];
+    return hits.map((h) => h.objectId).filter((id): id is string => typeof id === "string");
+  });
+  return json(result, 200, { "x-find-source": header });
 }
 
 // POST /v1/listings/generate  { listing, roomId? }
@@ -725,6 +773,19 @@ export async function postListingsGenerate(req: Request, env: Env, origin: strin
   if (!body.listing) throw new HttpError(400, "missing_field", "listing is required.");
   const item = await normalizeCatalogItem(body.listing);
   const roomId = typeof body.roomId === "string" && body.roomId ? body.roomId : null;
+
+  // A row that already has its mesh is done. Enqueueing it again would start a second job for a
+  // finished object and hand the caller a job id to poll that nothing will ever finish, and the
+  // Workflow would write over a reviewed mesh. Answer with the object instead: no job, no state
+  // change. `jobId` stays in the shape, as null, so a caller that polls sees "nothing to poll".
+  const existing = await env.DB.prepare(
+    "SELECT id FROM objects WHERE id = ? AND state = 'ready' AND glb_key IS NOT NULL",
+  ).bind(item.objectId).first<{ id: string }>();
+  if (existing) {
+    const object = await getObject(env, item.objectId, origin);
+    return json({ objectId: object.objectId, jobId: null, state: object.state, glbUrl: object.glbUrl });
+  }
+
   return json(await enqueueCatalogItem(env, item, origin, roomId), 202);
 }
 

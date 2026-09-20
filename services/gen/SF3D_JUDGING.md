@@ -1,14 +1,23 @@
 # Resident SF3D judging procedure
 
-Use only Hack the North / Team 26, **L4:4x16 (one NVIDIA L4)**. Never
-activate a second deployment before the first is INACTIVE with zero replicas.
-The latency experiment is separate from a deployed phone-to-XR integration.
-Its raw SF3D endpoint must sit behind the configured B04 generation adapter;
-never put a raw unscaled mesh into the Worker's ready state.
+Use only Hack the North, **L4:4x16 (one NVIDIA L4)**. Never activate a second
+deployment before the first is INACTIVE with zero replicas. The latency
+experiment is separate from a deployed phone-to-XR integration. Its raw SF3D
+endpoint must sit behind the configured B04 generation adapter; never put a raw
+unscaled mesh into the Worker's ready state.
 
-Reviewed deployment: model `wdlgzjk3`, deployment `w604592`, named
-`full-scale-team26-latency-20260919`. The experiment ended INACTIVE with zero
-replicas. [Measured results](SF3D_LATENCY_RESULTS.md) retain all four receipts.
+**Live deployment, 2026-09-20: model `3mzlyd6w` (`ani-sf3d-feasibility`),
+deployment `qe95lkp`, team `HTN2026`, `L4:4x16`.** Use the deployment id, not
+the mutable `/production` alias. `BASETEN_PREDICT_URL` in
+`~/.config/full-scale/secrets.env` points at it.
+
+The deployment this file described before — model `wdlgzjk3`, deployment
+`w604592`, `full-scale-team26-latency-20260919`, team "26" — no longer exists
+for our API key: `GET /v1/models/wdlgzjk3` answers 404 "No Oracle matches the
+given query". It is not inactive, it is not in this workspace. The measured
+results below were taken on it and still describe this model and this SKU.
+[Measured results](SF3D_LATENCY_RESULTS.md) retain all four receipts.
+
 **Keep texture resolution 1024.** There is no startup prewarm: merely reaching
 ACTIVE does not remove the first-prediction penalty. Budget about **29 seconds
 for the first request**, versus **1.2 seconds for a repeat on the same replica**,
@@ -19,7 +28,7 @@ Do not assume the repeat latency for the first judge request.
 
 1. Activate the reviewed deployment **7–10 minutes before** the expected demo.
    Record its exact model/deployment IDs from the latency evidence, not a mutable
-   production alias. Check the model belongs to Team 26.
+   production alias. Check the model belongs to team `HTN2026`.
 2. Verify `instance_type_name` starts with `L4:4x16`, `max_replica=1`,
    `concurrency_target=1`, and never more than one active replica. For a resident
    judging window set min/max replicas to 1/1 in that deployment's autoscaling
@@ -57,11 +66,11 @@ Use an already configured credential in the environment; never paste it into
 source, logs or command arguments. Set the exact reviewed IDs first.
 
 ```powershell
-$sf3dModel = 'wdlgzjk3'
-$sf3dDeployment = 'w604592'
+$sf3dModel = '3mzlyd6w'
+$sf3dDeployment = 'qe95lkp'
 $sf3dBase = "https://api.baseten.co/v1/models/$sf3dModel/deployments/$sf3dDeployment"
 $sf3dHeaders = @{ Authorization = "Api-Key $env:BASETEN_API_KEY" }
-# Pre-judging activation (after verifying Team 26 / exact SKU / max replica):
+# Pre-judging activation (after verifying team HTN2026 / exact SKU / max replica):
 Invoke-RestMethod -Method Post -Uri "$sf3dBase/activate" -Headers $sf3dHeaders -ContentType 'application/json' -Body '{}'
 # After judging, explicitly deactivate:
 Invoke-RestMethod -Method Post -Uri "$sf3dBase/deactivate" -Headers $sf3dHeaders -ContentType 'application/json' -Body '{}'
@@ -75,6 +84,99 @@ do {
 Keep the shutdown receipt and inspect usage afterward. Scale-to-zero is
 insufficient: the observed idle delay is 900 seconds. Stop catalog intake too,
 so a later request cannot accidentally restart a paid generation session.
+
+## The generation adapter — decided, not an open question
+
+The binding runs in a **separate CPU adapter service**, `app/generate_server.py`,
+outside the Baseten deployment. Worker -> adapter `/generate` -> raw SF3D on
+Baseten -> B04 dimension binding -> `BasetenResult` back to the Worker, which
+stores the bytes. The Worker's `BASETEN_URL` names the ADAPTER, never Baseten.
+
+Three reasons this is not a preference. The binding needs `trimesh` and NumPy and
+nothing else; putting it in the Truss would pin a CPU library to a GPU image and
+make every rebinding a GPU redeploy. `GenerateMeshWorkflow` rejects a raw response
+outright (`kind: "raw_sf3d_unscaled"` or a bare `glb_base64` is a
+`NonRetryableError`), so the adapter is what makes any mesh publishable at all.
+And the scale binding must happen exactly once (standing rule 2); one service
+owning it is how that stays true when the endpoint moves.
+
+The Worker secret named `BASETEN_API_KEY` is the adapter's `GENERATION_API_KEY`.
+It authenticates the Worker TO the adapter. The real Baseten credential never
+leaves the laptop.
+
+### Run it
+
+```bash
+# 1. Adapter + its own tunnel. NEVER a bare `bash infra/up.sh` during a demo: that
+#    rotates all four live tunnel URLs and recreates ingest without its vendor keys.
+#    gen-up.sh names only the `gen` service, and dies if a credential, the port or
+#    the health check is missing.
+bash infra/gen-up.sh
+#    -> prints the trycloudflare URL, after checking /health says provider:true, auth:true
+
+# 2. Wake the GPU, with ONE real paid prediction, before the Worker can send one.
+#    Measured 2026-09-20: 170.9 s from SCALED_TO_ZERO, of which 141.99 s is the model
+#    load; then 3.1 s for the whole adapter round trip on a warm replica. The adapter's
+#    provider timeout is 180 s, so a cold wake only just fits — never let the first
+#    real job be the one that pays for it. Do NOT use a dummy prediction as a health
+#    check: send a real catalogue image and read the revisions the Truss reports back.
+#    They must equal SOURCE_REVISION and MODEL_REVISION in deploy/sf3d/model/model.py,
+#    or SF3DProvider raises provider_revision_mismatch and nothing may be bound.
+curl -sS -H "Authorization: Bearer $BASETEN_API_KEY" -H 'content-type: application/json' \
+  --max-time 900 -d "{\"image_base64\": \"$(base64 < some-catalogue-photo.jpg)\"}" \
+  "$BASETEN_PREDICT_URL" | jq '.kind, .revisions, .settings.texture_resolution'
+
+# 3. Point the Worker at the adapter. From workers/. Paste at the prompt; never
+#    pass a credential as a command-line argument.
+cd workers
+npx wrangler secret put BASETEN_URL       # <tunnel>/generate
+npx wrangler secret put BASETEN_API_KEY   # the GENERATION_API_KEY value, NOT a Baseten key
+curl -s https://full-scale-workers.thomaszhangdev.workers.dev/v1/health | jq .meshPipeline
+#    -> providerConfigured: true, and the dispatcher starts draining queued jobs
+
+# 4. Stop the drain, if the first jobs fail. Either end removes the path:
+npx wrangler secret delete BASETEN_URL        # Worker side
+docker compose --profile gen stop gen         # adapter side
+```
+
+A quick-tunnel URL dies when `cloudflared` restarts. When that happens the Worker
+keeps POSTing to a dead hostname and every job fails: re-run `infra/gen-up.sh` and
+re-put `BASETEN_URL`. `infra/up.sh` refuses to start while the gen tunnel is alive;
+`kill $(cat infra/.run/gen.pid)` first if you really need it.
+
+### What the adapter declares on your behalf
+
+It records one operator-declared `VisualReview` (`manual_review`) and one
+operator-declared orientation, identity unless `GENERATION_ORIENTATION` is set, for
+every artifact. GENERATION_HANDOFF.md requires a human to look at each real SF3D
+mesh; this service completes without one. That is the demo operator's decision, not
+Ani's, and the receipt names the reviewer so it is never mistaken for a human check.
+A 90-degree yaw error passes the bounds check. Read the receipt's distortion label
+(`eligible_for_visual_review` / `review_required` / `proxy_recommended`) and look at
+anything above `eligible_for_visual_review` before it reaches a judge.
+
+### Measured on a real product, 2026-09-20 — pick demo objects by footprint
+
+First live catalogue binding: West 6 Drawer Dresser (`InStyle_Home__CA`,
+`37ade021-af28-58c3-a81c-362644200dec`). The dimensions bind perfectly — reloaded
+extents match D1's w/h/d to 1e-8 m, bottom-centre exact — and the mesh is still
+labelled `proxy_recommended`, `distortion_ratio` **2.73**.
+
+The reason is in the numbers and it is not a bug. SF3D's raw footprint is
+0.919 x 0.752 m, near square, because it inferred depth from one front-on product
+photo. The real dresser is 1.4986 wide by 0.4496 deep, aspect 3.33. Binding to the
+true box therefore stretches X by 1.63 and squashes Z by 0.60, and that is visible.
+
+It is NOT a yaw error. The test for one is cheap: recompute the distortion ratio
+against the SWAPPED target `(d, h, w)` using `validation.source_oriented_extents`.
+Here it is 4.07 against 2.73 as bound, so identity is the better fit and nothing is
+facing sideways. Only when the swapped ratio is the clearly smaller one does the
+mesh need a rotated orientation profile.
+
+**Choose demo objects whose real footprint is roughly square** — chairs, stools,
+lamps, side tables bind cleanly. Wide, shallow pieces — dressers, sideboards,
+dining tables, sectionals — will bind to the right numbers and look stretched.
+Every receipt carries `distortion_ratio`; sort by it before choosing a hero object.
 
 ## Profiling diagnostics
 

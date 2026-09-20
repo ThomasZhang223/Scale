@@ -18,6 +18,11 @@ compatibility_flags = ["nodejs_compat"]
 
 [vars]
 API_ORIGIN = "https://full-scale-workers.thomaszhangdev.workers.dev"
+# "1": POST /v1/find returns only products that already have a mesh in D1, and tops the wrist
+# menu up from the meshed catalogue. "0": the fully live path — every found row, generated on
+# pick. Turn it back to "0" when the Baseten provider is healthy (GET /v1/health says
+# providerConfigured:true). Unset or any other value is a 500, never a guessed side.
+FIND_READY_ONLY = "1"
 
 [triggers]
 crons = ["* * * * *"]

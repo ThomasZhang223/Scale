@@ -148,6 +148,23 @@ def test_worker_request_maps_hydrated_source_and_keeps_actual_reference():
                             image_ref=req.image_ref) == req
 
 
+@pytest.mark.parametrize("tier,accepted", [("live", True), ("quality", True), ("cheap", False), (None, False)])
+def test_worker_request_accepts_every_contract_tier(tier, accepted):
+    """.claude/contracts.md: POST /objects/{id}/generate takes "live" OR "quality"."""
+    req = request()
+    body = {"object_id": req.object_id, "source": "scan", "bbox_meters": req.bbox_meters,
+            "image_url": "https://worker.invalid/v1/assets/objects/owned-A/frames/0.png"}
+    if tier is not None:
+        body["tier"] = tier
+    call = lambda: g.worker_request(body, req.image, scope=req.scope,
+                                    image_sha256=req.image_sha256, image_ref=req.image_ref)
+    if accepted:
+        assert call() == req
+    else:
+        with pytest.raises(g.GenerationError, match="unsupported_generation_tier"):
+            call()
+
+
 def test_paid_disabled_by_default():
     client = Mock()
     with pytest.raises(g.GenerationError, match="not_enabled"):

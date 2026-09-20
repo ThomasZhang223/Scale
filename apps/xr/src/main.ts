@@ -23,14 +23,14 @@ import { Voice, type VoiceState } from './voice';
 import { findListings, needFromDetected, needFromText, isShoppingRequest, productQuery, STOREFRONTS, type Listing, type ListingsResult, type Need, type StageInfo } from './listings';
 import { FindPanel } from './findpanel';
 import { Outdoors } from './outdoors';
-import roomDemo from '../../../fixtures/room-demo.json';
+import roomH from '../../../fixtures/room-h.json';
 import roomLarge from '../public/room-large.json';
 
 /*
  * Stand inside a RoomPlan room scan, with scanned objects (GLBs) in it.
  *
  * Room: GET /v1/rooms/{id} from the team's server (RoomCapture v1; ?room=<id> picks one),
- *   falling back to the committed fixtures/room-demo.json when the server is unreachable.
+ *   falling back to the committed fixtures/room-h.json when the server is unreachable.
  *   ?scan=<url> loads a file instead; raw RoomPlan CapturedRoom JSON works too.
  *   Built at true size, floor at y = 0.
  * Objects: from the server (?object=<id>, and every `object` event on the room's live
@@ -453,7 +453,7 @@ async function start() {
       return;
     }
     findPanel.setProgress(objectId, 'Queued for Baseten…');
-    let job: { objectId: string; jobId: string };
+    let job: { objectId: string; jobId: string | null };
     try {
       job = await postListingsGenerate(l, SERVER_ROOM_ID);
     } catch (err) {
@@ -462,6 +462,20 @@ async function start() {
     }
     // The server mints a stable id; the placed box keeps tracking it so SSE dedupe works.
     placed.objectId = job.objectId;
+    if (!job.jobId) {
+      // The object already had its mesh, so no job was started and there is nothing to poll.
+      // This is the race where the row turned ready between the search and the pick; the
+      // usual ready path never reaches here, because addListing loaded the GLB above.
+      try {
+        const loaded = await loader.load(objectToItem(await getObject(job.objectId)).url, 1); // scale 1: the mesh normalisation contract
+        if (objects.has(placed.id)) swapLoaded(placed, loaded);
+        findPanel.setProgress(objectId, 'Mesh placed at true scale');
+      } catch (err) {
+        findPanel.setProgress(objectId, `Mesh failed to load: ${(err as Error).message}`);
+        tell(`${l.name}: ${concise((err as Error).message, 80)}`, 'error', 'listings');
+      }
+      return;
+    }
     tell(`${l.name}: in the room as a box, 3D on the way.`, 'info', 'listings');
     const started = Date.now();
     // ceiling: 3 s polling for up to 10 min. The SSE `object` event usually lands first; when it
@@ -1320,7 +1334,7 @@ async function start() {
       setConnection(STUB ? 'stub' : 'server');
     } catch (err) {
       console.warn('The server did not answer; showing the committed fixture instead.', err);
-      showScan(roomDemo, 'room-demo.json (fixture)');
+      showScan(roomH, 'room-h.json (the demo room, offline)');
       setConnection('offline');
     }
   }
