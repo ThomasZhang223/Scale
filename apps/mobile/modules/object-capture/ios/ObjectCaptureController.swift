@@ -66,7 +66,10 @@ final class ObjectCaptureController {
   private init() {}
 
   static var isSupported: Bool {
-    ObjectCaptureSession.isSupported && PhotogrammetrySession.isSupported
+    let capture = ObjectCaptureSession.isSupported
+    let photogrammetry = PhotogrammetrySession.isSupported
+    NSLog("[ObjectCapture] isSupported capture=%d photogrammetry=%d", capture, photogrammetry)
+    return capture && photogrammetry
   }
 
   // MARK: - Session lifecycle
@@ -94,8 +97,13 @@ final class ObjectCaptureController {
     config.isOverCaptureEnabled = true
     s.start(imagesDirectory: images, configuration: config)
     session = s
+    NSLog("[ObjectCapture] session started, state=%@", Self.describe(s.state))
     sessionListeners.forEach { $0(s) }
     observe(s)
+    // The current state, once, so JS is never left on the phase it guessed
+    // at mount if the first transition happened before the stream was read.
+    let initial = Self.describe(s.state)
+    stateListeners.forEach { $0(initial) }
   }
 
   func startDetecting() throws {
@@ -141,6 +149,7 @@ final class ObjectCaptureController {
     stateTask = Task { [weak self] in
       for await state in s.stateUpdates {
         guard let self, !Task.isCancelled else { return }
+        NSLog("[ObjectCapture] state -> %@", Self.describe(state))
         self.stateListeners.forEach { $0(Self.describe(state)) }
         switch state {
         case .completed:
@@ -162,9 +171,18 @@ final class ObjectCaptureController {
     }
     shotsTask = Task { [weak self] in
       var last = -1
+      var lastState = ""
       while !Task.isCancelled {
         try? await Task.sleep(nanoseconds: 400_000_000)
         guard let self, let session = self.session else { return }
+        // Belt and braces: if the Updates stream ever goes quiet, the polled
+        // state still reaches JS. Duplicates are harmless (same string).
+        let st = Self.describe(session.state)
+        if st != lastState {
+          lastState = st
+          NSLog("[ObjectCapture] polled state=%@", st)
+          self.stateListeners.forEach { $0(st) }
+        }
         let n = session.numberOfShotsTaken
         if n != last {
           last = n

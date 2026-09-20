@@ -1,7 +1,9 @@
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
-import { Host, VStack, HStack, List, Section, Button, Text, Image, Spacer, ProgressView, GlassEffectContainer } from "@expo/ui/swift-ui";
-import { buttonStyle, controlSize, font, foregroundStyle, frame, glassEffect, listRowBackground, padding } from "@expo/ui/swift-ui/modifiers";
+import { VStack, HStack, List, Section, Button, Text, Image, Spacer, ProgressView, GlassEffectContainer } from "@expo/ui/swift-ui";
+
+import { GlassHost, GlassSection, glassList } from "../../src/ui/glass";
+import { buttonStyle, font, foregroundStyle, frame, glassEffect, listRowBackground, listRowSeparator, padding } from "@expo/ui/swift-ui/modifiers";
 
 import { getJSON } from "../../src/lib/api";
 import { spacing } from "../../src/theme/tokens";
@@ -107,9 +109,9 @@ export default function CaptureHubScreen() {
   }
 
   return (
-    <Host style={{ flex: 1 }} useViewportSizeMeasurement>
-      <List>
-        <Section modifiers={[listRowBackground("clear")]}>
+    <GlassHost>
+      <List modifiers={glassList}>
+        <Section modifiers={[listRowBackground("clear"), listRowSeparator("hidden")]}>
           <GlassEffectContainer spacing={12}>
             <VStack spacing={12}>
               <CaptureTile
@@ -135,7 +137,7 @@ export default function CaptureHubScreen() {
           </GlassEffectContainer>
         </Section>
 
-        <Section title="Recent">
+        <GlassSection title="Recent">
           {state.status === "loading" ? (
             <ProgressView />
           ) : state.status === "error" ? (
@@ -159,8 +161,8 @@ export default function CaptureHubScreen() {
               </Button>
             ))
           )}
-        </Section>
+        </GlassSection>
       </List>
-    </Host>
+    </GlassHost>
   );
 }

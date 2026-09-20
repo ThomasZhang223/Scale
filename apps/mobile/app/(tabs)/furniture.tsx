@@ -4,8 +4,10 @@
 // at 1:1.
 import { useMemo, useState } from "react";
 import { useRouter } from "expo-router";
-import { Host, List, Section, Picker, Text, TextField } from "@expo/ui/swift-ui";
-import { font, foregroundStyle, listStyle, pickerStyle, refreshable, tag } from "@expo/ui/swift-ui/modifiers";
+import { List, Picker, Text, TextField } from "@expo/ui/swift-ui";
+import { font, foregroundStyle, pickerStyle, refreshable, tag } from "@expo/ui/swift-ui/modifiers";
+
+import { GlassHost, GlassSection, glassList } from "../../src/ui/glass";
 
 import { EmptyState } from "../../src/ui/EmptyState";
 import { ErrorView } from "../../src/ui/ErrorView";
@@ -42,9 +44,9 @@ export default function FurnitureScreen() {
   const secondary = foregroundStyle({ type: "hierarchical", style: "secondary" });
 
   return (
-    <Host style={{ flex: 1 }} useViewportSizeMeasurement>
-      <List modifiers={[listStyle("insetGrouped"), refreshable(async () => retry())]}>
-        <Section>
+    <GlassHost>
+      <List modifiers={[...glassList, refreshable(async () => retry())]}>
+        <GlassSection>
           <TextField placeholder="Search furniture" onTextChange={setQuery} />
           <Picker
             label="Merchant"
@@ -59,10 +61,10 @@ export default function FurnitureScreen() {
               </Text>
             ))}
           </Picker>
-        </Section>
+        </GlassSection>
 
         {shown.length === 0 ? (
-          <Section>
+          <GlassSection divided={false}>
             <EmptyState
               title={objects.length === 0 ? "No listings yet" : "No matches"}
               systemImage="sofa"
@@ -72,9 +74,9 @@ export default function FurnitureScreen() {
                   : "Try another merchant or a shorter search."
               }
             />
-          </Section>
+          </GlassSection>
         ) : (
-          <Section
+          <GlassSection
             title={merchant === ALL ? "All merchants" : merchant}
             footer={
               <Text modifiers={[font({ textStyle: "footnote" }), secondary]}>
@@ -91,9 +93,9 @@ export default function FurnitureScreen() {
                 onPress={() => router.push({ pathname: "/object/[id]", params: { id: object.objectId } })}
               />
             ))}
-          </Section>
+          </GlassSection>
         )}
       </List>
-    </Host>
+    </GlassHost>
   );
 }

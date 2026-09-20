@@ -1,6 +1,8 @@
 import { useLocalSearchParams } from "expo-router";
 import { ScrollView, View, StyleSheet, useWindowDimensions } from "react-native";
-import { Host, List, Section, LabeledContent } from "@expo/ui/swift-ui";
+import { Host, List, LabeledContent } from "@expo/ui/swift-ui";
+
+import { GlassSection, glassList } from "../../src/ui/glass";
 
 import { getJSON } from "../../src/lib/api";
 import { spacing } from "../../src/theme/tokens";
@@ -51,27 +53,27 @@ export default function RoomDetailScreen() {
       </View>
 
       <Host style={styles.hostAuto} matchContents>
-        <List>
-          <Section title="Room">
+        <List modifiers={glassList}>
+          <GlassSection title="Room">
             <Metric label="Area" value={`${room.floor.areaM2.toFixed(1)} m²`} />
-          </Section>
+          </GlassSection>
 
-          <Section title="Openings">
+          <GlassSection title="Openings">
             {doors.map((door) => (
               <Metric key={door.id} label="Door" value={formatMeters(door.dimensions[0])} />
             ))}
             {windows.map((window) => (
               <Metric key={window.id} label="Window" value={formatMeters(window.dimensions[0])} />
             ))}
-          </Section>
+          </GlassSection>
 
-          <Section title="Walls">
+          <GlassSection title="Walls">
             {room.walls.map((wall, i) => (
               <LabeledContent key={wall.id} label={`Wall ${i + 1}`}>
                 <ConfidenceBadge level={wall.confidence} />
               </LabeledContent>
             ))}
-          </Section>
+          </GlassSection>
         </List>
       </Host>
     </ScrollView>
@@ -81,6 +83,7 @@ export default function RoomDetailScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
+    backgroundColor: "#e8edf4",
   },
   content: {
     padding: spacing.md,

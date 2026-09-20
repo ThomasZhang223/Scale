@@ -27,11 +27,32 @@ class ObjectCaptureNativeView: ExpoView {
     host?.view.frame = bounds
   }
 
+  override func didMoveToWindow() {
+    super.didMoveToWindow()
+    // Parent the hosting controller once we are in a window; SwiftUI camera
+    // views need a real view-controller hierarchy for their lifecycle.
+    if window != nil, let host, host.parent == nil { parentController(host) }
+  }
+
+  private func parentController(_ hosting: UIHostingController<AnyView>) {
+    var responder: UIResponder? = next
+    while let r = responder, !(r is UIViewController) { responder = r.next }
+    guard let parent = responder as? UIViewController else { return }
+    parent.addChild(hosting)
+    hosting.didMove(toParent: parent)
+    NSLog("[ObjectCapture] view hosted under %@", String(describing: type(of: parent)))
+  }
+
   @MainActor
   private func attach(_ session: ObjectCaptureSession?) {
-    host?.view.removeFromSuperview()
+    if let host {
+      host.willMove(toParent: nil)
+      host.view.removeFromSuperview()
+      host.removeFromParent()
+    }
     host = nil
     guard let session else { return }
+    NSLog("[ObjectCapture] attaching ObjectCaptureView, bounds=%@", NSCoder.string(for: bounds))
     let hosting = UIHostingController(rootView: AnyView(
       ObjectCaptureView(session: session).ignoresSafeArea()
     ))
@@ -39,5 +60,6 @@ class ObjectCaptureNativeView: ExpoView {
     hosting.view.frame = bounds
     addSubview(hosting.view)
     host = hosting
+    if window != nil { parentController(hosting) }
   }
 }

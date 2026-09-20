@@ -1,9 +1,10 @@
 import { useRouter } from "expo-router";
-import { Host, List, Section, Button, VStack, HStack, Text, Image, Spacer } from "@expo/ui/swift-ui";
+import { List, Button, VStack, HStack, Text, Image, Spacer } from "@expo/ui/swift-ui";
 import { buttonStyle } from "@expo/ui/swift-ui/modifiers";
 
 import { getJSON } from "../../src/lib/api";
 import { colors } from "../../src/theme/tokens";
+import { GlassHost, GlassSection, glassList } from "../../src/ui/glass";
 import { DEMO_ROOM_ID } from "../../src/ui/demoIds";
 import { EmptyState } from "../../src/ui/EmptyState";
 import { ErrorView } from "../../src/ui/ErrorView";
@@ -52,20 +53,20 @@ export default function RoomsScreen() {
 
   if (rooms.length === 0) {
     return (
-      <Host style={{ flex: 1 }}>
+      <GlassHost>
         <EmptyState
           title="No rooms yet"
           systemImage="house"
           description="Scan a room from the Capture tab to see it here."
         />
-      </Host>
+      </GlassHost>
     );
   }
 
   return (
-    <Host style={{ flex: 1 }} useViewportSizeMeasurement>
-      <List>
-        <Section title="Rooms">
+    <GlassHost>
+      <List modifiers={glassList}>
+        <GlassSection title="Rooms">
           {rooms.map((r) => (
             <Button
               key={r.roomId}
@@ -89,8 +90,8 @@ export default function RoomsScreen() {
               </VStack>
             </Button>
           ))}
-        </Section>
+        </GlassSection>
       </List>
-    </Host>
+    </GlassHost>
   );
 }
