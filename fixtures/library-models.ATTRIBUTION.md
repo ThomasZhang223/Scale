@@ -20,7 +20,7 @@ No model in this project comes from a merchant, brand or manufacturer site, and 
 login, paywall or API token was bypassed to obtain one. The Poly Haven API was called
 with an identifying User-Agent, as its terms ask.
 
-## Models in the live library (99)
+## Models in the live library (100)
 
 | model | category | Poly Haven asset | author |
 | --- | --- | --- | --- |
@@ -73,6 +73,7 @@ with an identifying User-Agent, as its terms ask.
 | Small drawer unit | dresser | [vintage_wooden_drawer_01](https://polyhaven.com/a/vintage_wooden_drawer_01) | James Ray Cock |
 | Ceiling fan | fan | [ceiling_fan](https://polyhaven.com/a/ceiling_fan) | Ulan Cabanilla |
 | Adjustable desk lamp | lamp | [desk_lamp_arm_01](https://polyhaven.com/a/desk_lamp_arm_01) | Kuutti Siitonen, Yann Kervran |
+| Arc floor lamp | lamp | [LightsPunctualLamp](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/LightsPunctualLamp) | Teresa González Viegas |
 | Brass diya table lamp | lamp | [brass_diya_lantern](https://polyhaven.com/a/brass_diya_lantern) | Bhargav Kubal |
 | Industrial pipe desk lamp | lamp | [industrial_pipe_lamp](https://polyhaven.com/a/industrial_pipe_lamp) | Mateusz Sadek |
 | Small metal table lantern | lamp | [Lantern_01](https://polyhaven.com/a/Lantern_01) | Rajil Jose Macatangay |
@@ -146,7 +147,24 @@ the floor. They are kept here so they carry their attribution if they ever ship.
 | Tiered chandelier | ceiling | [Chandelier_03](https://polyhaven.com/a/Chandelier_03) | Kirill Sannikov |
 | Wooden ceiling chandelier | ceiling | [chinese_chandelier](https://polyhaven.com/a/chinese_chandelier) | Kirill Sannikov |
 
-## Not available
+## Models under CC-BY — attribution is REQUIRED for these
 
-Poly Haven publishes no rug, no wheeled office chair and no floor lamp. None was
-substituted with something that is not the thing named.
+The models below are **not** CC0. Their licence requires attribution and that
+changes be indicated. Both are given here and per model in
+`fixtures/library-models.json`.
+
+### Arc floor lamp
+
+- Source: [LightsPunctualLamp](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/LightsPunctualLamp), Khronos glTF-Sample-Assets
+- © 2021, DGG
+- Author: Teresa González Viegas
+- Licence: [CC-BY-4.0](https://creativecommons.org/licenses/by/4.0/legalcode)
+- Changes made: repacked to a single GLB with 1k textures; geometry unchanged, never rescaled
+
+
+## Not available under an open licence
+
+Poly Haven publishes no rug and no wheeled office chair, and the Khronos sample
+assets contain neither. Smithsonian Open Access needs an api.data.gov key, which
+this panel was not given. Nothing was substituted with something that is not the
+thing named.

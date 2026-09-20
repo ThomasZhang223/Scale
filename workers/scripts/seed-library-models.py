@@ -59,6 +59,7 @@ LICENSE = "CC0-1.0"
 LICENSE_URL = "https://polyhaven.com/license"
 # The id namespace. Fixed, so a re-run addresses the same rows instead of making new ones.
 ID_PREFIX = "full-scale:library:polyhaven:"
+KHRONOS_ID_PREFIX = "full-scale:library:khronos:"
 MAX_BYTES = 5 * 1024 * 1024
 MAX_TRIANGLES = 100_000
 
@@ -254,6 +255,104 @@ CURATED = [
 ]
 
 
+# --- Second source: Khronos glTF-Sample-Assets -----------------------------------------------
+# Poly Haven is exhausted for room furnishing: it has no floor lamp, no wheeled office chair and
+# no rug. This is the only other token-free source that filled one of those gaps. Smithsonian
+# Open Access answers 403 without an api.data.gov key, which this panel was not given, and
+# ambientCG publishes 34 models, all food and a tree stump.
+#
+# Unlike Poly Haven, the licence here is PER MODEL, in that model's README.md, and it is not all
+# CC0. Each entry states the licence it was read under, and the fetch REFUSES if that README no
+# longer contains it. A licence is not something to assume from last time.
+KHRONOS_RAW = "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models"
+KHRONOS = [
+    # (model, display name, category, min_largest_m, max_largest_m, licence, licence url,
+    #  authors, copyright notice, the phrase that must still appear in the README)
+    ("LightsPunctualLamp", "Arc floor lamp", "lamp", 0.5, 2.5,
+     "CC-BY-4.0", "https://creativecommons.org/licenses/by/4.0/legalcode",
+     ["Teresa Gonz\u00e1lez Viegas"], "\u00a9 2021, DGG",
+     "Creative Commons Attribution 4.0 International"),
+]
+
+
+def khronos_download(model, phrase, work):
+    """Fetch the binary glTF and the README, and refuse if the stated licence has changed."""
+    readme = get(f"{KHRONOS_RAW}/{model}/README.md", binary=True).decode("utf-8", "replace")
+    if phrase not in readme:
+        raise Stop(f"{model}: its README no longer states {phrase!r}; refusing to reuse it")
+    directory = work / model
+    directory.mkdir(parents=True, exist_ok=True)
+    target = directory / f"{model}.glb"
+    body = get(f"{KHRONOS_RAW}/{model}/glTF-Binary/{model}.glb", binary=True)
+    target.write_bytes(body)
+    return target, len(body)
+
+
+def process_khronos(spec, args, previous):
+    model, name, category, low, high, licence, licence_url, authors, copyright_, phrase = spec
+    record = {"source": "khronos-gltf-sample-assets", "assetId": model, "name": name,
+              "category": category, "categoryInKnownList": category in KNOWN_CATEGORIES,
+              "mount": MOUNT.get(model),
+              "url": f"https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/{model}",
+              "license": licence, "licenseUrl": licence_url, "attribution": authors,
+              "copyrightNotice": copyright_,
+              # CC-BY 4.0 asks that changes be indicated. They are, here and in the manifest.
+              "modifications": ("repacked to a single GLB with 1k textures; geometry unchanged, "
+                                "never rescaled"),
+              "objectId": object_id(model, KHRONOS_ID_PREFIX), "status": None}
+
+    earlier = previous.get(model)
+    if earlier and not args.plan_only and not args.refresh:
+        done = already_seeded(args.base, record["objectId"], earlier["packedSha256"])
+        if done is not None:
+            return {**earlier, **record, "status": "already_seeded",
+                    "verified": verify(args.base, record["objectId"], earlier["packedSha256"],
+                                       earlier["bboxMeters"])}
+
+    work = Path(args.work)
+    source, downloaded = khronos_download(model, phrase, work)
+    record["sourceFileUrl"] = f"{KHRONOS_RAW}/{model}/glTF-Binary/{model}.glb"
+    record["sourceBytes"] = downloaded
+    record["sourceSha256"] = hashlib.sha256(source.read_bytes()).hexdigest()
+
+    packed = work / f"{model}.packed.glb"
+    pack(source, packed)
+    count = triangles(packed)
+    if count > MAX_TRIANGLES:
+        ratio = round(MAX_TRIANGLES / count, 4)
+        reduced = work / f"{model}.simplified.glb"
+        simplify(packed, reduced, ratio)
+        record["simplifiedRatio"] = ratio
+        packed, count = reduced, triangles(reduced)
+    glb = packed.read_bytes()
+    sha256 = hashlib.sha256(glb).hexdigest()
+    record.update({"triangles": count, "bytes": len(glb), "packedSha256": sha256,
+                   "textureSize": 1024, "compression": "none"})
+
+    box, raw = measure(packed)
+    record["bboxMeters"] = box
+    record["measuredTransformed"] = raw["transformed"]
+    record["restsOnFloorMinY"] = round(raw["min"][1], 4)
+    largest = max(box.values())
+    if len(glb) > MAX_BYTES:
+        return {**record, "status": "skipped",
+                "reason": f"packed to {len(glb)} bytes, over the {MAX_BYTES} budget"}
+    if not (low <= largest <= high):
+        return {**record, "status": "skipped",
+                "reason": f"largest side {largest:.3f} m is outside the plausible {low}-{high} m for a {category}"}
+    if args.plan_only:
+        return {**record, "status": "planned"}
+
+    oid = record["objectId"]
+    post(f"{args.base}/v1/objects", {
+        "objectId": oid, "source": "primitive", "name": name, "category": category,
+        "bboxMeters": box, "measure": {"method": "declared", "confidence": 0.5},
+    })
+    key, _ = attach(args.base, oid, glb, sha256)
+    record["glbKey"] = key
+    return {**record, "status": "seeded", "verified": verify(args.base, oid, sha256, box)}
+
+
 def say(message):
     print(message, flush=True)
 
@@ -288,8 +387,9 @@ def put(url, body, content_type):
             raise Stop(f"PUT {url} answered {response.status}")
 
 
-def object_id(asset_id):
-    return str(uuid.uuid5(uuid.NAMESPACE_URL, ID_PREFIX + asset_id))
+def object_id(asset_id, prefix=None):
+    """Fixed id, so a re-run addresses the same row. The prefix names the source, truthfully."""
+    return str(uuid.uuid5(uuid.NAMESPACE_URL, (prefix or ID_PREFIX) + asset_id))
 
 
 def download_gltf(asset_id, work):
@@ -516,11 +616,14 @@ def main(argv=None):
         for row in json.loads(manifest_path.read_text(encoding="utf-8")).get("models", []):
             if row.get("status") in ("seeded", "already_seeded") and row.get("packedSha256"):
                 previous[row["assetId"]] = row
-    specs = [s for s in CURATED if not args.only or s[0] in set(args.only)]
+    wanted = set(args.only) if args.only else None
+    specs = [("polyhaven", s) for s in CURATED if not wanted or s[0] in wanted]
+    specs += [("khronos", s) for s in KHRONOS if not wanted or s[0] in wanted]
     records = []
-    for number, spec in enumerate(specs, 1):
+    for number, (origin_name, spec) in enumerate(specs, 1):
         try:
-            record = process(spec, args, index, previous)
+            record = (process_khronos(spec, args, previous) if origin_name == "khronos"
+                      else process(spec, args, index, previous))
         except Stop as stop:
             record = {"assetId": spec[0], "name": spec[1], "category": spec[2],
                       "status": "failed", "reason": str(stop)}
@@ -535,6 +638,15 @@ def main(argv=None):
         "note": ("Library models for the headset's Furniture page. Every row is "
                  "source:\"primitive\" — a library model, never a merchant product. Sizes are "
                  "as authored, in metres; nothing here was ever rescaled."),
+        "sources": {
+            "polyhaven": {"license": LICENSE, "url": LICENSE_URL,
+                          "note": "site-wide CC0; attribution recorded although not required"},
+            "khronos-gltf-sample-assets": {
+                "license": "per model, read from that model's README.md",
+                "url": "https://github.com/KhronosGroup/glTF-Sample-Assets",
+                "note": ("NOT all CC0. Each entry records the licence it was read under, its "
+                         "copyright notice and its authors, and the fetch refuses if the "
+                         "README no longer states that licence.")}},
         "license": {"id": LICENSE, "url": LICENSE_URL,
                     "statement": ("Poly Haven publishes every asset on the site as CC0. "
                                   "Redistribution and commercial use are permitted and "

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "note": "Library models for the headset's Furniture page. Every row is source:\"primitive\" \u2014 a library model, never a merchant product. Sizes are as authored, in metres; nothing here was ever rescaled.",
+  "note": "Library models for the headset's Furniture page. Every row is source:\"primitive\" \u2014 a library model, never a merchant product. Sizes are as authored, in metres; nothing here was ever rescaled. Two sources: Poly Haven (CC0 site-wide) and the Khronos glTF-Sample-Assets (licence per model, read from that model's README).",
   "license": {
     "id": "CC0-1.0",
     "url": "https://polyhaven.com/license",
@@ -4424,6 +4424,59 @@
         "state": "ready",
         "listed": true
       }
+    },
+    {
+      "source": "khronos-gltf-sample-assets",
+      "assetId": "LightsPunctualLamp",
+      "name": "Arc floor lamp",
+      "category": "lamp",
+      "categoryInKnownList": true,
+      "mount": null,
+      "url": "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/LightsPunctualLamp",
+      "license": "CC-BY-4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/4.0/legalcode",
+      "attribution": [
+        "Teresa Gonz\u00e1lez Viegas"
+      ],
+      "copyrightNotice": "\u00a9 2021, DGG",
+      "modifications": "repacked to a single GLB with 1k textures; geometry unchanged, never rescaled",
+      "objectId": "df789f6b-8c4d-5065-bbb7-b8440e874b5b",
+      "status": "seeded",
+      "sourceFileUrl": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/LightsPunctualLamp/glTF-Binary/LightsPunctualLamp.glb",
+      "sourceBytes": 4341320,
+      "sourceSha256": "b9a95cd0e17dea5284117e54807b49b746960038457a31a0011b9344acc11104",
+      "triangles": 6000,
+      "bytes": 1732884,
+      "packedSha256": "6ac7526ed95dff9431640caced8164011fbdba596907445e5c51389376cd2609",
+      "textureSize": 1024,
+      "compression": "none",
+      "bboxMeters": {
+        "w": 1.127,
+        "h": 1.8636,
+        "d": 0.7216
+      },
+      "measuredTransformed": true,
+      "restsOnFloorMinY": 0.0111,
+      "glbKey": "objects/df789f6b-8c4d-5065-bbb7-b8440e874b5b/mesh.glb",
+      "verified": {
+        "ok": true,
+        "problems": [],
+        "glbUrl": "https://full-scale-workers.thomaszhangdev.workers.dev/v1/assets/objects/df789f6b-8c4d-5065-bbb7-b8440e874b5b/mesh.glb",
+        "state": "ready",
+        "listed": true
+      }
     }
-  ]
+  ],
+  "sources": {
+    "polyhaven": {
+      "license": "CC0-1.0",
+      "url": "https://polyhaven.com/license",
+      "note": "site-wide CC0; attribution recorded although not required"
+    },
+    "khronos-gltf-sample-assets": {
+      "license": "per model, read from that model's README.md",
+      "url": "https://github.com/KhronosGroup/glTF-Sample-Assets",
+      "note": "NOT all CC0. Each entry records the licence it was read under, its copyright notice and its authors, and the fetch refuses if the README no longer states that licence."
+    }
+  }
 }
