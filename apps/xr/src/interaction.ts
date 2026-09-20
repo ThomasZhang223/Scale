@@ -152,14 +152,6 @@ export class Interaction {
   }
 
   /**
-   * Puts every window in front of the person. Called after a room switch: the rooms are
-   * different shapes, so a window left where it was can be inside the new room's wall.
-   */
-  reseatWindows(eye: THREE.Vector3, forward: THREE.Vector3) {
-    for (const window of this.windows) window.placeInFront(eye, forward);
-  }
-
-  /**
    * Another window the same grab can move. The tablet is added by the constructor; the search
    * popout adds itself, so both are dragged by one implementation and one gesture.
    */
