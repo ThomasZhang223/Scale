@@ -7,7 +7,7 @@ registerHooks({ resolve(specifier, context, next) {
   const stubs = {
     "cloudflare:workers": "export class WorkflowEntrypoint { constructor(_ctx, env) { this.env = env; } }",
     "cloudflare:workflows": "export class NonRetryableError extends Error {}",
-    "agents": "export function getAgentByName(namespace) { return namespace.stub; }",
+    "agents": "export function getAgentByName(namespace) { return namespace.stub; } export class Agent { constructor(ctx, env) { this.ctx = ctx; this.env = env; this.state = {}; } setState(state) { this.state = state; } sql() { return []; } }",
   };
   if (stubs[specifier]) return { url: `data:text/javascript,${encodeURIComponent(stubs[specifier])}`, shortCircuit: true };
   if (specifier.startsWith(".") && !/\.[a-z]+$/.test(specifier)) specifier += ".ts";
@@ -16,7 +16,10 @@ registerHooks({ resolve(specifier, context, next) {
 const { embedInput, indexObject } = await import("../src/lib/embedding.ts");
 const { consumeMeshJobs } = await import("../src/lib/queue.ts");
 const { GenerateMeshWorkflow } = await import("../src/workflows/generate-mesh.ts");
-const { postSearch, postGenerate, postObjectMesh, postObjectIndex, postUpload, postIngestMerchant } = await import("../src/routes/index.ts");
+const { postSearch, postGenerate, postObjectMesh, postObjectIndex, postUpload, postIngestMerchant, postSolve, postScout, getAsset } = await import("../src/routes/index.ts");
+const { RoomAgent } = await import("../src/agents/room-agent.ts");
+const { ScoutAgent } = await import("../src/agents/scout-agent.ts");
+import { readFileSync } from "node:fs";
 const { catalogObjectId, normalizeCatalogItem } = await import("../src/lib/catalog-ingest.ts");
 const fingerprint = "a".repeat(64);
 const vector = { values: Array(768).fill(1 / Math.sqrt(768)), dimension: 768,
@@ -471,4 +474,271 @@ test("POST /v1/ingest is token-gated, needs an https storefront and defaults eve
   assert.deepEqual(await response.json(), { workflowId: "wf-1", merchant: "M", storefront: "https://shop.example" });
   assert.deepEqual(created[0].params, { merchant: "M", storefront: "https://shop.example", collection: null,
     browserbase: false, llm: false, vlm: false });
+});
+
+// --- Attach by source --------------------------------------------------------------------------
+
+// scanEnvironment's row is shared by reference through DB.first(), so a test sets its source there.
+async function attach(source, key, stored = glbBytes()) {
+  const { env, writes } = scanEnvironment(stored);
+  env.DB.batch = async statements => { for (const statement of statements) await statement.run(); };
+  (await env.DB.prepare("").bind().first()).source = source;
+  const upserts = [];
+  env.OBJECTS_INDEX = { upsert: async vectors => { upserts.push(...vectors); } };
+  const { ctx, settle } = context();
+  const outcome = await postObjectMesh(scanRequest(key), env, "scan-1", "https://api.example", ctx).then(
+    response => ({ response }), error => ({ error }));
+  await settle();
+  return { ...outcome, writes, upserts };
+}
+
+test("a catalogue row takes objects/{id}/mesh.glb, is ready, and its parked mesh jobs are closed", async t => {
+  t.mock.method(globalThis, "fetch", async () => Response.json(vector));
+  const { response, writes, upserts } = await attach("catalog", "objects/scan-1/mesh.glb");
+  assert.equal(response.status, 200);
+  assert.equal(writes.find(w => w.sql.includes("state = 'ready'")).args[0], "objects/scan-1/mesh.glb");
+  const outbox = writes.find(w => w.sql.startsWith("UPDATE mesh_outbox"));
+  assert.match(outbox.sql, /delivered_at IS NULL/);
+  assert.match(outbox.sql, /state = 'queued'/);
+  assert.equal(outbox.args[1], "scan-1");
+  const jobs = writes.find(w => w.sql.startsWith("UPDATE jobs"));
+  assert.match(jobs.sql, /kind = 'mesh' AND state = 'queued'/);
+  assert.deepEqual([jobs.args[0], jobs.args[2]], ["mesh attached via POST /mesh (reviewed offline); generation skipped", "scan-1"]);
+  assert.ok(jobs.sql.includes("state = 'done', progress_pct = 100"));
+  assert.ok(writes.indexOf(outbox) < writes.indexOf(jobs), "outbox must be closed before the jobs its subquery selects");
+  assert.equal(upserts[0].metadata.source, "catalog");
+});
+
+test("a primitive row also takes objects/{id}/mesh.glb", async t => {
+  t.mock.method(globalThis, "fetch", async () => Response.json(vector));
+  const { response } = await attach("primitive", "objects/scan-1/mesh.glb");
+  assert.equal(response.status, 200);
+});
+
+test("a catalogue row can never be attached under scans/", async () => {
+  const { error, writes } = await attach("catalog", "scans/scan-1/mesh.glb");
+  assert.equal(error.status, 400);
+  assert.equal(error.code, "bad_mesh_key");
+  assert.match(error.message, /objects\/scan-1\/mesh\.glb/);
+  assert.match(error.message, /catalog/);
+  assert.equal(writes.length, 0);
+});
+
+test("a scan row can never be attached under objects/, and its jobs are left alone", async () => {
+  const { error, writes } = await attach("scan", "objects/scan-1/mesh.glb");
+  assert.equal(error.status, 400);
+  assert.equal(error.code, "bad_mesh_key");
+  assert.match(error.message, /scans\/scan-1\/mesh\.glb/);
+  assert.match(error.message, /scan object/);
+  assert.equal(writes.length, 0);
+});
+
+test("a scan row with the scans/ key is ready and touches no mesh jobs", async t => {
+  t.mock.method(globalThis, "fetch", async () => Response.json(vector));
+  const { response, writes, upserts } = await attach("scan", "scans/scan-1/mesh.glb");
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("x-indexed"), "pending");
+  assert.equal(writes.some(w => w.sql.startsWith("UPDATE jobs") || w.sql.startsWith("UPDATE mesh_outbox")), false);
+  assert.equal(upserts[0].metadata.source, "scan");
+});
+
+test("an unknown object 404s before the key is compared", async () => {
+  const { env } = scanEnvironment(glbBytes());
+  env.DB = { prepare: () => ({ bind: () => ({ first: async () => null }) }) };
+  await assert.rejects(postObjectMesh(scanRequest("anything"), env, "ghost", "https://api.example", context().ctx),
+    error => error.status === 404);
+});
+
+test("a job that reaches the workflow after a mesh was attached is refused without touching the object", async t => {
+  const { env, row, writes } = pipelineEnvironment();
+  Object.assign(row, { state: "ready", glb_key: "objects/object/mesh.glb" });
+  env.BASETEN_URL = "https://gpu.example/predict";
+  const fetched = t.mock.method(globalThis, "fetch", async () => { throw Error("must not call Baseten"); });
+  const catalog = { objectId: "object", name: "chair", description: "", imageUrl: "https://cdn.example/a.jpg",
+    category: "chair", bboxMeters: { w: 0.7, h: 1, d: 0.6 }, measure: { method: "extracted", confidence: 1 },
+    merchant: "M", productUrl: null, price: null, productId: null };
+  const steps = [];
+  await assert.rejects(new GenerateMeshWorkflow({}, env).run({ payload: { jobId: "job", objectId: "object", tier: "live",
+    apiOrigin: "https://api.example", roomId: null, catalog } }, { do: async (...args) => { steps.push(args[0]); return args.at(-1)(); } }),
+    /already ready with objects\/object\/mesh\.glb/);
+  assert.deepEqual(steps, ["refuse-attached-object"]);
+  assert.equal(fetched.mock.callCount(), 0);
+  assert.equal(writes.some(w => w.sql.includes("INSERT INTO objects")), false, "the catalogue step must not upsert the object");
+  assert.equal(writes.some(w => w.sql.includes("state = 'failed'")), false, "a ready object must never be marked failed");
+  const job = writes.find(w => w.sql.includes("UPDATE jobs"));
+  assert.deepEqual([job.args[0], job.args[2]], ["done", "mesh attached via POST /mesh (reviewed offline); generation skipped"]);
+});
+
+// --- Agents: the real origin, and search in-process ---------------------------------------------
+
+const REAL_ORIGIN = "https://full-scale-workers.example.workers.dev";
+const demoRoom = readFileSync(new URL("../../fixtures/room-demo.json", import.meta.url), "utf8");
+
+// A model that calls search_objects once, then answers. `seen` records what the tool returned.
+function scriptedModel(seen) {
+  let turn = 0;
+  return { run: async (_model, { messages }) => {
+    if (turn++ === 0) {
+      return { choices: [{ message: { content: "", tool_calls: [{ id: "c1",
+        function: { name: "search_objects", arguments: JSON.stringify({ text: "nightstand" }) } }] } }] };
+    }
+    seen.push(JSON.parse(messages.at(-1).content));
+    return { choices: [{ message: { content: "done" } }] };
+  } };
+}
+
+function agentEnvironment(seen) {
+  const { env, row } = pipelineEnvironment();
+  delete env.CONFIG.get; // no embedder: search answers from D1, in-process
+  env.CONFIG = { get: async () => null };
+  Object.assign(row, { glb_key: "objects/object/mesh.glb", palette_json: null });
+  env.BUCKET.get = async () => ({ json: async () => JSON.parse(demoRoom) });
+  env.AI = scriptedModel(seen);
+  return env;
+}
+
+const agentRequest = (path, body) => new Request(`https://agent/${path}`, { method: "POST", body: JSON.stringify(body) });
+
+test("RoomAgent's search tool runs in-process with the real origin, never against https://agent", async t => {
+  const seen = [];
+  const fetched = t.mock.method(globalThis, "fetch", async url => { throw Error(`must not fetch ${url}`); });
+  const agent = new RoomAgent({}, agentEnvironment(seen));
+  const response = await agent.onRequest(agentRequest("plan", { roomId: "room", intent: "add a nightstand", origin: REAL_ORIGIN }));
+  const out = await response.json();
+  assert.equal(out.answer, "done");
+  assert.equal(fetched.mock.callCount(), 0);
+  assert.equal(out.toolCalls[0].name, "search_objects");
+  assert.ok(Array.isArray(seen[0]), `search_objects returned ${JSON.stringify(seen[0])}`);
+  assert.equal(seen[0][0].name, "chair");
+});
+
+test("ScoutAgent's search tool runs in-process with the real origin, never against https://agent", async t => {
+  const seen = [];
+  const fetched = t.mock.method(globalThis, "fetch", async url => { throw Error(`must not fetch ${url}`); });
+  const agent = new ScoutAgent({}, agentEnvironment(seen));
+  const response = await agent.onRequest(agentRequest("scout", { query: "a nightstand", origin: REAL_ORIGIN }));
+  assert.equal((await response.json()).answer, "done");
+  assert.equal(fetched.mock.callCount(), 0);
+  assert.ok(Array.isArray(seen[0]), `search_objects returned ${JSON.stringify(seen[0])}`);
+});
+
+test("an agent request with no usable origin throws instead of defaulting to the synthetic URL", async () => {
+  for (const origin of [undefined, "", "not a url", "ftp://x.example"]) {
+    await assert.rejects(new RoomAgent({}, agentEnvironment([])).onRequest(
+      agentRequest("plan", { roomId: "room", intent: "x", origin })), error => error.code === "origin_required");
+    await assert.rejects(new ScoutAgent({}, agentEnvironment([])).onRequest(
+      agentRequest("scout", { query: "x", origin })), error => error.code === "origin_required");
+  }
+});
+
+test("postSolve and postScout hand the real request origin to their agent", async () => {
+  const bodies = [];
+  const stub = { fetch: async (_url, init) => { bodies.push(JSON.parse(init.body)); return Response.json({}); } };
+  const env = { ROOM_AGENT: { stub }, SCOUT_AGENT: { stub } };
+  await postSolve(new Request(`${REAL_ORIGIN}/v1/solve`, { method: "POST", body: JSON.stringify({ roomId: "room", intent: "x" }) }), env, REAL_ORIGIN);
+  await postScout(new Request(`${REAL_ORIGIN}/v1/scout`, { method: "POST", body: JSON.stringify({ query: "x" }) }), env, REAL_ORIGIN);
+  assert.deepEqual(bodies.map(body => body.origin), [REAL_ORIGIN, REAL_ORIGIN]);
+});
+
+// --- F-2: a text query with no source means the catalogue ------------------------------------------
+
+async function searchWith(body, { embedder = true } = {}) {
+  const { env } = pipelineEnvironment();
+  if (!embedder) env.CONFIG = { get: async () => null };
+  const filters = [];
+  env.OBJECTS_INDEX = { query: async (_values, options) => { filters.push(options.filter ?? null);
+    return { matches: [{ id: "object", score: 0.9 }] }; } };
+  const response = await postSearch(new Request("https://api.example/v1/search", { method: "POST", body: JSON.stringify(body) }),
+    env, "https://api.example");
+  return { response, filters };
+}
+
+test("a text search with no source queries the catalogue and says so in X-Search-Scope", async t => {
+  t.mock.method(globalThis, "fetch", async () => Response.json(vector));
+  for (const body of [{ text: "side table" }, { text: "side table", source: null }]) {
+    const { response, filters } = await searchWith(body);
+    assert.deepEqual(filters, [{ source: "catalog" }]);
+    assert.equal(response.headers.get("x-search-scope"), "catalog-default");
+    assert.equal(response.headers.get("x-ranker"), "vectorize");
+  }
+});
+
+test("an explicit source is always honoured and is not reported as narrowed", async t => {
+  t.mock.method(globalThis, "fetch", async () => Response.json(vector));
+  for (const source of ["scan", "catalog"]) {
+    const { response, filters } = await searchWith({ text: "side table", source });
+    assert.deepEqual(filters, [{ source }]);
+    assert.equal(response.headers.get("x-search-scope"), null);
+  }
+});
+
+test("a search with no text is not narrowed", async t => {
+  t.mock.method(globalThis, "fetch", async () => Response.json({ ...vector, modality: "image" }));
+  const env = pipelineEnvironment().env;
+  const filters = [];
+  env.OBJECTS_INDEX = { query: async (_v, options) => { filters.push(options.filter ?? null); return { matches: [] }; } };
+  const response = await postSearch(new Request("https://api.example/v1/search", { method: "POST",
+    body: JSON.stringify({ imageKey: "objects/id/frames/0.jpg" }) }), env, "https://api.example");
+  assert.deepEqual(filters, [null]);
+  assert.equal(response.headers.get("x-search-scope"), null);
+});
+
+test("the d1 fallback narrows the same way, and reports it", async () => {
+  const { response } = await searchWith({ text: "chair" }, { embedder: false });
+  assert.equal(response.headers.get("x-ranker"), "d1-fallback");
+  assert.equal(response.headers.get("x-search-scope"), "catalog-default");
+});
+
+// --- F-8: a foreign image key is refused by name ----------------------------------------------------
+
+test("a foreign, missing or oversized image is a named 4xx, not an internal error", async t => {
+  t.mock.method(globalThis, "fetch", async () => { throw Error("must not fetch"); });
+  const env = environment();
+  env.BUCKET = { get: async () => null };
+  await assert.rejects(embedInput(env, { imageKey: "random/not/a/key.jpg" }),
+    error => error.status === 400 && error.code === "bad_image_key" && error.message.includes("random/not/a/key.jpg"));
+  await assert.rejects(embedInput(env, { imageKey: "catalog/M/1/source.jpg" }),
+    error => error.status === 404 && error.code === "image_not_found");
+  env.BUCKET.get = async () => ({ size: 11 * 1024 * 1024, body: { cancel: async () => {} } });
+  await assert.rejects(embedInput(env, { imageKey: "catalog/M/1/source.jpg" }),
+    error => error.status === 413 && error.code === "image_too_large");
+});
+
+test("POST /v1/objects/{id}/index answers 400 bad_image_key for a foreign key", async t => {
+  const { env } = pipelineEnvironment();
+  env.UPSTREAM_TOKEN = "secret";
+  env.OBJECTS_INDEX = { upsert: async () => { throw Error("must not index"); } };
+  t.mock.method(globalThis, "fetch", async () => { throw Error("must not fetch"); });
+  await assert.rejects(postObjectIndex(new Request("https://api.example/v1/objects/object/index", {
+    method: "POST", headers: { "x-upstream-token": "secret" }, body: JSON.stringify({ imageKey: "random/not/a/key.jpg" }) }),
+    env, "object", "https://api.example"), error => error.status === 400 && error.code === "bad_image_key");
+});
+
+// --- F-9: the content-type follows the bytes of a catalogue photo ---------------------------------------
+
+async function assetType(key, bytes, stored) {
+  const env = { BUCKET: { get: async () => ({ body: null, httpEtag: '"e"', httpMetadata: stored ? { contentType: stored } : undefined,
+    arrayBuffer: async () => bytes.buffer }) } };
+  const response = await getAsset(env, `/v1/assets/${key}`);
+  return { type: response.headers.get("content-type"), body: new Uint8Array(await response.arrayBuffer()) };
+}
+
+test("a catalogue photo is served with the type its bytes have, not the .jpg it is named", async () => {
+  const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2]);
+  const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2]);
+  const key = "catalog/Floyd_Home/9246282842274/source.jpg";
+  const asPng = await assetType(key, png, "image/jpeg"); // the upload also stamped image/jpeg
+  assert.equal(asPng.type, "image/png");
+  assert.deepEqual(asPng.body, png);
+  assert.equal((await assetType(key, jpeg)).type, "image/jpeg");
+  assert.equal((await assetType("catalog/M/1/source.png", jpeg)).type, "image/jpeg");
+});
+
+test("unrecognised catalogue bytes and every other key keep the type they had", async () => {
+  const other = new Uint8Array([1, 2, 3, 4]);
+  assert.equal((await assetType("catalog/M/1/source.jpg", other)).type, "image/jpeg");
+  // A key that is not a catalogue photo is never sniffed: a GLB stays a GLB.
+  const glb = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
+  assert.equal((await assetType("objects/id/mesh.glb", glb)).type, "model/gltf-binary");
+  assert.equal((await assetType("objects/id/frames/0.jpg", glb)).type, "image/jpeg");
 });

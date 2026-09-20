@@ -13,9 +13,11 @@
 import { Agent } from "agents";
 import { runToolLoop, type ToolDef } from "../lib/ai";
 import { callUpstream } from "../lib/config";
+import { requireOrigin } from "../lib/http";
 import { normalizeCatalogItem, enqueueCatalogItem } from "../lib/catalog-ingest";
 import { nowIso, uuid } from "../lib/ids";
 import type { ObjectV1 } from "../lib/contracts";
+import { postSearch } from "../routes/index";
 
 export interface ScoutAgentState {
   lastQuery: string | null;
@@ -162,7 +164,7 @@ export class ScoutAgent extends Agent<Env, ScoutAgentState> {
 
     switch (action) {
       case "scout":
-        return this.handleScout(request, url.origin);
+        return this.handleScout(request);
       case "seed":
         return this.handleSeed(request);
       case "memory":
@@ -193,9 +195,11 @@ export class ScoutAgent extends Agent<Env, ScoutAgentState> {
     return Response.json({ merchantsKnown: this.state.merchantsKnown });
   }
 
-  private async handleScout(request: Request, origin: string): Promise<Response> {
-    const body = (await request.json()) as { query: string };
+  private async handleScout(request: Request): Promise<Response> {
+    const body = (await request.json()) as { query: string; origin?: string };
     if (!body.query) return Response.json({ error: "query_required" }, { status: 400 });
+    // Not request.url's origin: that is the synthetic https://agent the Worker reached us at.
+    const origin = requireOrigin(body.origin);
 
     this.setState({ ...this.state, lastQuery: body.query });
 
@@ -235,17 +239,24 @@ export class ScoutAgent extends Agent<Env, ScoutAgentState> {
   }
 
   private async toolSearch(args: Record<string, unknown>, origin: string): Promise<unknown> {
-    const res = await fetch(`${origin}/v1/search`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        text: args.text,
-        fit: { maxW: args.maxW ?? null, maxH: args.maxH ?? null, maxD: args.maxD ?? null },
-        maxPriceCents: args.maxPriceCents ?? null,
-        source: args.source ?? null,
-        limit: args.limit ?? 8,
+    // In-process, not an HTTP self-fetch: a Worker fetching its own workers.dev URL from inside a
+    // Durable Object can be answered with Cloudflare's own 404 page. `origin` is still needed —
+    // it is what postSearch builds each hit's glbUrl from.
+    const res = await postSearch(
+      new Request(`${origin}/v1/search`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          text: args.text,
+          fit: { maxW: args.maxW ?? null, maxH: args.maxH ?? null, maxD: args.maxD ?? null },
+          maxPriceCents: args.maxPriceCents ?? null,
+          source: args.source ?? null,
+          limit: args.limit ?? 8,
+        }),
       }),
-    });
+      this.env,
+      origin,
+    );
     if (!res.ok) throw new Error(`search returned ${res.status}`);
     const hits = (await res.json()) as { objectId: string; score: number; object: ObjectV1 }[];
     return hits.map((h) => ({

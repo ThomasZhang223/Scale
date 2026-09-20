@@ -15,7 +15,7 @@ import { WorkflowEntrypoint, type WorkflowEvent, type WorkflowStep } from "cloud
 import { NonRetryableError } from "cloudflare:workflows";
 import { R2Keys } from "../lib/keys";
 import { nowIso } from "../lib/ids";
-import { advanceJob, markObjectFailed, markObjectReady, insertObject, getObject } from "../lib/store";
+import { advanceJob, markObjectFailed, markObjectReady, insertObject, getObject, MESH_ATTACHED_NOTE } from "../lib/store";
 import type { CatalogItem } from "../lib/catalog-ingest";
 import { emitToRoom } from "../lib/notify";
 import { indexObject } from "../lib/embedding";
@@ -54,6 +54,34 @@ interface BasetenResult {
 export class GenerateMeshWorkflow extends WorkflowEntrypoint<Env, GenerateMeshParams> {
   async run(event: Readonly<WorkflowEvent<GenerateMeshParams>>, step: WorkflowStep) {
     const p = event.payload;
+
+    // A reviewed mesh may have been attached by hand (POST /v1/objects/{id}/mesh) while this job
+    // sat in the dispatcher's own storage, where D1 cannot reach it. Refuse before anything can
+    // touch the object: the catalogue step below upserts it back to `generating`, and the store
+    // step writes objects/{id}/mesh.glb, the same key the attached mesh lives at. This sits
+    // OUTSIDE the try below on purpose: that catch marks the object failed, and this one is ready.
+    // A regenerate request flips the row to `generating` before it enqueues, so it is not refused.
+    try {
+      await step.do(
+        "refuse-attached-object",
+        { retries: { limit: 2, delay: "2 seconds", backoff: "constant" }, timeout: "30 seconds" },
+        async () => {
+          const row = await this.env.DB.prepare("SELECT state, glb_key FROM objects WHERE id = ?")
+            .bind(p.objectId)
+            .first<{ state: string; glb_key: string | null }>();
+          if (row?.state === "ready" && row.glb_key) {
+            await advanceJob(this.env, p.jobId, "done", 100, MESH_ATTACHED_NOTE, nowIso());
+            throw new NonRetryableError(
+              `Object ${p.objectId} is already ready with ${row.glb_key}; generation refused so an attached mesh is never overwritten.`,
+            );
+          }
+          return { ok: true };
+        },
+      );
+    } catch (err) {
+      await notifyMeshFinished(this.env, p.jobId);
+      throw err;
+    }
 
     try {
       let catalogFrameKey: string | null = null;

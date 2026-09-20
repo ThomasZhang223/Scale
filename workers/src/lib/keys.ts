@@ -59,3 +59,20 @@ export function contentTypeFor(key: string): string {
   if (key.endsWith(".json")) return "application/json";
   return "application/octet-stream";
 }
+
+/** A catalogue photo key. Its extension is a name, not a type: see sniffImageType. */
+export function isCatalogSourceKey(key: string): boolean {
+  return /^catalog\/[^/]+\/[^/]+\/source\.[a-z]+$/.test(key);
+}
+
+/**
+ * The image type the BYTES say, or null when they are neither. Catalogue photos are stored at
+ * `.../source.jpg` whatever they are — the committed prebake set is PNG data under that name —
+ * so the extension (and the content-type stored from the upload's own header) cannot be trusted.
+ * ceiling: PNG and JPEG only; a WebP catalogue photo gets the extension's type, as before.
+ */
+export function sniffImageType(bytes: Uint8Array): "image/png" | "image/jpeg" | null {
+  if (bytes.length >= 4 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) return "image/png";
+  if (bytes.length >= 2 && bytes[0] === 0xff && bytes[1] === 0xd8) return "image/jpeg";
+  return null;
+}

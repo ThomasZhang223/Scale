@@ -169,6 +169,30 @@ export async function markObjectReady(
     .run();
 }
 
+/** The note on a mesh job closed because a reviewed mesh was attached by hand. */
+export const MESH_ATTACHED_NOTE = "mesh attached via POST /mesh (reviewed offline); generation skipped";
+
+/**
+ * Close an object's PARKED mesh jobs (queued, not yet running) and mark their outbox rows
+ * delivered, so the cron relay cannot re-send them and a later Baseten configuration cannot
+ * regenerate over an attached mesh. The outbox update runs first: its subquery selects on the
+ * jobs' `queued` state, which the second statement removes.
+ * ceiling: a job already handed to the dispatcher lives in the dispatcher's own storage, which
+ * D1 cannot reach — GenerateMeshWorkflow's first step refuses an object that is already ready.
+ */
+export async function closeParkedMeshJobs(env: Env, objectId: string, at: string): Promise<void> {
+  await env.DB.batch([
+    env.DB.prepare(
+      `UPDATE mesh_outbox SET delivered_at = ? WHERE delivered_at IS NULL AND job_id IN
+         (SELECT id FROM jobs WHERE object_id = ? AND kind = 'mesh' AND state = 'queued')`,
+    ).bind(at, objectId),
+    env.DB.prepare(
+      `UPDATE jobs SET state = 'done', progress_pct = 100, error = ?, updated_at = ?
+         WHERE object_id = ? AND kind = 'mesh' AND state = 'queued'`,
+    ).bind(MESH_ATTACHED_NOTE, at, objectId),
+  ]);
+}
+
 export async function markObjectFailed(env: Env, objectId: string): Promise<void> {
   await env.DB.prepare("UPDATE objects SET state = 'failed' WHERE id = ?").bind(objectId).run();
 }
