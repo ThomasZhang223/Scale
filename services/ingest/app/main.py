@@ -21,6 +21,8 @@ validate.py (4 and 5). See ../EXTRACTION.md.
 
 from __future__ import annotations
 
+import asyncio
+import functools
 import os
 import time
 
@@ -34,6 +36,9 @@ from .browserbase import BrowserbaseFetch, CachedFetch, FetchError
 from .dimensions import extract
 from .identity import object_id
 from .page_extract import extract_from_page, product_url
+from .product_search import (
+    handles_from_search_page, normalise_query, products_by_handle, search_url,
+)
 from .validate import validate
 
 app = FastAPI(title="ingest")
@@ -42,6 +47,41 @@ USER_AGENT = "FullScale-HTN2026/0.1 (hackathon project; catalogue dimension rese
 PAGE_CACHE = os.environ.get("PAGE_CACHE", ".page-cache")
 MAX_PAGES = 4          # 250 products each; past this a merchant is not a demo, it is a scrape
 CRAWL_TIMEOUT_S = 30.0
+
+# Steps 2 and 3 call OpenAI through a synchronous client. Awaiting them directly on the event
+# loop blocks the whole process: measured, ten LLM products held /health past its 3s timeout
+# twice in a row, and the default aiLimit of 40 is four times that — long enough for compose
+# to hit its five-failure threshold and mark a working container unhealthy. So every blocking
+# call goes to a worker thread, which also lets them overlap: they are round trips this
+# process would otherwise spend asleep.
+# ceiling: a fixed width with no adaptive backoff. A 429 is swallowed by _ask and costs that
+# one product its recovery. Fine for a single merchant per request.
+AI_CONCURRENCY = int(os.environ.get("AI_CONCURRENCY") or 8)
+
+# Step 2.5 is the slowest call in the pipeline — Browserbase renders a real page — and it is
+# synchronous too, so it had both of step 2's problems and a tighter budget: at the default
+# pageLimit of 60, anything past ~4s a render blows the Worker's 240s timeout, with /health
+# unanswerable the whole time.
+# Deliberately much lower than AI_CONCURRENCY: Browserbase limits concurrent sessions by plan
+# (low single digits on the smaller ones), so a wide pool earns 429s rather than speed. Three
+# is safe on a starter plan and still 3x serial; raise it if your plan allows.
+PAGE_CONCURRENCY = int(os.environ.get("PAGE_CONCURRENCY") or 3)
+
+
+async def _in_threads(calls: list, limit: int) -> list:
+    """Run blocking callables on worker threads, at most `limit` at once, keeping order.
+
+    Order matters: the caller zips the results back against the products that produced them.
+    """
+    if not calls:
+        return []
+    sem = asyncio.Semaphore(max(limit, 1))
+
+    async def run(fn):
+        async with sem:
+            return await asyncio.to_thread(fn)
+
+    return await asyncio.gather(*(run(fn) for fn in calls))
 
 
 def _err(status: int, code: str, detail: str):
@@ -87,6 +127,97 @@ async def crawl(request: Request):
                 break
 
     return {"storefront": storefront, "count": len(products), "products": products}
+
+
+@app.post("/find", dependencies=[Depends(require_upstream_token)])
+async def find_products(request: Request):
+    """Prompt -> candidate products from one storefront, best match first.
+
+      POST /find  { storefront, query, limit?, merchant? }
+                  -> { query, searchedFor, count, handles, products }
+
+    The front half the pipeline was missing. Everything else here is merchant-driven — crawl a
+    catalogue, extract all of it — which pre-generates assets fine but cannot answer "find me a
+    red chair" live.
+
+    Relevance is the merchant's, not ours. Their search already knows a "Cloud" is a chair and
+    that "sectional" means sofa, which title matching never will, so this renders their own
+    /search page through Browserbase and reads the order off it. Rendering rather than fetching
+    is what makes stores with client-side search work, the same reason step 2.5 exists.
+
+    Returns raw products, not Object v1: measuring them is /extract's job, and keeping the two
+    apart means a caller can cache this and re-extract without paying for the page again —
+    exactly the split /crawl and /extract already have.
+
+    `query` is expected to already describe a PRODUCT. Pulling the product out of an utterance
+    — "a bookshelf beside my desk" is a search for a bookshelf, not a desk — belongs to the
+    voice agent, which splits it into find_anchor and search_objects before anything reaches
+    here. This endpoint only strips leftover imperative and article noise; it does not parse
+    intent, because two places doing that is how they drift apart.
+    """
+    body = await request.json()
+    storefront = (body.get("storefront") or "").strip()
+    raw_query = (body.get("query") or "").strip()
+    if not storefront:
+        return _err(422, "missing_storefront", "storefront is required")  # standing rule 4
+    if not raw_query:
+        return _err(422, "missing_query", "query is required")            # standing rule 4
+
+    limit = min(int(body.get("limit") or 12), 50)
+    query = normalise_query(raw_query)
+
+    # Never a silent skip: without a key this endpoint cannot work at all, and returning an
+    # empty list would look exactly like a merchant having nothing that matches.
+    try:
+        fetcher = CachedFetch(PAGE_CACHE, upstream=BrowserbaseFetch())
+    except ValueError as e:
+        return _err(503, "browserbase_unconfigured", str(e))
+
+    url = search_url(storefront, query)
+    try:
+        res = await asyncio.to_thread(fetcher.fetch, url)
+    except FetchError as e:
+        return _err(502, "search_page_unreachable", f"{url}: {e}")
+
+    handles = handles_from_search_page(res.content, limit=limit)
+    if not handles:
+        # A real, reportable outcome — not an error. Say which URL was read so the caller can
+        # look at the same page rather than guess whether the search or the parse came up dry.
+        return {"query": raw_query, "searchedFor": query, "searchUrl": url,
+                "count": 0, "handles": [], "products": []}
+
+    # The search page gives a title, a thumbnail and a link. The catalogue gives variants,
+    # body_html and the full image list — which is what the extraction pipeline takes — so
+    # join back to it rather than fetching every product again.
+    catalogue: list[dict] = []
+    async with httpx.AsyncClient(headers={"User-Agent": USER_AGENT},
+                                 timeout=CRAWL_TIMEOUT_S, follow_redirects=True) as client:
+        for page in range(1, MAX_PAGES + 1):
+            try:
+                r = await client.get(
+                    f"{storefront.rstrip('/')}/products.json?limit=250&page={page}")
+                r.raise_for_status()
+            except httpx.HTTPError as e:
+                return _err(502, "storefront_unreachable", f"{type(e).__name__}: {e}")
+            batch = (r.json() or {}).get("products") or []
+            catalogue.extend(batch)
+            if len(batch) < 250 or len({h for h in handles} - {
+                    (x.get("handle") or "").lower() for x in catalogue}) == 0:
+                break
+
+    products = products_by_handle(catalogue, handles)
+    return {
+        "query": raw_query,
+        "searchedFor": query,
+        "searchUrl": url,
+        "count": len(products),
+        "handles": handles,
+        # Handles the catalogue does not serve cannot be measured, so they are reported rather
+        # than quietly dropped — a caller comparing count to handles should see why.
+        "missing": [h for h in handles if h not in {
+            (x.get("handle") or "").lower() for x in products}],
+        "products": products,
+    }
 
 
 def _object_v1(merchant: str, storefront: str, p: dict, bbox: dict, verdict, method_src: str,
@@ -193,9 +324,15 @@ async def extract_products(request: Request):
             continue
         needs_ai.append(p)
 
-    # Step 2: the same text, read rather than pattern-matched.
-    for p in needs_ai[:ai_limit] if use_llm else []:
-        if accept(p, extract_with_llm(p, cfg), "llm", "from_llm"):
+    # Step 2: the same text, read rather than pattern-matched. The calls overlap on worker
+    # threads; accept() stays on this one, in input order, because it mutates objects/stats.
+    llm_batch = needs_ai[:ai_limit] if use_llm else []
+    ai_errors: list[str] = []
+    llm_hits = await _in_threads(
+        [functools.partial(extract_with_llm, p, cfg, None, ai_errors) for p in llm_batch],
+        AI_CONCURRENCY)
+    for p, hit in zip(llm_batch, llm_hits):
+        if accept(p, hit, "llm", "from_llm"):
             continue
         if p.get("handle"):
             needs_page.append(p)
@@ -203,12 +340,23 @@ async def extract_products(request: Request):
         needs_page = [p for p in needs_ai if p.get("handle")]
 
     # Step 2.5: another surface entirely, for products whose text simply lacks the numbers.
+    # The fetches run on worker threads; the bookkeeping below stays on this one, in input
+    # order, so stats and objects come out the same regardless of which page finished first.
     needs_image: list[dict] = []
-    for p in needs_page[:page_limit] if fetcher else []:
-        stats["pages_fetched"] += 1
+    page_batch = needs_page[:page_limit] if fetcher else []
+
+    def fetch_one(p: dict):
+        """Returns the page content, or the FetchError to be counted by the caller."""
         try:
-            res = fetcher.fetch(product_url(storefront, p["handle"]))
-        except FetchError:
+            return fetcher.fetch(product_url(storefront, p["handle"]))
+        except FetchError as e:
+            return e
+
+    for p, res in zip(page_batch,
+                      await _in_threads([functools.partial(fetch_one, p) for p in page_batch],
+                                        PAGE_CONCURRENCY)):
+        stats["pages_fetched"] += 1
+        if isinstance(res, FetchError):
             stats["page_failures"] += 1
             continue
         if not accept(p, extract_from_page(res.content), "page", "from_page"):
@@ -217,20 +365,46 @@ async def extract_products(request: Request):
     # Step 3: the spec-sheet diagram. Last resort, and the most expensive call here, so it runs
     # only over what every cheaper source failed on.
     if use_vlm:
+        vlm_batch = needs_image[:ai_limit]
+        sem = asyncio.Semaphore(AI_CONCURRENCY)
         async with httpx.AsyncClient(timeout=CRAWL_TIMEOUT_S, follow_redirects=True) as img:
-            for p in needs_image[:ai_limit]:
-                # A spec diagram is rarely the hero shot, so try the later images first.
-                for src in [i.get("src") for i in (p.get("images") or [])][1:4]:
-                    if not src:
-                        continue
-                    try:
-                        r = await img.get(src)
-                        r.raise_for_status()
-                    except httpx.HTTPError:
-                        continue
-                    hit = extract_with_vlm(r.content, r.headers.get("content-type", ""), cfg)
-                    if accept(p, hit, "vlm", "from_vlm"):
-                        break
+
+            async def read_one(p: dict) -> None:
+                """Up to three images, stopping at the first accept() takes. Kept sequential
+                inside a product on purpose: most stop at the first, and firing all three
+                would spend three calls to save latency on a product that needed one. The
+                overlap is across products.
+
+                accept() is called here rather than after the gather so that a hit it refuses
+                — a partial bbox, or a value validate() rejects — still falls through to the
+                next image, as it did when this loop was serial. That is safe: only the
+                to_thread call leaves the event loop, so every accept() still runs on one
+                thread. The cost is that VLM rows land in completion order rather than input
+                order, which nothing downstream depends on.
+                """
+                async with sem:
+                    # A spec diagram is rarely the hero shot, so try the later images first.
+                    for src in [i.get("src") for i in (p.get("images") or [])][1:4]:
+                        if not src:
+                            continue
+                        try:
+                            r = await img.get(src)
+                            r.raise_for_status()
+                        except httpx.HTTPError:
+                            continue
+                        hit = await asyncio.to_thread(
+                            extract_with_vlm, r.content,
+                            r.headers.get("content-type", ""), cfg, None, ai_errors)
+                        if accept(p, hit, "vlm", "from_vlm"):
+                            return
+
+            await asyncio.gather(*(read_one(p) for p in vlm_batch))
+
+    # A caller cannot tell "the model found nothing" from "every call was rejected" unless we
+    # say so. Counted, with one example, rather than raised: these passes are additive.
+    if ai_errors:
+        stats["ai_call_failures"] = len(ai_errors)
+        stats["ai_first_failure"] = ai_errors[0][:200]
 
     return {"merchant": merchant, "count": len(objects), "stats": stats, "objects": objects}
 

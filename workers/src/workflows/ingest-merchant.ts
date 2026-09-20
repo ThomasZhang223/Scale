@@ -18,8 +18,8 @@
 // retry that one step rather than restart the merchant.
 //
 // This workflow writes `state: "measured"` rows only. It never generates a mesh — the pre-bake
-// is a separate decision made per product, and it goes through the queue so it cannot exhaust
-// the free plan's 100 concurrent Workflow instances.
+// is a separate decision made per product. Catalog generation uses the queue;
+// queue delivery concurrency does not cap outstanding Workflow instances.
 
 import { WorkflowEntrypoint, type WorkflowEvent, type WorkflowStep } from "cloudflare:workers";
 // NonRetryableError lives in cloudflare:workflows, not cloudflare:workers.
@@ -27,11 +27,13 @@ import { NonRetryableError } from "cloudflare:workflows";
 import { callUpstream } from "../lib/config";
 import { nowIso } from "../lib/ids";
 import { insertObject } from "../lib/store";
+import { normalizeCatalogItem, enqueueCatalogItem } from "../lib/catalog-ingest";
 
 export interface IngestMerchantParams {
   merchant: string;
   storefront: string;
   collection: string | null;
+  apiOrigin?: string;
 }
 
 /** Object v1 as services/ingest returns it (.claude/contracts.md), plus its extraction notes. */
@@ -48,6 +50,7 @@ interface ExtractedObject {
   merchant: string | null;
   createdAt: string;
   extraction?: {
+    imageUrl?: string | null;
     via: "api" | "llm" | "page" | "vlm";
     unverified: boolean;
     flags: string[];
@@ -70,9 +73,9 @@ export class IngestMerchantWorkflow extends WorkflowEntrypoint<Env, IngestMercha
     // A storefront that rate-limits gets three chances, spaced out. It is somebody else's
     // server, and here the polite thing and the reliable thing are the same thing.
     const crawled = await step.do(
-      "crawl",
+      "crawl-json-v1", // New durable return shape; do not reuse a checkpoint from the old step.
       { retries: { limit: 3, delay: "10 seconds", backoff: "exponential" }, timeout: "2 minutes" },
-      async (): Promise<{ products: unknown[] }> => {
+      async (): Promise<{ productsJson: string; count: number }> => {
         try {
           const res = await callUpstream<{ products: unknown[] }>(
             this.env,
@@ -81,7 +84,9 @@ export class IngestMerchantWorkflow extends WorkflowEntrypoint<Env, IngestMercha
             { storefront, collection: p.collection, pages: 1 },
             60_000,
           );
-          return { products: (res.products ?? []).slice(0, MAX_PRODUCTS) };
+          const products = (res.products ?? []).slice(0, MAX_PRODUCTS);
+          // Store arbitrary merchant JSON as a string across the durable step boundary.
+          return { productsJson: JSON.stringify(products), count: products.length };
         } catch (cause) {
           const message = cause instanceof Error ? cause.message : String(cause);
           // A merchant that has disabled /products.json, or is not Shopify, is a decision
@@ -107,7 +112,7 @@ export class IngestMerchantWorkflow extends WorkflowEntrypoint<Env, IngestMercha
           {
             merchant: p.merchant,
             storefront,
-            products: crawled.products,
+            products: JSON.parse(crawled.productsJson),
             browserbase: true,
             llm: true,
             vlm: false, // the most expensive pass; turn it on per merchant, not by default
@@ -120,9 +125,15 @@ export class IngestMerchantWorkflow extends WorkflowEntrypoint<Env, IngestMercha
       const at = nowIso();
       let count = 0;
       for (const o of extracted.objects) {
+        const objectId = o.extraction?.imageUrl ? (await normalizeCatalogItem(o)).objectId : o.objectId;
+        // A replay must not demote a previously ready mesh back to measured.
+        if (await this.env.DB.prepare("SELECT id FROM objects WHERE id = ?").bind(objectId).first()) {
+          count++;
+          continue;
+        }
         await insertObject(this.env, {
           // The service mints the id, so a re-run of this step upserts rather than duplicating.
-          objectId: o.objectId,
+          objectId,
           source: "catalog",
           state: "measured",
           name: o.name,
@@ -141,11 +152,25 @@ export class IngestMerchantWorkflow extends WorkflowEntrypoint<Env, IngestMercha
       return { count };
     });
 
+    const queued = await step.do("enqueue-meshes", async () => {
+      let count = 0;
+      let missingImage = 0;
+      for (const object of extracted.objects) {
+        if (!object.extraction?.imageUrl) { missingImage++; continue; }
+        const item = await normalizeCatalogItem(object);
+        await enqueueCatalogItem(this.env, item, p.apiOrigin ?? this.env.API_ORIGIN);
+        count++;
+      }
+      return { count, missingImage };
+    });
+
     return {
       merchant: p.merchant,
-      pulled: crawled.products.length,
+      pulled: crawled.count,
       extracted: extracted.count,
       written: written.count,
+      queued: queued.count,
+      missingImage: queued.missingImage,
       // Which surface each dimension came from, and how many carry low enough confidence to
       // show as "unverified fit" rather than a number.
       stats: extracted.stats,

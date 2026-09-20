@@ -52,7 +52,7 @@ quality follows from the synthetic tests.
 
 Paul's HTTP `/search` currently does not accept query vectors, ignores budgets,
 and can relax dimensions. For strict local demos use the library handoff. His
-HTTP embedding caller can use `EMBED_URL=http://127.0.0.1:8002/embed/search` with
+HTTP embedding caller can use `EMBED_URL=http://127.0.0.1:8004/embed/search` with
 `EMBEDDING_LOCAL_SEARCH=1` and `EMBEDDING_SEARCH_FINGERPRINT` set to the indexed
 corpus fingerprint on gen. That optional route accepts his text/imageKey
 payload and returns `vector`, using the same validated encoder. It only accepts
@@ -64,13 +64,11 @@ per photo. Use `trusted-local-search` for Paul's local caller and
 `trusted-internal-service` for authenticated callers. Unindexed query photos can
 be listed too. No caller-controlled paths/URLs are fetched; changed bytes fail.
 
-For Thomas's current caller, explicitly enable `EMBEDDING_WORKER_COMPAT=1` and
-set `EMBEDDING_SEARCH_FINGERPRINT`. `/embed` then accepts `Api-Key` with the same
-configured **embedding service token**, `image_key` and nullable text; it returns
-`embedding` alongside canonical fields. Wrong/missing tokens and fingerprint
-mismatches fail. Thomas must configure the CPU embedding origin/token separately
-from GPU inference credentials; his Worker search payload still needs to match
-Paul's flat request. No backend files are changed.
+The Cloudflare Worker now calls the canonical Bearer `/embed` route using the
+separate `upstream:embedding` origin and `EMBEDDING_API_KEY`. It reads R2 frames
+itself, sends inline image bytes, and pins `embedding:fingerprint` for queries and
+index writes. The legacy `EMBEDDING_WORKER_COMPAT` adapter remains opt-in for old
+callers but is no longer required. See [deployment notes](EMBEDDING_DEPLOY.md).
 
 Repeatable strict query CLI (no insertion, no HTTP dependency), from services/gen:
 

@@ -17,7 +17,8 @@ from starlette.concurrency import run_in_threadpool
 
 from .config import DIMENSION, MAX_BODY_BYTES, MAX_IMAGE_BYTES
 from .encoder import SiglipEncoder, EncoderBusy, EncoderInvariantError
-from .preprocess import InputError, InputTooLarge, image_bytes_from_base64
+from .preprocess import InputError, InputTooLarge, image_bytes_from_base64, normalize_text, content_hash
+from .cache import EmbeddingCache
 
 
 @dataclass(frozen=True)
@@ -114,10 +115,13 @@ async def bounded_request(request, *, worker_compat=False):
 
 
 def create_app(*, encoder=None, authenticator=None, image_reader: ImageReader | None = None,
-               load_encoder=True):
+               load_encoder=True, result_cache=None):
     @asynccontextmanager
     async def lifespan(app):
         app.state.auth = authenticator or ServiceTokenAuth(os.environ.get("EMBEDDING_API_KEY"))
+        cache_path = os.environ.get("EMBEDDING_RESULT_CACHE")
+        if result_cache is None and cache_path:
+            app.state.result_cache = EmbeddingCache(cache_path)
         if encoder is None and load_encoder:
             try:
                 cache_dir = os.environ.get("EMBEDDING_CACHE_DIR")
@@ -131,6 +135,7 @@ def create_app(*, encoder=None, authenticator=None, image_reader: ImageReader | 
 
     app = FastAPI(title="services-gen", lifespan=lifespan)
     app.state.encoder = encoder
+    app.state.result_cache = result_cache
     app.state.auth = authenticator or ServiceTokenAuth(None)
 
     @app.get("/health")
@@ -201,11 +206,7 @@ def create_app(*, encoder=None, authenticator=None, image_reader: ImageReader | 
                     raise EncoderInvariantError("Storage adapter returned non-bytes")
                 if len(raw) > MAX_IMAGE_BYTES:
                     raise InputTooLarge("Image exceeds byte limit")
-            result = await run_in_threadpool(current.response, image=raw, text=payload.text)
-            try:
-                return EmbedResponse.model_validate(result)
-            except ValidationError:
-                raise EncoderInvariantError("Invalid embedding response") from None
+            return await run_in_threadpool(cached_response, current, raw, payload.text)
         except InputTooLarge:
             raise HTTPException(413, detail="embedding_input_too_large") from None
         except InputError:
@@ -222,5 +223,39 @@ def create_app(*, encoder=None, authenticator=None, image_reader: ImageReader | 
             raise HTTPException(502, detail="image_read_failed") from None
         except EncoderInvariantError:
             raise HTTPException(500, detail="embedding_validation_failed") from None
+
+    def cached_response(current, raw, text):
+        canonical = normalize_text(text) if text is not None else None
+        modality = "text" if canonical is not None else "image"
+        digest = content_hash(canonical.encode("utf-8") if canonical is not None else raw)
+        key = (current.fingerprint, modality, digest)
+
+        def validate(result):
+            try:
+                response = EmbedResponse.model_validate(result)
+                if (response.fingerprint, response.modality, response.inputHash) != key:
+                    raise ValueError("Embedding identity mismatch")
+                return response
+            except (ValidationError, ValueError):
+                raise EncoderInvariantError("Invalid embedding response") from None
+
+        cache = app.state.result_cache
+        if cache is None:
+            return validate(current.response(image=raw, text=canonical))
+        # Preserve overload behavior instead of letting misses build an unbounded queue.
+        if not cache.lock.acquire(blocking=False):
+            raise EncoderBusy()
+        try:
+            cached = cache.get(key)
+            if cached is not None:
+                try:
+                    return validate(cached)
+                except EncoderInvariantError:
+                    pass  # Corrupt entries are recomputed, never returned.
+            response = validate(current.response(image=raw, text=canonical))
+            cache.put(key, response.model_dump())
+            return response
+        finally:
+            cache.lock.release()
 
     return app

@@ -272,6 +272,35 @@ def test_cli_file_mode_gates_on_product_count():
         os.unlink(path)
 
 
+
+# --- beds are a category, soft goods are not ------------------------------
+
+def test_beds_get_their_own_category_instead_of_falling_into_other():
+    """20 of 100 slots in a real handoff went to beds and mattresses via `other`, four
+    colourways of one model among them. If they are in the set they are in it on purpose."""
+    assert vm.bucket_for("beds", "Orbit Bed") == "sleeping"
+    assert vm.bucket_for("mattresses", "The Mattress 2.0") == "sleeping"
+    assert vm.bucket_for("daybeds", "") == "sleeping"
+    # product_type is often empty; the title has to carry it.
+    assert vm.bucket_for("", "The Floyd Bed — Upholstered, Lift Off") == "sleeping"
+
+
+def test_soft_goods_are_not_placeable_even_when_they_contain_a_category_word():
+    """"bedding" contains "bed" and "table runner" contains "table". Neither is an object you
+    place against a room scan, and substring matching would have taken both."""
+    assert vm.bucket_for("Bedding", "Duvet cover") is None
+    assert vm.bucket_for("Pillows", "Throw Pillow") is None
+    assert vm.bucket_for("Rugs", "Jute Runner") is None
+    assert vm.bucket_for("Mirrors", "Full Length Mirror") is None
+    assert vm.bucket_for("Gift Cards", "Gift card") is None
+
+
+def test_the_exclusion_does_not_swallow_real_furniture():
+    assert vm.bucket_for("Sofas", "Sectional") == "seating"
+    assert vm.bucket_for("Bedside Tables", "Nightstand") == "surface"
+    assert vm.bucket_for("Table Lamps", "") == "lighting"
+    assert vm.bucket_for("Bookcases", "") == "storage"
+
 if __name__ == "__main__":
     fails = 0
     for name, fn in sorted(globals().items()):
