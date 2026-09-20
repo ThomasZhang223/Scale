@@ -16,6 +16,29 @@ export async function enqueueMesh(env: Env, params: GenerateMeshParams): Promise
       VALUES (?, ?, ?) ON CONFLICT(job_id) DO NOTHING`)
       .bind(params.jobId, JSON.stringify(params), at),
   ]);
+  // Acceptance is durable BEFORE this best-effort fast path. Cron repairs a
+  // crash or response loss; dispatcher deduplication uses the same job ID.
+  try {
+    const response = await meshDispatcher(env).fetch("https://dispatcher/enqueue", {
+      method: "POST", body: JSON.stringify(params),
+    });
+    if (!response.ok) return;
+    await env.DB.prepare("UPDATE mesh_outbox SET delivered_at = ? WHERE job_id = ?")
+      .bind(new Date().toISOString(), params.jobId).run();
+  } catch {
+    // Leave the outbox unacknowledged, without making durable acceptance fail.
+  }
+}
+
+/** Last action of a workflow: wake terminal-status reconciliation immediately. */
+export async function notifyMeshFinished(env: Env, jobId: string): Promise<void> {
+  try {
+    await meshDispatcher(env).fetch("https://dispatcher/complete", {
+      method: "POST", body: JSON.stringify({ jobId }),
+    });
+  } catch {
+    // The persisted alarm and cron still reconcile terminal instances.
+  }
 }
 
 /** Cron retries delivery until the consumer has durably handed the job to the dispatcher. */

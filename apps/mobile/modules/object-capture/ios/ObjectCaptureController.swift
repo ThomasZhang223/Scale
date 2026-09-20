@@ -66,7 +66,10 @@ final class ObjectCaptureController {
   private init() {}
 
   static var isSupported: Bool {
-    ObjectCaptureSession.isSupported && PhotogrammetrySession.isSupported
+    let capture = ObjectCaptureSession.isSupported
+    let photogrammetry = PhotogrammetrySession.isSupported
+    NSLog("[ObjectCapture] isSupported capture=%d photogrammetry=%d", capture, photogrammetry)
+    return capture && photogrammetry
   }
 
   // MARK: - Session lifecycle
@@ -94,8 +97,13 @@ final class ObjectCaptureController {
     config.isOverCaptureEnabled = true
     s.start(imagesDirectory: images, configuration: config)
     session = s
+    NSLog("[ObjectCapture] session started, state=%@", Self.describe(s.state))
     sessionListeners.forEach { $0(s) }
     observe(s)
+    // The current state, once, so JS is never left on the phase it guessed
+    // at mount if the first transition happened before the stream was read.
+    let initial = Self.describe(s.state)
+    stateListeners.forEach { $0(initial) }
   }
 
   func startDetecting() throws {
@@ -141,6 +149,7 @@ final class ObjectCaptureController {
     stateTask = Task { [weak self] in
       for await state in s.stateUpdates {
         guard let self, !Task.isCancelled else { return }
+        NSLog("[ObjectCapture] state -> %@", Self.describe(state))
         self.stateListeners.forEach { $0(Self.describe(state)) }
         switch state {
         case .completed:
@@ -162,9 +171,18 @@ final class ObjectCaptureController {
     }
     shotsTask = Task { [weak self] in
       var last = -1
+      var lastState = ""
       while !Task.isCancelled {
         try? await Task.sleep(nanoseconds: 400_000_000)
         guard let self, let session = self.session else { return }
+        // Belt and braces: if the Updates stream ever goes quiet, the polled
+        // state still reaches JS. Duplicates are harmless (same string).
+        let st = Self.describe(session.state)
+        if st != lastState {
+          lastState = st
+          NSLog("[ObjectCapture] polled state=%@", st)
+          self.stateListeners.forEach { $0(st) }
+        }
         let n = session.numberOfShotsTaken
         if n != last {
           last = n
@@ -219,16 +237,32 @@ final class ObjectCaptureController {
 
     var modelURL: URL?
     do {
-      for try await output in ps.outputs {
+      // Break out explicitly on completion. The outputs sequence is tied to
+      // the session's lifetime, not to the request list, so waiting for it to
+      // end on its own left the screen at "100%" forever on first device test.
+      outputs: for try await output in ps.outputs {
         switch output {
         case .requestProgress(_, let fraction):
           progressListeners.forEach { $0(fraction, "reconstructing") }
         case .requestComplete(_, let result):
-          if case .modelFile(let url) = result { modelURL = url }
+          if case .modelFile(let url) = result {
+            NSLog("[ObjectCapture] model file written: %@", url.path)
+            modelURL = url
+          }
         case .requestError(_, let error):
           throw ObjectCaptureError.reconstructionFailed(error.localizedDescription)
+        case .processingComplete:
+          // The documented terminal event. A plain `break` here only leaves
+          // the switch and the loop then waits on a stream that never ends —
+          // that was the "stuck at 100%" on first device test.
+          NSLog("[ObjectCapture] photogrammetry processingComplete")
+          break outputs
         case .processingCancelled:
           throw ObjectCaptureError.cancelled
+        case .inputComplete:
+          NSLog("[ObjectCapture] photogrammetry inputComplete")
+        case .invalidSample(let id, let reason):
+          NSLog("[ObjectCapture] invalid sample %d: %@", id, reason)
         default:
           break
         }
@@ -238,7 +272,10 @@ final class ObjectCaptureController {
     } catch {
       throw ObjectCaptureError.reconstructionFailed(error.localizedDescription)
     }
-    photogrammetry = nil
+    // Deliberately NOT released here. Breaking out of `outputs` before the
+    // session's worker thread has fully wound down and then dropping the last
+    // reference was a SIGSEGV on device, right after the GLB was written. It
+    // is released on the next start()/cancel() instead.
 
     guard let modelURL else {
       throw ObjectCaptureError.reconstructionFailed("PhotogrammetrySession finished without a model file")
@@ -246,7 +283,10 @@ final class ObjectCaptureController {
 
     progressListeners.forEach { $0(1.0, "exporting") }
     let glbURL = rootDir.appendingPathComponent("model.glb")
+    NSLog("[ObjectCapture] exporting GLB from %@", modelURL.path)
+    let started = Date()
     let bbox = try GLBExporter.export(usdz: modelURL, to: glbURL)
+    NSLog("[ObjectCapture] GLB written in %.1fs, bbox=%@", Date().timeIntervalSince(started), String(describing: bbox))
 
     let imageCount = (try? FileManager.default.contentsOfDirectory(atPath: imagesDir.path).count) ?? 0
     return ReconstructionResult(

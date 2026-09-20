@@ -1,0 +1,1738 @@
+{
+  "baseline_commit": "9ec40a6",
+  "deployment_source_commit": "29c9d4b",
+  "baseline": {
+    "cold_activation_s": [
+      275,
+      286
+    ],
+    "first_client_s": 59.53055809997022,
+    "sf3d_s": 58.200016982,
+    "b04_s": [
+      0.2,
+      0.28
+    ],
+    "first_prediction_on_replica": true
+  },
+  "experiment": {
+    "model_name": "full-scale-team26-latency-20260919",
+    "model_id": "wdlgzjk3",
+    "deployment_id": "w604592",
+    "team": "26",
+    "instance_type": "L4:4x16",
+    "listed_hardware_and_price": {
+      "name": "L4:4x16",
+      "gpu_count": 1,
+      "gpu_type": "L4",
+      "price": "0.01414"
+    },
+    "requests_attempted": 4,
+    "replica_id": "f6a9516c81b141caa265ed54fd97c165",
+    "autoscaling": {
+      "min_replica": 0,
+      "max_replica": 1,
+      "autoscaling_window": 60,
+      "scale_down_delay": 900,
+      "concurrency_target": 1,
+      "target_utilization_percentage": 70
+    },
+    "push_to_active_s": 428.1010096000973,
+    "conservative_session_seconds": 473.1336961000925,
+    "shutdown": {
+      "status": "INACTIVE",
+      "active_replica_count": 0
+    }
+  },
+  "framework_model_load_s": 171.906,
+  "cold_start_notes": "Fresh deployment, not reactivation: submission/preflight-to-ACTIVE 428.1s; first observed DEPLOYING-to-ACTIVE about 207.1s with roughly 12s polling uncertainty. Not a controlled startup improvement.",
+  "cost": {
+    "actual_reported_charge_usd": null,
+    "reason": "Account billing introspection unavailable; no actual charge returned by deployment API",
+    "published_usd_per_minute": 0.01414,
+    "published_usd_per_hour": 0.8484,
+    "price_source": "https://www.baseten.co/pricing/",
+    "all_session_time_rate_estimate_usd": 0.11150184104758847,
+    "twenty_minute_budget_at_rate_usd": 0.2828,
+    "no_purchase_or_payment_method_added": true
+  },
+  "decisions": {
+    "production_texture_resolution": 1024,
+    "prewarm": false,
+    "second_deployment": false,
+    "reason": "First-run penalty spans many stages; all_edges only 0.982s. Repeated 512 client latency is 7.52% slower, server saves only 0.0664s and details are softer."
+  },
+  "software_tests": {
+    "gen_passed": 229,
+    "gen_skipped": 3,
+    "worker_passed": 24,
+    "typescript": "PASS",
+    "secret_artifact_scan": "PASS",
+    "dispatch_fake_clock_accepted_to_notified_ms": 0,
+    "completion_reconcile_ms": 250,
+    "worker_deployed": false,
+    "indexing_blocks_mesh_ready": false
+  },
+  "artifact_root": "C:\\Users\\hp\\AppData\\Local\\Temp\\sf3d-latency-20260919",
+  "runs": {
+    "A": {
+      "generation": {
+        "kind": "raw_sf3d_unscaled",
+        "input_sha256": "2503c12a74419d91a4c6c9f1affc48fee6e2b8b9091956ca6211e91ada57b5bf",
+        "sha256": "4d770f9d2dbcaa6b580bf0865d1c543d3cdf24a9b63512fe6834bad279a4c839",
+        "bytes": 797632,
+        "structure": {
+          "meshes": 1,
+          "materials": 1,
+          "textures": 2,
+          "images": 2
+        },
+        "revisions": {
+          "sf3d_source": "ff21fc491b4dc5314bf6734c7c0dabd86b5f5bb2",
+          "sf3d_weights": "f0c9a8ffd62cb1bbc8a7a53c9f87a0be1b6be778",
+          "dinov2": "47b73eefe95e8d44ec3623f8890bd894b6ea2d6c",
+          "open_clip": "1a25a446712ba5ee05982a381eed697ef9b435cf",
+          "rembg": "2.0.57",
+          "u2net_md5": "60024c5c889badc19c04ad937298a77b"
+        },
+        "settings": {
+          "foreground_ratio": 0.85,
+          "texture_resolution": 1024,
+          "remesh": "none",
+          "vertex_count": -1,
+          "dtype": "cuda-bfloat16-autocast"
+        },
+        "runtime": {
+          "python": "3.11.9",
+          "torch": "2.4.0",
+          "cuda": "12.1",
+          "gpu": "NVIDIA L4",
+          "onnx_providers": [
+            "CPUExecutionProvider"
+          ],
+          "cond_image_size": 512,
+          "u2net_sha256": "8d10d2f3bb75ae3b6d527c77944fc5e7dcd94b29809d47a739a7a728a912b491",
+          "startup_stages": {
+            "checkpoint_lookup_download": {
+              "wall_ms": 54640.56753999967,
+              "exclusive_ms": 54640.56753999967,
+              "calls": 1
+            },
+            "model_construction_including_secondary_checkpoints": {
+              "wall_ms": 10650.2615039999,
+              "exclusive_ms": 10650.2615039999,
+              "calls": 1
+            },
+            "primary_checkpoint_deserialization": {
+              "wall_ms": 19161.42650499978,
+              "exclusive_ms": 19161.42650499978,
+              "calls": 1
+            },
+            "model_to_cuda_initialization": {
+              "wall_ms": 738.9776370000618,
+              "exclusive_ms": 738.9776370000618,
+              "calls": 1
+            },
+            "rembg_u2net_session": {
+              "wall_ms": 3204.3962180000563,
+              "exclusive_ms": 3204.3962180000563,
+              "calls": 1
+            }
+          },
+          "runtime_init_ms": 169673.1817599998,
+          "replica_id": "f6a9516c81b141caa265ed54fd97c165",
+          "model_load_ms": 169673.2240309998
+        },
+        "timings": {
+          "decode_ms": 39.677323999967484,
+          "preprocess_ms": 9.569731999818032,
+          "generate_bake_ms": 27543.73732000022,
+          "export_ms": 75.5232189999333,
+          "peak_cuda_bytes": 6470981632,
+          "stages": {
+            "background_alpha_decision": {
+              "wall_ms": 0.9157140002571396,
+              "exclusive_ms": 0.9157140002571396,
+              "calls": 1
+            },
+            "foreground_crop_pad": {
+              "wall_ms": 6.953593000162073,
+              "exclusive_ms": 6.953593000162073,
+              "calls": 1
+            },
+            "conditioning_prepare": {
+              "wall_ms": 468.3170739999696,
+              "exclusive_ms": 468.3170739999696,
+              "calls": 1
+            },
+            "conditioning_resize": {
+              "wall_ms": 586.8409569998221,
+              "exclusive_ms": 586.8409569998221,
+              "calls": 2
+            },
+            "dino_features": {
+              "wall_ms": 9912.996074000148,
+              "exclusive_ms": 9912.996074000148,
+              "calls": 1
+            },
+            "transformer": {
+              "wall_ms": 616.6118539999843,
+              "exclusive_ms": 616.6118539999843,
+              "calls": 1
+            },
+            "triplane_postprocess": {
+              "wall_ms": 1273.5541869997178,
+              "exclusive_ms": 1273.5541869997178,
+              "calls": 1
+            },
+            "scene_codes_total": {
+              "wall_ms": 13239.236059999712,
+              "exclusive_ms": 1436.0739449998619,
+              "calls": 1
+            },
+            "material_estimator": {
+              "wall_ms": 3177.2729670001354,
+              "exclusive_ms": 3177.2729670001354,
+              "calls": 1
+            },
+            "field_sampling": {
+              "wall_ms": 801.7334390001452,
+              "exclusive_ms": 801.7334390001452,
+              "calls": 2
+            },
+            "geometry_field": {
+              "wall_ms": 625.3814639999291,
+              "exclusive_ms": 625.3814639999291,
+              "calls": 1
+            },
+            "lazy_all_edges": {
+              "wall_ms": 981.8053619997045,
+              "exclusive_ms": 981.8053619997045,
+              "calls": 1
+            },
+            "marching_tetrahedra_total": {
+              "wall_ms": 2359.9269260002984,
+              "exclusive_ms": 1378.121564000594,
+              "calls": 1
+            },
+            "geometry_total": {
+              "wall_ms": 3786.2930080000297,
+              "exclusive_ms": 0.6023749997439154,
+              "calls": 1
+            },
+            "vertex_normals": {
+              "wall_ms": 503.51959300041926,
+              "exclusive_ms": 503.51959300041926,
+              "calls": 2
+            },
+            "cpu_atlas_overlap": {
+              "wall_ms": 138.32494300004328,
+              "exclusive_ms": 138.32494300004328,
+              "calls": 1
+            },
+            "normal_map_tangents": {
+              "wall_ms": 0.9389540000483976,
+              "exclusive_ms": 0.9389540000483976,
+              "calls": 1
+            },
+            "uv_unwrap_total": {
+              "wall_ms": 4827.4361560002035,
+              "exclusive_ms": 4184.6526659996925,
+              "calls": 1
+            },
+            "texture_rasterizer_bvh": {
+              "wall_ms": 19.74121000012019,
+              "exclusive_ms": 19.74121000012019,
+              "calls": 1
+            },
+            "texture_interpolation": {
+              "wall_ms": 0.4586119994200999,
+              "exclusive_ms": 0.4586119994200999,
+              "calls": 3
+            },
+            "texture_material_field": {
+              "wall_ms": 65.34838000015952,
+              "exclusive_ms": 65.34838000015952,
+              "calls": 1
+            },
+            "gpu_cpu_transfer": {
+              "wall_ms": 2.620911000576598,
+              "exclusive_ms": 2.620911000576598,
+              "calls": 5
+            },
+            "texture_padding": {
+              "wall_ms": 1127.0075229999748,
+              "exclusive_ms": 1127.0075229999748,
+              "calls": 2
+            },
+            "texture_quantization": {
+              "wall_ms": 39.35414499983381,
+              "exclusive_ms": 39.35414499983381,
+              "calls": 2
+            },
+            "pbr_construction": {
+              "wall_ms": 0.01757000018187682,
+              "exclusive_ms": 0.01757000018187682,
+              "calls": 1
+            },
+            "trimesh_construction": {
+              "wall_ms": 26.34520399988105,
+              "exclusive_ms": 26.34520399988105,
+              "calls": 1
+            },
+            "glb_export": {
+              "wall_ms": 75.50095900023734,
+              "exclusive_ms": 75.50095900023734,
+              "calls": 1
+            }
+          },
+          "rembg_ran": false,
+          "all_edges_cached_before": false,
+          "vertices": 12178,
+          "faces": 19996,
+          "glb_bytes": 797632,
+          "timing_method": "coarse completed CUDA wall boundaries; nested totals inclusive",
+          "unseparated": [
+            "normal-map inline tensor assembly (tangents separately timed)",
+            "rasterizer native BVH setup included in rasterize",
+            "scalar GPU transfers and inline mesh transforms"
+          ],
+          "request_decode_ms": 0.8464319998893188,
+          "image_decode_rgba_ms": 38.74152000025788,
+          "image_size": [
+            512,
+            512
+          ],
+          "image_mode": "RGBA",
+          "requested_bake_resolution": 1024,
+          "effective_bake_resolution": 1024,
+          "request_ordinal": 1,
+          "response_base64_validation_serialization_ms": 5.2060380003240425,
+          "server_total_ms": 27675.453947999813
+        },
+        "client_elapsed_s": 28.709949300042354,
+        "request_id": "3a72401a0bc3ccac17a6bb72b251dc8392232",
+        "endpoint": "https://model-wdlgzjk3.api.baseten.co/deployment/w604592/predict",
+        "artifact": "C:\\Users\\hp\\AppData\\Local\\Temp\\sf3d-latency-20260919\\A\\mesh.glb",
+        "validation": "structural GLB only; visual review and normalization NOT performed"
+      },
+      "binding": {
+        "axis_scale": [
+          1.08,
+          1.0,
+          0.96
+        ],
+        "binder": "ani-bind-v2",
+        "bottom_centre_error_meters": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "bound_key": "0067c7cc27ee593aaf4b78dbed8da288cb289d04ba8be8cb53d6b45bc64c7c83",
+        "bound_sha256": "8fe4031e731aa5fba43a53057b090c27b961a6d86e4ab072d335fc7a5d36bea7",
+        "dimension_error_meters": [
+          2.622604367008563e-08,
+          0.0,
+          1.1920928910669204e-08
+        ],
+        "distortion_diagnostic": "eligible_for_visual_review",
+        "distortion_ratio": 1.1250000000000002,
+        "embedded_image_hashes": [
+          "dd6162f8a26072bc70ab968bcc4489ef3719bfeed5cb97b1bc69845221a17cc9",
+          "fc038422f65fb963f266a329dae8ac3abb7f05a490322652ad384ffb2b1f5bcb"
+        ],
+        "export_reloaded": true,
+        "exporter": "ani-glb-preserve-v2",
+        "generated_normal_primitives": 0,
+        "instance_transforms": [
+          {
+            "matrix_rows": [
+              [
+                1.08,
+                0.0,
+                0.0,
+                0.0013582062721252443
+              ],
+              [
+                0.0,
+                1.0,
+                0.0,
+                0.44422751665115356
+              ],
+              [
+                0.0,
+                0.0,
+                0.96,
+                0.01831732749938965
+              ],
+              [
+                0.0,
+                0.0,
+                0.0,
+                1.0
+              ]
+            ],
+            "source_node": 1
+          }
+        ],
+        "materials": 1,
+        "measured_meters": [
+          0.5374427437782288,
+          0.9512068629264832,
+          0.5020748972892761
+        ],
+        "numpy": "1.26.4",
+        "orientation": {
+          "evidence": "manual_review",
+          "matrix": [
+            [
+              1.0,
+              0.0,
+              0.0
+            ],
+            [
+              0.0,
+              1.0,
+              0.0
+            ],
+            [
+              0.0,
+              0.0,
+              1.0
+            ]
+          ],
+          "name": "sf3d-latency-chair-4d770f9d2dbc",
+          "version": "1"
+        },
+        "orientation_then_binding_matrix_rows": [
+          [
+            1.08,
+            0.0,
+            0.0,
+            0.0013582062721252443
+          ],
+          [
+            0.0,
+            1.0,
+            0.0,
+            0.44422751665115356
+          ],
+          [
+            0.0,
+            0.0,
+            0.96,
+            0.01831732749938965
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "physical_measurement_accuracy": "not_established",
+        "primitive_instances": 1,
+        "publication_requires_visual_review": true,
+        "raw_sha256": "4d770f9d2dbcaa6b580bf0865d1c543d3cdf24a9b63512fe6834bad279a4c839",
+        "source_oriented_extents": [
+          0.49763214588165283,
+          0.9512068629264832,
+          0.5229946970939636
+        ],
+        "tangent_normal_map_support": "recomputed_final_geometry_angle_weighted",
+        "tangent_primitives": 1,
+        "tangent_seam_vertices": 5,
+        "target_meters": [
+          0.5374427175521851,
+          0.9512068629264832,
+          0.502074909210205
+        ],
+        "textures": 2,
+        "trimesh": "4.4.1",
+        "units": "metres",
+        "validation": "PASS",
+        "binding_elapsed_s": 0.2228413000702858,
+        "raw_vertices": 12178,
+        "raw_faces": 19996,
+        "raw_bytes": 797632,
+        "bound_bytes": 1624508,
+        "uv_corners_preserved": true,
+        "target_provenance": "Same baseline software target; NOT independently measured chair dimensions",
+        "visual_review": "Raw front/quarter/detail inspected; +Y up and -Z front accepted"
+      },
+      "preview_sha256": {
+        "front": "81856776bcd6a4d44c1bd1c2f641f72668ecd4259b8e2e1f6ce74a141ddce1d9",
+        "quarter": "362e221d407366b6f11846acfb26cf9402a38afb0be3971f00b5943ce9d7db10",
+        "detail": "2402b92eed1517fe9b7605eaab5a300ecd4b507b03b426139511e8e1284d8f2e"
+      }
+    },
+    "B": {
+      "generation": {
+        "kind": "raw_sf3d_unscaled",
+        "input_sha256": "2503c12a74419d91a4c6c9f1affc48fee6e2b8b9091956ca6211e91ada57b5bf",
+        "sha256": "bac7110fffb32f3eddfc7bcd669ac39ae70a1f8738f07966b1f17497b91cf446",
+        "bytes": 797660,
+        "structure": {
+          "meshes": 1,
+          "materials": 1,
+          "textures": 2,
+          "images": 2
+        },
+        "revisions": {
+          "sf3d_source": "ff21fc491b4dc5314bf6734c7c0dabd86b5f5bb2",
+          "sf3d_weights": "f0c9a8ffd62cb1bbc8a7a53c9f87a0be1b6be778",
+          "dinov2": "47b73eefe95e8d44ec3623f8890bd894b6ea2d6c",
+          "open_clip": "1a25a446712ba5ee05982a381eed697ef9b435cf",
+          "rembg": "2.0.57",
+          "u2net_md5": "60024c5c889badc19c04ad937298a77b"
+        },
+        "settings": {
+          "foreground_ratio": 0.85,
+          "texture_resolution": 1024,
+          "remesh": "none",
+          "vertex_count": -1,
+          "dtype": "cuda-bfloat16-autocast"
+        },
+        "runtime": {
+          "python": "3.11.9",
+          "torch": "2.4.0",
+          "cuda": "12.1",
+          "gpu": "NVIDIA L4",
+          "onnx_providers": [
+            "CPUExecutionProvider"
+          ],
+          "cond_image_size": 512,
+          "u2net_sha256": "8d10d2f3bb75ae3b6d527c77944fc5e7dcd94b29809d47a739a7a728a912b491",
+          "startup_stages": {
+            "checkpoint_lookup_download": {
+              "wall_ms": 54640.56753999967,
+              "exclusive_ms": 54640.56753999967,
+              "calls": 1
+            },
+            "model_construction_including_secondary_checkpoints": {
+              "wall_ms": 10650.2615039999,
+              "exclusive_ms": 10650.2615039999,
+              "calls": 1
+            },
+            "primary_checkpoint_deserialization": {
+              "wall_ms": 19161.42650499978,
+              "exclusive_ms": 19161.42650499978,
+              "calls": 1
+            },
+            "model_to_cuda_initialization": {
+              "wall_ms": 738.9776370000618,
+              "exclusive_ms": 738.9776370000618,
+              "calls": 1
+            },
+            "rembg_u2net_session": {
+              "wall_ms": 3204.3962180000563,
+              "exclusive_ms": 3204.3962180000563,
+              "calls": 1
+            }
+          },
+          "runtime_init_ms": 169673.1817599998,
+          "replica_id": "f6a9516c81b141caa265ed54fd97c165",
+          "model_load_ms": 169673.2240309998
+        },
+        "timings": {
+          "decode_ms": 4.91594899995107,
+          "preprocess_ms": 2.940636999937851,
+          "generate_bake_ms": 667.5216909998198,
+          "export_ms": 55.247484000119584,
+          "peak_cuda_bytes": 6424048128,
+          "stages": {
+            "background_alpha_decision": {
+              "wall_ms": 0.8467329998893547,
+              "exclusive_ms": 0.8467329998893547,
+              "calls": 1
+            },
+            "foreground_crop_pad": {
+              "wall_ms": 0.7527600000685197,
+              "exclusive_ms": 0.7527600000685197,
+              "calls": 1
+            },
+            "conditioning_prepare": {
+              "wall_ms": 8.301528000174585,
+              "exclusive_ms": 8.301528000174585,
+              "calls": 1
+            },
+            "conditioning_resize": {
+              "wall_ms": 0.2237849998891761,
+              "exclusive_ms": 0.2237849998891761,
+              "calls": 2
+            },
+            "dino_features": {
+              "wall_ms": 40.26551999959338,
+              "exclusive_ms": 40.26551999959338,
+              "calls": 1
+            },
+            "transformer": {
+              "wall_ms": 224.5472240001618,
+              "exclusive_ms": 224.5472240001618,
+              "calls": 1
+            },
+            "triplane_postprocess": {
+              "wall_ms": 37.759224999717844,
+              "exclusive_ms": 37.759224999717844,
+              "calls": 1
+            },
+            "scene_codes_total": {
+              "wall_ms": 304.35336499976984,
+              "exclusive_ms": 1.7813960002968088,
+              "calls": 1
+            },
+            "material_estimator": {
+              "wall_ms": 13.551876000292395,
+              "exclusive_ms": 13.551876000292395,
+              "calls": 1
+            },
+            "field_sampling": {
+              "wall_ms": 4.207730999951309,
+              "exclusive_ms": 4.207730999951309,
+              "calls": 2
+            },
+            "geometry_field": {
+              "wall_ms": 15.39421699999366,
+              "exclusive_ms": 15.39421699999366,
+              "calls": 1
+            },
+            "all_edges_cache_hit": {
+              "wall_ms": 0.015380999684566632,
+              "exclusive_ms": 0.015380999684566632,
+              "calls": 1
+            },
+            "marching_tetrahedra_total": {
+              "wall_ms": 3.975944000103482,
+              "exclusive_ms": 3.960563000418915,
+              "calls": 1
+            },
+            "geometry_total": {
+              "wall_ms": 22.74762000024566,
+              "exclusive_ms": 0.49611299982643686,
+              "calls": 1
+            },
+            "vertex_normals": {
+              "wall_ms": 1.0120659999302006,
+              "exclusive_ms": 1.0120659999302006,
+              "calls": 2
+            },
+            "cpu_atlas_overlap": {
+              "wall_ms": 149.93144900017796,
+              "exclusive_ms": 149.93144900017796,
+              "calls": 1
+            },
+            "normal_map_tangents": {
+              "wall_ms": 0.5131140001140011,
+              "exclusive_ms": 0.5131140001140011,
+              "calls": 1
+            },
+            "uv_unwrap_total": {
+              "wall_ms": 178.5437409998849,
+              "exclusive_ms": 27.08711199966274,
+              "calls": 1
+            },
+            "texture_rasterizer_bvh": {
+              "wall_ms": 9.67740500027503,
+              "exclusive_ms": 9.67740500027503,
+              "calls": 1
+            },
+            "texture_interpolation": {
+              "wall_ms": 0.3598500002226501,
+              "exclusive_ms": 0.3598500002226501,
+              "calls": 3
+            },
+            "texture_material_field": {
+              "wall_ms": 6.836711000232754,
+              "exclusive_ms": 6.836711000232754,
+              "calls": 1
+            },
+            "gpu_cpu_transfer": {
+              "wall_ms": 2.568338999481057,
+              "exclusive_ms": 2.568338999481057,
+              "calls": 5
+            },
+            "texture_padding": {
+              "wall_ms": 44.200113999977475,
+              "exclusive_ms": 44.200113999977475,
+              "calls": 2
+            },
+            "texture_quantization": {
+              "wall_ms": 34.695352999733586,
+              "exclusive_ms": 34.695352999733586,
+              "calls": 2
+            },
+            "pbr_construction": {
+              "wall_ms": 0.017320000097242882,
+              "exclusive_ms": 0.017320000097242882,
+              "calls": 1
+            },
+            "trimesh_construction": {
+              "wall_ms": 15.562770000087767,
+              "exclusive_ms": 15.562770000087767,
+              "calls": 1
+            },
+            "glb_export": {
+              "wall_ms": 55.23428399965269,
+              "exclusive_ms": 55.23428399965269,
+              "calls": 1
+            }
+          },
+          "rembg_ran": false,
+          "all_edges_cached_before": true,
+          "vertices": 12183,
+          "faces": 19996,
+          "glb_bytes": 797660,
+          "timing_method": "coarse completed CUDA wall boundaries; nested totals inclusive",
+          "unseparated": [
+            "normal-map inline tensor assembly (tangents separately timed)",
+            "rasterizer native BVH setup included in rasterize",
+            "scalar GPU transfers and inline mesh transforms"
+          ],
+          "request_decode_ms": 0.1316729999416566,
+          "image_decode_rgba_ms": 4.696494000199891,
+          "image_size": [
+            512,
+            512
+          ],
+          "image_mode": "RGBA",
+          "requested_bake_resolution": 1024,
+          "effective_bake_resolution": 1024,
+          "request_ordinal": 2,
+          "response_base64_validation_serialization_ms": 3.521841999827302,
+          "server_total_ms": 734.3410200001017
+        },
+        "client_elapsed_s": 1.1925536999478936,
+        "request_id": "3a72401a0bc3d3ff579cab755b5b65225d213",
+        "endpoint": "https://model-wdlgzjk3.api.baseten.co/deployment/w604592/predict",
+        "artifact": "C:\\Users\\hp\\AppData\\Local\\Temp\\sf3d-latency-20260919\\B\\mesh.glb",
+        "validation": "structural GLB only; visual review and normalization NOT performed"
+      },
+      "binding": {
+        "axis_scale": [
+          1.08,
+          1.0,
+          0.96
+        ],
+        "binder": "ani-bind-v2",
+        "bottom_centre_error_meters": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "bound_key": "0e0afa7694d4e44ed63037728985900fb76fdc6dba6375034bc6fa59193a4331",
+        "bound_sha256": "2e8952ebb09e1b0c8d8745821e87a029eb91396ee16b999cf0aafb119be16d97",
+        "dimension_error_meters": [
+          2.622604367008563e-08,
+          0.0,
+          1.1920928910669204e-08
+        ],
+        "distortion_diagnostic": "eligible_for_visual_review",
+        "distortion_ratio": 1.1250000000000002,
+        "embedded_image_hashes": [
+          "ee78b2a909018293983e91d2cd08933af81d4abfee650d3666724e27b932f5d4",
+          "018745a2c0ac0a1b654f8d025b51686cb1a3a5715e84e4bd6f29c03f7b7ab081"
+        ],
+        "export_reloaded": true,
+        "exporter": "ani-glb-preserve-v2",
+        "generated_normal_primitives": 0,
+        "instance_transforms": [
+          {
+            "matrix_rows": [
+              [
+                1.08,
+                0.0,
+                0.0,
+                0.0013582062721252443
+              ],
+              [
+                0.0,
+                1.0,
+                0.0,
+                0.44422751665115356
+              ],
+              [
+                0.0,
+                0.0,
+                0.96,
+                0.01831732749938965
+              ],
+              [
+                0.0,
+                0.0,
+                0.0,
+                1.0
+              ]
+            ],
+            "source_node": 1
+          }
+        ],
+        "materials": 1,
+        "measured_meters": [
+          0.5374427437782288,
+          0.9512068629264832,
+          0.5020748972892761
+        ],
+        "numpy": "1.26.4",
+        "orientation": {
+          "evidence": "manual_review",
+          "matrix": [
+            [
+              1.0,
+              0.0,
+              0.0
+            ],
+            [
+              0.0,
+              1.0,
+              0.0
+            ],
+            [
+              0.0,
+              0.0,
+              1.0
+            ]
+          ],
+          "name": "sf3d-latency-chair-bac7110fffb3",
+          "version": "1"
+        },
+        "orientation_then_binding_matrix_rows": [
+          [
+            1.08,
+            0.0,
+            0.0,
+            0.0013582062721252443
+          ],
+          [
+            0.0,
+            1.0,
+            0.0,
+            0.44422751665115356
+          ],
+          [
+            0.0,
+            0.0,
+            0.96,
+            0.01831732749938965
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "physical_measurement_accuracy": "not_established",
+        "primitive_instances": 1,
+        "publication_requires_visual_review": true,
+        "raw_sha256": "bac7110fffb32f3eddfc7bcd669ac39ae70a1f8738f07966b1f17497b91cf446",
+        "source_oriented_extents": [
+          0.49763214588165283,
+          0.9512068629264832,
+          0.5229946970939636
+        ],
+        "tangent_normal_map_support": "recomputed_final_geometry_angle_weighted",
+        "tangent_primitives": 1,
+        "tangent_seam_vertices": 5,
+        "target_meters": [
+          0.5374427175521851,
+          0.9512068629264832,
+          0.502074909210205
+        ],
+        "textures": 2,
+        "trimesh": "4.4.1",
+        "units": "metres",
+        "validation": "PASS",
+        "binding_elapsed_s": 0.184265699936077,
+        "raw_vertices": 12183,
+        "raw_faces": 19996,
+        "raw_bytes": 797660,
+        "bound_bytes": 1624776,
+        "uv_corners_preserved": true,
+        "target_provenance": "Same baseline software target; NOT independently measured chair dimensions",
+        "visual_review": "Raw front/quarter/detail inspected; +Y up and -Z front accepted"
+      },
+      "preview_sha256": {
+        "front": "e15c8952afc30cde4e6615ad08ecb877ed7c06b75071cbd07f8457f4364e2529",
+        "quarter": "2aee0b48419c27aebd0bb769ac8fd8be55ebde450618d4217ef0fadd96101635",
+        "detail": "1af3eaf7846090f76a54fa49a40cf30bd24c5e4208e2c397cf4b80132a5e37fa"
+      }
+    },
+    "C": {
+      "generation": {
+        "kind": "raw_sf3d_unscaled",
+        "input_sha256": "2503c12a74419d91a4c6c9f1affc48fee6e2b8b9091956ca6211e91ada57b5bf",
+        "sha256": "f48c40f3cbe26cd920e1080ea7ac086778788a9563ba7565436c0bda582e696f",
+        "bytes": 695144,
+        "structure": {
+          "meshes": 1,
+          "materials": 1,
+          "textures": 2,
+          "images": 2
+        },
+        "revisions": {
+          "sf3d_source": "ff21fc491b4dc5314bf6734c7c0dabd86b5f5bb2",
+          "sf3d_weights": "f0c9a8ffd62cb1bbc8a7a53c9f87a0be1b6be778",
+          "dinov2": "47b73eefe95e8d44ec3623f8890bd894b6ea2d6c",
+          "open_clip": "1a25a446712ba5ee05982a381eed697ef9b435cf",
+          "rembg": "2.0.57",
+          "u2net_md5": "60024c5c889badc19c04ad937298a77b"
+        },
+        "settings": {
+          "foreground_ratio": 0.85,
+          "texture_resolution": 512,
+          "remesh": "none",
+          "vertex_count": -1,
+          "dtype": "cuda-bfloat16-autocast"
+        },
+        "runtime": {
+          "python": "3.11.9",
+          "torch": "2.4.0",
+          "cuda": "12.1",
+          "gpu": "NVIDIA L4",
+          "onnx_providers": [
+            "CPUExecutionProvider"
+          ],
+          "cond_image_size": 512,
+          "u2net_sha256": "8d10d2f3bb75ae3b6d527c77944fc5e7dcd94b29809d47a739a7a728a912b491",
+          "startup_stages": {
+            "checkpoint_lookup_download": {
+              "wall_ms": 54640.56753999967,
+              "exclusive_ms": 54640.56753999967,
+              "calls": 1
+            },
+            "model_construction_including_secondary_checkpoints": {
+              "wall_ms": 10650.2615039999,
+              "exclusive_ms": 10650.2615039999,
+              "calls": 1
+            },
+            "primary_checkpoint_deserialization": {
+              "wall_ms": 19161.42650499978,
+              "exclusive_ms": 19161.42650499978,
+              "calls": 1
+            },
+            "model_to_cuda_initialization": {
+              "wall_ms": 738.9776370000618,
+              "exclusive_ms": 738.9776370000618,
+              "calls": 1
+            },
+            "rembg_u2net_session": {
+              "wall_ms": 3204.3962180000563,
+              "exclusive_ms": 3204.3962180000563,
+              "calls": 1
+            }
+          },
+          "runtime_init_ms": 169673.1817599998,
+          "replica_id": "f6a9516c81b141caa265ed54fd97c165",
+          "model_load_ms": 169673.2240309998
+        },
+        "timings": {
+          "decode_ms": 4.848826999932498,
+          "preprocess_ms": 2.940098000181024,
+          "generate_bake_ms": 571.7536180000025,
+          "export_ms": 26.06199599995307,
+          "peak_cuda_bytes": 6424048128,
+          "stages": {
+            "background_alpha_decision": {
+              "wall_ms": 0.8807639997030492,
+              "exclusive_ms": 0.8807639997030492,
+              "calls": 1
+            },
+            "foreground_crop_pad": {
+              "wall_ms": 0.7310490000236314,
+              "exclusive_ms": 0.7310490000236314,
+              "calls": 1
+            },
+            "conditioning_prepare": {
+              "wall_ms": 7.715893999829859,
+              "exclusive_ms": 7.715893999829859,
+              "calls": 1
+            },
+            "conditioning_resize": {
+              "wall_ms": 0.21441599983518245,
+              "exclusive_ms": 0.21441599983518245,
+              "calls": 2
+            },
+            "dino_features": {
+              "wall_ms": 40.08503499971994,
+              "exclusive_ms": 40.08503499971994,
+              "calls": 1
+            },
+            "transformer": {
+              "wall_ms": 224.5072529999561,
+              "exclusive_ms": 224.5072529999561,
+              "calls": 1
+            },
+            "triplane_postprocess": {
+              "wall_ms": 37.91472900002191,
+              "exclusive_ms": 37.91472900002191,
+              "calls": 1
+            },
+            "scene_codes_total": {
+              "wall_ms": 304.1480599999886,
+              "exclusive_ms": 1.641043000290665,
+              "calls": 1
+            },
+            "material_estimator": {
+              "wall_ms": 8.780981000199972,
+              "exclusive_ms": 8.780981000199972,
+              "calls": 1
+            },
+            "field_sampling": {
+              "wall_ms": 3.767499999867141,
+              "exclusive_ms": 3.767499999867141,
+              "calls": 2
+            },
+            "geometry_field": {
+              "wall_ms": 15.152277999732178,
+              "exclusive_ms": 15.152277999732178,
+              "calls": 1
+            },
+            "all_edges_cache_hit": {
+              "wall_ms": 0.010729999758041231,
+              "exclusive_ms": 0.010729999758041231,
+              "calls": 1
+            },
+            "marching_tetrahedra_total": {
+              "wall_ms": 3.200743999968836,
+              "exclusive_ms": 3.1900140002107946,
+              "calls": 1
+            },
+            "geometry_total": {
+              "wall_ms": 21.488956000212056,
+              "exclusive_ms": 0.355021000814304,
+              "calls": 1
+            },
+            "vertex_normals": {
+              "wall_ms": 0.9525039999971341,
+              "exclusive_ms": 0.9525039999971341,
+              "calls": 2
+            },
+            "cpu_atlas_overlap": {
+              "wall_ms": 142.07934100022612,
+              "exclusive_ms": 142.07934100022612,
+              "calls": 1
+            },
+            "normal_map_tangents": {
+              "wall_ms": 0.6532969996442262,
+              "exclusive_ms": 0.6532969996442262,
+              "calls": 1
+            },
+            "uv_unwrap_total": {
+              "wall_ms": 167.2734449998643,
+              "exclusive_ms": 23.588302999996813,
+              "calls": 1
+            },
+            "texture_rasterizer_bvh": {
+              "wall_ms": 10.980109999763954,
+              "exclusive_ms": 10.980109999763954,
+              "calls": 1
+            },
+            "texture_interpolation": {
+              "wall_ms": 0.19347600027685985,
+              "exclusive_ms": 0.19347600027685985,
+              "calls": 3
+            },
+            "texture_material_field": {
+              "wall_ms": 1.5011189998404006,
+              "exclusive_ms": 1.5011189998404006,
+              "calls": 1
+            },
+            "gpu_cpu_transfer": {
+              "wall_ms": 1.0517669998080237,
+              "exclusive_ms": 1.0517669998080237,
+              "calls": 5
+            },
+            "texture_padding": {
+              "wall_ms": 4.813976000150433,
+              "exclusive_ms": 4.813976000150433,
+              "calls": 2
+            },
+            "texture_quantization": {
+              "wall_ms": 9.62595400005739,
+              "exclusive_ms": 9.62595400005739,
+              "calls": 2
+            },
+            "pbr_construction": {
+              "wall_ms": 0.01917000008688774,
+              "exclusive_ms": 0.01917000008688774,
+              "calls": 1
+            },
+            "trimesh_construction": {
+              "wall_ms": 20.141340999998647,
+              "exclusive_ms": 20.141340999998647,
+              "calls": 1
+            },
+            "glb_export": {
+              "wall_ms": 26.047226000173396,
+              "exclusive_ms": 26.047226000173396,
+              "calls": 1
+            }
+          },
+          "rembg_ran": false,
+          "all_edges_cached_before": true,
+          "vertices": 12166,
+          "faces": 19996,
+          "glb_bytes": 695144,
+          "timing_method": "coarse completed CUDA wall boundaries; nested totals inclusive",
+          "unseparated": [
+            "normal-map inline tensor assembly (tangents separately timed)",
+            "rasterizer native BVH setup included in rasterize",
+            "scalar GPU transfers and inline mesh transforms"
+          ],
+          "request_decode_ms": 0.13223400037531974,
+          "image_decode_rgba_ms": 4.63075099969501,
+          "image_size": [
+            512,
+            512
+          ],
+          "image_mode": "RGBA",
+          "requested_bake_resolution": 512,
+          "effective_bake_resolution": 512,
+          "request_ordinal": 3,
+          "response_base64_validation_serialization_ms": 4.035836999719322,
+          "server_total_ms": 609.8399110001083
+        },
+        "client_elapsed_s": 1.545105299912393,
+        "request_id": "3a72401a0bc3d4b9f7e94a0cdbb0be0c185eb",
+        "endpoint": "https://model-wdlgzjk3.api.baseten.co/deployment/w604592/predict",
+        "artifact": "C:\\Users\\hp\\AppData\\Local\\Temp\\sf3d-latency-20260919\\C\\mesh.glb",
+        "validation": "structural GLB only; visual review and normalization NOT performed"
+      },
+      "binding": {
+        "axis_scale": [
+          1.08,
+          1.0,
+          0.96
+        ],
+        "binder": "ani-bind-v2",
+        "bottom_centre_error_meters": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "bound_key": "aeb951c2f4683080bfd6c42fb563b6032d1976311d79b808302824aaf78dd949",
+        "bound_sha256": "1ce4844e444d03b3d19c135be289f948bea2ecf77a899c48ab0ca053daa859e7",
+        "dimension_error_meters": [
+          2.622604367008563e-08,
+          0.0,
+          1.1920928910669204e-08
+        ],
+        "distortion_diagnostic": "eligible_for_visual_review",
+        "distortion_ratio": 1.1250000000000002,
+        "embedded_image_hashes": [
+          "ab09797deefbb1eda07169126d201d78a0fdc6d5a605809c047e14992ca381de",
+          "64ce3a9ece8e8a7b81ae1b608939e05915dc79e8e4c2d0d1c59d4011eb915801"
+        ],
+        "export_reloaded": true,
+        "exporter": "ani-glb-preserve-v2",
+        "generated_normal_primitives": 0,
+        "instance_transforms": [
+          {
+            "matrix_rows": [
+              [
+                1.08,
+                0.0,
+                0.0,
+                0.0013582062721252443
+              ],
+              [
+                0.0,
+                1.0,
+                0.0,
+                0.44422751665115356
+              ],
+              [
+                0.0,
+                0.0,
+                0.96,
+                0.01831732749938965
+              ],
+              [
+                0.0,
+                0.0,
+                0.0,
+                1.0
+              ]
+            ],
+            "source_node": 1
+          }
+        ],
+        "materials": 1,
+        "measured_meters": [
+          0.5374427437782288,
+          0.9512068629264832,
+          0.5020748972892761
+        ],
+        "numpy": "1.26.4",
+        "orientation": {
+          "evidence": "manual_review",
+          "matrix": [
+            [
+              1.0,
+              0.0,
+              0.0
+            ],
+            [
+              0.0,
+              1.0,
+              0.0
+            ],
+            [
+              0.0,
+              0.0,
+              1.0
+            ]
+          ],
+          "name": "sf3d-latency-chair-f48c40f3cbe2",
+          "version": "1"
+        },
+        "orientation_then_binding_matrix_rows": [
+          [
+            1.08,
+            0.0,
+            0.0,
+            0.0013582062721252443
+          ],
+          [
+            0.0,
+            1.0,
+            0.0,
+            0.44422751665115356
+          ],
+          [
+            0.0,
+            0.0,
+            0.96,
+            0.01831732749938965
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "physical_measurement_accuracy": "not_established",
+        "primitive_instances": 1,
+        "publication_requires_visual_review": true,
+        "raw_sha256": "f48c40f3cbe26cd920e1080ea7ac086778788a9563ba7565436c0bda582e696f",
+        "source_oriented_extents": [
+          0.49763214588165283,
+          0.9512068629264832,
+          0.5229946970939636
+        ],
+        "tangent_normal_map_support": "recomputed_final_geometry_angle_weighted",
+        "tangent_primitives": 1,
+        "tangent_seam_vertices": 5,
+        "target_meters": [
+          0.5374427175521851,
+          0.9512068629264832,
+          0.502074909210205
+        ],
+        "textures": 2,
+        "trimesh": "4.4.1",
+        "units": "metres",
+        "validation": "PASS",
+        "binding_elapsed_s": 0.15214699995703995,
+        "raw_vertices": 12166,
+        "raw_faces": 19996,
+        "raw_bytes": 695144,
+        "bound_bytes": 1521444,
+        "uv_corners_preserved": true,
+        "target_provenance": "Same baseline software target; NOT independently measured chair dimensions",
+        "visual_review": "Raw front/quarter/detail inspected; +Y up and -Z front accepted"
+      },
+      "preview_sha256": {
+        "front": "649353fa6a3dea67c13518837d6d836be86aac475b4339960b1b728825c0edef",
+        "quarter": "8005aac997ad6cd4d38ef34f527249a4a89c679d5763711a9f4c0fd0ea4dc812",
+        "detail": "21798e71c6e6696a72efc7a47b306876d5991ceac7ff5f1401d7131c87d42a12"
+      }
+    },
+    "D": {
+      "generation": {
+        "kind": "raw_sf3d_unscaled",
+        "input_sha256": "2503c12a74419d91a4c6c9f1affc48fee6e2b8b9091956ca6211e91ada57b5bf",
+        "sha256": "a7244b4db67ed80ccd00a98d998f2e486f1a76d643f83c8690f9aa5126d5ddb4",
+        "bytes": 696608,
+        "structure": {
+          "meshes": 1,
+          "materials": 1,
+          "textures": 2,
+          "images": 2
+        },
+        "revisions": {
+          "sf3d_source": "ff21fc491b4dc5314bf6734c7c0dabd86b5f5bb2",
+          "sf3d_weights": "f0c9a8ffd62cb1bbc8a7a53c9f87a0be1b6be778",
+          "dinov2": "47b73eefe95e8d44ec3623f8890bd894b6ea2d6c",
+          "open_clip": "1a25a446712ba5ee05982a381eed697ef9b435cf",
+          "rembg": "2.0.57",
+          "u2net_md5": "60024c5c889badc19c04ad937298a77b"
+        },
+        "settings": {
+          "foreground_ratio": 0.85,
+          "texture_resolution": 512,
+          "remesh": "none",
+          "vertex_count": -1,
+          "dtype": "cuda-bfloat16-autocast"
+        },
+        "runtime": {
+          "python": "3.11.9",
+          "torch": "2.4.0",
+          "cuda": "12.1",
+          "gpu": "NVIDIA L4",
+          "onnx_providers": [
+            "CPUExecutionProvider"
+          ],
+          "cond_image_size": 512,
+          "u2net_sha256": "8d10d2f3bb75ae3b6d527c77944fc5e7dcd94b29809d47a739a7a728a912b491",
+          "startup_stages": {
+            "checkpoint_lookup_download": {
+              "wall_ms": 54640.56753999967,
+              "exclusive_ms": 54640.56753999967,
+              "calls": 1
+            },
+            "model_construction_including_secondary_checkpoints": {
+              "wall_ms": 10650.2615039999,
+              "exclusive_ms": 10650.2615039999,
+              "calls": 1
+            },
+            "primary_checkpoint_deserialization": {
+              "wall_ms": 19161.42650499978,
+              "exclusive_ms": 19161.42650499978,
+              "calls": 1
+            },
+            "model_to_cuda_initialization": {
+              "wall_ms": 738.9776370000618,
+              "exclusive_ms": 738.9776370000618,
+              "calls": 1
+            },
+            "rembg_u2net_session": {
+              "wall_ms": 3204.3962180000563,
+              "exclusive_ms": 3204.3962180000563,
+              "calls": 1
+            }
+          },
+          "runtime_init_ms": 169673.1817599998,
+          "replica_id": "f6a9516c81b141caa265ed54fd97c165",
+          "model_load_ms": 169673.2240309998
+        },
+        "timings": {
+          "decode_ms": 7.816627000011067,
+          "preprocess_ms": 4.434847000084119,
+          "generate_bake_ms": 620.640364999872,
+          "export_ms": 29.9989000000096,
+          "peak_cuda_bytes": 6424048128,
+          "stages": {
+            "background_alpha_decision": {
+              "wall_ms": 1.2688729998444614,
+              "exclusive_ms": 1.2688729998444614,
+              "calls": 1
+            },
+            "foreground_crop_pad": {
+              "wall_ms": 1.0992389998136787,
+              "exclusive_ms": 1.0992389998136787,
+              "calls": 1
+            },
+            "conditioning_prepare": {
+              "wall_ms": 11.003538999830198,
+              "exclusive_ms": 11.003538999830198,
+              "calls": 1
+            },
+            "conditioning_resize": {
+              "wall_ms": 0.21848500045962282,
+              "exclusive_ms": 0.21848500045962282,
+              "calls": 2
+            },
+            "dino_features": {
+              "wall_ms": 40.49993700027699,
+              "exclusive_ms": 40.49993700027699,
+              "calls": 1
+            },
+            "transformer": {
+              "wall_ms": 224.7584389997428,
+              "exclusive_ms": 224.7584389997428,
+              "calls": 1
+            },
+            "triplane_postprocess": {
+              "wall_ms": 37.68711200018515,
+              "exclusive_ms": 37.68711200018515,
+              "calls": 1
+            },
+            "scene_codes_total": {
+              "wall_ms": 304.7826570000325,
+              "exclusive_ms": 1.8371689998275542,
+              "calls": 1
+            },
+            "material_estimator": {
+              "wall_ms": 14.278575000389537,
+              "exclusive_ms": 14.278575000389537,
+              "calls": 1
+            },
+            "field_sampling": {
+              "wall_ms": 3.919064000456274,
+              "exclusive_ms": 3.919064000456274,
+              "calls": 2
+            },
+            "geometry_field": {
+              "wall_ms": 15.421936999700847,
+              "exclusive_ms": 15.421936999700847,
+              "calls": 1
+            },
+            "all_edges_cache_hit": {
+              "wall_ms": 0.015360000361397397,
+              "exclusive_ms": 0.015360000361397397,
+              "calls": 1
+            },
+            "marching_tetrahedra_total": {
+              "wall_ms": 4.184590000022581,
+              "exclusive_ms": 4.169229999661184,
+              "calls": 1
+            },
+            "geometry_total": {
+              "wall_ms": 23.022035999929358,
+              "exclusive_ms": 0.5338129999472585,
+              "calls": 1
+            },
+            "vertex_normals": {
+              "wall_ms": 1.1995210002169188,
+              "exclusive_ms": 1.1995210002169188,
+              "calls": 2
+            },
+            "cpu_atlas_overlap": {
+              "wall_ms": 168.95067899986316,
+              "exclusive_ms": 168.95067899986316,
+              "calls": 1
+            },
+            "normal_map_tangents": {
+              "wall_ms": 0.7460389997504535,
+              "exclusive_ms": 0.7460389997504535,
+              "calls": 1
+            },
+            "uv_unwrap_total": {
+              "wall_ms": 197.36866799985364,
+              "exclusive_ms": 26.472429000023112,
+              "calls": 1
+            },
+            "texture_rasterizer_bvh": {
+              "wall_ms": 11.308608000035747,
+              "exclusive_ms": 11.308608000035747,
+              "calls": 1
+            },
+            "texture_interpolation": {
+              "wall_ms": 0.23338700020758552,
+              "exclusive_ms": 0.23338700020758552,
+              "calls": 3
+            },
+            "texture_material_field": {
+              "wall_ms": 1.5521509999416594,
+              "exclusive_ms": 1.5521509999416594,
+              "calls": 1
+            },
+            "gpu_cpu_transfer": {
+              "wall_ms": 1.0924389998763218,
+              "exclusive_ms": 1.0924389998763218,
+              "calls": 5
+            },
+            "texture_padding": {
+              "wall_ms": 3.5781529995801975,
+              "exclusive_ms": 3.5781529995801975,
+              "calls": 2
+            },
+            "texture_quantization": {
+              "wall_ms": 12.84073700026056,
+              "exclusive_ms": 12.84073700026056,
+              "calls": 2
+            },
+            "pbr_construction": {
+              "wall_ms": 0.020320999738032697,
+              "exclusive_ms": 0.020320999738032697,
+              "calls": 1
+            },
+            "trimesh_construction": {
+              "wall_ms": 21.470234999924287,
+              "exclusive_ms": 21.470234999924287,
+              "calls": 1
+            },
+            "glb_export": {
+              "wall_ms": 29.9782399997639,
+              "exclusive_ms": 29.9782399997639,
+              "calls": 1
+            }
+          },
+          "rembg_ran": false,
+          "all_edges_cached_before": true,
+          "vertices": 12181,
+          "faces": 19996,
+          "glb_bytes": 696608,
+          "timing_method": "coarse completed CUDA wall boundaries; nested totals inclusive",
+          "unseparated": [
+            "normal-map inline tensor assembly (tangents separately timed)",
+            "rasterizer native BVH setup included in rasterize",
+            "scalar GPU transfers and inline mesh transforms"
+          ],
+          "request_decode_ms": 0.22034599987819092,
+          "image_decode_rgba_ms": 7.504507999783527,
+          "image_size": [
+            512,
+            512
+          ],
+          "image_mode": "RGBA",
+          "requested_bake_resolution": 512,
+          "effective_bake_resolution": 512,
+          "request_ordinal": 4,
+          "response_base64_validation_serialization_ms": 4.80672699995921,
+          "server_total_ms": 667.9377119999117
+        },
+        "client_elapsed_s": 1.2822719000978395,
+        "request_id": "3a72401a0bc3d58ad7430a35271d288b6ee33",
+        "endpoint": "https://model-wdlgzjk3.api.baseten.co/deployment/w604592/predict",
+        "artifact": "C:\\Users\\hp\\AppData\\Local\\Temp\\sf3d-latency-20260919\\D\\mesh.glb",
+        "validation": "structural GLB only; visual review and normalization NOT performed"
+      },
+      "binding": {
+        "axis_scale": [
+          1.08,
+          1.0,
+          0.96
+        ],
+        "binder": "ani-bind-v2",
+        "bottom_centre_error_meters": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "bound_key": "60026a1052ed5f0c5c586231a2905fc7d17ef0f6fe85ad3869460ce36dd25667",
+        "bound_sha256": "f8c225d8064721d9be188cce00f2204789e824963d4d524daf871fa2017316ee",
+        "dimension_error_meters": [
+          2.622604367008563e-08,
+          0.0,
+          1.1920928910669204e-08
+        ],
+        "distortion_diagnostic": "eligible_for_visual_review",
+        "distortion_ratio": 1.1250000000000002,
+        "embedded_image_hashes": [
+          "2cadb3895c7724b54bf8222ff08b073c9389fdaf14197e13c9ea7359c03f8d97",
+          "41832dd51a28bdb7ef5d7d786e6371b94c65995deef7bc5e11e1feeacc3ecbfd"
+        ],
+        "export_reloaded": true,
+        "exporter": "ani-glb-preserve-v2",
+        "generated_normal_primitives": 0,
+        "instance_transforms": [
+          {
+            "matrix_rows": [
+              [
+                1.08,
+                0.0,
+                0.0,
+                0.0013582062721252443
+              ],
+              [
+                0.0,
+                1.0,
+                0.0,
+                0.44422751665115356
+              ],
+              [
+                0.0,
+                0.0,
+                0.96,
+                0.01831732749938965
+              ],
+              [
+                0.0,
+                0.0,
+                0.0,
+                1.0
+              ]
+            ],
+            "source_node": 1
+          }
+        ],
+        "materials": 1,
+        "measured_meters": [
+          0.5374427437782288,
+          0.9512068629264832,
+          0.5020748972892761
+        ],
+        "numpy": "1.26.4",
+        "orientation": {
+          "evidence": "manual_review",
+          "matrix": [
+            [
+              1.0,
+              0.0,
+              0.0
+            ],
+            [
+              0.0,
+              1.0,
+              0.0
+            ],
+            [
+              0.0,
+              0.0,
+              1.0
+            ]
+          ],
+          "name": "sf3d-latency-chair-a7244b4db67e",
+          "version": "1"
+        },
+        "orientation_then_binding_matrix_rows": [
+          [
+            1.08,
+            0.0,
+            0.0,
+            0.0013582062721252443
+          ],
+          [
+            0.0,
+            1.0,
+            0.0,
+            0.44422751665115356
+          ],
+          [
+            0.0,
+            0.0,
+            0.96,
+            0.01831732749938965
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "physical_measurement_accuracy": "not_established",
+        "primitive_instances": 1,
+        "publication_requires_visual_review": true,
+        "raw_sha256": "a7244b4db67ed80ccd00a98d998f2e486f1a76d643f83c8690f9aa5126d5ddb4",
+        "source_oriented_extents": [
+          0.49763214588165283,
+          0.9512068629264832,
+          0.5229946970939636
+        ],
+        "tangent_normal_map_support": "recomputed_final_geometry_angle_weighted",
+        "tangent_primitives": 1,
+        "tangent_seam_vertices": 5,
+        "target_meters": [
+          0.5374427175521851,
+          0.9512068629264832,
+          0.502074909210205
+        ],
+        "textures": 2,
+        "trimesh": "4.4.1",
+        "units": "metres",
+        "validation": "PASS",
+        "binding_elapsed_s": 0.21027759998105466,
+        "raw_vertices": 12181,
+        "raw_faces": 19996,
+        "raw_bytes": 696608,
+        "bound_bytes": 1523628,
+        "uv_corners_preserved": true,
+        "target_provenance": "Same baseline software target; NOT independently measured chair dimensions",
+        "visual_review": "Raw front/quarter/detail inspected; +Y up and -Z front accepted"
+      },
+      "preview_sha256": {
+        "front": "67b1364ea303a18d484fcd200560fb44ac8d11bf0351e94ad77261dc03ac13a3",
+        "quarter": "7d7468ee96950f8ecb653d36f08f07fc6d322a5a584077c514a2111abc4e151e",
+        "detail": "c81ea398b5e6273376e3133df0e9b68734964d856ae906ab858b8e8f097dd479"
+      }
+    }
+  },
+  "artifact_validation": {
+    "A": {
+      "images": [
+        {
+          "size": [
+            1024,
+            1024
+          ],
+          "sha256": "dd6162f8a26072bc70ab968bcc4489ef3719bfeed5cb97b1bc69845221a17cc9"
+        },
+        {
+          "size": [
+            1024,
+            1024
+          ],
+          "sha256": "fc038422f65fb963f266a329dae8ac3abb7f05a490322652ad384ffb2b1f5bcb"
+        }
+      ],
+      "geometry_corner_max_delta_vs_B": 0.0
+    },
+    "B": {
+      "images": [
+        {
+          "size": [
+            1024,
+            1024
+          ],
+          "sha256": "ee78b2a909018293983e91d2cd08933af81d4abfee650d3666724e27b932f5d4"
+        },
+        {
+          "size": [
+            1024,
+            1024
+          ],
+          "sha256": "018745a2c0ac0a1b654f8d025b51686cb1a3a5715e84e4bd6f29c03f7b7ab081"
+        }
+      ]
+    },
+    "C": {
+      "images": [
+        {
+          "size": [
+            512,
+            512
+          ],
+          "sha256": "ab09797deefbb1eda07169126d201d78a0fdc6d5a605809c047e14992ca381de"
+        },
+        {
+          "size": [
+            512,
+            512
+          ],
+          "sha256": "64ce3a9ece8e8a7b81ae1b608939e05915dc79e8e4c2d0d1c59d4011eb915801"
+        }
+      ],
+      "geometry_corner_max_delta_vs_B": 0.0
+    },
+    "D": {
+      "images": [
+        {
+          "size": [
+            512,
+            512
+          ],
+          "sha256": "2cadb3895c7724b54bf8222ff08b073c9389fdaf14197e13c9ea7359c03f8d97"
+        },
+        {
+          "size": [
+            512,
+            512
+          ],
+          "sha256": "41832dd51a28bdb7ef5d7d786e6371b94c65995deef7bc5e11e1feeacc3ecbfd"
+        }
+      ],
+      "geometry_corner_max_delta_vs_B": 0.0
+    }
+  },
+  "preview_method": "Blender 5.2.2 Cycles CPU, 24 samples, identical front/quarter/detail camera and lighting; display translation only",
+  "quality": "1024 preferred. 512 retains silhouette/base colors but loses upholstery button/seam and wood-edge detail; both inherit SF3D uneven feet. Normal texture exists and is shaded; no new gross normal-map corruption observed.",
+  "limitations": [
+    "Single chair, one replica, four requests; not p95 or a multi-input benchmark.",
+    "Previous 59.53s was a first prediction; no previous warm-repeat control exists.",
+    "No algorithm/dtype/geometry change, no dummy inference and no extra requests.",
+    "CUDA coarse-boundary timing adds synchronization overhead shared across A/B/C/D.",
+    "Cold first-pass costs are spread across DINO, UV, estimator and other CUDA stages; no specific deterministic >5s cache was established.",
+    "Full capture-to-mesh/first-proxy latency and deployed Worker savings not measured.",
+    "B04 dimensions use the prior software target, not independently measured physical chair dimensions."
+  ],
+  "package_sha256": {
+    "config.yaml": "bf3b6e7b9dc1133ec3bd9a62478fdfe30f2726778e3e657b5c3c9cc667336e00",
+    "requirements.txt": "caee50a07cab40f5077a44c2954e0fcbab4225b346965305b8ca011b7460c960",
+    "model/model.py": "c4e0c2d5489441e6c472eaac0dc3ab5441cc9a3c7138e937181d5fec4315c3fc",
+    "model/telemetry.py": "6b88c727b50c91cf6aacaafef42e04efc0ea7c6e509ca9ac66889abbbceab36c",
+    "model/transport.py": "18d8a87216cd57bf89ea2fe5a86dbcedc788f7842e3764698ad75b15ae3ed57d",
+    "model/__init__.py": "4d7b4913de0135f37acf6c9e8d582a07011e704ff43c02402a67c38f5d730b89"
+  }
+}

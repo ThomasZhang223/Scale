@@ -80,6 +80,8 @@ function measure(): CanvasRenderingContext2D | null {
 export class Palette {
   /** Attach this to the left controller's grip. Hidden until it has items. */
   readonly group = new THREE.Group();
+  /** The phone's top edge, in the phone's plane: what sits here (the transcript card) follows the hand. */
+  readonly above = new THREE.Group();
   private tiles: THREE.Mesh[] = [];
   private hovered: THREE.Mesh | null = null;
 
@@ -97,6 +99,7 @@ export class Palette {
 
   setItems(items: PaletteItem[]) {
     this.group.clear();
+    this.group.add(this.above); // survives the clear; repositioned once the height is known
     this.tiles = [];
     this.hovered = null;
     this.group.visible = items.length > 0;
@@ -106,6 +109,7 @@ export class Palette {
     const screenH = (slots.at(-1)!.y + slots.at(-1)!.h / 2) + MARGIN + ISLAND.top + ISLAND.h;
     const frameW = SCREEN_W + 2 * BEZEL;
     const frameH = screenH + 2 * BEZEL;
+    this.above.position.set(0, frameH / 2, 0);
 
     // The phone: body, screen, Dynamic Island.
     this.group.add(plate(frameW, frameH, RADIUS_FRAME, C.frame, -0.0025));

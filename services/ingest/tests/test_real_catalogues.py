@@ -1,8 +1,15 @@
-"""Regression tests against real merchant catalogues in ../samples/.
+"""Regression tests against real merchant catalogues, frozen in tests/fixtures/catalogues/.
 
 Every other extraction test uses markup I wrote, which proves only that the regex matches
-itself. These lock in measured behaviour on catalogues pulled from live stores on 2026-09-19,
-so a pattern change that breaks a real merchant fails here instead of at H14.
+itself. These lock in measured behaviour on catalogues pulled from live stores, so a pattern
+change that breaks a real merchant fails here instead of at H14.
+
+They read fixtures/catalogues/ and NOT ../samples/, which they used to. `verify_merchants.py
+--dump` rewrites samples/ on every run and takes whichever 8 products a store serves first, so
+the baseline moved underneath the test: a re-run on 2026-09-20 pulled an InStyle sample opening
+with rugs and fabric codes rather than its furniture line, usable went 7 -> 2, and this file
+reported a fixture swap as an extractor regression. A test that cries wolf when nothing broke
+is worse than no test. See fixtures/catalogues/README.md.
 
 Run: python3 tests/test_real_catalogues.py
 """
@@ -14,7 +21,7 @@ sys.path.insert(0, str(ROOT))
 
 from app.dimensions import extract
 
-SAMPLES = ROOT / "samples"
+SAMPLES = ROOT / "tests" / "fixtures" / "catalogues"
 
 # merchant -> (min any-dimension hits, min fully-usable hits) out of 8 sampled.
 # Floors, not equalities: improving the extractor should never fail these.
@@ -32,7 +39,9 @@ NO_DIMENSIONS = ["Bend_Goods", "Branch_Furniture__office_", "Floyd_Home", "Fyrn"
 def _measure(name):
     path = SAMPLES / f"{name}.json"
     if not path.exists():
-        raise FileNotFoundError(f"{path} — run verify_merchants.py --dump samples/")
+        raise FileNotFoundError(
+            f"{path} — frozen fixtures live here, not in samples/. Copy one over "
+            f"deliberately and update EXPECTED in the same commit.")
     products = json.load(open(path))
     hits = [extract(p) for p in products]
     return sum(1 for h in hits if h), sum(1 for h in hits if h and h.as_bbox())

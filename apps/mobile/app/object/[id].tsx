@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { View, StyleSheet } from "react-native";
-import { Host, List, Section, Button, Gauge, Text, Link } from "@expo/ui/swift-ui";
-import { font, foregroundStyle } from "@expo/ui/swift-ui/modifiers";
+import { Host, List, Button, Gauge, Text, Link, ZStack } from "@expo/ui/swift-ui";
+
+import { GlassSection, backdrop, glassList } from "../../src/ui/glass";
+import { font, foregroundStyle, ignoreSafeArea } from "@expo/ui/swift-ui/modifiers";
 
 import { formatPrice, getJob, getObject, startGenerate } from "../../src/ui/objectsApi";
 import { StateBadge } from "../../src/ui/StateBadge";
@@ -101,16 +103,17 @@ export default function ObjectDetailScreen() {
       </View>
 
       <Host style={styles.host} useViewportSizeMeasurement>
-        <List>
-          <Section title={object.name}>
+        <ZStack modifiers={[backdrop, ignoreSafeArea()]}>
+        <List modifiers={glassList}>
+          <GlassSection title={object.name}>
             <StateBadge state={object.state} />
             <Metric label="Width" value={formatLengthCm(object.bboxMeters.w)} />
             <Metric label="Height" value={formatLengthCm(object.bboxMeters.h)} />
             <Metric label="Depth" value={formatLengthCm(object.bboxMeters.d)} />
-          </Section>
+          </GlassSection>
 
           {object.source === "catalog" ? (
-            <Section title="Listing">
+            <GlassSection title="Listing">
               {object.merchant ? <Metric label="Merchant" value={object.merchant} /> : null}
               {price ? <Metric label="Price" value={price} /> : null}
               <Metric label="Category" value={object.category} />
@@ -119,20 +122,22 @@ export default function ObjectDetailScreen() {
                   <Text>Open listing</Text>
                 </Link>
               ) : null}
-            </Section>
+            </GlassSection>
           ) : null}
 
           {object.palette && object.palette.length > 0 ? (
-            <Section title="Palette">
+            <GlassSection title="Palette">
               <PaletteSwatches colors={object.palette} size={24} />
-            </Section>
+            </GlassSection>
           ) : null}
 
-          <Section title="Caption">
-            <Text>{object.caption}</Text>
-          </Section>
+          {object.caption ? (
+            <GlassSection title="Caption">
+              <Text>{object.caption}</Text>
+            </GlassSection>
+          ) : null}
 
-          <Section title="3D model">
+          <GlassSection title="3D model">
             <Gauge value={progress} currentValueLabel={<Text>{`${Math.round(progress * 100)}%`}</Text>}>
               <Text>{job ? "Generating" : object.state === "ready" ? "Ready for the headset" : object.state}</Text>
             </Gauge>
@@ -146,9 +151,9 @@ export default function ObjectDetailScreen() {
             {job?.error ? (
               <Text modifiers={[font({ textStyle: "footnote" }), foregroundStyle("#c62d25")]}>{job.error}</Text>
             ) : null}
-          </Section>
+          </GlassSection>
 
-          <Section>
+          <GlassSection divided={false}>
             <Button
               label="View in AR at 1:1"
               systemImage="arkit"
@@ -156,8 +161,9 @@ export default function ObjectDetailScreen() {
                 router.push({ pathname: "/ar/[objectId]", params: { objectId: object.objectId } })
               }
             />
-          </Section>
+          </GlassSection>
         </List>
+        </ZStack>
       </Host>
     </View>
   );
@@ -166,6 +172,7 @@ export default function ObjectDetailScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
+    backgroundColor: "#e8edf4",
   },
   previewWrap: {
     alignItems: "center",

@@ -101,13 +101,8 @@ const room = new THREE.Group();
 scene.add(room);
 const fitOverlay = new FitOverlay();
 scene.add(fitOverlay.group);
-// The transcript card follows the head: it hangs off the camera, which must be in the scene
-// for its children to render.
-scene.add(camera);
+// The transcript card sits past the top of the phone on the left hand (Palette.above).
 const hud = new Hud();
-hud.attachTo(camera);
-renderer.xr.addEventListener('sessionstart', () => hud.setPresenting(true));
-renderer.xr.addEventListener('sessionend', () => hud.setPresenting(false));
 
 const PALETTE_ACTIONS: PaletteItem[] = [
   { url: '', name: 'Reset room', action: 'reset', section: 'Room' },
@@ -138,8 +133,8 @@ const micButton = document.getElementById('agent-mic') as HTMLButtonElement;
 panel.hidden = !SHOW_PANEL;
 const say = (text: string) => (note.textContent = text);
 
-// The transcript: what was heard and what was answered, shown in full on the head-locked
-// card (hud.ts). The wrist keeps the buttons; the reasons live here, in front of the eyes.
+// The transcript: what was heard and what was answered, shown in full on the card above the
+// phone (hud.ts). The phone keeps the buttons; the reasons live on the card.
 const TRANSCRIPT_KEEP = 8;
 const transcript: HudLine[] = [];
 function tell(text: string, tone: Tone = 'info') {
@@ -213,6 +208,7 @@ async function start() {
   const physics = await createPhysics(scene);
   const loader = new ObjectLoader(renderer);
   const palette = new Palette();
+  hud.attachTo(palette.above);
   const applier = new ProposalApplier(physics);
   // Built before the first showPalette(): the talk row reads voice.supported.
   const voice = new Voice({
@@ -606,7 +602,9 @@ async function start() {
         if (p.explanation) tell(p.explanation, 'info');
         if (p.tradeoffs[0]) tell(`Trade-off: ${p.tradeoffs[0]}`, 'warn');
         if (p.fit.red || p.fit.amber) tell(`Fit: ${p.fit.red} red, ${p.fit.amber} amber.`, p.fit.red ? 'error' : 'warn');
-        speak(concise(p.summary));
+        // Aloud: the summary and the reasoning behind it. The trade-off and the fit counts stay
+        // written only, so the voice stops while the furniture is still gliding.
+        speak([p.summary, p.explanation].filter(Boolean).join(' '));
       }
     } else if (s.state === 'failed' && s.error && spokenFor !== `failed:${s.error}`) {
       spokenFor = `failed:${s.error}`;

@@ -2,7 +2,8 @@
 
 Owner: Ani. **Real build/load/generation succeeded for the saved chair artifact.**
 See [evidence](../../evidence/real-sf3d-binding-2026-09-19.json). The prior deployment
-is recorded INACTIVE with zero replicas; no further Baseten/GPU calls are authorized.
+is recorded INACTIVE with zero replicas. The later latency experiment has separate
+bounded authorization; see [the judging procedure](../../SF3D_JUDGING.md).
 No deployment is created by importing these
 files, running the packaging tests, or asking the runner for `--help`.
 

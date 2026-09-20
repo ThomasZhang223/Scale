@@ -51,6 +51,7 @@ enum GLBExporter {
     guard let meshes = asset.childObjects(of: MDLMesh.self) as? [MDLMesh], !meshes.isEmpty else {
       throw ExportError.noMeshes
     }
+    NSLog("[GLBExporter] %d meshes, vertices: %@", meshes.count, meshes.map { "\($0.vertexCount)" }.joined(separator: ","))
 
     var bin = Data()
     var primitives: [Primitive] = []
@@ -154,7 +155,11 @@ enum GLBExporter {
               let key = ObjectIdentifier(tex)
               if let cached = textureCache[key] {
                 mat.imageIndex = cached
-              } else if let cg = tex.imageFromTexture()?.takeRetainedValue(),
+              // Unretained on purpose: imageFromTexture() hands back an
+              // autoreleased CGImage despite the Unmanaged signature. Taking
+              // it retained over-released it, and the app died with SIGSEGV at
+              // the next pool drain — a few ms after "GLB written" — twice.
+              } else if let cg = tex.imageFromTexture()?.takeUnretainedValue(),
                         let jpeg = UIImage(cgImage: cg).jpegData(compressionQuality: 0.88) {
                 pad4(&bin)
                 let off = bin.count
@@ -186,6 +191,7 @@ enum GLBExporter {
     }
     pad4(&bin)
     guard !primitives.isEmpty else { throw ExportError.noMeshes }
+    NSLog("[GLBExporter] %d primitives, %d images, bin=%d bytes", primitives.count, images.count, bin.count)
 
     // --- glTF JSON ---------------------------------------------------------
     var bufferViews: [[String: Any]] = []

@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import * as Haptics from "expo-haptics";
-import { Host, List, Section, Button, Text, Image, HStack, Spacer } from "@expo/ui/swift-ui";
+import { List, Button, Text, Image, HStack, Spacer } from "@expo/ui/swift-ui";
+
+import { GlassHost, GlassSection, glassList } from "../../src/ui/glass";
 
 import { API_BASE, getJSON, postJSON } from "../../src/lib/api";
 import { subscribeRoomSync } from "../../src/lib/sse";
@@ -80,9 +82,9 @@ export default function HeadsetScreen() {
   }
 
   return (
-    <Host style={{ flex: 1 }} useViewportSizeMeasurement>
-      <List>
-        <Section title="Headset">
+    <GlassHost>
+      <List modifiers={glassList}>
+        <GlassSection title="Headset" divided={false}>
           <HStack>
             <Spacer />
             <Image systemName="qrcode" size={120} />
@@ -93,14 +95,14 @@ export default function HeadsetScreen() {
           {push !== "idle" ? (
             <Text>{push === "pushing" ? "Pushing…" : push === "pushed" ? "Pushed" : "Failed to push"}</Text>
           ) : null}
-        </Section>
+        </GlassSection>
 
-        <Section title="Diagnostics">
+        <GlassSection title="Diagnostics">
           <Metric label="API base" value={API_BASE ?? "not set"} />
           <Metric label="Stub layer" value={healthLabel(health)} />
           <Metric label="Sync (SSE)" value={sse} />
-        </Section>
+        </GlassSection>
       </List>
-    </Host>
+    </GlassHost>
   );
 }

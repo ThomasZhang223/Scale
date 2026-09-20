@@ -7,6 +7,7 @@ import io
 import json
 import struct
 import warnings
+import time
 
 from PIL import Image, ImageOps, UnidentifiedImageError
 
@@ -49,11 +50,18 @@ def decode_image(raw):
         raise ValueError("Invalid or unsafe image") from None
 
 
-def decode_request(payload):
+def decode_request(payload, diagnostics=None):
+    start = time.perf_counter()
     if not isinstance(payload, dict) or set(payload) != {"image_base64"}:
         raise ValueError("Expected exactly one field: image_base64")
     raw = decode_base64(payload["image_base64"], MAX_IMAGE_BYTES)
-    return decode_image(raw), hashlib.sha256(raw).hexdigest()
+    decoded = time.perf_counter()
+    image = decode_image(raw)
+    if diagnostics is not None:
+        diagnostics.update(request_decode_ms=(decoded - start) * 1000,
+                           image_decode_rgba_ms=(time.perf_counter() - decoded) * 1000,
+                           image_size=list(image.size), image_mode=image.mode)
+    return image, hashlib.sha256(raw).hexdigest()
 
 
 def inspect_glb(raw):

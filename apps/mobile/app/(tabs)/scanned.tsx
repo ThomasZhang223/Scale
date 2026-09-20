@@ -1,9 +1,12 @@
+import { useCallback } from "react";
 // Scanned — every object this phone measured with LiDAR, newest first. Source "scan" only.
 // The row's state capsule is the whole generation story: Measured (box only) → Generating →
 // 3D ready (a GLB the Quest can load).
-import { useRouter } from "expo-router";
-import { Host, List, Section, Button, Text } from "@expo/ui/swift-ui";
-import { font, foregroundStyle, listStyle, refreshable } from "@expo/ui/swift-ui/modifiers";
+import { useFocusEffect, useRouter } from "expo-router";
+import { List, Button, Text } from "@expo/ui/swift-ui";
+import { font, foregroundStyle, refreshable } from "@expo/ui/swift-ui/modifiers";
+
+import { GlassHost, GlassSection, glassList } from "../../src/ui/glass";
 
 import { EmptyState } from "../../src/ui/EmptyState";
 import { ErrorView } from "../../src/ui/ErrorView";
@@ -20,6 +23,13 @@ function subtitleFor(method: string, confidence: number): string {
 export default function ScannedScreen() {
   const router = useRouter();
   const [state, retry] = useFetchState(() => listObjects("scan"), []);
+  // A scan made on another tab lands here on the next visit, not on the next app launch.
+  useFocusEffect(
+    useCallback(() => {
+      retry();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
+  );
 
   if (state.status === "loading") return <LoadingView />;
   if (state.status === "error") return <ErrorView message={state.message} onRetry={retry} />;
@@ -28,19 +38,19 @@ export default function ScannedScreen() {
   const ready = objects.filter((o) => o.state === "ready").length;
 
   return (
-    <Host style={{ flex: 1 }} useViewportSizeMeasurement>
-      <List modifiers={[listStyle("insetGrouped"), refreshable(async () => retry())]}>
+    <GlassHost>
+      <List modifiers={[...glassList, refreshable(async () => retry())]}>
         {objects.length === 0 ? (
-          <Section>
+          <GlassSection divided={false}>
             <EmptyState
               title="No scans yet"
               systemImage="cube.transparent"
               description="Point the phone at an object and tap it. It appears here in under a second."
             />
-            <Button label="Scan an object" systemImage="viewfinder" onPress={() => router.push("/capture/object")} />
-          </Section>
+            <Button label="Scan an object" systemImage="viewfinder" onPress={() => router.push("/capture/object3d")} />
+          </GlassSection>
         ) : (
-          <Section
+          <GlassSection
             title="Scanned"
             footer={
               <Text modifiers={[font({ textStyle: "footnote" }), foregroundStyle({ type: "hierarchical", style: "secondary" })]}>
@@ -56,9 +66,9 @@ export default function ScannedScreen() {
                 onPress={() => router.push({ pathname: "/object/[id]", params: { id: object.objectId } })}
               />
             ))}
-          </Section>
+          </GlassSection>
         )}
       </List>
-    </Host>
+    </GlassHost>
   );
 }

@@ -2,10 +2,12 @@
 // page pass for stores whose products.json carries no dimensions), each already an Object v1
 // with measured metres. Filter by merchant, search by name, tap through to generate 3D and view
 // at 1:1.
-import { useMemo, useState } from "react";
-import { useRouter } from "expo-router";
-import { Host, List, Section, Picker, Text, TextField } from "@expo/ui/swift-ui";
-import { font, foregroundStyle, listStyle, pickerStyle, refreshable, tag } from "@expo/ui/swift-ui/modifiers";
+import { useCallback, useMemo, useState } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import { List, Picker, Text, TextField } from "@expo/ui/swift-ui";
+import { font, foregroundStyle, pickerStyle, refreshable, tag } from "@expo/ui/swift-ui/modifiers";
+
+import { GlassHost, GlassSection, glassList } from "../../src/ui/glass";
 
 import { EmptyState } from "../../src/ui/EmptyState";
 import { ErrorView } from "../../src/ui/ErrorView";
@@ -31,6 +33,13 @@ export default function FurnitureScreen() {
   // One fetch of the whole catalog; merchant and text narrow it locally. A few hundred rows is
   // nothing, and it keeps the merchant menu stable while you switch between merchants.
   const [state, retry] = useFetchState(() => listObjects("catalog"), []);
+  // A scan made on another tab lands here on the next visit, not on the next app launch.
+  useFocusEffect(
+    useCallback(() => {
+      retry();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
+  );
 
   const objects = state.status === "ready" ? state.data : [];
   const merchants = useMemo(() => merchantsOf(objects), [objects]);
@@ -42,9 +51,9 @@ export default function FurnitureScreen() {
   const secondary = foregroundStyle({ type: "hierarchical", style: "secondary" });
 
   return (
-    <Host style={{ flex: 1 }} useViewportSizeMeasurement>
-      <List modifiers={[listStyle("insetGrouped"), refreshable(async () => retry())]}>
-        <Section>
+    <GlassHost>
+      <List modifiers={[...glassList, refreshable(async () => retry())]}>
+        <GlassSection>
           <TextField placeholder="Search furniture" onTextChange={setQuery} />
           <Picker
             label="Merchant"
@@ -59,10 +68,10 @@ export default function FurnitureScreen() {
               </Text>
             ))}
           </Picker>
-        </Section>
+        </GlassSection>
 
         {shown.length === 0 ? (
-          <Section>
+          <GlassSection divided={false}>
             <EmptyState
               title={objects.length === 0 ? "No listings yet" : "No matches"}
               systemImage="sofa"
@@ -72,9 +81,9 @@ export default function FurnitureScreen() {
                   : "Try another merchant or a shorter search."
               }
             />
-          </Section>
+          </GlassSection>
         ) : (
-          <Section
+          <GlassSection
             title={merchant === ALL ? "All merchants" : merchant}
             footer={
               <Text modifiers={[font({ textStyle: "footnote" }), secondary]}>
@@ -91,9 +100,9 @@ export default function FurnitureScreen() {
                 onPress={() => router.push({ pathname: "/object/[id]", params: { id: object.objectId } })}
               />
             ))}
-          </Section>
+          </GlassSection>
         )}
       </List>
-    </Host>
+    </GlassHost>
   );
 }
