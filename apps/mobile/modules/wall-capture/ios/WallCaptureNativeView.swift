@@ -1,3 +1,4 @@
+import ARKit
 import ExpoModulesCore
 import RealityKit
 import UIKit
@@ -39,11 +40,13 @@ class WallCaptureNativeView: ExpoView {
       dots.path = nil
       return
     }
-    // Raw buffer is landscape-right. In view space (portrait): x_view = 1 - y_raw, y_view = 1 - x_raw
-    // with Vision's bottom-left origin folded in. Then aspect-fill: the buffer's 4:3 becomes the
-    // view's 3:4 rotated, so the mapping is uniform in both axes once rotated.
+    // ARKit's own map from raw-buffer image coordinates (top-left origin) to this portrait,
+    // aspect-filled view — rotation and crop included. Vision's bottom-left origin folded in.
+    guard let frame = WallCaptureController.shared.arSession.currentFrame else { return }
+    let t = frame.displayTransform(for: .portrait, viewportSize: bounds.size)
     let pts = quad.corners.map { c -> CGPoint in
-      CGPoint(x: c.y * bounds.width, y: c.x * bounds.height)
+      let v = CGPoint(x: c.x, y: 1 - c.y).applying(t)
+      return CGPoint(x: v.x * bounds.width, y: v.y * bounds.height)
     }
     let path = UIBezierPath()
     path.move(to: pts[0]); for p in pts.dropFirst() { path.addLine(to: p) }

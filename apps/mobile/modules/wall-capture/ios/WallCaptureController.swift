@@ -10,7 +10,7 @@ enum WallCaptureError: Error, LocalizedError {
     case .notSupported: return "This device has no LiDAR sensor"
     case .noFrame: return "The camera has not produced a frame yet"
     case .rectifyFailed: return "Could not straighten the photo"
-    case .cornersOffPlane: return "Could not find the surface behind all four corners — step back so the whole face is in view, then try again"
+    case .cornersOffPlane: return "No depth behind one of the corners — keep the whole face in view, a little further back, and try again"
     }
   }
 }
@@ -38,6 +38,8 @@ final class WallCaptureController: NSObject, ARSessionDelegate {
     config.worldAlignment = .gravityAndHeading
     config.planeDetection = [.horizontal, .vertical]
     if ARWorldTrackingConfiguration.supportsSceneReconstruction(.mesh) { config.sceneReconstruction = .mesh }
+    // The depth map is the corner fallback when no plane covers a corner (see WallRectifier.unproject).
+    if ARWorldTrackingConfiguration.supportsFrameSemantics(.sceneDepth) { config.frameSemantics.insert(.sceneDepth) }
     arSession.run(config, options: [.resetTracking, .removeExistingAnchors])
   }
 

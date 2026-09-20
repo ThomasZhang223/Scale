@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { needFromText, needFromDetected, rank, findListings, isShoppingRequest, parseLengthMetres, type Listing } from './listings.ts';
+import { needFromText, needFromDetected, rank, findListings, isShoppingRequest, parseLengthMetres, productQuery, findLive, STOREFRONTS, type Listing } from './listings.ts';
 
 const catalog: Listing[] = JSON.parse(readFileSync(new URL('../public/catalog.json', import.meta.url), 'utf-8'));
 
@@ -84,4 +84,42 @@ test('shopping sentences route to listings; rearranging ones do not', () => {
   assert.ok(isShoppingRequest('recommend a lamp'));
   assert.ok(!isShoppingRequest('make it cozy'));
   assert.ok(!isShoppingRequest('move the sofa to the window'));
+});
+
+test('productQuery strips the imperative and the length phrases, keeping the product words', () => {
+  assert.equal(productQuery('find me a lamp under 1.5 m tall'), 'lamp');
+  assert.equal(productQuery('Find a red chair for the 80 cm gap beside my desk'), 'red chair beside my desk');
+  assert.equal(productQuery('recommend some floor lamps'), 'floor lamps');
+  assert.equal(productQuery('lamp'), 'lamp');
+});
+
+test('findLive posts one /find per storefront in parallel, reports stages, and merges listings', async () => {
+  const bodies: Record<string, unknown>[] = [];
+  const stages: string[] = [];
+  const row = (merchant: string, i: number) => ({
+    schemaVersion: 1, objectId: `${merchant}-${i}`, source: 'catalog', state: 'measured', name: `Lamp ${i}`, category: 'lighting',
+    glbUrl: null, bboxMeters: { w: 0.3, h: 1.2, d: 0.3 }, merchant, productUrl: null, price: null,
+    measure: { method: 'extracted', confidence: 0.9 }, extraction: { imageUrl: `https://cdn/${i}.jpg`, fits: true, via: 'api', productId: String(i) },
+  });
+  const fetchFn = (async (_url: string, init: RequestInit) => {
+    const body = JSON.parse(init.body as string);
+    bodies.push(body);
+    if (body.merchant === 'Sabai Design') return new Response(JSON.stringify({ error: 'upstream_error', message: 'ingest answered 502' }), { status: 502 });
+    return new Response(JSON.stringify({ merchant: body.merchant, storefront: body.storefront, searchUrl: 'u', searchedFor: 'lamp', handles: 2, products: 2, measured: 2, fitting: 2, fallbackSuspected: false, warning: null, listings: [row(body.merchant, 1), row(body.merchant, 2)] }));
+  }) as unknown as typeof fetch;
+
+  const rows = await findLive({ text: 'find me a lamp under 1.5 m', bucket: 'lighting', categoryWords: ['lamp'], maxH: 1.5 }, 8, (s) => stages.push(`${s.merchant}:${s.stage}`), fetchFn);
+  assert.equal(bodies.length, STOREFRONTS.length);
+  assert.equal(bodies[0].query, 'lamp');
+  assert.deepEqual(bodies[0].fit, { maxH: 1.5 });
+  assert.equal(rows.length, 4);
+  assert.ok(rows.every((r) => r.imageUrl?.startsWith('https://cdn/')));
+  for (const { merchant } of STOREFRONTS) assert.ok(stages.includes(`${merchant}:searching`), `${merchant} never started`);
+  assert.ok(stages.includes('Poly & Bark:done'));
+  assert.ok(stages.includes('Sabai Design:failed'));
+});
+
+test('findLive throws when every store failed, so findListings can fall back and say so', async () => {
+  const fetchFn = (async () => new Response('nope', { status: 503, statusText: 'Service Unavailable' })) as unknown as typeof fetch;
+  await assert.rejects(findLive({ text: 'lamp' }, 8, undefined, fetchFn), /every store failed/);
 });
