@@ -639,7 +639,7 @@ async function start() {
     const obj = id ? objects.get(id) : undefined;
     if (!id || !obj) return say('Grab or add an object first, then turn it.');
     const n = obj.loaded.node;
-    physics.moveTo(id, n.position.x, n.position.z, physics.rotationY(id) + delta);
+    physics.moveTo(id, n.position.x, n.position.z, physics.rotationY(id) + delta, n.position.y);
     say(`${obj.name}: turned ${delta > 0 ? 'left' : 'right'} 90°.`);
     layoutChanged(id);
   }
@@ -953,14 +953,14 @@ async function start() {
     layoutChanged('');
   }
 
-  /** Puts every object where a stored layout says, instantly. */
+  /** Puts every object where a stored layout says, instantly. Lowest first, as applyVersion. */
   function applyPlacements(placements: PlacementV1[]) {
     if (!currentRoom) return;
-    for (const p of placements) {
+    for (const p of [...placements].sort((a, b) => a.p[1] - b.p[1])) {
       const layout = fromPlacement(p, currentRoom.offset);
       const hit = resolveObject(p.objectId);
       if (!hit) continue;
-      if (hit.kind === 'placed') physics.moveTo(hit.obj.id, layout.position[0], layout.position[2], layout.rotationY);
+      if (hit.kind === 'placed') physics.moveTo(hit.obj.id, layout.position[0], layout.position[2], layout.rotationY, layout.position[1]);
       else {
         hit.box.node.position.set(...layout.position);
         hit.box.node.rotation.y = layout.rotationY;
@@ -1381,12 +1381,22 @@ async function start() {
 
   // ---------- versions (stored layouts) ----------
 
-  /** Moves every object the version mentions to its stored spot; fetches ones we don't have yet. */
+  /**
+   * Moves every object the version mentions to its stored spot; fetches ones we don't have yet.
+   *
+   * Lowest first. A Placement's `p` is a full 3D point, so an object that was resting on a table
+   * comes back on the table — but only if the table is already there. These bodies are dynamic
+   * and under gravity, so a rider restored before its support falls straight through to the floor
+   * and the stack is lost a frame later, where nobody can see why. Ascending y puts every support
+   * in place, collider and all, before anything that rests on it.
+   */
   async function applyVersion(version: VersionV1) {
     if (!currentRoom) return;
     currentVersionId = version.versionId;
     const offset = currentRoom.offset;
-    for (const p of version.placements) {
+    const lowestFirst = [...version.placements].sort((a, b) => a.p[1] - b.p[1]);
+    const unsupported: string[] = [];
+    for (const p of lowestFirst) {
       const layout = fromPlacement(p, offset);
       let obj = objects.get(p.placementId) ?? [...objects.values()].find((o) => o.objectId === p.objectId && !version.placements.some((q) => q.placementId === o.id && q !== p));
       if (!obj) {
@@ -1399,7 +1409,15 @@ async function start() {
         obj = [...objects.values()].find((o) => o.objectId === p.objectId);
         if (!obj) continue;
       }
-      physics.moveTo(obj.id, layout.position[0], layout.position[2], layout.rotationY);
+      physics.moveTo(obj.id, layout.position[0], layout.position[2], layout.rotationY, layout.position[1]);
+      // Stored off the floor with nothing under it: whatever it rested on is missing from this
+      // version, or its GLB failed to load. Gravity is about to drop it. Say so rather than let
+      // the layout quietly differ from the one that was saved.
+      if (layout.position[1] > 0.01 && !physics.supportUnder(obj.id)) unsupported.push(obj.name);
+    }
+    if (unsupported.length) {
+      console.warn(`Version ${version.versionId}: nothing to rest on for ${unsupported.join(', ')}; they fall to the floor.`);
+      tell(`${unsupported.join(', ')} had nothing to rest on and fell to the floor.`);
     }
     say(`Layout "${version.label}" applied: ${version.placements.length} placements.`);
   }

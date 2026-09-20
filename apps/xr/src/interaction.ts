@@ -3,7 +3,7 @@ import type { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js
 import { XRControllerModelFactory } from 'three/examples/jsm/webxr/XRControllerModelFactory.js';
 import type { Physics } from './physics';
 import type { Palette, PaletteItem } from './palette';
-import { Halo } from './halo';
+import { Halo, LandingPad } from './halo';
 
 /*
  * Moving scanned objects, in the headset and on the laptop.
@@ -99,6 +99,7 @@ export class Interaction {
   private halo = new Halo();
   /** Every window a controller can take hold of, in the order they were added. */
   private windows: DraggableWindow[] = [];
+  private landing = new LandingPad();
 
   constructor(
     renderer: THREE.WebGLRenderer,
@@ -120,6 +121,7 @@ export class Interaction {
   ) {
     this.renderer = renderer;
     scene.add(this.rig);
+    scene.add(this.landing.mesh);
     this.rig.add(camera);
     // The window lives in the room, not on a hand; it is placed in front of you on entry.
     this.palette.attachTo(scene);
@@ -213,6 +215,12 @@ export class Interaction {
     const node = this.physics.nodeOf(held ?? hoverId ?? this.mouseHover ?? '');
     if (node) this.halo.show(node, held ? 0.85 : 0.35);
     else this.halo.hide();
+    // And the surface it would land on: the floor, or the top of whatever is under it. While
+    // an object is in the air nothing else says whether it will land ON the table or beside it.
+    const carried = held ? this.physics.nodeOf(held) : null;
+    const under = held ? this.physics.footprintOf(held) : null;
+    if (carried && under) this.landing.show(carried.position.x, this.physics.supportUnder(held!)?.top ?? 0, carried.position.z, under);
+    else this.landing.hide();
   }
 
   /**

@@ -226,3 +226,106 @@ test('a repeat that is not two positive numbers, or fights a quarter turn, fails
   assert.throws(() => buildRoomFromScan(withRepeat({ repeat: [2] })), /above zero/);
   assert.throws(() => buildRoomFromScan(withRepeat({ rotationDeg: 90, repeat: [2, 3] })), /square repeat/);
 });
+
+// --- stacking: an object resting on another object -------------------------------------
+
+/**
+ * A table 0.75 m high and a small lamp, both on the floor to start. In the real demo room,
+ * which is empty: the older fixture has furniture of its own that the table lands on top of,
+ * which makes "did it land on MY table" impossible to ask.
+ */
+async function stackScene() {
+  const physics = await createPhysics(new THREE.Scene());
+  physics.setRoom(buildRoomFromScan(roomH));
+  const table = { size: new THREE.Vector3(1.2, 0.75, 0.6), node: new THREE.Group() };
+  const lamp = { size: new THREE.Vector3(0.2, 0.4, 0.2), node: new THREE.Group() };
+  physics.addObject('table', table.node, table.size, new Float32Array(), { x: 0, z: 0 }, 0);
+  physics.addObject('lamp', lamp.node, lamp.size, new Float32Array(), { x: 1.0, z: 1.5 }, 0);
+  for (let i = 0; i < 90; i++) physics.step(1 / 60); // both land
+  return { physics, table, lamp };
+}
+
+test('stacking: a lamp let go over a table comes to rest on the table, not the floor', async () => {
+  const { physics, lamp } = await stackScene();
+  // Carry it over the table at 1 m and let go.
+  for (let i = 0; i < 40; i++) {
+    physics.drag('lamp', 0, 0, 0, 1.0);
+    physics.step(1 / 60);
+  }
+  assert.equal(physics.supportUnder('lamp')?.supportId, 'table', 'the table is what it would land on');
+  physics.release('lamp');
+  for (let i = 0; i < 90; i++) physics.step(1 / 60);
+  near(lamp.node.position.y, 0.75, 'resting on the table top, not the floor', 0.03);
+});
+
+test('stacking: the support rule refuses a perch', async () => {
+  const { physics, lamp } = await stackScene();
+  // Hovering over the table's edge: the centre is past it, so nothing holds the lamp up.
+  for (let i = 0; i < 40; i++) {
+    physics.drag('lamp', 0.68, 0, 0, 1.0);
+    physics.step(1 / 60);
+  }
+  assert.equal(physics.supportUnder('lamp'), null, 'a lamp whose centre is off the table is not supported');
+  assert.ok(lamp.node.position.y > 0.5, 'still held in the air');
+});
+
+test('stacking: moving the table carries the lamp with it', async () => {
+  const { physics, table, lamp } = await stackScene();
+  for (let i = 0; i < 40; i++) {
+    physics.drag('lamp', 0, 0, 0, 1.0);
+    physics.step(1 / 60);
+  }
+  physics.release('lamp');
+  for (let i = 0; i < 90; i++) physics.step(1 / 60);
+  assert.deepEqual(physics.ridersOf('table'), ['lamp'], 'the lamp is riding the table');
+
+  const startX = lamp.node.position.x;
+  for (let i = 0; i < 30; i++) {
+    physics.drag('table', 0.5, 0, 0); // 0.5, not further: the room is 2.76 m wide and the table is 1.2
+    physics.step(1 / 60);
+  }
+  near(table.node.position.x, 0.5, 'the table moved', 0.02);
+  near(lamp.node.position.x - startX, table.node.position.x, 'the lamp travelled the same distance', 0.05);
+  near(lamp.node.position.y, 0.75, 'and stayed on top', 0.05);
+});
+
+test('stacking: removing the support drops its rider to the floor', async () => {
+  const { physics, lamp } = await stackScene();
+  for (let i = 0; i < 40; i++) {
+    physics.drag('lamp', 0, 0, 0, 1.0);
+    physics.step(1 / 60);
+  }
+  physics.release('lamp');
+  for (let i = 0; i < 90; i++) physics.step(1 / 60);
+  near(lamp.node.position.y, 0.75, 'on the table first', 0.03);
+
+  physics.remove('table');
+  for (let i = 0; i < 120; i++) physics.step(1 / 60);
+  near(lamp.node.position.y, 0, 'falls to the floor once the table is gone', 0.02);
+});
+
+test('stacking: a stored height is restored, even when the support arrives late', async () => {
+  // The reload case. moveTo now takes the bottom height a Placement carries, and applyVersion
+  // restores lowest first — so the support is already there, collider and all, when its rider
+  // lands. Here the rider is restored while its support is still missing, then the support
+  // arrives: the rider must not have fallen through in the meantime.
+  const physics = await createPhysics(new THREE.Scene());
+  physics.setRoom(buildRoomFromScan(roomH));
+  const lamp = new THREE.Group();
+  physics.addObject('lamp', lamp, new THREE.Vector3(0.2, 0.4, 0.2), new Float32Array(), { x: 0, z: 0 }, 0);
+  physics.moveTo('lamp', 0, 0, 0, 0.75); // its stored pose: 0.75 m up, on a table that is not here yet
+  assert.equal(physics.supportUnder('lamp'), null, 'nothing under it yet — the caller warns and it falls');
+  for (let i = 0; i < 120; i++) physics.step(1 / 60);
+  near(lamp.position.y, 0, 'unsupported, so gravity takes it to the floor', 0.02);
+
+  // Now in the right order: support first, then the rider at its stored height. The lamp waits
+  // out of the way, or the table would land on IT and the question stops meaning anything.
+  physics.moveTo('lamp', 1.0, 1.5, 0);
+  const table = new THREE.Group();
+  physics.addObject('table', table, new THREE.Vector3(1.2, 0.75, 0.6), new Float32Array(), { x: 0, z: 0 }, 0);
+  for (let i = 0; i < 90; i++) physics.step(1 / 60);
+  physics.moveTo('lamp', 0, 0, 0, 0.75);
+  assert.equal(physics.supportUnder('lamp')?.supportId, 'table', 'the table holds it up');
+  for (let i = 0; i < 120; i++) physics.step(1 / 60);
+  near(lamp.position.y, 0.75, 'still on the table after a hundred frames of gravity', 0.03);
+});
