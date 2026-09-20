@@ -35,6 +35,8 @@ import {
   required,
 } from "../lib/validate";
 import { SCHEMA_VERSION } from "../lib/contracts";
+import { assertFindBody, runFind } from "../lib/find";
+import { enqueueCatalogItem, normalizeCatalogItem } from "../lib/catalog-ingest";
 import type {
   FitReportV1,
   ObjectV1,
@@ -647,6 +649,34 @@ async function d1Search(env: Env, body: SearchBody, limit: number, origin: strin
   // Score is 0 on this path, and deliberately not a fabricated similarity. The X-Ranker header
   // says d1-fallback, so a caller that cares can tell these apart from real vector scores.
   return objects.map((object) => ({ objectId: object.objectId, score: 0, object }));
+}
+
+// POST /v1/find  { storefront, merchant, query, fit?, limit? }
+//
+// The headset's live "find me a lamp" against one storefront. Fans into services/ingest
+// (/find via Browserbase, then /extract) with the upstream token the browser must never hold.
+// One call per storefront; the headset runs three in parallel and shows each as a stage row.
+// Not in contracts.md yet — see workers/DEPLOY.md "Schema proposals".
+export async function postFind(req: Request, env: Env): Promise<Response> {
+  const body = assertFindBody(await readJson<unknown>(req));
+  const call = <T>(path: string, payload: unknown, timeoutMs?: number) =>
+    callUpstream<T>(env, "ingest", path, payload, timeoutMs);
+  return json(await runFind(call, body));
+}
+
+// POST /v1/listings/generate  { listing, roomId? }
+//
+// A picked /v1/find row becomes a D1 object and a mesh job. Reuses the catalogue-ingest
+// normaliser so the Workflow downloads the product image before Baseten runs — the plain
+// /objects/{id}/generate route cannot do that for a catalogue row (no frames in R2 yet).
+// Public: it only enqueues a row the Worker itself normalised, and the job id is
+// content-addressed, so repeats never start a second paid inference.
+export async function postListingsGenerate(req: Request, env: Env, origin: string): Promise<Response> {
+  const body = await readJson<{ listing?: unknown; roomId?: string | null }>(req);
+  if (!body.listing) throw new HttpError(400, "missing_field", "listing is required.");
+  const item = await normalizeCatalogItem(body.listing);
+  const roomId = typeof body.roomId === "string" && body.roomId ? body.roomId : null;
+  return json(await enqueueCatalogItem(env, item, origin, roomId), 202);
 }
 
 // --- Fit and solve -------------------------------------------------------------------------

@@ -67,12 +67,14 @@ export async function normalizeCatalogItem(value: unknown): Promise<CatalogItem>
     price: row.price?.cents != null ? row.price : null };
 }
 
-export async function enqueueCatalogItem(env: Env, item: CatalogItem, apiOrigin: string) {
+export async function enqueueCatalogItem(env: Env, item: CatalogItem, apiOrigin: string, roomId: string | null = null) {
   // A repeated scrape cannot start another paid inference for the same input.
   const jobId = await stableId([item.objectId, item.imageUrl, item.bboxMeters]);
   const existing = await env.DB.prepare("SELECT id FROM objects WHERE id = ?").bind(item.objectId).first();
   if (!existing) await insertObject(env, { ...item, source: "catalog", state: "measured", createdAt: new Date().toISOString() });
-  await enqueueMesh(env, { jobId, objectId: item.objectId, tier: "live", apiOrigin, roomId: null, catalog: item });
+  // roomId: the headset that picked this listing; the Workflow's finalize emits the ready
+  // object over that room's SSE feed so the box is swapped for the mesh without polling.
+  await enqueueMesh(env, { jobId, objectId: item.objectId, tier: "live", apiOrigin, roomId, catalog: item });
   return { objectId: item.objectId, jobId };
 }
 

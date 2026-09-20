@@ -163,6 +163,23 @@ const routes: Route[] = [
   route("POST", "/v1/search", () => [
     { objectId: objectMacbook.objectId, score: 0.93, object: objectMacbook },
   ]),
+  route("POST", "/v1/find", () => ({
+    merchant: "Stub Merchant",
+    storefront: "https://stub.local/",
+    searchUrl: "https://stub.local/search?q=stub",
+    searchedFor: "stub",
+    handles: 1, products: 1, measured: 1, fitting: 1,
+    fallbackSuspected: false, warning: null,
+    listings: [{
+      ...objectMacbook,
+      merchant: "Stub Merchant",
+      productUrl: "https://stub.local/products/macbook",
+      price: { cents: 129900, currency: "USD" },
+      measure: { method: "extracted", confidence: 0.9 },
+      extraction: { productId: "1", via: "api", imageUrl: "https://stub.local/macbook.jpg", fits: true },
+    }],
+  })),
+  route("POST", "/v1/listings/generate", () => ({ objectId: objectMacbook.objectId, jobId: STUB_JOB_ID })),
   route("POST", "/v1/fit", () => fitReportDoorSwing),
   route("POST", "/v1/solve", () => ({
     placements: [stubPlacement],
@@ -221,6 +238,8 @@ async function dispatch(
   if ((hit = m("GET", /^\/v1\/jobs\/([^/]+)$/))) return real.getJobById(env, hit[1]);
 
   if (m("POST", /^\/v1\/search$/)) return real.postSearch(req, env, origin);
+  if (m("POST", /^\/v1\/find$/)) return real.postFind(req, env);
+  if (m("POST", /^\/v1\/listings\/generate$/)) return real.postListingsGenerate(req, env, origin);
   if (m("POST", /^\/v1\/fit$/)) return real.postFit(req, env, origin);
   if (m("POST", /^\/v1\/solve$/)) return real.postSolve(req, env, origin);
 
