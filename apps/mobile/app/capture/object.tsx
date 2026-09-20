@@ -92,6 +92,10 @@ export default function CaptureObjectScreen() {
         bboxMeters: result.bboxMeters,
         measure: { method: "lidar", confidence: result.confidence },
       });
+      // ceiling: the Worker stores no record of which frames exist — there is no frame_keys column
+      // (workers/src/schema.sql). The keys are derivable (objects/{objectId}/frames/{n}.jpg) and R2
+      // supports prefix listing, so the generator can find them. If that ever stops being true, add
+      // the column rather than re-sending the keys.
       for (const [n, framePath] of result.framePaths.entries()) {
         const { putUrl } = await postJSON<{ key: string; putUrl: string }>("/uploads", {
           kind: "objectFrame",
