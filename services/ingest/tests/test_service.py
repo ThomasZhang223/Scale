@@ -187,6 +187,52 @@ def test_the_llm_pass_does_not_block_the_event_loop():
         f"took {elapsed:.2f}s; serial would be ~{serial:.2f}s — the calls are not overlapping")
 
 
+# --- fit: the placing use case ---------------------------------------------
+
+def test_extract_flags_which_objects_fit_the_space():
+    """Browsing wants every red chair; placing one in an 0.8 m gap wants only what goes there.
+    The check can only happen after measurement, which is here — /find has no sizes yet."""
+    r = client.post("/extract", json={
+        "merchant": "m", "storefront": "https://s.com", "products": CATALOGUE[:2],
+        "fit": {"maxW": 0.5}})
+    assert r.status_code == 200, r.text
+    b = r.json()
+    by_name = {o["name"]: o for o in b["objects"]}
+    # Oak Dining Chair is 0.45 wide, Mystery Sofa is 0.08 (a flagged unit mistake).
+    assert by_name["Oak Dining Chair"]["extraction"]["fits"] is True
+    assert b["stats"]["fitting"] + b["stats"]["too_big"] == len(b["objects"])
+
+
+def test_an_object_wider_than_the_gap_is_flagged_not_dropped():
+    """Missing by a centimetre is worth saying out loud, not vanishing with no explanation."""
+    r = client.post("/extract", json={
+        "merchant": "m", "storefront": "https://s.com", "products": CATALOGUE[:1],
+        "fit": {"maxW": 0.40}})          # the chair is 0.45 wide
+    b = r.json()
+    assert len(b["objects"]) == 1, "it must still be returned"
+    assert b["objects"][0]["extraction"]["fits"] is False
+    assert b["stats"]["too_big"] == 1
+
+
+def test_with_no_fit_asked_for_everything_fits():
+    r = client.post("/extract", json={
+        "merchant": "m", "storefront": "https://s.com", "products": CATALOGUE[:2]})
+    b = r.json()
+    assert all(o["extraction"]["fits"] for o in b["objects"])
+    assert b["stats"]["too_big"] == 0
+
+
+def test_a_fit_in_the_wrong_units_is_422_not_a_filter_that_does_nothing():
+    """80 instead of 0.8 is centimetres that escaped a UI edge. Filtering nothing would look
+    exactly like a gap big enough for everything."""
+    for bad in ({"maxW": 80}, {"maxH": 0}, {"maxD": -1}):
+        r = client.post("/extract", json={
+            "merchant": "m", "storefront": "https://s.com",
+            "products": CATALOGUE[:1], "fit": bad})
+        assert r.status_code == 422, f"{bad} -> {r.status_code}"
+        assert r.json()["error"] == "bad_fit"
+
+
 # --- /find: prompt -> products ---------------------------------------------
 
 SEARCH_PAGE = """
