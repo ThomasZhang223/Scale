@@ -126,7 +126,7 @@ export default function CaptureObject3DScreen() {
         measure: { method: "lidar", confidence: 1 },
       });
       const { key, putUrl } = await postJSON<{ key: string; putUrl: string }>("/uploads", {
-        kind: "objectMesh",
+        kind: "scanMesh",
         objectId: object.objectId,
       });
       await putUpload(result.glbPath, putUrl, "model/gltf-binary");
