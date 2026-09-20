@@ -420,8 +420,14 @@ async function start() {
     const rec = listings?.recommendations.find((r) => r.listing.objectId === objectId);
     if (!rec) return say('That listing is no longer in the results.');
     const l = rec.listing;
-    await addListing(objectId); // the measured box, placed where it belongs
-    const placed = [...objects.values()].reverse().find((o) => o.objectId === objectId);
+    const placedId = await addListing(objectId); // the measured box, placed where it belongs
+    const placed = placedId ? objects.get(placedId) : undefined;
+    if (!placed) return tell(`${l.name}: couldn't be placed, so no mesh was queued.`, 'warn');
+    // Already has a real mesh — addListing loaded it, there's nothing left to generate.
+    if (l.state === 'ready' && l.glbUrl) {
+      findPanel.setProgress(objectId, 'Mesh placed at true scale');
+      return;
+    }
     findPanel.setProgress(objectId, 'Queued for Baseten…');
     let job: { objectId: string; jobId: string };
     try {
@@ -431,13 +437,16 @@ async function start() {
       return tell(`${l.name}: couldn’t queue the mesh — ${(err as Error).message}`, 'error');
     }
     // The server mints a stable id; the placed box keeps tracking it so SSE dedupe works.
-    if (placed) placed.objectId = job.objectId;
+    placed.objectId = job.objectId;
     tell(`${l.name}: mesh job queued. It’s in the room as a box until Baseten answers.`, 'info');
     const started = Date.now();
-    // ceiling: 3 s polling for up to 10 min; the SSE `object` event usually lands first and
-    // addServerObject dedupes by objectId, so the poll only matters when the room feed is stubbed.
+    // ceiling: 3 s polling for up to 10 min. The SSE `object` event usually lands first; when it
+    // does, addServerObject's own dedupe guard (matching objects by objectId) skips placing a
+    // second copy, so this poll only matters when the room feed is stubbed or unavailable.
     for (;;) {
       await new Promise((r) => setTimeout(r, 3000));
+      const elapsed = Date.now() - started;
+      if (elapsed > 600_000) return findPanel.setProgress(objectId, 'Still waiting on Baseten; the box stays.');
       let j;
       try { j = await getJob(job.jobId); } catch (err) { findPanel.setProgress(objectId, `Job status unavailable: ${(err as Error).message}`); continue; }
       if (j.state === 'done') {
@@ -447,9 +456,14 @@ async function start() {
           const loaded = await loader.load(item.url, 1); // scale 1: the mesh normalisation contract
           const mismatch = boundsMismatch(loaded.size, item.expected);
           if (mismatch) tell(`${item.name}: ${mismatch}.`, 'warn');
-          if (placed && objects.has(placed.id)) swapLoaded(placed, loaded);
-          findPanel.setProgress(objectId, 'Mesh placed at true scale');
-          tell(`${l.name}: mesh ready and placed.`, 'info');
+          if (objects.has(placed.id)) {
+            swapLoaded(placed, loaded);
+            findPanel.setProgress(objectId, 'Mesh placed at true scale');
+            tell(`${l.name}: mesh ready and placed.`, 'info');
+          } else {
+            findPanel.setProgress(objectId, 'Mesh ready, but the box was removed');
+            tell(`${l.name}: mesh is ready but the box was removed; add it again from the wrist.`, 'warn');
+          }
         } catch (err) {
           findPanel.setProgress(objectId, `Mesh failed to load: ${(err as Error).message}`);
           tell(`${l.name}: ${(err as Error).message}`, 'error');
@@ -460,9 +474,8 @@ async function start() {
         findPanel.setProgress(objectId, `Generation failed: ${j.error ?? 'unknown'}`);
         return tell(`${l.name}: generation failed — ${j.error ?? 'unknown error'}. The box stays.`, 'error');
       }
-      const waiting = j.state === 'queued' && Date.now() - started > 20_000;
+      const waiting = j.state === 'queued' && elapsed > 20_000;
       findPanel.setProgress(objectId, waiting ? 'Waiting on Baseten — box placed at true size' : `Generating mesh ${j.progressPct}%`);
-      if (Date.now() - started > 600_000) return findPanel.setProgress(objectId, 'Still waiting on Baseten; the box stays.');
     }
   }
 
