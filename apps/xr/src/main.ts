@@ -257,7 +257,7 @@ async function start() {
     offlineProposal: offlineProposal as unknown as Proposal,
     onChange: onAgentChange,
   });
-  const interaction = new Interaction(renderer, scene, camera, controls, physics, palette, spawn, onAction, layoutChanged, onGrab, (r) => {
+  const interaction = new Interaction(renderer, scene, camera, controls, physics, palette, spawn, onAction, layoutChanged, onGrab, (id) => removeObject(id), (r) => {
     const hit = findPanel.hitTest(r);
     if (!hit) return null;
     return hit.kind === 'close' ? 'find:close' : `find:pick:${hit.objectId}`;
@@ -647,8 +647,17 @@ async function start() {
   }
 
   /** Removes the held object (or the last one touched). A detected piece it stood in for comes back. */
+  /** The Remove tile: whatever is in hand, else the last one touched. */
   function removeLast() {
-    const id = interaction.heldIds()[0] ?? lastTouchedId ?? [...objects.keys()].pop() ?? null;
+    removeObject(interaction.heldIds()[0] ?? lastTouchedId ?? [...objects.keys()].pop() ?? null);
+  }
+
+  /**
+   * Removes exactly this object. The A button names the one under its own ray, so this must not
+   * fall back to a guess — and it is final: Undo restores a layout, which only moves objects
+   * that still exist, so an object removed here does not come back.
+   */
+  function removeObject(id: string | null) {
     const obj = id ? objects.get(id) : undefined;
     if (!id || !obj) return say('Grab or add an object first, then remove it.');
     interaction.drop(id);

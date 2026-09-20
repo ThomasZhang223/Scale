@@ -329,3 +329,22 @@ test('stacking: a stored height is restored, even when the support arrives late'
   for (let i = 0; i < 120; i++) physics.step(1 / 60);
   near(lamp.position.y, 0.75, 'still on the table after a hundred frames of gravity', 0.03);
 });
+
+test('stacking: turning the table swings the lamp round with it', async () => {
+  const { physics, table, lamp } = await stackScene();
+  for (let i = 0; i < 40; i++) {
+    physics.drag('lamp', 0.4, 0, 0, 1.0); // off-centre, so a turn actually moves it
+    physics.step(1 / 60);
+  }
+  physics.release('lamp');
+  for (let i = 0; i < 90; i++) physics.step(1 / 60);
+  near(lamp.node.position.x, 0.4, 'on the table, 0.4 m from its centre', 0.05);
+
+  physics.turn('table', Math.PI / 2); // a quarter turn about the table's own centre
+  for (let i = 0; i < 30; i++) physics.step(1 / 60);
+  near(physics.rotationY('table'), Math.PI / 2, 'the table turned');
+  // A quarter turn about +Y sends +X to -Z, so the lamp leaves x and arrives at z.
+  near(lamp.node.position.x, 0, 'the lamp left its old side', 0.08);
+  near(lamp.node.position.z, -0.4, 'and came round a quarter turn', 0.08);
+  near(lamp.node.position.y, 0.75, 'still on top', 0.05);
+});

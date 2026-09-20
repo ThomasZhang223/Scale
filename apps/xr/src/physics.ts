@@ -248,6 +248,34 @@ export class Physics {
     this.refreshQueries();
   }
 
+  /**
+   * Turns an object in place, about the vertical axis. Anything resting on it turns with it,
+   * around the support's own centre — a lamp on a table travels round as the table swings,
+   * rather than staying put while the table turns underneath it.
+   */
+  turn(id: string, rotY: number) {
+    const d = this.dynamics.get(id);
+    if (!d) return;
+    const riders = this.ridersOf(id);
+    const t = d.body.translation();
+    const delta = rotY - this.rotationY(id);
+    d.body.setRotation(this.quat.setFromAxisAngle(THREE.Object3D.DEFAULT_UP, rotY), true);
+    d.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+    const cos = Math.cos(delta);
+    const sin = Math.sin(delta);
+    for (const riderId of riders) {
+      const rider = this.dynamics.get(riderId);
+      if (!rider) continue;
+      const r = rider.body.translation();
+      const dx = r.x - t.x;
+      const dz = r.z - t.z;
+      rider.body.setTranslation({ x: t.x + dx * cos + dz * sin, y: r.y, z: t.z - dx * sin + dz * cos }, true);
+      rider.body.setRotation(this.quat.setFromAxisAngle(THREE.Object3D.DEFAULT_UP, this.rotationY(riderId) + delta), true);
+      rider.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+      rider.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+    }
+  }
+
   release(id: string) {
     const d = this.dynamics.get(id);
     if (!d) return;
