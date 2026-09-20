@@ -263,6 +263,41 @@ Rescued rows carry `extractedFrom` (`json_ld`, `spec_block` or `page_text`) so y
 which surface paid off. `measure.method` stays `"extracted"` — a page read is still extraction,
 and inventing a fourth enum value would be a schema change.
 
+### `POST /find` — a prompt, live
+
+The pipeline is otherwise merchant-driven: crawl a catalogue, extract all of it, curate. That
+pre-generates assets but cannot answer "find me a red chair". `/find` is the front half.
+
+```
+POST /find { storefront, query, limit? }
+  -> { query, searchedFor, searchUrl, count, handles, missing, products }
+```
+
+Browserbase renders the merchant's own `/search?q=` page and the product handles are read off
+it **in document order** — that is their relevance ranking, and their search knows a "Cloud" is
+a chair in a way title-matching never will. Handles are then joined back to `/products.json`,
+because the search page carries a title and a thumbnail while the catalogue carries variants,
+`body_html` and the image list, which is what the extraction pipeline takes. `/find` returns
+raw products; feed them to `/extract` to measure them.
+
+`query` is expected to describe a **product**. Separating the product from the place — "a
+bookshelf beside my desk" is a search for a bookshelf, not a desk — is the voice agent's job,
+which splits it into `find_anchor` and `search_objects` before anything reaches here. This
+endpoint only strips leftover imperative noise; it does not parse intent, because two places
+doing that is how they drift.
+
+To try it without running the service:
+
+```
+export BROWSERBASE_API_KEY=...
+python3 probe_find.py https://floydhome.com "red chair" --extract
+```
+
+That prints the URL fetched, the handles in the merchant's order, how many joined back to the
+catalogue, and with `--extract`, which are measurable from `/products.json` alone. If nothing
+parses, `--save-html out.html` keeps the page so the theme can be looked at — every theme
+renders search differently and that variety cannot be fixture-tested.
+
 ### Testing a change without paying for ten merchants
 
 `--only` runs a subset, matched case-insensitively against the merchant name:
