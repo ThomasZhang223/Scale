@@ -7,7 +7,7 @@ registerHooks({ resolve(specifier, context, next) {
   const stubs = {
     "cloudflare:workers": "export class WorkflowEntrypoint { constructor(_ctx, env) { this.env = env; } }",
     "cloudflare:workflows": "export class NonRetryableError extends Error {}",
-    "agents": "export function getAgentByName(namespace) { return namespace.stub; }",
+    "agents": "export function getAgentByName(namespace) { return namespace.stub; } export class Agent { constructor(ctx, env) { this.ctx = ctx; this.env = env; this.state = {}; } setState(state) { this.state = state; } sql() { return []; } }",
   };
   if (stubs[specifier]) return { url: `data:text/javascript,${encodeURIComponent(stubs[specifier])}`, shortCircuit: true };
   if (specifier.startsWith(".") && !/\.[a-z]+$/.test(specifier)) specifier += ".ts";
@@ -16,7 +16,10 @@ registerHooks({ resolve(specifier, context, next) {
 const { embedInput, indexObject } = await import("../src/lib/embedding.ts");
 const { consumeMeshJobs } = await import("../src/lib/queue.ts");
 const { GenerateMeshWorkflow } = await import("../src/workflows/generate-mesh.ts");
-const { postSearch, postGenerate, postObjectMesh, postObjectIndex, postUpload, postIngestMerchant } = await import("../src/routes/index.ts");
+const { postSearch, postGenerate, postObjectMesh, postObjectIndex, postUpload, postIngestMerchant, postSolve, postScout } = await import("../src/routes/index.ts");
+const { RoomAgent } = await import("../src/agents/room-agent.ts");
+const { ScoutAgent } = await import("../src/agents/scout-agent.ts");
+import { readFileSync } from "node:fs";
 const { catalogObjectId, normalizeCatalogItem } = await import("../src/lib/catalog-ingest.ts");
 const fingerprint = "a".repeat(64);
 const vector = { values: Array(768).fill(1 / Math.sqrt(768)), dimension: 768,
@@ -564,4 +567,75 @@ test("a job that reaches the workflow after a mesh was attached is refused witho
   assert.equal(writes.some(w => w.sql.includes("state = 'failed'")), false, "a ready object must never be marked failed");
   const job = writes.find(w => w.sql.includes("UPDATE jobs"));
   assert.deepEqual([job.args[0], job.args[2]], ["done", "mesh attached via POST /mesh (reviewed offline); generation skipped"]);
+});
+
+// --- Agents: the real origin, and search in-process ---------------------------------------------
+
+const REAL_ORIGIN = "https://full-scale-workers.example.workers.dev";
+const demoRoom = readFileSync(new URL("../../fixtures/room-demo.json", import.meta.url), "utf8");
+
+// A model that calls search_objects once, then answers. `seen` records what the tool returned.
+function scriptedModel(seen) {
+  let turn = 0;
+  return { run: async (_model, { messages }) => {
+    if (turn++ === 0) {
+      return { choices: [{ message: { content: "", tool_calls: [{ id: "c1",
+        function: { name: "search_objects", arguments: JSON.stringify({ text: "nightstand" }) } }] } }] };
+    }
+    seen.push(JSON.parse(messages.at(-1).content));
+    return { choices: [{ message: { content: "done" } }] };
+  } };
+}
+
+function agentEnvironment(seen) {
+  const { env, row } = pipelineEnvironment();
+  delete env.CONFIG.get; // no embedder: search answers from D1, in-process
+  env.CONFIG = { get: async () => null };
+  Object.assign(row, { glb_key: "objects/object/mesh.glb", palette_json: null });
+  env.BUCKET.get = async () => ({ json: async () => JSON.parse(demoRoom) });
+  env.AI = scriptedModel(seen);
+  return env;
+}
+
+const agentRequest = (path, body) => new Request(`https://agent/${path}`, { method: "POST", body: JSON.stringify(body) });
+
+test("RoomAgent's search tool runs in-process with the real origin, never against https://agent", async t => {
+  const seen = [];
+  const fetched = t.mock.method(globalThis, "fetch", async url => { throw Error(`must not fetch ${url}`); });
+  const agent = new RoomAgent({}, agentEnvironment(seen));
+  const response = await agent.onRequest(agentRequest("plan", { roomId: "room", intent: "add a nightstand", origin: REAL_ORIGIN }));
+  const out = await response.json();
+  assert.equal(out.answer, "done");
+  assert.equal(fetched.mock.callCount(), 0);
+  assert.equal(out.toolCalls[0].name, "search_objects");
+  assert.ok(Array.isArray(seen[0]), `search_objects returned ${JSON.stringify(seen[0])}`);
+  assert.equal(seen[0][0].name, "chair");
+});
+
+test("ScoutAgent's search tool runs in-process with the real origin, never against https://agent", async t => {
+  const seen = [];
+  const fetched = t.mock.method(globalThis, "fetch", async url => { throw Error(`must not fetch ${url}`); });
+  const agent = new ScoutAgent({}, agentEnvironment(seen));
+  const response = await agent.onRequest(agentRequest("scout", { query: "a nightstand", origin: REAL_ORIGIN }));
+  assert.equal((await response.json()).answer, "done");
+  assert.equal(fetched.mock.callCount(), 0);
+  assert.ok(Array.isArray(seen[0]), `search_objects returned ${JSON.stringify(seen[0])}`);
+});
+
+test("an agent request with no usable origin throws instead of defaulting to the synthetic URL", async () => {
+  for (const origin of [undefined, "", "not a url", "ftp://x.example"]) {
+    await assert.rejects(new RoomAgent({}, agentEnvironment([])).onRequest(
+      agentRequest("plan", { roomId: "room", intent: "x", origin })), error => error.code === "origin_required");
+    await assert.rejects(new ScoutAgent({}, agentEnvironment([])).onRequest(
+      agentRequest("scout", { query: "x", origin })), error => error.code === "origin_required");
+  }
+});
+
+test("postSolve and postScout hand the real request origin to their agent", async () => {
+  const bodies = [];
+  const stub = { fetch: async (_url, init) => { bodies.push(JSON.parse(init.body)); return Response.json({}); } };
+  const env = { ROOM_AGENT: { stub }, SCOUT_AGENT: { stub } };
+  await postSolve(new Request(`${REAL_ORIGIN}/v1/solve`, { method: "POST", body: JSON.stringify({ roomId: "room", intent: "x" }) }), env, REAL_ORIGIN);
+  await postScout(new Request(`${REAL_ORIGIN}/v1/scout`, { method: "POST", body: JSON.stringify({ query: "x" }) }), env, REAL_ORIGIN);
+  assert.deepEqual(bodies.map(body => body.origin), [REAL_ORIGIN, REAL_ORIGIN]);
 });

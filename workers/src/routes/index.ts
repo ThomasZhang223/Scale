@@ -733,15 +733,16 @@ export async function postSolve(req: Request, env: Env, origin: string): Promise
       intent: body.intent,
       budgetCents: body.budgetCents ?? null,
       fixed: body.fixed ?? [],
+      // The agent is reached through a synthetic URL, so it cannot learn the real origin itself.
+      origin,
     }),
   });
-  void origin;
   return json(await res.json(), res.status);
 }
 
 // --- Agent entry points ----------------------------------------------------------------------
 
-export async function postScout(req: Request, env: Env): Promise<Response> {
+export async function postScout(req: Request, env: Env, origin: string): Promise<Response> {
   const body = await readJson<{ sessionId?: string; query: string }>(req);
   // One agent per session, so its memory of what it already ingested survives the follow-up
   // question. A caller that sends no sessionId gets a fresh agent with no memory, which is
@@ -751,7 +752,8 @@ export async function postScout(req: Request, env: Env): Promise<Response> {
   const res = await agent.fetch("https://agent/scout", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ query: required(body.query, "query") }),
+    // origin: the agent is reached through a synthetic URL, so it cannot learn the real one itself.
+    body: JSON.stringify({ query: required(body.query, "query"), origin }),
   });
   const out = (await res.json()) as Record<string, unknown>;
   return json({ sessionId, ...out }, res.status);

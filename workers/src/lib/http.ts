@@ -71,3 +71,23 @@ export async function readJson<T>(req: Request): Promise<T> {
     throw new HttpError(400, "bad_json", "Request body is not valid JSON.");
   }
 }
+
+/**
+ * The public API origin a Durable Object must use to build asset URLs. The Worker passes it in
+ * the request body because a DO is reached through a synthetic URL (https://agent/...), whose
+ * origin is NOT the API's. There is no default: an origin guessed from that URL puts
+ * `https://agent/v1/assets/...` into every glbUrl.
+ */
+export function requireOrigin(value: unknown): string {
+  try {
+    const url = new URL(String(value));
+    if (url.protocol === "https:" || url.protocol === "http:") return url.origin;
+  } catch {
+    // falls through to the error below
+  }
+  throw new HttpError(
+    400,
+    "origin_required",
+    `The request body must carry the public API "origin" (got ${JSON.stringify(value)}).`,
+  );
+}
