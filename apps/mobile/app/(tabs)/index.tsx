@@ -176,7 +176,7 @@ function RoomsScreen() {
             <Card style={[styles.card, isSelected && styles.cardSelected]}>
               <View style={styles.header}>
                 {photo ? (
-                  <Image source={photo} style={styles.photo} resizeMode="cover" />
+                  <Image source={photo} style={[styles.photo, { width: cardWidth, height: Math.round((cardWidth * 2) / 3) }]} resizeMode="cover" />
                 ) : (
                   <RoomInsideView room={r} width={cardWidth} />
                 )}
@@ -247,12 +247,13 @@ const styles = StyleSheet.create({
   useButtonText: { color: colors.accent, fontSize: 15, fontWeight: "600" },
   useButtonTextSelected: { color: "white" },
   header: { backgroundColor: "rgba(255,255,255,0.35)" },
-  // 3:2 is the exact ratio every bundled room picture is cropped to (assets/ROOM_PHOTOS.md), so
-  // the box and the pixels agree and nothing can stretch. On RN 0.86 the `resizeMode` PROP did not
-  // take effect on device (a 3:2 photo filled a 4:3 box, 12% too tall); it is set in style as well.
-  // ceiling: a photo taken on this phone (roomPhotoUri) is whatever the camera gave; it relies on
-  // resizeMode "cover" to crop. If that still stretches, crop it to 3:2 when it is saved.
-  photo: { width: "100%", aspectRatio: 3 / 2, resizeMode: "cover" },
+  // The photo box is sized in NUMBERS at the call site (cardWidth x cardWidth*2/3), never by
+  // aspectRatio. A bundled require() picture arrives with its own pixel size as a default style
+  // (height 1067 for these files); with a width AND a height present Yoga ignores aspectRatio, so
+  // the box was card-width x 1067 pt and "cover" zoomed the photo into it. 3:2 is the exact ratio
+  // every bundled room picture is cropped to (assets/ROOM_PHOTOS.md).
+  // ceiling: a photo taken on this phone is cropped by "cover" to 3:2; nothing is distorted.
+  photo: { resizeMode: "cover" },
   planWrap: { alignItems: "center", justifyContent: "center", paddingVertical: spacing.lg },
   body: { padding: spacing.md, gap: spacing.md },
   titleRow: { flexDirection: "row", alignItems: "center" },

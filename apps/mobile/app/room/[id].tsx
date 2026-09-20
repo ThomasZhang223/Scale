@@ -68,7 +68,13 @@ export default function RoomDetailScreen() {
       {stitched ? (
         <StitchedRoom uris={faces.uris} meta={faces.meta} />
       ) : photo ? (
-        <Image source={photo} style={styles.photo} resizeMode="cover" />
+        <Image
+          source={photo}
+          // Sized in numbers: a bundled picture brings its own pixel height as a default style, and
+          // with a width and a height present aspectRatio is ignored (see (tabs)/index.tsx).
+          style={[styles.photo, { width: width - spacing.md * 2, height: Math.round(((width - spacing.md * 2) * 2) / 3) }]}
+          resizeMode="cover"
+        />
       ) : (
         <View style={styles.inside}>
           <RoomInsideView room={room} width={planWidth} />
@@ -123,7 +129,7 @@ const styles = StyleSheet.create({
   planWrap: {
     alignItems: "center",
   },
-  photo: { width: "100%", aspectRatio: 4 / 3, borderRadius: spacing.lg, overflow: "hidden" },
+  photo: { borderRadius: spacing.lg, overflow: "hidden", resizeMode: "cover" },
   inside: { borderRadius: spacing.lg, overflow: "hidden" },
   hostAuto: {
     width: "100%",
