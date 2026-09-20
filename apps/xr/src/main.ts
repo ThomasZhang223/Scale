@@ -216,6 +216,37 @@ let lastTouchedId: string | null = null; // what the turn buttons act on when no
 let listings: ListingsResult | null = null; // the last recommendation set, shown on the wrist and the laptop
 let listingsNeed: Need | null = null;
 let listingsBusy = false;
+
+/*
+ * State the tablet reads on its FIRST draw, so it lives here beside the other panel state and
+ * not inside start(). A `let` inside start() is in its temporal dead zone until execution
+ * reaches it, and `showPalette()` runs long before that: designerTiles then threw
+ * "Cannot access 'routing' before initialization" and the whole page stopped. Typecheck and the
+ * unit tests both pass with that bug in place; only loading the real page finds it.
+ */
+
+/** The design request in flight, and what the room was missing for it, from the user's sentence. */
+let designContext: { request: string; missing: string[]; rows: Recommendation[]; settled: boolean } | null = null;
+/** Which library the rows on the popout came from, so a pick knows what it is picking. */
+let lastResultKind: FindKind = 'shop';
+/**
+ * A sentence is being routed: transcription is over, the handler has not taken over yet.
+ * Measured on the deployed system, that hole is ~800 ms long (speech-to-text answers at 491 ms,
+ * the agent's own 'working' state begins at 1299 ms once the room has been uploaded), and the
+ * Designer page spent it showing "Hold to talk" again — which reads as "it did not hear you".
+ */
+let routing = false;
+/**
+ * The agent's own working stretch, so the tablet can count the seconds off.
+ *
+ * Measured on the deployed system: the request is accepted at 1.6 s and the status line then
+ * changes at 2.0 s (planning), 4.5 s (solving), 4.8 s (checking) and 6.1 s (proposed) — so the
+ * longest stretch with NOTHING changing in front of the person is 2.5 s of the word "Planning…",
+ * which is the planner's own call and not something the headset can shorten. A second counter is
+ * the honest thing to put in it: it is real information, and it moves.
+ */
+let workingSince = 0;
+let workingTimer: ReturnType<typeof setInterval> | undefined;
 let stageLines: string[] = []; // per-store Browserbase progress, mirrored on the laptop
 let voiceState: VoiceState = 'idle';
 let lastHeard: string | null = null;
@@ -994,30 +1025,6 @@ async function start() {
   type PlacedMove = { id: string; x: number; z: number; rotY: number };
   type BoxPose = { box: ScannedObject; position: ScannedObject['position']; rotationY: number };
   let previewedRequest: string | null = null; // onAgentChange fires on every status change; preview once per proposal
-  /**
-   * The design request in flight, and what the room was missing for it. Computed from the user's
-   * sentence before the request goes out, so the agent's answer is never parsed for it.
-   */
-  let designContext: { request: string; missing: string[]; rows: Recommendation[]; settled: boolean } | null = null;
-  let lastResultKind: FindKind = 'shop';
-  /**
-   * A sentence is being routed: transcription is over, the handler has not taken over yet.
-   * Measured on the deployed system, that hole is ~800 ms long (speech-to-text answers at 491 ms,
-   * the agent's own 'working' state begins at 1299 ms once the room has been uploaded), and the
-   * Designer page spent it showing "Hold to talk" again — which reads as "it did not hear you".
-   */
-  let routing = false;
-  /**
-   * The agent's own working stretch, so the tablet can count the seconds off.
-   *
-   * Measured on the deployed system: the request is accepted at 1.6 s and the status line then
-   * changes at 2.0 s (planning), 4.5 s (solving), 4.8 s (checking) and 6.1 s (proposed) — so the
-   * longest stretch with NOTHING changing in front of the person is 2.5 s of the word
-   * "Planning…", which is the planner's own call and not something the headset can shorten. A
-   * second counter is the honest thing to put in it: it is real information, and it moves.
-   */
-  let workingSince = 0;
-  let workingTimer: ReturnType<typeof setInterval> | undefined;
   let previewBefore: { placed: PlacedMove[]; boxes: BoxPose[] } | null = null;
 
   /** A detected box has no body: it simply moves, and its solid collider with it. */
