@@ -1,0 +1,468 @@
+{
+ "note": "First live catalogue binding through the B06 adapter. Raw SF3D response with the mesh bytes stripped (sha256 identifies it), plus the adapter's own receipt. Evidence for services/gen/SF3D_JUDGING.md, section 'Measured on a real product'.",
+ "at": "2026-09-20T06:14:54Z",
+ "deployment": {
+  "model": "3mzlyd6w",
+  "name": "ani-sf3d-feasibility",
+  "deployment": "qe95lkp",
+  "team": "HTN2026",
+  "instance_type": "L4:4x16",
+  "state_before": {
+   "status": "SCALED_TO_ZERO",
+   "active_replica_count": 0
+  }
+ },
+ "product": {
+  "objectId": "37ade021-af28-58c3-a81c-362644200dec",
+  "name": "West 6 Drawer Dresser",
+  "merchant": "InStyle_Home__CA",
+  "productId": "8726021341406",
+  "imageKey": "catalog/InStyle_Home__CA/8726021341406/source.jpg",
+  "bboxMetersFromD1": {
+   "w": 1.4986,
+   "h": 0.7976,
+   "d": 0.4496
+  },
+  "chosen_because": "in Paul's missing-models.json, so no already-generated mesh was paid for twice"
+ },
+ "latency_seconds": {
+  "raw_predict_cold_total": 170.862856,
+  "adapter_generate_warm_total": 3.075277
+ },
+ "raw_sf3d_response_without_mesh": {
+  "schema_version": 1,
+  "kind": "raw_sf3d_unscaled",
+  "input_sha256": "92965a4eec8cf43bc092d8c2ba0823a6de0b258b2f94165c74db6627dc7b9f1a",
+  "bytes": 900856,
+  "sha256": "709e068b8ee167eceee9d41d975639de99b7338774764af7d51efc55dfec2233",
+  "structure": {
+   "meshes": 1,
+   "materials": 1,
+   "textures": 2,
+   "images": 2
+  },
+  "revisions": {
+   "sf3d_source": "ff21fc491b4dc5314bf6734c7c0dabd86b5f5bb2",
+   "sf3d_weights": "f0c9a8ffd62cb1bbc8a7a53c9f87a0be1b6be778",
+   "dinov2": "47b73eefe95e8d44ec3623f8890bd894b6ea2d6c",
+   "open_clip": "1a25a446712ba5ee05982a381eed697ef9b435cf",
+   "rembg": "2.0.57",
+   "u2net_md5": "60024c5c889badc19c04ad937298a77b"
+  },
+  "settings": {
+   "foreground_ratio": 0.85,
+   "texture_resolution": 1024,
+   "remesh": "none",
+   "vertex_count": -1,
+   "dtype": "cuda-bfloat16-autocast"
+  },
+  "runtime": {
+   "python": "3.11.9",
+   "torch": "2.4.0",
+   "cuda": "12.1",
+   "gpu": "NVIDIA L4",
+   "onnx_providers": [
+    "CPUExecutionProvider"
+   ],
+   "cond_image_size": 512,
+   "u2net_sha256": "8d10d2f3bb75ae3b6d527c77944fc5e7dcd94b29809d47a739a7a728a912b491",
+   "startup_stages": {
+    "checkpoint_lookup_download": {
+     "wall_ms": 56351.24224199899,
+     "exclusive_ms": 56351.24224199899,
+     "calls": 1
+    },
+    "model_construction_including_secondary_checkpoints": {
+     "wall_ms": 10535.464750999381,
+     "exclusive_ms": 10535.464750999381,
+     "calls": 1
+    },
+    "primary_checkpoint_deserialization": {
+     "wall_ms": 546.8810610000219,
+     "exclusive_ms": 546.8810610000219,
+     "calls": 1
+    },
+    "model_to_cuda_initialization": {
+     "wall_ms": 1254.3229729999439,
+     "exclusive_ms": 1254.3229729999439,
+     "calls": 1
+    },
+    "rembg_u2net_session": {
+     "wall_ms": 3790.5915250012185,
+     "exclusive_ms": 3790.5915250012185,
+     "calls": 1
+    }
+   },
+   "runtime_init_ms": 141992.26729099973,
+   "replica_id": "683f061eede24df9b0dc4edc485c8a77",
+   "model_load_ms": 141992.324750001
+  },
+  "timings": {
+   "decode_ms": 30.417284000577638,
+   "preprocess_ms": 470.9994810000353,
+   "generate_bake_ms": 1533.8886650024506,
+   "export_ms": 90.41954099666327,
+   "peak_cuda_bytes": 6471112704,
+   "stages": {
+    "background_alpha_decision": {
+     "wall_ms": 457.9748500000278,
+     "exclusive_ms": 457.9748500000278,
+     "calls": 1
+    },
+    "foreground_crop_pad": {
+     "wall_ms": 5.594154998107115,
+     "exclusive_ms": 5.594154998107115,
+     "calls": 1
+    },
+    "conditioning_prepare": {
+     "wall_ms": 46.31417099881219,
+     "exclusive_ms": 46.31417099881219,
+     "calls": 1
+    },
+    "conditioning_resize": {
+     "wall_ms": 10.505171998374863,
+     "exclusive_ms": 10.505171998374863,
+     "calls": 2
+    },
+    "dino_features": {
+     "wall_ms": 272.33814900318976,
+     "exclusive_ms": 272.33814900318976,
+     "calls": 1
+    },
+    "transformer": {
+     "wall_ms": 233.65765099879354,
+     "exclusive_ms": 233.65765099879354,
+     "calls": 1
+    },
+    "triplane_postprocess": {
+     "wall_ms": 48.39649600035045,
+     "exclusive_ms": 48.39649600035045,
+     "calls": 1
+    },
+    "scene_codes_total": {
+     "wall_ms": 645.6568869980401,
+     "exclusive_ms": 91.26459099570639,
+     "calls": 1
+    },
+    "material_estimator": {
+     "wall_ms": 68.41436500326381,
+     "exclusive_ms": 68.41436500326381,
+     "calls": 1
+    },
+    "field_sampling": {
+     "wall_ms": 28.060648997779936,
+     "exclusive_ms": 28.060648997779936,
+     "calls": 2
+    },
+    "geometry_field": {
+     "wall_ms": 29.20857699791668,
+     "exclusive_ms": 29.20857699791668,
+     "calls": 1
+    },
+    "lazy_all_edges": {
+     "wall_ms": 89.66125900042243,
+     "exclusive_ms": 89.66125900042243,
+     "calls": 1
+    },
+    "marching_tetrahedra_total": {
+     "wall_ms": 168.70952200042666,
+     "exclusive_ms": 79.04826300000423,
+     "calls": 1
+    },
+    "geometry_total": {
+     "wall_ms": 225.28385400073603,
+     "exclusive_ms": 0.9006410036818124,
+     "calls": 1
+    },
+    "vertex_normals": {
+     "wall_ms": 17.852031996881124,
+     "exclusive_ms": 17.852031996881124,
+     "calls": 2
+    },
+    "cpu_atlas_overlap": {
+     "wall_ms": 110.29975700148498,
+     "exclusive_ms": 110.29975700148498,
+     "calls": 1
+    },
+    "normal_map_tangents": {
+     "wall_ms": 1.3982470009068493,
+     "exclusive_ms": 1.3982470009068493,
+     "calls": 1
+    },
+    "uv_unwrap_total": {
+     "wall_ms": 283.21777200108045,
+     "exclusive_ms": 153.6677360018075,
+     "calls": 1
+    },
+    "texture_rasterizer_bvh": {
+     "wall_ms": 24.321013999724528,
+     "exclusive_ms": 24.321013999724528,
+     "calls": 1
+    },
+    "texture_interpolation": {
+     "wall_ms": 0.5568909982685,
+     "exclusive_ms": 0.5568909982685,
+     "calls": 3
+    },
+    "texture_material_field": {
+     "wall_ms": 9.662213000410702,
+     "exclusive_ms": 9.662213000410702,
+     "calls": 1
+    },
+    "gpu_cpu_transfer": {
+     "wall_ms": 5.557957003475167,
+     "exclusive_ms": 5.557957003475167,
+     "calls": 5
+    },
+    "texture_padding": {
+     "wall_ms": 66.33205999605707,
+     "exclusive_ms": 66.33205999605707,
+     "calls": 2
+    },
+    "texture_quantization": {
+     "wall_ms": 52.95584100167616,
+     "exclusive_ms": 52.95584100167616,
+     "calls": 2
+    },
+    "pbr_construction": {
+     "wall_ms": 0.02516799941076897,
+     "exclusive_ms": 0.02516799941076897,
+     "calls": 1
+    },
+    "trimesh_construction": {
+     "wall_ms": 29.626053998072166,
+     "exclusive_ms": 29.626053998072166,
+     "calls": 1
+    },
+    "glb_export": {
+     "wall_ms": 90.39470800053095,
+     "exclusive_ms": 90.39470800053095,
+     "calls": 1
+    }
+   },
+   "rembg_ran": true,
+   "all_edges_cached_before": false,
+   "vertices": 13602,
+   "faces": 24380,
+   "glb_bytes": 900856,
+   "timing_method": "coarse completed CUDA wall boundaries; nested totals inclusive",
+   "unseparated": [
+    "normal-map inline tensor assembly (tangents separately timed)",
+    "rasterizer native BVH setup included in rasterize",
+    "scalar GPU transfers and inline mesh transforms"
+   ],
+   "request_decode_ms": 0.20903599943267182,
+   "image_decode_rgba_ms": 29.961405001813546,
+   "image_size": [
+    1024,
+    1024
+   ],
+   "image_mode": "RGBA",
+   "requested_bake_resolution": 1024,
+   "effective_bake_resolution": 1024,
+   "request_ordinal": 1,
+   "response_base64_validation_serialization_ms": 21.514017000299646,
+   "server_total_ms": 2147.645159999229
+  }
+ },
+ "adapter_receipt": {
+  "bboxMeters": {
+   "d": 0.4496,
+   "h": 0.7976,
+   "w": 1.4986
+  },
+  "boundSha256": "79d9d8149fdb49fb85b7c744396f6e1401a9bd288a2ddf9d641254a1cd705a3f",
+  "bytes": 1848348,
+  "evidence": "real_sf3d",
+  "generatorRevision": "ff21fc491b4dc5314bf6734c7c0dabd86b5f5bb2:f0c9a8ffd62cb1bbc8a7a53c9f87a0be1b6be778",
+  "imageRef": "/v1/assets/catalog/InStyle_Home__CA/8726021341406/source.jpg",
+  "imageSha256": "92965a4eec8cf43bc092d8c2ba0823a6de0b258b2f94165c74db6627dc7b9f1a",
+  "objectId": "37ade021-af28-58c3-a81c-362644200dec",
+  "providerRequestId": "3b68a01a0bd752c42725b93c3c4437ee6e4ee",
+  "rawSha256": "f82eeefe3b457fd4050353b93dffc7793d2e5bb0679059b7d2d0f8f11a54634e",
+  "scale": 1,
+  "schemaVersion": 1,
+  "scope": "worker-live",
+  "source": "catalog",
+  "timings": {
+   "bindingSeconds": 0.05814737499895273,
+   "providerSeconds": 2.644239834000473
+  },
+  "validation": {
+   "axis_scale": [
+    1.63053118130996,
+    1.341401366090447,
+    0.5975619395041757
+   ],
+   "binder": "ani-bind-v2",
+   "bottom_centre_error_meters": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bound_key": "5322132f6253975bb8c1c91f2330b08767bb98110d1360daad941d8c02e28ffa",
+   "bound_sha256": "79d9d8149fdb49fb85b7c744396f6e1401a9bd288a2ddf9d641254a1cd705a3f",
+   "dimension_error_meters": [
+    6.103515692856831e-09,
+    2.8705596899492036e-08,
+    1.1110305786488084e-08
+   ],
+   "distortion_diagnostic": "proxy_recommended",
+   "distortion_ratio": 2.7286396162762405,
+   "embedded_image_hashes": [
+    "cc45bab8efe1bfd7ae97c88b88017abf7f2b883de7d7d22fd2803d88a43e10e9",
+    "e8bd1a7592bc0ac8c7f85fcd718ad6c19911fd02e9a306f869ebfcb1d42aecb0"
+   ],
+   "export_reloaded": true,
+   "exporter": "ani-glb-preserve-v2",
+   "generated_normal_primitives": 0,
+   "instance_transforms": [
+    {
+     "matrix_rows": [
+      [
+       1.63053118130996,
+       0.0,
+       0.0,
+       -0.033579986570444434
+      ],
+      [
+       0.0,
+       1.341401366090447,
+       0.0,
+       0.33294541261839816
+      ],
+      [
+       0.0,
+       0.0,
+       0.5975619395041757,
+       0.030277197817954814
+      ],
+      [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ]
+     ],
+     "source_node": 1
+    }
+   ],
+   "materials": 1,
+   "measured_meters": [
+    1.4986000061035156,
+    0.7975999712944031,
+    0.4496000111103058
+   ],
+   "numpy": "1.26.4",
+   "orientation": {
+    "evidence": "manual_review",
+    "matrix": [
+     [
+      1.0,
+      0.0,
+      0.0
+     ],
+     [
+      0.0,
+      1.0,
+      0.0
+     ],
+     [
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    "name": "operator-declared",
+    "version": "1"
+   },
+   "orientation_then_binding_matrix_rows": [
+    [
+     1.63053118130996,
+     0.0,
+     0.0,
+     -0.033579986570444434
+    ],
+    [
+     0.0,
+     1.341401366090447,
+     0.0,
+     0.33294541261839816
+    ],
+    [
+     0.0,
+     0.0,
+     0.5975619395041757,
+     0.030277197817954814
+    ],
+    [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "physical_measurement_accuracy": "not_established",
+   "primitive_instances": 1,
+   "publication_requires_visual_review": true,
+   "raw_sha256": "f82eeefe3b457fd4050353b93dffc7793d2e5bb0679059b7d2d0f8f11a54634e",
+   "selected_image_sha256": "92965a4eec8cf43bc092d8c2ba0823a6de0b258b2f94165c74db6627dc7b9f1a",
+   "selected_object_id": "37ade021-af28-58c3-a81c-362644200dec",
+   "source_oriented_extents": [
+    0.9190869927406311,
+    0.5946020483970642,
+    0.7523906230926514
+   ],
+   "tangent_normal_map_support": "recomputed_final_geometry_angle_weighted",
+   "tangent_primitives": 1,
+   "tangent_seam_vertices": 28,
+   "target_meters": [
+    1.4986,
+    0.7976,
+    0.4496
+   ],
+   "textures": 2,
+   "trimesh": "4.4.1",
+   "units": "metres",
+   "validation": "PASS"
+  },
+  "visualReview": {
+   "reviewer": "operator-auto-demo",
+   "evidence": "manual_review",
+   "boundSha256": "79d9d8149fdb49fb85b7c744396f6e1401a9bd288a2ddf9d641254a1cd705a3f"
+  }
+ },
+ "independent_check": {
+  "tool": "trimesh reload inside the adapter image, not the binder's own report",
+  "header": "glTF version 2, declared length 1848348 == actual",
+  "reloaded_extents_meters": [
+   1.4986,
+   0.7976,
+   0.4496
+  ],
+  "max_dimension_error_meters": 2.87e-08,
+  "bottom_centre_error_meters": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "yaw_swap_test": {
+   "distortion_ratio_as_bound": 2.7286396162762405,
+   "distortion_ratio_if_w_d_swapped": 4.072,
+   "verdict": "identity is the better fit; no 90-degree yaw error indicated"
+  },
+  "verdict": "PASS"
+ },
+ "revision_gate": {
+  "reported_by_truss": {
+   "sf3d_source": "ff21fc491b4dc5314bf6734c7c0dabd86b5f5bb2",
+   "sf3d_weights": "f0c9a8ffd62cb1bbc8a7a53c9f87a0be1b6be778",
+   "dinov2": "47b73eefe95e8d44ec3623f8890bd894b6ea2d6c",
+   "open_clip": "1a25a446712ba5ee05982a381eed697ef9b435cf",
+   "rembg": "2.0.57",
+   "u2net_md5": "60024c5c889badc19c04ad937298a77b"
+  },
+  "pinned_in": "services/gen/deploy/sf3d/model/model.py",
+  "verdict": "sf3d_source and sf3d_weights match SOURCE_REVISION and MODEL_REVISION exactly"
+ }
+}

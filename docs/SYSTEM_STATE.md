@@ -76,10 +76,31 @@ coordinates -> OR-Tools in `fit` -> proposal -> new Version -> SSE. `POST /v1/so
 Workers AI) is the front door's own agent; nothing in the apps calls it.
 
 **2D->3D.** D1 job -> outbox -> 1-minute cron -> Queue -> `MeshDispatcher` (one admission slot)
--> `GenerateMeshWorkflow`. With `BASETEN_URL`/`BASETEN_API_KEY` unset the job PARKS as `queued`
-and `/v1/health` says `providerConfigured:false`. Two hosts for the provider exist in
-`services/gen`: `prepare.py` + `approve.py` (offline, human-reviewed, see `HERO_RUNBOOK.md`) and
-`app/generate_server.py` (live, records an operator-declared review for every artifact).
+-> `GenerateMeshWorkflow` -> the B06 adapter -> SF3D on Baseten -> B04 binding -> R2. With
+`BASETEN_URL`/`BASETEN_API_KEY` unset the job PARKS as `queued` and `/v1/health` says
+`providerConfigured:false`. Two hosts for the provider exist in `services/gen`: `prepare.py` +
+`approve.py` (offline, human-reviewed, see `HERO_RUNBOOK.md`) and `app/generate_server.py`
+(live, records an operator-declared review for every artifact). Thomas chose the live one.
+
+`BASETEN_URL` names the **adapter**, never Baseten. The Worker secret `BASETEN_API_KEY` is the
+adapter's `GENERATION_API_KEY` and authenticates the Worker TO the adapter; the real Baseten
+credential never leaves the laptop. `GenerateMeshWorkflow` rejects a raw SF3D response outright
+(`kind:"raw_sf3d_unscaled"`, or a bare `glb_base64`), so the adapter is not optional.
+
+| Piece | Where | Notes |
+| --- | --- | --- |
+| `gen` adapter | Docker on the laptop, `:8006`, compose profile **`gen`** (not `local`) | `services/gen/Dockerfile.adapter`, `app/generate_server.py`. Start with `bash infra/gen-up.sh`, which also gives it its OWN quick tunnel and touches none of the other four. Its three credentials come from `~/.config/full-scale/secrets.env`, which `infra/up.sh` does not load — hence the separate profile. |
+| SF3D | Baseten, model `3mzlyd6w` (`ani-sf3d-feasibility`), deployment `qe95lkp`, team `HTN2026`, `L4:4x16` | `SCALED_TO_ZERO` between sessions. A cold wake measured 170.9 s against the adapter's 180 s provider timeout, so warm it with one real prediction BEFORE the Worker can send one. The deployment named in older docs, `wdlgzjk3`/`w604592`, 404s for this API key. |
+
+The scale binding happens exactly once, in the adapter. Dimensions come from the D1 row's
+`bbox_w/h/d`, which the Worker sends as `bbox_meters`. Measured on the first live catalogue
+product: bound extents match D1 to 1e-8 m. The binder still labels a single-photo SF3D mesh of
+a wide, shallow object `proxy_recommended` — see `services/gen/SF3D_JUDGING.md`, "Measured on a
+real product", for why, and for how to tell that apart from a 90-degree yaw error.
+
+`infra/up.sh` refuses to run while the gen tunnel is alive (it globs `infra/.run/*.pid`). Kill
+`$(cat infra/.run/gen.pid)` first — and re-put `BASETEN_URL` afterwards, because a quick-tunnel
+URL changes on every restart.
 
 ## Verify
 
