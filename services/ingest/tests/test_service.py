@@ -99,8 +99,15 @@ def test_extract_returns_object_v1_rows():
     assert chair["glbUrl"] is None, "ingest never generates a mesh"
     assert chair["bboxMeters"] == {"w": 0.45, "h": 0.9, "d": 0.5}
     assert chair["measure"]["method"] == "extracted"
-    assert chair["price"]["cents"] == 24900
+    assert chair["price"] is None, "no currency supplied -> no price, never a guessed USD"
+    assert chair["extraction"]["productId"] == "1", "the Worker builds catalog/{m}/{productId}/source.jpg"
     assert chair["productUrl"] == "https://shop.test/products/oak-chair"
+
+
+def test_a_supplied_currency_is_carried_onto_the_price():
+    r = client.post("/extract", json={"merchant": "Fake Co", "storefront": "https://shop.test",
+                                      "products": [CATALOGUE[0]], "currency": "cad"})
+    assert r.json()["objects"][0]["price"] == {"cents": 24900, "currency": "CAD"}
 
 
 def test_a_confident_row_is_not_flagged_unverified():
