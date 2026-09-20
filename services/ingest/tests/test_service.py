@@ -187,6 +187,52 @@ def test_the_llm_pass_does_not_block_the_event_loop():
         f"took {elapsed:.2f}s; serial would be ~{serial:.2f}s — the calls are not overlapping")
 
 
+# --- fit: the placing use case ---------------------------------------------
+
+def test_extract_flags_which_objects_fit_the_space():
+    """Browsing wants every red chair; placing one in an 0.8 m gap wants only what goes there.
+    The check can only happen after measurement, which is here — /find has no sizes yet."""
+    r = client.post("/extract", json={
+        "merchant": "m", "storefront": "https://s.com", "products": CATALOGUE[:2],
+        "fit": {"maxW": 0.5}})
+    assert r.status_code == 200, r.text
+    b = r.json()
+    by_name = {o["name"]: o for o in b["objects"]}
+    # Oak Dining Chair is 0.45 wide, Mystery Sofa is 0.08 (a flagged unit mistake).
+    assert by_name["Oak Dining Chair"]["extraction"]["fits"] is True
+    assert b["stats"]["fitting"] + b["stats"]["too_big"] == len(b["objects"])
+
+
+def test_an_object_wider_than_the_gap_is_flagged_not_dropped():
+    """Missing by a centimetre is worth saying out loud, not vanishing with no explanation."""
+    r = client.post("/extract", json={
+        "merchant": "m", "storefront": "https://s.com", "products": CATALOGUE[:1],
+        "fit": {"maxW": 0.40}})          # the chair is 0.45 wide
+    b = r.json()
+    assert len(b["objects"]) == 1, "it must still be returned"
+    assert b["objects"][0]["extraction"]["fits"] is False
+    assert b["stats"]["too_big"] == 1
+
+
+def test_with_no_fit_asked_for_everything_fits():
+    r = client.post("/extract", json={
+        "merchant": "m", "storefront": "https://s.com", "products": CATALOGUE[:2]})
+    b = r.json()
+    assert all(o["extraction"]["fits"] for o in b["objects"])
+    assert b["stats"]["too_big"] == 0
+
+
+def test_a_fit_in_the_wrong_units_is_422_not_a_filter_that_does_nothing():
+    """80 instead of 0.8 is centimetres that escaped a UI edge. Filtering nothing would look
+    exactly like a gap big enough for everything."""
+    for bad in ({"maxW": 80}, {"maxH": 0}, {"maxD": -1}):
+        r = client.post("/extract", json={
+            "merchant": "m", "storefront": "https://s.com",
+            "products": CATALOGUE[:1], "fit": bad})
+        assert r.status_code == 422, f"{bad} -> {r.status_code}"
+        assert r.json()["error"] == "bad_fit"
+
+
 # --- /find: prompt -> products ---------------------------------------------
 
 SEARCH_PAGE = """
@@ -259,6 +305,46 @@ def test_find_reports_handles_the_catalogue_does_not_serve():
     b = _find({"storefront": "https://s.com", "query": "chair"}).json()
     assert "ghost" in b["handles"]
     assert b["missing"] == ["ghost"]
+
+
+def test_find_flags_a_fallback_page_rather_than_returning_beds_for_a_chair():
+    """Real: floydhome.com answers "red chair" with twelve beds, and "red chair" and "bed"
+    return the same twelve handles. Returning those unflagged is a confident answer to a
+    question nobody asked."""
+    page = ('<a href="/products/the-floyd-bed">Bed</a>'
+            '<a href="/products/the-mattress">Mattress</a>')
+    cat = [{"handle": "the-floyd-bed", "title": "The Floyd Bed", "product_type": "beds",
+            "variants": [], "images": []},
+           {"handle": "the-mattress", "title": "The Mattress 2.0", "product_type": "mattresses",
+            "variants": [], "images": []}]
+    b = _find({"storefront": "https://s.com", "query": "red chair"},
+              fetcher=_FakeFetcher(page), catalogue=cat).json()
+    assert b["count"] == 2, "the products still come back"
+    assert b["fallbackSuspected"] is True
+    assert b["relevance"]["matched"] == 0
+    assert "nothing for that query" in (b["warning"] or "")
+
+
+def test_find_does_not_cry_fallback_on_a_real_result_set():
+    page = '<a href="/products/oak-chair">Oak Chair</a>'
+    b = _find({"storefront": "https://s.com", "query": "oak chair"},
+              fetcher=_FakeFetcher(page)).json()
+    assert b["fallbackSuspected"] is False
+    assert b["relevance"]["ratio"] == 1.0
+    assert b["warning"] is None
+
+
+def test_find_drops_a_gift_card_from_the_results():
+    """polyandbark.com returns its gift card first for a chair query."""
+    page = ('<a href="/products/gift">Gift</a><a href="/products/oak-chair">Chair</a>')
+    cat = [{"handle": "gift", "title": "Digital Gift Card", "product_type": "",
+            "variants": [], "images": []},
+           {"handle": "oak-chair", "title": "Oak Chair", "product_type": "chairs",
+            "variants": [], "images": []}]
+    b = _find({"storefront": "https://s.com", "query": "chair"},
+              fetcher=_FakeFetcher(page), catalogue=cat).json()
+    assert [p["handle"] for p in b["products"]] == ["oak-chair"]
+    assert "gift" in b["handles"], "still reported as a handle the search returned"
 
 
 def test_find_with_no_results_is_a_zero_not_an_error():

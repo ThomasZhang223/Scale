@@ -128,6 +128,54 @@ def handles_from_search_page(html: str, limit: int = 24) -> list[str]:
     return seen[:limit]
 
 
+def relevance(query: str, products: list[dict]) -> tuple[int, float]:
+    """(how many products match a query word, as a fraction).
+
+    Floyd answers a search for "red chair" with twelve beds: their catalogue has no chairs, so
+    the theme falls back to popular products and the results page looks exactly like a real
+    one. "red chair" and "bed" returned the same twelve handles in the same order.
+
+    That is the worst kind of wrong — a confident answer to a question nobody asked — so it
+    has to be detectable. A results page where NOTHING matches any query word is a fallback,
+    not a ranking. Checked against title, product_type and tags, which is where a Shopify
+    product says what it is.
+    """
+    words = {w for w in re.findall(r"[a-z]{3,}", (query or "").lower())}
+    if not words or not products:
+        return 0, 0.0
+    hits = 0
+    for p in products:
+        haystack = " ".join([
+            str(p.get("title") or ""),
+            str(p.get("product_type") or ""),
+            " ".join(str(x) for x in (p.get("tags") or [])),
+        ]).lower()
+        if any(w in haystack for w in words):
+            hits += 1
+    return hits, hits / len(products)
+
+
+def drop_unplaceable(products: list[dict]) -> list[dict]:
+    """Gift cards, samples, swatches, care kits. A search for a chair at Poly & Bark returns
+    their gift card first; nothing downstream can make a mesh of it or place it in a room."""
+    out = []
+    for p in products:
+        text = f"{p.get('title') or ''} {p.get('product_type') or ''}".lower()
+        if any(w in text for w in _UNPLACEABLE):
+            continue
+        out.append(p)
+    return out
+
+
+# Kept here rather than imported from verify_merchants: that list is about which demo CATEGORY
+# a product belongs to, this one is about whether it is a physical object at all. They overlap
+# today and would drift for good reasons tomorrow.
+_UNPLACEABLE = (
+    "gift card", "e-gift", "sample", "swatch", "care kit", "cleaner", "touch-up",
+    "replacement part", "warranty", "protection plan", "assembly service", "delivery",
+)
+
+
 def products_by_handle(catalogue: list[dict], handles: list[str]) -> list[dict]:
     """Full product records for those handles, in the handles' order.
 

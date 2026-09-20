@@ -27,7 +27,8 @@ import httpx
 from app.browserbase import BrowserbaseFetch, CachedFetch, FetchError
 from app.dimensions import extract
 from app.product_search import (
-    handles_from_search_page, normalise_query, products_by_handle, search_url,
+    drop_unplaceable, handles_from_search_page, normalise_query, products_by_handle,
+    relevance, search_url,
 )
 from verify_merchants import USER_AGENT
 
@@ -101,10 +102,17 @@ def main() -> int:
                 break
     print(f"  catalogue has {len(catalogue)} products")
 
-    products = products_by_handle(catalogue, handles)
-    missing = [h for h in handles if h not in {(p.get("handle") or "").lower() for p in products}]
-    print(f"  matched {len(products)}/{len(handles)}"
+    matched = products_by_handle(catalogue, handles)
+    missing = [h for h in handles if h not in {(p.get("handle") or "").lower() for p in matched}]
+    print(f"  matched {len(matched)}/{len(handles)}"
           + (f", missing from the catalogue: {missing}" if missing else ""))
+
+    products = drop_unplaceable(matched)
+    if len(products) != len(matched):
+        dropped = [p.get("title") for p in matched if p not in products]
+        print(f"  dropped {len(matched) - len(products)} unplaceable: {dropped}")
+
+    hits, ratio = relevance(args.query or "", products)
 
     print()
     for i, p in enumerate(products, 1):
@@ -120,6 +128,14 @@ def main() -> int:
         measured = sum(1 for p in products if (extract(p).as_bbox() if extract(p) else None))
         print(f"\n  {measured}/{len(products)} measurable from /products.json alone.")
         print("  The rest are what steps 2, 2.5 and 3 exist for — /extract runs those.")
+
+    print(f"\n  relevance: {hits}/{len(products)} match a word of "
+          f"{(args.query or '')!r} ({ratio:.0%})")
+    if products and hits == 0:
+        print("  *** FALLBACK SUSPECTED ***")
+        print("  Nothing here matches the query. This storefront most likely has nothing for")
+        print("  it and served popular products instead — a no-results page that looks exactly")
+        print("  like a real one. /find flags this as fallbackSuspected rather than pretending.")
     return 0
 
 

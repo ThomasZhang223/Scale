@@ -34,10 +34,12 @@ from .ai_extract import OpenAIConfig, extract_with_llm, extract_with_vlm
 from .auth import require_upstream_token
 from .browserbase import BrowserbaseFetch, CachedFetch, FetchError
 from .dimensions import extract
+from .fit import fit_bounds_mm, passes_fit
 from .identity import object_id
 from .page_extract import extract_from_page, product_url
 from .product_search import (
-    handles_from_search_page, normalise_query, products_by_handle, search_url,
+    drop_unplaceable, handles_from_search_page, normalise_query, products_by_handle,
+    relevance, search_url,
 )
 from .validate import validate
 
@@ -205,7 +207,17 @@ async def find_products(request: Request):
                     (x.get("handle") or "").lower() for x in catalogue}) == 0:
                 break
 
-    products = products_by_handle(catalogue, handles)
+    matched = products_by_handle(catalogue, handles)
+    products = drop_unplaceable(matched)
+    hits, ratio = relevance(query, products)
+
+    # A store whose search finds nothing may serve its popular products instead, and that page
+    # is indistinguishable from a real result set — Floyd answers "red chair" with twelve beds.
+    # Returning those unflagged is the worst outcome available: a confident answer to a
+    # question nobody asked. Flagged rather than emptied, because the caller knows whether it
+    # would rather show something loosely related or say it found nothing.
+    fallback = bool(products) and hits == 0
+
     return {
         "query": raw_query,
         "searchedFor": query,
@@ -215,7 +227,13 @@ async def find_products(request: Request):
         # Handles the catalogue does not serve cannot be measured, so they are reported rather
         # than quietly dropped — a caller comparing count to handles should see why.
         "missing": [h for h in handles if h not in {
-            (x.get("handle") or "").lower() for x in products}],
+            (x.get("handle") or "").lower() for x in matched}],
+        "relevance": {"matched": hits, "ratio": round(ratio, 2)},
+        "fallbackSuspected": fallback,
+        "warning": (
+            f"no result matches any word of {query!r} — this storefront most likely has "
+            f"nothing for that query and served popular products instead"
+        ) if fallback else None,
         "products": products,
     }
 
@@ -285,6 +303,15 @@ async def extract_products(request: Request):
     use_llm = bool(body.get("llm")) and cfg.configured
     use_vlm = bool(body.get("vlm")) and cfg.configured
     ai_limit = int(body.get("aiLimit") or 40)
+
+    # Optional, and only meaningful here — /find has no sizes yet, so a fit filter can only be
+    # applied once something has been measured. Two callers want different things: a person
+    # browsing for a red chair wants every red chair, an agent putting one in an 0.8 m gap
+    # wants only the ones that go there.
+    try:
+        bounds = fit_bounds_mm(body.get("fit"))
+    except (ValueError, TypeError) as e:
+        return _err(422, "bad_fit", str(e))  # standing rule 4: never filter nothing silently
     fetcher = None
     if use_pages:
         try:
@@ -297,7 +324,9 @@ async def extract_products(request: Request):
     objects: list[dict] = []
     stats = {"products": len(products), "from_api": 0, "from_llm": 0, "from_page": 0,
              "from_vlm": 0, "pages_fetched": 0, "page_failures": 0,
-             "rejected": 0, "unverified": 0}
+             "rejected": 0, "unverified": 0,
+             # Only meaningful when a fit was asked for; with none, everything fits.
+             "fitting": 0, "too_big": 0}
     if body.get("llm") and not cfg.configured:
         stats["llm_skipped"] = "OPENAI_API_KEY / OPENAI_MODEL not configured"
     needs_page: list[dict] = []
@@ -315,7 +344,14 @@ async def extract_products(request: Request):
             return False
         stats[counter] += 1
         stats["unverified"] += int(v.unverified)
-        objects.append(_object_v1(merchant, storefront, p, bbox, v, hit.source_field, via))
+        obj = _object_v1(merchant, storefront, p, bbox, v, hit.source_field, via)
+        # Flagged, not dropped. The caller knows whether it is placing or browsing, and an
+        # object that misses by a centimetre is worth showing with that said out loud rather
+        # than vanishing with no explanation.
+        fits = passes_fit(bbox, bounds)
+        obj["extraction"]["fits"] = fits
+        stats["fitting" if fits else "too_big"] += 1
+        objects.append(obj)
         return True
 
     needs_ai: list[dict] = []

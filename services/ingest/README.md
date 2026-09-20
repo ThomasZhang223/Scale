@@ -303,6 +303,36 @@ catalogue, and with `--extract`, which are measurable from `/products.json` alon
 parses, `--save-html out.html` keeps the page so the theme can be looked at — every theme
 renders search differently and that variety cannot be fixture-tested.
 
+### `fit` on `/extract` — the placing use case
+
+A search has two callers wanting different things. Someone browsing for a red chair wants
+every red chair. An agent putting one in the 0.8 m gap beside a desk wants only the ones that
+go there.
+
+```
+POST /extract { ..., "fit": { "maxW": 0.8, "maxH": 1.2, "maxD": 0.5 } }   # metres
+  -> objects[].extraction.fits: true|false
+  -> stats.fitting / stats.too_big
+```
+
+It belongs on `/extract`, not `/find`: nothing has a size until it has been measured, so the
+check happens after steps 1 through 3, whichever of them produced the number.
+
+**Flagged, not dropped.** An object that misses by a centimetre is worth showing with that
+said out loud rather than vanishing with no explanation, and the caller knows whether it is
+placing or browsing. An object with no measurement never passes a fit filter — "probably
+fine" about an unmeasured object is the one answer this pipeline must never give.
+
+A fit in the wrong units is a **422**, not a filter that quietly does nothing: `maxW: 80` is
+centimetres that escaped a UI edge, and silently matching everything looks exactly like a gap
+big enough for anything.
+
+`app/fit.py` mirrors `services/search/app/ranking.py` deliberately — the services deploy as
+separate images and cannot import each other. `tests/test_fit_agrees_with_search.py` imports
+**both** and asserts identical answers over a table of bounds and boxes, so changing one
+fails the build. Two fit rules that drift is the same failure as two places rescaling a mesh:
+nobody notices until a sofa is offered for a gap it cannot go in, on stage.
+
 ### Testing a change without paying for ten merchants
 
 `--only` runs a subset, matched case-insensitively against the merchant name:

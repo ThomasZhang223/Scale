@@ -78,7 +78,64 @@
     {
       "name": "EQ3 (CA)",
       "storefrontBaseUrl": "https://www.eq3.com"
+    },
+    {
+      "name": "Burrow",
+      "storefrontBaseUrl": "https://burrow.com"
+    },
+    {
+      "name": "Gus Modern",
+      "storefrontBaseUrl": "https://gusmodern.com"
+    },
+    {
+      "name": "Sixpenny",
+      "storefrontBaseUrl": "https://sixpenny.com"
+    },
+    {
+      "name": "Sundays Company (CA)",
+      "storefrontBaseUrl": "https://sundaysfurniture.com"
+    },
+    {
+      "name": "Nathan James",
+      "storefrontBaseUrl": "https://nathanjameshome.com"
+    },
+    {
+      "name": "Open Spaces",
+      "storefrontBaseUrl": "https://getopenspaces.com"
+    },
+    {
+      "name": "Grain (CA)",
+      "storefrontBaseUrl": "https://graindesign.com"
+    },
+    {
+      "name": "Schoolhouse",
+      "storefrontBaseUrl": "https://schoolhouse.com"
+    },
+    {
+      "name": "Cedar & Moss",
+      "storefrontBaseUrl": "https://cedarandmoss.com"
+    },
+    {
+      "name": "Color Cord Company",
+      "storefrontBaseUrl": "https://colorcord.com"
+    },
+    {
+      "name": "Lostine",
+      "storefrontBaseUrl": "https://lostine.com"
+    },
+    {
+      "name": "Thuma",
+      "storefrontBaseUrl": "https://thuma.co"
+    },
+    {
+      "name": "Avocado Green",
+      "storefrontBaseUrl": "https://avocadogreenmattress.com"
+    },
+    {
+      "name": "Quagga Designs (CA)",
+      "storefrontBaseUrl": "https://quaggadesigns.com"
     }
   ],
-  "_note_round2": "Round 2 added after the first live run: 2/16 merchants usable, but ~390 usable products already. These target the CATEGORY gaps (surface, storage, lighting), not merchant count. Still unverified."
+  "_note_round2": "Round 2 added after the first live run: 2/16 merchants usable, but ~390 usable products already. These target the CATEGORY gaps (surface, storage, lighting), not merchant count. Still unverified.",
+  "_note_round3": "Round 3, added 2026-09-20 and UNVERIFIED like everything else here. Targets the two problems a real 100-product run exposed, not merchant count. (1) Poly & Bark is 46 of the 100 because curate() balances categories and not merchants, so this adds seating and upholstery from elsewhere. (2) Kohara alone supplied 14 of 20 lighting slots and Floyd carries sleeping almost alone \u2014 single-merchant risk on a whole demo category. Every URL is a guess at a Shopify storefront; several will not be Shopify at all. verify_merchants.py is the gate, and remember reachability is not usefulness: Floyd, Bend, Lulu and Branch all report 0 usable products from /products.json and are rescued by step 2.5, while Stylegarage answered 200 with 250 products and yielded nothing."
 }
