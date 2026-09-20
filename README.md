@@ -5,7 +5,7 @@
 <h1 align="center">Scale</h1>
 
 <p align="center">
-  Scan your room and any real object, then compose them together at true measured scale:
+  Scan your room and any real object, browse Shopify and generate 3d renders, then compose them together at true measured scale:
   on the phone in 3D and AR, and in a Meta Quest at 1:1.
 </p>
 
@@ -154,8 +154,7 @@ runs against stubs with none of the above.
 **Thomas** — iOS native capture modules (RoomPlan room scanning, object measurement) and the
 Expo app around them; the Cloudflare Workers backend, including the mesh
 generation and merchant-ingest workflows, the catalogue and search routes, and the KV/D1/R2/
-Vectorize wiring; `infra/` (Docker, tunnels, deploy and provisioning scripts); `.claude/contracts.md`
-and the fixtures every stub answers; and, in the final integration pass, WebXR interaction and
+Vectorize wiring; `infra/` (Docker, tunnels, deploy and provisioning scripts); WebXR interaction and
 palette work (room selection, window/panel handling, voice-driven library answers) alongside Justin.
 
 **Justin** — the WebXR runtime for the Quest (`apps/xr/src`): scene setup, interaction, physics and
