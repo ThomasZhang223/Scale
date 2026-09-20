@@ -48,10 +48,9 @@ export default function CaptureRoomScreen() {
       });
 
     return () => {
-      // Best-effort: if the screen unmounts mid-scan (back button), stop the
-      // session so the next visit starts clean. Errors here are expected
-      // when the sweep already finished normally.
-      RoomCaptureModule.stopSession().catch(() => {});
+      // Leaving mid-scan (close button) discards the sweep so the next visit
+      // starts clean. After a normal finish this is a harmless no-op.
+      RoomCaptureModule.cancelSession().catch(() => {});
     };
   }, []);
 

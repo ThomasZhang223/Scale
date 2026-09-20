@@ -85,7 +85,11 @@ final class RoomCaptureController: NSObject {
 
   func start() throws {
     guard isSupported else { throw RoomCaptureError.notSupported }
-    guard roomCaptureSession == nil else { throw RoomCaptureError.alreadyRunning }
+    // A session left behind by a screen that was closed mid-sweep, or by a
+    // stop that threw, must not block the next scan. Reclaim it here instead
+    // of refusing: the previous sweep's data was never wanted, or it would
+    // have been serialized. (This was the "already running" alert on device.)
+    if roomCaptureSession != nil { cancel() }
 
     frameRingBuffer.removeAll()
     lastFrameSampleTime = 0
@@ -103,7 +107,20 @@ final class RoomCaptureController: NSObject {
     let arConfig = ARWorldTrackingConfiguration()
     arConfig.worldAlignment = .gravityAndHeading
     arConfig.planeDetection = [.horizontal, .vertical]
-    arSession.run(arConfig)
+    // RoomPlan builds walls from the LiDAR mesh. Apple's own RoomCaptureView
+    // runs the session with scene reconstruction on; when we inject our own
+    // session we have to ask for it ourselves, or RoomPlan sees frames with
+    // no geometry and reports nothing.
+    if ARWorldTrackingConfiguration.supportsSceneReconstruction(.mesh) {
+      arConfig.sceneReconstruction = .mesh
+    }
+    if ARWorldTrackingConfiguration.supportsFrameSemantics(.sceneDepth) {
+      arConfig.frameSemantics.insert(.sceneDepth)
+    }
+    arSession.run(arConfig, options: [.resetTracking, .removeExistingAnchors])
+    NSLog("[RoomCapture] ARSession running: mesh=%d depth=%d location=%d",
+          arConfig.sceneReconstruction == .mesh, arConfig.frameSemantics.contains(.sceneDepth),
+          locationManager.authorizationStatus.rawValue)
 
     locationManager.requestWhenInUseAuthorization()
     if CLLocationManager.headingAvailable() {
@@ -116,13 +133,34 @@ final class RoomCaptureController: NSObject {
     roomCaptureSession = session
   }
 
+  /// Stops the sweep and throws its data away. For leaving the screen early.
+  func cancel() {
+    stopContinuation?.resume(throwing: RoomCaptureError.notRunning)
+    stopContinuation = nil
+    roomCaptureSession?.delegate = nil
+    roomCaptureSession?.stop()
+    roomCaptureSession = nil
+    locationManager.stopUpdatingHeading()
+    arSession.pause()
+  }
+
   func stopAndSerialize() async throws -> [String: Any] {
     guard let session = roomCaptureSession else { throw RoomCaptureError.notRunning }
 
-    let capturedRoom = try await withCheckedThrowingContinuation {
-      (continuation: CheckedContinuation<CapturedRoom, Error>) in
-      self.stopContinuation = continuation
-      session.stop()
+    let capturedRoom: CapturedRoom
+    do {
+      capturedRoom = try await withCheckedThrowingContinuation {
+        (continuation: CheckedContinuation<CapturedRoom, Error>) in
+        self.stopContinuation = continuation
+        session.stop()
+      }
+    } catch {
+      // Whatever happened, the session is over: never leave the reference
+      // set, or the next start() has nothing to reclaim but a dead session.
+      roomCaptureSession = nil
+      locationManager.stopUpdatingHeading()
+      arSession.pause()
+      throw error
     }
 
     roomCaptureSession = nil
@@ -185,6 +223,7 @@ extension RoomCaptureController: RoomCaptureSessionDelegate {
   }
 
   func captureSession(_ session: RoomCaptureSession, didAdd room: CapturedRoom) {
+    NSLog("[RoomCapture] didAdd walls=%d objects=%d", room.walls.count, room.objects.count)
     reportProgress(room)
   }
 
@@ -192,11 +231,16 @@ extension RoomCaptureController: RoomCaptureSessionDelegate {
     reportProgress(room)
   }
 
+  func captureSession(_ session: RoomCaptureSession, didStartWith configuration: RoomCaptureSession.Configuration) {
+    NSLog("[RoomCapture] RoomCaptureSession started")
+  }
+
   func captureSession(_ session: RoomCaptureSession, didRemove room: CapturedRoom) {
     reportProgress(room)
   }
 
   func captureSession(_ session: RoomCaptureSession, didEndWith data: CapturedRoomData, error: Error?) {
+    NSLog("[RoomCapture] didEndWith error=%@", error?.localizedDescription ?? "none")
     if let error {
       stopContinuation?.resume(throwing: error)
       stopContinuation = nil
@@ -222,6 +266,18 @@ extension RoomCaptureController: RoomCaptureSessionDelegate {
 }
 
 extension RoomCaptureController: ARSessionDelegate {
+  func session(_ session: ARSession, cameraDidChangeTrackingState camera: ARCamera) {
+    NSLog("[RoomCapture] tracking: %@", String(describing: camera.trackingState))
+  }
+
+  func session(_ session: ARSession, didFailWithError error: Error) {
+    NSLog("[RoomCapture] ARSession failed: %@", error.localizedDescription)
+  }
+
+  func sessionWasInterrupted(_ session: ARSession) {
+    NSLog("[RoomCapture] ARSession interrupted")
+  }
+
   func session(_ session: ARSession, didUpdate frame: ARFrame) {
     // Gate on tracking, not on brightness (plan section 1): a garbage pose
     // makes a garbage frame sample regardless of how well-lit it looks.

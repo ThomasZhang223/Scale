@@ -28,6 +28,11 @@ public final class RoomCaptureModule: Module {
       try RoomCaptureController.shared.start()
     }
 
+    // Leave the screen without a room: stops the sweep, keeps nothing.
+    AsyncFunction("cancelSession") { () in
+      RoomCaptureController.shared.cancel()
+    }
+
     // Ends the sweep and returns RoomCapture v1 as a plain dictionary
     // (bridges to a JS object with no extra encode/decode step). Throws
     // rather than returning a partial room — never a synthesized fallback.
