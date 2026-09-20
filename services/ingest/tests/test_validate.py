@@ -14,7 +14,7 @@ import sys, pathlib
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from app.validate import validate, prior_for
+from app.validate import validate, prior_for, candidate_priors
 
 
 def v(bbox, category="", title=""):
@@ -71,6 +71,39 @@ def test_a_straight_sofa_still_uses_the_straight_sofa_prior():
     real product and has to stay flagged."""
     r = v({"w": 2.1, "h": 0.85, "d": 2.4}, "Sofas", "Bergen Two-Seater Sofa")
     assert r.unverified or r.flags, "a 2.4 m deep sofa passed unflagged"
+
+
+def test_a_product_is_checked_against_every_reading_of_what_it_is():
+    """Which source is right VARIES, so picking a winner is wrong in one direction or the
+    other. Real: Poly & Bark's "Sink Down Lounge Chair" has product_type "sectionals" and is
+    2.34 m wide — the type is right and the title is a marketing name. Preferring the title
+    flagged it; preferring the type would flag the L-shaped sectional above."""
+    keys = [k for k, _ in candidate_priors("sectionals", "Sink Down Lounge Chair")]
+    assert set(keys) == {"chair", "sectional"}, keys
+    r = v({"w": 2.34, "h": 0.81, "d": 1.14}, "sectionals", "Sink Down Lounge Chair")
+    assert not r.unverified, f"{r.confidence} {r.notes}"
+    assert "sectional" in " ".join(r.notes), r.notes
+
+
+def test_a_wardrobe_is_not_judged_as_a_dresser():
+    """Real: "Maro Wardrobe / Armoire" is 1.95 m tall with product_type "storage". A wardrobe
+    is a dresser's height plus a hanging rail."""
+    assert prior_for("storage", "Maro Wardrobe / Armoire | Walnut")[0] == "wardrobe"
+    r = v({"w": 1.20, "h": 1.95, "d": 0.55}, "storage", "Maro Wardrobe / Armoire | Walnut")
+    assert not r.unverified, f"{r.confidence} {r.notes}"
+
+
+def test_a_single_modular_piece_is_a_plausible_sectional():
+    """Modular ranges sell armless pieces well under a whole sofa's width."""
+    r = v({"w": 1.35, "h": 0.71, "d": 1.07}, "sectionals", "Soft Serve Lounge Chair")
+    assert not r.unverified, f"{r.confidence} {r.notes}"
+
+
+def test_failing_every_reading_is_still_a_mismatch():
+    """Checking more readings must not become a way of never flagging anything. Nothing this
+    service sells is 8 cm wide under any category."""
+    r = v({"w": 0.08, "h": 0.75, "d": 0.90}, "sectionals", "Mystery Lounge Chair")
+    assert "prior_mismatch" in r.flags, f"{r.confidence} {r.notes}"
 
 
 # --- the flags that must keep firing ---------------------------------------

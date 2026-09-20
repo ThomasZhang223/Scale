@@ -31,13 +31,19 @@ CATEGORY_PRIORS: dict[str, dict[str, tuple[float, float]]] = {
     # Poly & Bark sells came back flagged at confidence 0.488, just under the 0.5 threshold,
     # so accurate rows ranked below worse-measured ones. Height stays a sofa's: an L-shape is
     # wider and deeper than a sofa, never taller.
-    "sectional": {"w": (1.50, 4.60), "h": (0.55, 1.30), "d": (0.60, 3.60)},
+    # Width starts below a whole sofa's on purpose: modular ranges sell single armless
+    # pieces, and Poly & Bark's "Soft Serve Lounge Chair" is one at 1.35 m. The lower bound
+    # is here to catch a unit mistake, not to assert how small a sectional may be.
+    "sectional": {"w": (0.90, 4.60), "h": (0.55, 1.30), "d": (0.60, 3.60)},
     "bench":     {"w": (0.60, 2.40), "h": (0.30, 0.70), "d": (0.25, 0.70)},
     "table":     {"w": (0.30, 3.20), "h": (0.25, 1.25), "d": (0.30, 1.60)},
     "desk":      {"w": (0.60, 2.40), "h": (0.55, 1.30), "d": (0.35, 1.00)},
     "shelf":     {"w": (0.25, 2.60), "h": (0.25, 2.50), "d": (0.15, 0.75)},
     "cabinet":   {"w": (0.30, 2.60), "h": (0.30, 2.40), "d": (0.20, 0.80)},
     "dresser":   {"w": (0.60, 2.20), "h": (0.60, 1.60), "d": (0.35, 0.70)},
+    # A wardrobe is a dresser's height plus a hanging rail — 1.95 m is normal and was being
+    # flagged against the dresser prior's 1.60 m ceiling.
+    "wardrobe":  {"w": (0.45, 2.40), "h": (1.20, 2.40), "d": (0.35, 0.80)},
     "bed":       {"w": (0.70, 2.20), "h": (0.20, 1.50), "d": (1.70, 2.40)},
     "lamp":      {"w": (0.08, 0.90), "h": (0.15, 2.10), "d": (0.08, 0.90)},
     "rug":       {"w": (0.50, 4.50), "h": (0.00, 0.10), "d": (0.50, 6.00)},
@@ -60,7 +66,9 @@ _PRIOR_ALIASES = {
     "desk": "desk",
     "shelf": "shelf", "shelv": "shelf", "bookcase": "shelf", "bookshelf": "shelf",
     "cabinet": "cabinet", "credenza": "cabinet", "sideboard": "cabinet", "storage": "cabinet",
-    "dresser": "dresser", "chest": "dresser", "wardrobe": "dresser",
+    "dresser": "dresser",
+    "wardrobe": "wardrobe", "armoire": "wardrobe", "closet": "wardrobe",
+    "chest": "dresser",
     "bed": "bed", "mattress": "bed",
     "lamp": "lamp", "sconce": "lamp", "pendant": "lamp", "lantern": "lamp",
     "chandelier": "lamp", "light": "lamp",
@@ -107,6 +115,33 @@ def _best_alias(text: str) -> str | None:
     return best
 
 
+def candidate_priors(category: str | None, title: str = "") -> list[tuple[str, dict]]:
+    """Every prior this product could plausibly be judged by, most specific first.
+
+    Both the product_type and the title are read, because which one is right VARIES and
+    picking a winner is wrong in one direction or the other. All four of these are real:
+
+      "Modular Sofas"              + "L-Shaped Sectional"   -> the TITLE is more specific
+      "Benches, Stools & Ottomans" + "Este Bench"           -> the TITLE; the type is three
+                                                               categories in one string
+      "sectionals"                 + "Sink Down Lounge Chair" -> the TYPE; that "chair" is
+                                                               2.34 m wide, a sectional piece
+                                                               with a marketing name
+      "storage"                    + "Maro Wardrobe"        -> the TITLE; the type is generic
+
+    So a bbox is checked against all of them and flagged only if it fits NONE. This file's
+    priors are, by its own description, "deliberately generous: this catches parse errors and
+    unit mistakes, not unusual furniture" — and flagging a product that is plausible under a
+    reading its own merchant gave it is exactly the over-narrowing that warns against.
+    """
+    out: list[tuple[str, dict]] = []
+    for text in ((title or "").lower(), (category or "").lower()):
+        key = _best_alias(text)
+        if key and key not in {k for k, _ in out}:
+            out.append((key, CATEGORY_PRIORS[key]))
+    return out
+
+
 def prior_for(category: str | None, title: str = "") -> tuple[str, dict] | tuple[None, None]:
     """Which prior to judge a product by, from its product_type and its title.
 
@@ -151,20 +186,34 @@ def validate(bbox: dict, *, category: str | None = None, title: str = "",
             return Verdict(False, 0.0, ["unit_sanity"],
                            [f"{axis}={v} m is outside {lo}-{hi} m — a unit mistake, not a product"])
 
-    # 2. Category priors.
-    name, prior = prior_for(category, title)
-    if prior is None:
+    # 2. Category priors. Checked against every reading of what this product is — see
+    #    candidate_priors — and a mismatch only counts when it fails all of them.
+    candidates = candidate_priors(category, title)
+    name = candidates[0][0] if candidates else None
+    if not candidates:
         flags.append("no_prior")
         notes.append("no category prior to check against")
         confidence *= 0.9
     else:
-        out = [f"{a}={bbox[a]:.2f} m outside {prior[a][0]}-{prior[a][1]} m"
-               for a in ("w", "h", "d") if not (prior[a][0] <= bbox[a] <= prior[a][1])]
-        if not out:
+        misses = {}
+        for key, prior in candidates:
+            out = [f"{a}={bbox[a]:.2f} m outside {prior[a][0]}-{prior[a][1]} m"
+                   for a in ("w", "h", "d") if not (prior[a][0] <= bbox[a] <= prior[a][1])]
+            if not out:
+                # Plausible under this reading. Report the one it agreed with, which is not
+                # always the first — a "lounge chair" that is really a sectional agrees with
+                # the type, not the title.
+                name = key
+                misses = {}
+                break
+            misses[key] = out
+        if not misses:
             confidence = min(1.0, confidence + 0.10)
             notes.append(f"agrees with the {name} prior on all three axes")
         else:
-            # One axis out is often a real variant; all three means the parse is wrong.
+            # Implausible however it is read. Score against its closest reading: one axis out
+            # is often a real variant, all three means the parse is wrong.
+            name, out = min(misses.items(), key=lambda kv: len(kv[1]))
             confidence *= 0.75 if len(out) == 1 else 0.45
             flags.append("prior_mismatch")
             notes.append(f"{name} prior: " + "; ".join(out))
