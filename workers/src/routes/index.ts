@@ -6,7 +6,7 @@
 
 import { HttpError, json, noContent, readJson } from "../lib/http";
 import { contentHash, nowIso, token, uuid } from "../lib/ids";
-import { R2Keys, contentTypeFor, isCatalogSourceKey, keyFromAssetPath, sniffImageType } from "../lib/keys";
+import { R2Keys, assetUrl, contentTypeFor, isCatalogSourceKey, keyFromAssetPath, sniffImageType } from "../lib/keys";
 import { callUpstream, callUpstreamRaw, upstreamOrigin } from "../lib/config";
 import { embedInput, indexObject, type Embedding } from "../lib/embedding";
 import { enqueueMesh } from "../lib/mesh-dispatch";
@@ -68,8 +68,30 @@ export async function postRoom(req: Request, env: Env): Promise<Response> {
   return json({ roomId });
 }
 
-export async function getRoom(env: Env, roomId: string): Promise<Response> {
-  return json(await loadRoomCapture(env, roomId));
+export async function getRoom(env: Env, roomId: string, origin: string): Promise<Response> {
+  const capture = (await loadRoomCapture(env, roomId)) as RoomCaptureV1;
+  return json(withTextureUrls(capture, origin));
+}
+
+/**
+ * Key in the database, URL in the API (lib/keys.ts), applied to the appearance layer.
+ *
+ * A stored capture carries `textureKey` — the R2 key of that surface's rectified photo — and a
+ * null `textureUrl`. The client never resolves a key, so the conversion happens here, in the one
+ * response that carries it. A surface with no `textureKey` is returned untouched: appearance is
+ * optional per surface, and an absent texture is not a missing one.
+ */
+function withTextureUrls(capture: RoomCaptureV1, origin: string): RoomCaptureV1 {
+  const surfaces = (capture.appearance as { surfaces?: Record<string, { textureKey?: string }> } | undefined)
+    ?.surfaces;
+  if (!surfaces) return capture;
+  const resolved = Object.fromEntries(
+    Object.entries(surfaces).map(([key, surface]) => [
+      key,
+      surface?.textureKey ? { ...surface, textureUrl: assetUrl(origin, surface.textureKey) } : surface,
+    ]),
+  );
+  return { ...capture, appearance: { ...(capture.appearance as object), surfaces: resolved } };
 }
 
 // --- Versions ------------------------------------------------------------------------------

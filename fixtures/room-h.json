@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 1,
+  "roomId": "ccff7dec-1fc1-493e-96e3-3ab6f6ddfb2a",
+  "capturedAt": "2026-09-20T05:40:00Z",
+  "worldAlignment": "gravityAndHeading",
+  "northBearingDeg": 0.0,
+  "floor": {
+    "polygon": [[0.0, 0.0], [2.76, 0.0], [2.76, 4.72], [0.0, 4.72]],
+    "areaM2": 13.0272
+  },
+  "walls": [
+    {
+      "id": "c5da5378-6b98-46f3-8d5d-13f10e30113e",
+      "transform": [1,0,0,0, 0,1,0,0, 0,0,1,0, 1.38,1.48,0.0,1],
+      "dimensions": [2.76, 2.96, 0.12],
+      "confidence": "high"
+    },
+    {
+      "id": "6689660c-8055-46c7-83bb-1ad3c678093f",
+      "transform": [1,0,0,0, 0,1,0,0, 0,0,1,0, 1.38,1.48,4.72,1],
+      "dimensions": [2.76, 2.96, 0.12],
+      "confidence": "high"
+    },
+    {
+      "id": "fb511d7e-8351-4876-beee-a2b11853f20a",
+      "transform": [0,0,-1,0, 0,1,0,0, 1,0,0,0, 0.0,1.48,2.36,1],
+      "dimensions": [4.72, 2.96, 0.12],
+      "confidence": "high"
+    },
+    {
+      "id": "46a64e7b-d411-4fed-be66-c89fe320d944",
+      "transform": [0,0,-1,0, 0,1,0,0, 1,0,0,0, 2.76,1.48,2.36,1],
+      "dimensions": [4.72, 2.96, 0.12],
+      "confidence": "high"
+    }
+  ],
+  "openings": [],
+  "objects": [],
+  "appearance": {
+    "surfaces": {
+      "c5da5378-6b98-46f3-8d5d-13f10e30113e": {
+        "hex": "#9a968e",
+        "textureUrl": "/v1/assets/rooms/ccff7dec-1fc1-493e-96e3-3ab6f6ddfb2a/appearance/front.jpg",
+        "rotationDeg": 0,
+        "mirrored": false
+      },
+      "6689660c-8055-46c7-83bb-1ad3c678093f": {
+        "hex": "#7b7771",
+        "textureUrl": "/v1/assets/rooms/ccff7dec-1fc1-493e-96e3-3ab6f6ddfb2a/appearance/back.jpg",
+        "rotationDeg": 0,
+        "mirrored": false
+      },
+      "fb511d7e-8351-4876-beee-a2b11853f20a": {
+        "hex": "#8f3f42",
+        "textureUrl": "/v1/assets/rooms/ccff7dec-1fc1-493e-96e3-3ab6f6ddfb2a/appearance/left.jpg",
+        "rotationDeg": 0,
+        "mirrored": false
+      },
+      "46a64e7b-d411-4fed-be66-c89fe320d944": {
+        "hex": "#a3a099",
+        "textureUrl": "/v1/assets/rooms/ccff7dec-1fc1-493e-96e3-3ab6f6ddfb2a/appearance/right.jpg",
+        "rotationDeg": 0,
+        "mirrored": false
+      },
+      "floor": {
+        "hex": "#666560",
+        "textureUrl": "/v1/assets/rooms/ccff7dec-1fc1-493e-96e3-3ab6f6ddfb2a/appearance/floor.jpg",
+        "rotationDeg": 0,
+        "mirrored": false
+      },
+      "ceiling": {
+        "hex": "#80766e",
+        "textureUrl": "/v1/assets/rooms/ccff7dec-1fc1-493e-96e3-3ab6f6ddfb2a/appearance/ceiling.jpg",
+        "rotationDeg": 180,
+        "mirrored": false
+      }
+    }
+  }
+}

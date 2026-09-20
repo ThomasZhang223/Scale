@@ -7,7 +7,10 @@
 // Without X-Stub: 1, every route still 501s. None of the 15 have real logic yet — that lands
 // behind this same dispatch later, one route at a time.
 
-import roomDemo from "../../fixtures/room-demo.json";
+// The demo room: Judging Room H, 2.76 x 4.72 x 2.96 m, its six surfaces photographed and
+// rectified (fixtures/room-h.json). fixtures/room-demo.json is the older invented 4 x 3.5 m
+// room and stays put: four test suites across three owners assert against its numbers.
+import roomH from "../../fixtures/room-h.json";
 import objectMacbook from "../../fixtures/object-macbook.json";
 import fitReportDoorSwing from "../../fixtures/fitreport-doorswing.json";
 
@@ -37,7 +40,7 @@ function isStub(req: Request): boolean {
 
 // --- Stub data for routes with no committed fixture file -----------------------------------
 // Built from contracts.md's own schema examples, with real UUIDs, and cross-referenced against
-// the three committed fixtures (same roomId as room-demo.json, same objectId as
+// the three committed fixtures (same roomId as room-h.json, same objectId as
 // object-macbook.json, same placementId as the door-swing violation) so the stub layer is one
 // coherent scene, not fifteen unrelated blobs.
 
@@ -60,7 +63,7 @@ const stubPlacement = {
 const stubRootVersion = {
   schemaVersion: 1,
   versionId: STUB_ROOT_VERSION_ID,
-  roomId: roomDemo.roomId,
+  roomId: roomH.roomId,
   parentId: null,
   label: "stub: empty room",
   createdAt: "2026-09-19T18:15:00Z",
@@ -74,7 +77,7 @@ const stubRootVersion = {
 const stubVersion = {
   schemaVersion: 1,
   versionId: STUB_VERSION_ID,
-  roomId: roomDemo.roomId,
+  roomId: roomH.roomId,
   parentId: STUB_ROOT_VERSION_ID as string | null,
   label: "stub: macbook by the door",
   createdAt: "2026-09-19T18:20:00Z",
@@ -126,8 +129,8 @@ function route(
 }
 
 const routes: Route[] = [
-  route("POST", "/v1/rooms", () => ({ roomId: roomDemo.roomId })),
-  route("GET", "/v1/rooms/{id}", () => roomDemo),
+  route("POST", "/v1/rooms", () => ({ roomId: roomH.roomId })),
+  route("GET", "/v1/rooms/{id}", () => roomH),
   route("POST", "/v1/rooms/{id}/versions", () => stubVersion),
   route("GET", "/v1/rooms/{id}/versions", () =>
     [stubRootVersion, stubVersion].map(({ versionId, label, createdAt, parentId }) => ({
@@ -219,7 +222,7 @@ async function dispatch(
   if (m("GET", /^\/v1\/health\/upstream$/)) return real.getUpstreamHealth(env);
 
   if (m("POST", /^\/v1\/rooms$/)) return real.postRoom(req, env);
-  if ((hit = m("GET", /^\/v1\/rooms\/([^/]+)$/))) return real.getRoom(env, hit[1]);
+  if ((hit = m("GET", /^\/v1\/rooms\/([^/]+)$/))) return real.getRoom(env, hit[1], origin);
   if ((hit = m("POST", /^\/v1\/rooms\/([^/]+)\/versions$/))) return real.postVersion(req, env, hit[1]);
   if ((hit = m("GET", /^\/v1\/rooms\/([^/]+)\/versions$/))) return real.getVersionList(env, hit[1]);
   if ((hit = m("GET", /^\/v1\/versions\/([^/]+)$/))) return real.getVersionById(env, hit[1]);
