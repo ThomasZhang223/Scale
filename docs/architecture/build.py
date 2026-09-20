@@ -101,7 +101,7 @@ add(rect(0, 0, W, H, BG, r=0))
 # ---------------------------------------------------------------------------------------
 add(text(M, 52, "Full Scale — system architecture", 34, INK, 700, ls="-0.6"))
 add(text(M, 80, "Scan your room and any real object, then place it at true measured scale.", 15, MUTED, 500))
-add(text(M, 100, "Hack the North 2026 · verified against the deployed system, 2026-09-20 06:11 UTC",
+add(text(M, 100, "Hack the North 2026 · verified against the deployed system, 2026-09-20 06:25 UTC",
          12, MUTED, 400, font=MONO))
 
 pills = [
@@ -300,7 +300,8 @@ GROUPS = [
     ]),
     ("ASYNC", [
         ("Workflows", "generate-mesh · ingest-merchant",
-         ["Each step.do() retries on its own —", "what a flaky GPU actually needs."], (2,), None),
+         ["Each step.do() retries on its own —", "what a flaky GPU actually needs."], (2,),
+         "BASETEN_URL names the adapter, not Baseten"),
         ("Queues", "full-scale-jobs · 1 consumer · 3 retries",
          ["Delivery and back-off for every", "mesh generation job."], (2,), None),
         ("Cron Triggers", "crons = [\"* * * * *\"]",
@@ -353,18 +354,18 @@ add(text(lap_x + 22, BOT_Y + 28, "LAPTOP EDGE", 13, MUTED, 700, ls="1.6"))
 add(text(lap_x + 22 + 108, BOT_Y + 28,
          "— stateless tools, no database, reached only through Cloudflare Tunnel",
          12.5, MUTED, 500))
-add(f'<circle cx="{lap_x + lap_w - 150}" cy="{BOT_Y + 24}" r="5" fill="#2E7D4F"/>')
-add(text(lap_x + lap_w - 138, BOT_Y + 28, "live", 11.5, MUTED, 600))
-add(f'<circle cx="{lap_x + lap_w - 104}" cy="{BOT_Y + 24}" r="5" fill="{WHITE}" '
+add(f'<circle cx="{lap_x + lap_w - 216}" cy="{BOT_Y + 24}" r="5" fill="#2E7D4F"/>')
+add(text(lap_x + lap_w - 204, BOT_Y + 28, "live", 11.5, MUTED, 600))
+add(f'<circle cx="{lap_x + lap_w - 170}" cy="{BOT_Y + 24}" r="5" fill="{WHITE}" '
     f'stroke="{MUTED}" stroke-width="1.5"/>')
-add(text(lap_x + lap_w - 92, BOT_Y + 28, "built, off the path", 11.5, MUTED, 600))
+add(text(lap_x + lap_w - 158, BOT_Y + 28, "built, off the path today", 11.5, MUTED, 600))
 
 LAP = [
     ("fit", ":8001", "OR-Tools CP-SAT — /fit and /solve", "C++ extension; Workers Python is Pyodide", (4,), True),
     ("embedding", ":8004", "SigLIP 2 — embeds queries and photos", "2 GB of pinned weights", (1, 3), True),
     ("ingest", ":8003", "Crawl, /find, dimension extraction", "long crawls, Python scraping stack", (2,), True),
     ("search", ":8005", "Standby ranker (Vectorize path is live)", "fallback only, not on the path", (), False),
-    ("generate", "adapter", "SF3D + the scale binding, exactly once", "wraps a GPU call (P-GEN)", (2,), False),
+    ("gen adapter", ":8006", "SF3D + the scale binding, exactly once", "live; Worker BASETEN_URL unset", (2,), False),
 ]
 ly = BOT_Y + 48
 for name, port, role, why, nums, live in LAP:
@@ -372,8 +373,8 @@ for name, port, role, why, nums, live in LAP:
     add(f'<circle cx="{lap_x + 34}" cy="{ly + 19}" r="5" fill="{"#2E7D4F" if live else "#FFFFFF"}" '
         f'stroke="{"#2E7D4F" if live else MUTED}" stroke-width="1.5"/>')
     add(text(lap_x + 48, ly + 24, name, 14, INK, 700, font=MONO))
-    add(text(lap_x + 48 + 92, ly + 24, port, 12, MUTED, 500, font=MONO))
-    add(text(lap_x + 48 + 150, ly + 24, role, 12.5, INK, 500))
+    add(text(lap_x + 48 + 106, ly + 24, port, 12, MUTED, 500, font=MONO))
+    add(text(lap_x + 48 + 164, ly + 24, role, 12.5, INK, 500))
     add(text(lap_x + lap_w - 88, ly + 24, why, 11.5, MUTED, 500, anchor="end"))
     if nums:
         add(badges(lap_x + lap_w - 22, ly + 19, nums, r=9, gap=4))
@@ -385,7 +386,7 @@ add(text(ven_x + 22 + 78, BOT_Y + 28,
          "— each attached to the one component that calls it", 12.5, MUTED, 500))
 
 VEN = [
-    ("Baseten", "SF3D image-to-3D on GPU", "called by GenerateMeshWorkflow", (2,)),
+    ("Baseten", "SF3D image-to-3D · L4 · model 3mzlyd6w", "reached only via the gen adapter", (2,)),
     ("Browserbase", "Headless storefront sessions", "called by services/ingest", (2,)),
     ("Shopify storefronts", "Public /products.json + collections", "read by services/ingest", (2,)),
     ("OpenAI", "Layout planner · dimension extraction", "designer-agent + services/ingest", (2, 4)),
@@ -421,7 +422,8 @@ CHAINS = [
     (2, [("ven", "Shopify /products.json"), ("ven", "Browserbase renders the page"),
          ("lap", "ingest /crawl + /extract"), ("mono", "POST /v1/catalog/ingest"),
          ("cf", "D1 objects + mesh_outbox"), ("cf", "cron every 60 s"), ("cf", "Queue"),
-         ("cf", "MeshDispatcher"), ("cf", "GenerateMeshWorkflow"), ("ven", "Baseten SF3D"),
+         ("cf", "MeshDispatcher"), ("cf", "GenerateMeshWorkflow"), ("lap", "gen adapter binds the scale"),
+         ("ven", "Baseten SF3D"),
          ("cf", "R2 objects/{id}/mesh.glb")]),
     (3, [("mono", "POST /v1/search"), ("lap", "SigLIP 2 embeds the sentence"),
          ("cf", "Vectorize: cosine style"), ("cf", "+ w_mm/h_mm/d_mm $lte fit filter"),
@@ -526,7 +528,7 @@ ROWS = [
      "Public /products.json and /collections/<handle>/products.json are the catalogue source"),
     ("Browserbase", "services/ingest/app/browserbase.py · page_extract.py",
      "Renders the product pages whose dimensions live in metafields that JSON never serves"),
-    ("Baseten", "workers/src/workflows/generate-mesh.ts · services/gen/deploy/sf3d",
+    ("Baseten", "services/gen/app/generate_server.py · Dockerfile.adapter",
      "SF3D image-to-3D on an L4, behind the adapter that binds metric scale exactly once"),
     ("OpenAI", "services/agent/src/agent.ts · services/ingest/app/ai_extract.py",
      "The layout planner in designer-agent, and the LLM/VLM dimension passes in extraction"),
