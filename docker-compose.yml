@@ -1,5 +1,10 @@
 # Local CPU services; GPU generation runs on Baseten. See infra/README.md.
 
+# Fixed project name: the name prefixes the named volumes and the container names. Without it the
+# name comes from the checkout directory, so each worktree makes its own project, collides on the
+# host ports, and orphans the multi-GB embedding-models volume.
+name: full-scale
+
 services:
   fit:
     # Owner: Justin. Solver service — reads RoomCapture v1 and bboxMeters, answers /solve.
