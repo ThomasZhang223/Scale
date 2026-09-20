@@ -57,9 +57,12 @@ const OBJECTS_URL = params.get('objects'); // null: the built-in furniture comes
 const SERVER_ROOM_ID: string | null = params.get('room') ?? import.meta.env.VITE_ROOM_ID ?? null;
 const ROOM_ID = SERVER_ROOM_ID ?? roomLarge.roomId;
 const OBJECT_IDS = params.get('object')?.split(',').filter(Boolean) ?? [];
-// How many of the newest phone scans to bring into the room on load (?scans=N; 0 turns it off).
-// The scan list is shared by the whole team, so "all of them" would fill the room with test rows.
-const RECENT_SCANS = Number(params.get('scans') ?? 6);
+// How many of the newest phone scans to bring into the room on load (?scans=N).
+// ceiling: 0 for the demo — the room opens empty and everything in it was put there on purpose.
+// `?scans=6` brings the old behaviour back for one page load, and changing this default restores
+// it for everyone. The scans themselves are unaffected: they are still listed on the tablet's My
+// scans page and in the scans popout, which read listScans(), and still re-list every 10 s.
+const RECENT_SCANS = Number(params.get('scans') ?? 0);
 /**
  * A voice request puts its top result in the room by itself. A person who says "find me a lamp"
  * to a headset expects a lamp to appear, not a list to read.
@@ -980,10 +983,17 @@ async function start() {
   /** Puts every object where a stored layout says, instantly. Lowest first, as applyVersion. */
   function applyPlacements(placements: PlacementV1[]) {
     if (!currentRoom) return;
+    const gone: string[] = [];
     for (const p of [...placements].sort((a, b) => a.p[1] - b.p[1])) {
       const layout = fromPlacement(p, currentRoom.offset);
       const hit = resolveObject(p.objectId);
-      if (!hit) continue;
+      if (!hit) {
+        // Same rule as applyVersion: skip what no longer exists, and name it. This path had no
+        // message at all, so an Undo onto a layout holding a deleted object came back short
+        // with nothing said.
+        gone.push(p.objectId.slice(0, 8));
+        continue;
+      }
       if (hit.kind === 'placed') physics.moveTo(hit.obj.id, layout.position[0], layout.position[2], layout.rotationY, layout.position[1]);
       else {
         hit.box.node.position.set(...layout.position);
@@ -992,6 +1002,10 @@ async function start() {
         hit.box.rotationY = layout.rotationY;
         physics.moveDetected(hit.box.identifier, layout.position[0], layout.position[2], layout.rotationY, hit.box.dimensions);
       }
+    }
+    if (gone.length) {
+      console.warn(`Layout: ${gone.length} object(s) no longer exist and were left out:`, gone);
+      tell(`${gone.length} object${gone.length > 1 ? 's are' : ' is'} no longer available and ${gone.length > 1 ? 'were' : 'was'} left out: ${gone.join(', ')}.`);
     }
   }
 
@@ -1516,6 +1530,7 @@ async function start() {
     const offset = currentRoom.offset;
     const lowestFirst = [...version.placements].sort((a, b) => a.p[1] - b.p[1]);
     const unsupported: string[] = [];
+    const missing: string[] = [];
     for (const p of lowestFirst) {
       const layout = fromPlacement(p, offset);
       let obj = objects.get(p.placementId) ?? [...objects.values()].find((o) => o.objectId === p.objectId && !version.placements.some((q) => q.placementId === o.id && q !== p));
@@ -1523,11 +1538,18 @@ async function start() {
         try {
           await addServerObject(await getObject(p.objectId));
         } catch (err) {
+          // The object was deleted, or its mesh is gone. Skip it: a layout must never be able to
+          // refuse to open because one thing in it no longer exists. But say which one — a room
+          // that quietly comes back smaller than it was saved is worse than one that explains.
           console.warn(`Version ${version.versionId}: object ${p.objectId} unavailable:`, err);
+          missing.push(p.objectId.slice(0, 8));
           continue;
         }
         obj = [...objects.values()].find((o) => o.objectId === p.objectId);
-        if (!obj) continue;
+        if (!obj) {
+          missing.push(p.objectId.slice(0, 8));
+          continue;
+        }
       }
       physics.moveTo(obj.id, layout.position[0], layout.position[2], layout.rotationY, layout.position[1]);
       // Stored off the floor with nothing under it: whatever it rested on is missing from this
@@ -1535,11 +1557,14 @@ async function start() {
       // the layout quietly differ from the one that was saved.
       if (layout.position[1] > 0.01 && !physics.supportUnder(obj.id)) unsupported.push(obj.name);
     }
+    if (missing.length) {
+      tell(`${missing.length} object${missing.length > 1 ? 's are' : ' is'} no longer available and ${missing.length > 1 ? 'were' : 'was'} left out: ${missing.join(', ')}.`);
+    }
     if (unsupported.length) {
       console.warn(`Version ${version.versionId}: nothing to rest on for ${unsupported.join(', ')}; they fall to the floor.`);
       tell(`${unsupported.join(', ')} had nothing to rest on and fell to the floor.`);
     }
-    say(`Layout "${version.label}" applied: ${version.placements.length} placements.`);
+    say(`Layout "${version.label}" applied: ${version.placements.length - missing.length} of ${version.placements.length} placements.`);
   }
 
   let pushTimer: number | undefined;
