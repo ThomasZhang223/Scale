@@ -121,6 +121,33 @@ test('findLive posts one /find per storefront in parallel, reports stages, and m
   assert.ok(stages.includes('Sabai Design:failed'));
 });
 
+test('findLive returns one row per objectId when every store was topped up from the same catalogue', async () => {
+  const stages: string[] = [];
+  const shared = (i: number) => ({
+    schemaVersion: 1, objectId: `catalog-${i}`, source: 'catalog', state: 'ready', name: `Lamp ${i}`, category: 'lighting',
+    glbUrl: `https://api/v1/assets/objects/catalog-${i}/mesh.glb`, bboxMeters: { w: 0.3, h: 1.2, d: 0.3 },
+    merchant: 'Poly & Bark', productUrl: null, price: null, measure: { method: 'extracted', confidence: 0.9 },
+    extraction: { imageUrl: null, fits: true, via: 'catalog-ready', productId: null }, findSource: 'catalog',
+  });
+  // Every store answers with the SAME two meshed catalogue rows, which is what the Worker does
+  // in ready-only mode, plus one storefront row of its own.
+  const fetchFn = (async (_url: string, init: RequestInit) => {
+    const body = JSON.parse(init.body as string);
+    return new Response(JSON.stringify({
+      merchant: body.merchant, storefront: body.storefront, searchUrl: 'u', searchedFor: 'lamp',
+      handles: 0, products: 0, measured: 3, fitting: 3, fallbackSuspected: false,
+      warning: 'storefront search failed: browserbase timeout',
+      listings: [{ ...shared(1), objectId: `own-${body.merchant}` }, shared(1), shared(2)],
+    }));
+  }) as unknown as typeof fetch;
+
+  const rows = await findLive({ text: 'find me a lamp', categoryWords: ['lamp'] }, 8, (s) => stages.push(s.detail), fetchFn);
+  assert.equal(rows.length, STOREFRONTS.length + 2);
+  assert.equal(new Set(rows.map((r) => r.objectId)).size, rows.length);
+  // A dead storefront behind a full menu has to be visible, not hidden by the row count.
+  assert.ok(stages.some((d) => d.startsWith('storefront search failed')), stages.join(' | '));
+});
+
 test('findLive throws when every store failed, so findListings can fall back and say so', async () => {
   const fetchFn = (async () => new Response('nope', { status: 503, statusText: 'Service Unavailable' })) as unknown as typeof fetch;
   await assert.rejects(findLive({ text: 'lamp' }, 8, undefined, fetchFn), /every store failed/);

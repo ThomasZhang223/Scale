@@ -429,7 +429,7 @@ async function start() {
       return;
     }
     findPanel.setProgress(objectId, 'Queued for Baseten…');
-    let job: { objectId: string; jobId: string };
+    let job: { objectId: string; jobId: string | null };
     try {
       job = await postListingsGenerate(l, SERVER_ROOM_ID);
     } catch (err) {
@@ -438,6 +438,20 @@ async function start() {
     }
     // The server mints a stable id; the placed box keeps tracking it so SSE dedupe works.
     placed.objectId = job.objectId;
+    if (!job.jobId) {
+      // The object already had its mesh, so no job was started and there is nothing to poll.
+      // This is the race where the row turned ready between the search and the pick; the
+      // usual ready path never reaches here, because addListing loaded the GLB above.
+      try {
+        const loaded = await loader.load(objectToItem(await getObject(job.objectId)).url, 1); // scale 1: the mesh normalisation contract
+        if (objects.has(placed.id)) swapLoaded(placed, loaded);
+        findPanel.setProgress(objectId, 'Mesh placed at true scale');
+      } catch (err) {
+        findPanel.setProgress(objectId, `Mesh failed to load: ${(err as Error).message}`);
+        tell(`${l.name}: ${(err as Error).message}`, 'error');
+      }
+      return;
+    }
     tell(`${l.name}: mesh job queued. It’s in the room as a box until Baseten answers.`, 'info');
     const started = Date.now();
     // ceiling: 3 s polling for up to 10 min. The SSE `object` event usually lands first; when it

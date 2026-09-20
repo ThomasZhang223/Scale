@@ -180,7 +180,15 @@ export async function findLive(need: Need, limit: number, onStage: OnStage = () 
       const out = (await res.json()) as FindResponse;
       const rows = out.listings.map((l) => ({ ...l, merchant: l.merchant ?? merchant, imageUrl: l.imageUrl ?? l.extraction?.imageUrl ?? null }));
       const fits = out.listings.filter((l) => l.extraction?.fits !== false).length;
-      onStage({ merchant, stage: 'done', detail: out.fallbackSuspected ? `${out.measured} measured, none match — ${out.warning ?? 'store fallback'}` : `${out.handles} found, ${out.measured} measured, ${fits} fit` });
+      // A warning with no fallbackSuspected is the ready-only path saying the storefront round
+      // trip itself failed and these rows came from the meshed catalogue instead. Saying only
+      // "N measured" there would hide a dead store behind a full-looking menu.
+      const detail = out.fallbackSuspected
+        ? `${out.measured} measured, none match — ${out.warning ?? 'store fallback'}`
+        : out.warning
+          ? `${out.warning} — ${out.measured} from the catalogue`
+          : `${out.handles} found, ${out.measured} measured, ${fits} fit`;
+      onStage({ merchant, stage: 'done', detail });
       return rows;
     } catch (err) {
       onStage({ merchant, stage: 'failed', detail: (err as Error).message });
@@ -196,7 +204,15 @@ export async function findLive(need: Need, limit: number, onStage: OnStage = () 
     const reasons = settled.map((s, i) => `${STOREFRONTS[i].merchant}: ${(s as PromiseRejectedResult).reason?.message ?? 'failed'}`).join('; ');
     throw new Error(`every store failed (${reasons})`);
   }
-  return rows;
+  // One objectId, one row. Each store's answer is topped up from the SAME meshed catalogue when
+  // the Worker is in ready-only mode (X-Find-Source), so three stores return the same rows three
+  // times. First occurrence wins; rank() re-sorts against the need afterwards either way.
+  const seen = new Set<string>();
+  return rows.filter((r) => {
+    if (seen.has(r.objectId)) return false;
+    seen.add(r.objectId);
+    return true;
+  });
 }
 
 /** Fits within every bound the need sets; a bound that isn't set never fails. */
