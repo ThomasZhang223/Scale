@@ -36,6 +36,14 @@ enum WallRectifier {
   private static let ciContext = CIContext()
 
   static func detect(in buffer: CVPixelBuffer) -> DetectedQuad? {
+    detect(handler: VNImageRequestHandler(cvPixelBuffer: buffer, orientation: .up, options: [:]))
+  }
+
+  static func detect(in cgImage: CGImage) -> DetectedQuad? {
+    detect(handler: VNImageRequestHandler(cgImage: cgImage, orientation: .up, options: [:]))
+  }
+
+  private static func detect(handler: VNImageRequestHandler) -> DetectedQuad? {
     let request = VNDetectRectanglesRequest()
     request.minimumAspectRatio = 0.2
     request.maximumAspectRatio = 1.0
@@ -43,7 +51,6 @@ enum WallRectifier {
     request.quadratureTolerance = 30 // walls shot from an angle are far from square
     request.minimumConfidence = 0.5
     request.maximumObservations = 1
-    let handler = VNImageRequestHandler(cvPixelBuffer: buffer, orientation: .up, options: [:])
     do {
       try handler.perform([request])
     } catch {
@@ -85,6 +92,49 @@ enum WallRectifier {
     let url = FileManager.default.temporaryDirectory.appendingPathComponent("face-\(UUID().uuidString).jpg")
     do { try data.write(to: url) } catch { return nil }
     return url
+  }
+
+  struct RectifiedPhoto {
+    let imagePath: String
+    let aspect: Float // width / height of the straightened face
+    let detected: Bool
+    let confidence: Float
+  }
+
+  /// The same four-point transform for a photo from the library (no ARKit, so no metres):
+  /// upright it, find the face, straighten it. The rectified aspect ratio is the face's real
+  /// width-to-height ratio, which is what turns one entered ceiling height into a room.
+  static func rectifyLibraryPhoto(path: String) -> RectifiedPhoto? {
+    guard let ui = UIImage(contentsOfFile: path) else { return nil }
+    let longEdge = max(ui.size.width, ui.size.height)
+    let scale = min(1, 2000 / max(longEdge, 1))
+    let size = CGSize(width: ui.size.width * scale, height: ui.size.height * scale)
+    let fmt = UIGraphicsImageRendererFormat.default(); fmt.scale = 1
+    // Drawing through UIImage bakes in the EXIF orientation: the CGImage below is upright.
+    let upright = UIGraphicsImageRenderer(size: size, format: fmt).image { _ in ui.draw(in: CGRect(origin: .zero, size: size)) }
+    guard let cg = upright.cgImage else { return nil }
+    let detected = detect(in: cg)
+    let quad = detected ?? fullFrame()
+    let image = CIImage(cgImage: cg)
+    let w = image.extent.width, h = image.extent.height
+    let px = { (p: CGPoint) in CIVector(x: p.x * w, y: p.y * h) }
+    guard let filter = CIFilter(name: "CIPerspectiveCorrection") else { return nil }
+    filter.setValue(image, forKey: kCIInputImageKey)
+    filter.setValue(px(quad.topLeft), forKey: "inputTopLeft")
+    filter.setValue(px(quad.topRight), forKey: "inputTopRight")
+    filter.setValue(px(quad.bottomRight), forKey: "inputBottomRight")
+    filter.setValue(px(quad.bottomLeft), forKey: "inputBottomLeft")
+    guard let corrected = filter.outputImage, corrected.extent.width > 1, corrected.extent.height > 1,
+          let outCG = ciContext.createCGImage(corrected, from: corrected.extent),
+          let data = UIImage(cgImage: outCG).jpegData(compressionQuality: 0.88) else { return nil }
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent("face-\(UUID().uuidString).jpg")
+    do { try data.write(to: url) } catch { return nil }
+    return RectifiedPhoto(
+      imagePath: url.path,
+      aspect: Float(corrected.extent.width / corrected.extent.height),
+      detected: detected != nil,
+      confidence: quad.confidence
+    )
   }
 
   /// World points for the four corners. First a raycast against the face's plane (detected

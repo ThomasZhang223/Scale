@@ -17,3 +17,12 @@ export interface CapturedFace {
 
 export type QuadEvent = { found: boolean; confidence: number };
 export type WallCaptureViewProps = ViewProps;
+
+// A library photo after the four-point transform. No metres: the phone was
+// not there when it was taken. `aspect` is the face's real width / height.
+export interface RectifiedPhoto {
+  imagePath: string;
+  aspect: number;
+  detected: boolean;
+  confidence: number;
+}

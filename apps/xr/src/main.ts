@@ -380,16 +380,17 @@ async function start() {
    * Puts a listing in the room: its GLB when the mesh is ready, else a box of exactly its
    * bboxMeters. If the search was for a scanned piece, it takes that piece's place.
    */
-  async function addListing(objectId: string) {
+  async function addListing(objectId: string): Promise<string | null> {
     const rec = listings?.recommendations.find((r) => r.listing.objectId === objectId);
-    if (!rec) return say('That listing is no longer in the results.');
+    if (!rec) { say('That listing is no longer in the results.'); return null; }
     const l = rec.listing;
     let loaded: LoadedObject;
     try {
       // scale 1: the mesh normalisation contract; a measured box is already exact.
       loaded = l.state === 'ready' && l.glbUrl ? await loader.load(l.glbUrl, 1) : measuredBox(l.bboxMeters, l.name);
     } catch (err) {
-      return say(`Couldn't load ${l.name}: ${(err as Error).message}`);
+      say(`Couldn't load ${l.name}: ${(err as Error).message}`);
+      return null;
     }
     const replaces = listingsNeed?.replaces;
     const obj: PlacedObject = {
@@ -407,6 +408,7 @@ async function start() {
     showPalette();
     renderCatalog();
     layoutChanged(obj.id);
+    return obj.id;
   }
 
   /**
@@ -471,9 +473,16 @@ async function start() {
     const rotY = physics.rotationY(obj.id);
     physics.remove(obj.id);
     obj.loaded.node.removeFromParent();
+    // The box is being replaced, not kept: dispose its geometry/material so it doesn't leak.
+    obj.loaded.node.traverse((n) => {
+      const m = n as THREE.Mesh;
+      m.geometry?.dispose?.();
+      const mat = m.material as THREE.Material | THREE.Material[] | undefined;
+      (Array.isArray(mat) ? mat : mat ? [mat] : []).forEach((x) => x.dispose());
+    });
     obj.loaded = loaded;
     scene.add(loaded.node);
-    physics.addObject(obj.id, loaded.node, loaded.size, loaded.hull, { x, z }, rotY);
+    physics.addObject(obj.id, loaded.node, loaded.size, loaded.hull, { x, z }, rotY, 0); // in place: no drop
     showPalette();
     layoutChanged(obj.id);
   }
@@ -1141,6 +1150,7 @@ async function start() {
       }
       return say(`${obj.name ?? obj.objectId}: ${(err as Error).message}.`);
     }
+    if ([...objects.values()].some((o) => o.objectId === obj.objectId)) return; // the poller in pickListing swaps the box for this mesh
     if (catalog.some((c) => c.url === item.url)) return; // the feed can repeat an object
     const entry: PaletteItem = { url: item.url, name: item.name, scale: 1, objectId: obj.objectId, section: 'Furniture' };
     catalog.push(entry);

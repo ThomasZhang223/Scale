@@ -34,6 +34,18 @@ public final class WallCaptureModule: Module {
       ]
     }.runOnQueue(.main)
 
+    // Library photos: Apple's picker, then the same straightening without ARKit.
+    AsyncFunction("pickPhoto") { () async throws -> String? in
+      try await PhotoPicker.pick()
+    }
+
+    AsyncFunction("rectifyPhoto") { (path: String) throws -> [String: Any] in
+      guard let r = WallRectifier.rectifyLibraryPhoto(path: path) else {
+        throw NSError(domain: "WallCapture", code: 3, userInfo: [NSLocalizedDescriptionKey: "Could not read or straighten that photo"])
+      }
+      return ["imagePath": r.imagePath, "aspect": r.aspect, "detected": r.detected, "confidence": r.confidence]
+    }
+
     View(WallCaptureNativeView.self) {}
   }
 }

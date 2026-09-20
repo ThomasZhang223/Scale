@@ -20,12 +20,15 @@ function uuid(): string {
 }
 
 // Column-major 4×4: local X along the wall's width, Y up, Z out of the wall.
-function wallTransform(face: CapturedFace): Transform16 {
-  const yaw = (face.yawDeg * Math.PI) / 180;
+export function wallTransformFrom(c: { x: number; y: number; z: number }, yawDeg: number): Transform16 {
+  const yaw = (yawDeg * Math.PI) / 180;
   const dx = Math.cos(yaw);
   const dz = -Math.sin(yaw);
-  const c = face.center;
   return [dx, 0, dz, 0, 0, 1, 0, 0, -dz, 0, dx, 0, c.x, c.y, c.z, 1];
+}
+
+function wallTransform(face: CapturedFace): Transform16 {
+  return wallTransformFrom(face.center, face.yawDeg);
 }
 
 function convexHull(points: [number, number][]): [number, number][] {
