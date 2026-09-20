@@ -283,7 +283,10 @@ export function rank(listings: Listing[], need: Need, limit = 8): Recommendation
 
     out.push({ listing: l, score: Math.min(1, score), reasons });
   }
-  return out.sort((a, b) => b.score - a.score || a.listing.name.localeCompare(b.listing.name)).slice(0, limit);
+  // Equal score keeps the order the rows arrived in, which is the Worker's: least distorted mesh
+  // first (X-Find-Source, lib/find-ready.ts). Array.prototype.sort is stable, so no tie-break is
+  // needed to hold that. An alphabetical tie-break was here before and shuffled it away.
+  return out.sort((a, b) => b.score - a.score).slice(0, limit);
 }
 
 interface SearchHit {

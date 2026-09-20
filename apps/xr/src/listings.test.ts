@@ -121,6 +121,20 @@ test('findLive posts one /find per storefront in parallel, reports stages, and m
   assert.ok(stages.includes('Sabai Design:failed'));
 });
 
+test('rank keeps the Worker order for equally scored rows, so the least distorted mesh stays first', () => {
+  // The Worker returns least-distorted first (X-Find-Source). These three score identically:
+  // same kind, same box, same confidence. Only the incoming order can separate them.
+  const lamp = (name: string) => ({
+    schemaVersion: 1, objectId: name, source: 'catalog', state: 'ready', name, category: 'lighting',
+    glbUrl: `https://api/${name}.glb`, bboxMeters: { w: 0.3, h: 1.2, d: 0.3 },
+    measure: { method: 'extracted', confidence: 0.9 }, merchant: 'Poly & Bark', productUrl: null, price: null,
+  }) as unknown as Listing;
+  const order = ['Zeta Lamp', 'Alpha Lamp', 'Mid Lamp'];
+  const out = rank(order.map(lamp), { categoryWords: ['light'] }, 8); // matches the category, not the title
+  assert.deepEqual(out.map((r) => r.listing.name), order);
+  assert.equal(new Set(out.map((r) => r.score)).size, 1, 'the three must tie, or this proves nothing');
+});
+
 test('findLive returns one row per objectId when every store was topped up from the same catalogue', async () => {
   const stages: string[] = [];
   const shared = (i: number) => ({

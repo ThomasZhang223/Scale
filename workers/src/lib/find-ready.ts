@@ -16,6 +16,7 @@
  */
 
 import { catalogObjectId } from "./catalog-ingest";
+import { DISTORTION_LIMIT, DISTORTION_RATIOS } from "./distortion-ratios";
 import { HttpError } from "./http";
 import type { FindBody, FindListing, FindResult } from "./find";
 import { getObjects } from "./store";
@@ -182,11 +183,34 @@ export async function restrictFindToReady(
       .map(asCatalogListing);
   }
 
-  const listings = [...kept, ...topped];
+  // Both branches are ordered together: a storefront hit can be just as stretched as a
+  // catalogue one, and neither source is a reason to show a bad mesh first.
+  const listings = orderByDistortion([...kept, ...topped]);
+  const stretched = listings.filter((l) => (DISTORTION_RATIOS[l.objectId] ?? 0) > DISTORTION_LIMIT).length;
+  const unrated = listings.filter((l) => DISTORTION_RATIOS[l.objectId] === undefined).length;
   return {
     result: { ...live, measured: listings.length, fitting: listings.length, listings },
-    header: `storefront=${kept.length},catalog=${topped.length},dropped=${dropped},unidentified=${unidentified}`,
+    header: `storefront=${kept.length},catalog=${topped.length},dropped=${dropped},`
+      + `unidentified=${unidentified},stretched=${stretched},unrated=${unrated}`,
   };
+}
+
+/**
+ * Rank down a mesh the binder would rather have shown as a dimensional proxy. Nothing is hidden:
+ * three tiers, in this order — a ratio at or below the limit, then a row we have no ratio for,
+ * then a ratio above it. Lower ratio first inside a tier, and the sort is stable, so rows the
+ * search ranked equally keep the search's order.
+ *
+ * A row with no ratio sits in the middle deliberately. Sorting it with the good rows would put an
+ * unmeasured mesh above a measured-good one; sorting it with the bad rows would punish a row for
+ * being newer than this file.
+ */
+export function orderByDistortion(listings: FindListing[]): FindListing[] {
+  const tier = (ratio: number | undefined) => (ratio === undefined ? 1 : ratio <= DISTORTION_LIMIT ? 0 : 2);
+  return listings
+    .map((listing, i) => ({ listing, i, ratio: DISTORTION_RATIOS[listing.objectId] }))
+    .sort((a, b) => tier(a.ratio) - tier(b.ratio) || (a.ratio ?? 0) - (b.ratio ?? 0) || a.i - b.i)
+    .map((x) => x.listing);
 }
 
 /**
