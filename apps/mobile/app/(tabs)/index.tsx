@@ -46,14 +46,13 @@ async function fetchRoomsPayload(): Promise<RoomsPayload> {
   // Rooms built on this phone (photo upload, wall capture) and the seeded rooms: live reads, newest
   // first, then the demo fixture. One failing id — the demo fixture included — does not hide the
   // rest, but it is reported, not dropped (CLAUDE.md "Fail loud").
-  const localIds = localRoomIds();
-  const targets = [
-    ...[...localIds, ...SEED_ROOM_IDS.filter((id) => !localIds.includes(id))].map((id) => ({ id, stub: false })),
-    // Live, like every other room: the demo room is a real row in D1. Through the stub layer the
-    // Worker answers with its fixture's OWN roomId, so the card was keyed by a different id and
-    // found no bundled picture (and no versions).
-    { id: DEMO_ROOM_ID, stub: false },
-  ];
+  // Only the two real rooms (SEED_ROOM_IDS): the Meeting room and the Skyline room, the same two
+  // the headset's room selector lists. The demo fixture, the four synthetic seed rooms and the
+  // test rooms made on this phone are no longer shown.
+  // ceiling: a room made on this phone ("New from photos") is not listed until its id is added
+  // here; the upgrade path is a GET /v1/rooms list route on the Worker.
+  const targets = SEED_ROOM_IDS.map((id) => ({ id, stub: false }));
+
   const settled = await Promise.all(
     targets.map(({ id, stub }) =>
       getJSON<RoomCaptureV1>(`/v1/rooms/${id}`, { stub, schemaLabel: "RoomCapture v1" }).then(

@@ -5,6 +5,8 @@
 // when it gets one, this file becomes a thin wrapper over it.
 import Constants from "expo-constants";
 
+import { postJSON } from "./api";
+
 const XR_PORT = 5173;
 
 export function devServerBase(): string | null {
@@ -14,12 +16,9 @@ export function devServerBase(): string | null {
 }
 
 export async function setActiveRoomOnHeadset(roomId: string): Promise<void> {
-  const base = devServerBase();
-  if (!base) throw new Error("Metro's address is unknown, so the XR dev server can't be found. Run from the dev client.");
-  const res = await fetch(`${base}/local/active-room`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ roomId }),
-  });
-  if (!res.ok) throw new Error(`XR dev server answered ${res.status}. Is "npm run dev" running in apps/xr on the Mac?`);
+  // The cloud route, not the Mac: POST /v1/active-room on the front door stores the choice and
+  // pushes it over SSE to every headset (GET /v1/sync/lobby). It used to POST to the Vite dev
+  // server found through Metro's address, which a Release build does not have ("Metro's address
+  // is unknown"), and which the deployed headset page never read.
+  await postJSON<{ roomId: string; delivered: number }>("/v1/active-room", { roomId });
 }

@@ -31,7 +31,7 @@ export async function scoutAgent(env: Env, sessionId: string) {
 export async function emitToRoom(
   env: Env,
   roomId: string,
-  event: "object" | "version" | "fit",
+  event: "object" | "version" | "fit" | "active-room",
   data: unknown,
 ): Promise<number> {
   const stub = await roomAgent(env, roomId);

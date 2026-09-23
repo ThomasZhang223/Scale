@@ -47,7 +47,9 @@ async function get<T>(path: string): Promise<T> {
 
 /** The room the phone picked for the headset (dev server, see vite.config.ts). null = none. */
 export async function getActiveRoom(): Promise<string | null> {
-  const res = await fetch('/local/active-room', { cache: 'no-store' });
+  // The cloud route (POST/GET /v1/active-room on the front door), not the Vite dev server: the
+  // deployed page has no dev server, and a Release build of the phone app has no Metro to find one.
+  const res = await fetch(`${API_BASE}/active-room`, { cache: 'no-store' });
   if (!res.ok) return null;
   const body = (await res.json()) as { roomId?: string | null };
   return body.roomId ?? null;
@@ -314,6 +316,34 @@ export interface RoomEvents {
  * subscribes once and never polls. If the stream isn't available (the stub answers 501),
  * try again every ten seconds. Returns a function that stops watching.
  */
+/**
+ * The phone's room choice, pushed. One EventSource on the LOBBY stream (GET /v1/sync/lobby): the
+ * same SSE fan-out as a room's feed, keyed by a name that is not a room, because a headset showing
+ * room A must still hear that the phone picked room B. Always live, never the stub.
+ */
+export function watchActiveRoom(onPick: (roomId: string) => void): () => void {
+  let source: EventSource | null = null;
+  let retry: number | undefined;
+  let stopped = false;
+  const open = () => {
+    source = new EventSource(`${API_BASE}/sync/lobby`);
+    source.addEventListener('active-room', (e) => {
+      const roomId = (JSON.parse((e as MessageEvent).data) as { roomId?: string }).roomId;
+      if (roomId) onPick(roomId);
+    });
+    source.onerror = () => {
+      source?.close();
+      if (!stopped) retry = window.setTimeout(open, 10_000);
+    };
+  };
+  open();
+  return () => {
+    stopped = true;
+    clearTimeout(retry);
+    source?.close();
+  };
+}
+
 export function watchRoom(roomId: string, on: RoomEvents): () => void {
   let source: EventSource | null = null;
   let retry: number | undefined;

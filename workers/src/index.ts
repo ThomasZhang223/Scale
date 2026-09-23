@@ -253,6 +253,8 @@ async function dispatch(
   if (m("POST", /^\/v1\/fit$/)) return real.postFit(req, env, origin);
   if (m("POST", /^\/v1\/solve$/)) return real.postSolve(req, env, origin);
 
+  if (m("POST", /^\/v1\/active-room$/)) return real.postActiveRoom(req, env);
+  if (m("GET", /^\/v1\/active-room$/)) return real.getActiveRoom(env);
   if ((hit = m("POST", /^\/v1\/push\/([^/]+)$/))) return real.postPush(req, env, hit[1]);
   if ((hit = m("GET", /^\/v1\/sync\/([^/]+)$/))) return real.getSync(env, hit[1]);
 

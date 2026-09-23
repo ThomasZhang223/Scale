@@ -1032,6 +1032,45 @@ export async function postPush(req: Request, env: Env, roomId: string): Promise<
   return noContent();
 }
 
+// --- The room the phone picked, for the headset ----------------------------------------------
+//
+// The phone's "Use in headset" used to POST to a Vite dev server on the demo Mac, found through
+// Metro's address — so it could not work in a Release build, and the deployed headset page never
+// saw it. It is a cloud route now: the choice is kept in KV (so a headset that loads later still
+// gets it) and pushed over SSE to every headset listening on the LOBBY stream
+// (GET /v1/sync/lobby — the same RoomAgent fan-out, keyed by a name that is not a room, because
+// a headset showing room A must still hear that the phone picked room B).
+// ceiling: one active room for the whole deployment (one demo, one phone). Several users need a
+// per-user key and a per-user lobby name.
+export const LOBBY = "lobby";
+const ACTIVE_ROOM_KEY = "active-room";
+
+export async function postActiveRoom(req: Request, env: Env): Promise<Response> {
+  const body = await readJson<{ roomId: string }>(req);
+  const roomId = required(body.roomId, "roomId");
+  // 404 before telling a headset to load a room that does not exist.
+  await loadRoomCapture(env, roomId);
+  const value = { roomId, at: new Date().toISOString() };
+  await env.CONFIG.put(ACTIVE_ROOM_KEY, JSON.stringify(value));
+  // The choice is already stored, so a headset's 3 s poll of GET /v1/active-room will find it.
+  // The SSE push is the fast path on top of that, and it needs a Durable Object: when that fails
+  // (the account's Durable Object quota ran out on 2026-09-20) the route still succeeds and SAYS
+  // the push did not happen, rather than failing a choice that did take effect.
+  let delivered = 0;
+  let push: string = "sent";
+  try {
+    delivered = await emitToRoom(env, LOBBY, "active-room", value);
+  } catch (cause) {
+    push = `unavailable: ${cause instanceof Error ? cause.message : String(cause)}`;
+  }
+  return json({ ...value, delivered, push });
+}
+
+export async function getActiveRoom(env: Env): Promise<Response> {
+  const raw = await env.CONFIG.get(ACTIVE_ROOM_KEY);
+  return json(raw ? JSON.parse(raw) : { roomId: null, at: null });
+}
+
 export async function getSync(env: Env, roomId: string): Promise<Response> {
   const agent = await roomAgent(env, roomId);
   // The Durable Object holds the connection open. A Worker alone cannot: its request ends.

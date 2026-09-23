@@ -158,6 +158,9 @@ const TOOLS: ToolDef[] = [
   },
 ];
 
+/** How long one SSE listener may take to accept a frame before it is dropped. */
+const FANOUT_DEADLINE_MS = 1500;
+
 export class RoomAgent extends Agent<Env, RoomAgentState> {
   initialState: RoomAgentState = {
     roomId: "",
@@ -250,26 +253,46 @@ export class RoomAgent extends Agent<Env, RoomAgentState> {
 
   private async fanOut(frame: string): Promise<void> {
     const payload = encode(frame);
-    const dead: WritableStreamDefaultWriter<Uint8Array>[] = [];
-    for (const w of this.writers) {
-      try {
-        await w.write(payload);
-      } catch {
-        dead.push(w);
-      }
+    // Every listener at once, each with a deadline. The loop used to `await w.write()` one
+    // listener after another with no limit: a client that vanished without closing its stream
+    // (a headset tab killed, a dropped network) never drains its side, so that write never
+    // resolved and EVERY later event for the room hung behind it - fit, version, object alike.
+    // A listener that cannot take a frame in FANOUT_DEADLINE_MS is dropped; a live one reconnects
+    // on its own (the client's EventSource retries) and misses at most this one frame.
+    const results = await Promise.all(
+      [...this.writers].map(async (w) => {
+        let timer: ReturnType<typeof setTimeout> | null = null;
+        try {
+          await Promise.race([
+            w.write(payload),
+            new Promise<never>((_, reject) => {
+              timer = setTimeout(() => reject(new Error("listener did not drain")), FANOUT_DEADLINE_MS);
+            }),
+          ]);
+          return null;
+        } catch {
+          return w;
+        } finally {
+          if (timer !== null) clearTimeout(timer);
+        }
+      }),
+    );
+    const dead = results.filter((w): w is WritableStreamDefaultWriter<Uint8Array> => w !== null);
+    for (const w of dead) {
+      this.writers.delete(w);
+      void w.abort().catch(() => {});
     }
-    for (const w of dead) this.writers.delete(w);
     if (dead.length > 0) this.setState({ ...this.state, subscribers: this.writers.size });
   }
 
   /** Broadcast one SSE event. Called by the Worker on /push and by the mesh workflow. */
-  async emit(event: "object" | "version" | "fit", data: unknown): Promise<void> {
+  async emit(event: "object" | "version" | "fit" | "active-room", data: unknown): Promise<void> {
     await this.fanOut(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
   }
 
   private async handleBroadcast(request: Request): Promise<Response> {
     const body = (await request.json()) as {
-      event: "object" | "version" | "fit";
+      event: "object" | "version" | "fit" | "active-room";
       data: unknown;
       roomId?: string;
     };

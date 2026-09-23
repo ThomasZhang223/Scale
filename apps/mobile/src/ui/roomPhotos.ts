@@ -37,13 +37,9 @@ export function roomPhotoUri(roomId: string): string | null {
 // ceiling: one bundled image for one fixture id. A real photo field on RoomCapture v1 is the
 // upgrade path (schema-change protocol, Thomas).
 const BUNDLED_ROOM_PHOTOS: Record<string, number> = {
-  [DEMO_ROOM_ID]: require("../../assets/room-demo-hero.jpg"),
-  // The seeded rooms, see SEED_ROOM_IDS in demoIds.ts. The studio is the demo room's own photo;
-  // the other three are stock photos of empty rooms (sources in assets/ROOM_PHOTOS.md).
-  "d1f43c52-23b2-4f2c-afb7-721d50b798cc": require("../../assets/room-seed-studio.jpg"),
-  "c29878d5-c638-4322-baac-ff3d188e74c9": require("../../assets/room-seed-living.jpg"),
-  "6380b79e-fa3d-4202-ab77-f0c85fc5c755": require("../../assets/room-seed-office.jpg"),
-  "3f60a5fb-d32a-4c51-a286-47a36e64c5f8": require("../../assets/room-seed-open.jpg"),
+  // The two real rooms, each with a real photo of that room (not stock).
+  "ccff7dec-1fc1-493e-96e3-3ab6f6ddfb2a": require("../../assets/room-demo-hero.jpg"), // Meeting room
+  "b5318133-49d1-4484-88dc-f38cef684175": require("../../assets/room-skyline.jpg"), // Skyline room
 };
 export function roomPhotoSource(roomId: string): { uri: string } | number | null {
   const local = roomPhotoUri(roomId);

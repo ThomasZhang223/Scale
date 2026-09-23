@@ -7,7 +7,7 @@ import { createPhysics } from './physics';
 import { Interaction } from './interaction';
 import {
   getRoom, listVersions, getObject, listObjects, getVersion, postVersion, objectToItem, boundsMismatch, watchRoom, postFit, STUB, askIntent, listScans, listBuiltIns, searchObjects, sameOrigin, getJob, postListingsGenerate, postObjectThumbnail,
-  type ObjectV1, type VersionV1, type PlacementV1, getActiveRoom, getRoomLive
+  type ObjectV1, type VersionV1, type PlacementV1, getActiveRoom, watchActiveRoom, getRoomLive
 } from './api';
 import { FitOverlay, type FitReport } from './fit';
 import { fromPlacement, layoutToVersion, toPlacement, type PlacedLayout } from './placements';
@@ -2172,21 +2172,21 @@ async function start() {
    * the palette; the floor and walls under them change.
    */
   let phoneRoomId: string | null = null;
-  async function followPhoneRoom() {
+  async function followPhoneRoom(pushed?: string) {
     let picked: string | null;
     try {
-      picked = await getActiveRoom();
+      picked = pushed ?? (await getActiveRoom());
     } catch {
       return;
     }
     if (!picked || picked === phoneRoomId) return;
     try {
-      // Live first (a room built on the phone exists only there); the stub second, which is
-      // where the committed demo room lives.
-      const scan = await getRoomLive(picked).catch(() => getRoom(picked));
+      // The SAME path the headset's own room selector takes (switchRoom -> enterRoom): it builds
+      // the room, re-binds the live sync to it, loads and applies the room's stored layout, and
+      // re-seats the person. This used to call showScan() alone, which draws the empty shell:
+      // the room changed and its furniture never appeared.
       phoneRoomId = picked;
-      showScan(scan, `Room ${picked.slice(0, 8)}… picked on the phone`);
-      setConnection('server');
+      await switchRoom(picked);
       say('Now in the room you picked on the phone.');
     } catch (err) {
       phoneRoomId = picked; // do not retry a room the server cannot give us every 3 s
@@ -2194,6 +2194,11 @@ async function start() {
     }
   }
   void followPhoneRoom();
+  // Pushed over SSE the moment the phone picks (sub-second). The 3 s poll stays, reading the same
+  // choice from GET /v1/active-room (KV, no Durable Object): the SSE path needs a Durable Object,
+  // and on 2026-09-20 the account's Durable Object quota ran out mid-demo while plain routes kept working.
+  // ceiling: one cloud request per tab every 3 s; raise the interval once the stream is dependable.
+  watchActiveRoom((roomId) => void followPhoneRoom(roomId));
   setInterval(() => void followPhoneRoom(), 3_000);
 
   // Phone captures arrive while the headset is on. Poll rather than SSE: the sync feed is
