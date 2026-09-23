@@ -32,6 +32,9 @@
       "./plugins/with-room-capture",
       "./plugins/with-ar-view",
       "./plugins/with-speech"
-    ]
+    ],
+    "android": {
+      "package": "com.fullscale.app"
+    }
   }
 }
