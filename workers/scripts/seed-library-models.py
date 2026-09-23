@@ -42,6 +42,7 @@ The pipeline per model:
 import argparse
 import hashlib
 import json
+import struct
 import subprocess
 import sys
 import urllib.request
@@ -353,6 +354,142 @@ def process_khronos(spec, args, previous):
     return {**record, "status": "seeded", "verified": verify(args.base, oid, sha256, box)}
 
 
+# --- Third source: one model from Objaverse, with a recorded unit conversion ------------------
+# THE ONLY LIBRARY MODEL WHOSE SIZE WAS INFERRED RATHER THAN AUTHORED IN METRES.
+#
+# Poly Haven has no floor lamp and the Khronos arc lamp was not liked. This one is a genuine
+# arco-style arched floor lamp, but its glTF is in centimetres: the lamp alone measures 213 x 232
+# x 36 units. glTF is metres by definition, so that is not a measurement this project can take at
+# face value, and the standing rule is never to rescale and never to assign a looked-up size.
+# Thomas overruled that for this one model on 2026-09-20 after being shown the numbers. The
+# exception is recorded in the manifest, in the attribution note and in the ledger so that nobody
+# later mistakes it for a measured asset.
+#
+# Two edits, both recorded, neither a per-axis fit:
+#   1. one node removed — `Plane_Fondo_0`, a two-triangle ground/backdrop plane spanning 414
+#      units. Removing a stage prop is not rescaling; it is why the raw bbox looked 4.14 m square.
+#   2. ONE uniform scale of 0.01 (centimetres to metres), applied as a wrapper node and baked by
+#      the packer. Not per-axis, not rounded to a nicer number.
+# The result measures 2.13 x 2.32 x 0.36 m with its base on y = 0, which is what an arco lamp is.
+OBJAVERSE_HF = "https://huggingface.co/datasets/allenai/objaverse/resolve/main"
+OBJAVERSE_ID_PREFIX = "full-scale:library:objaverse:"
+OBJAVERSE = [
+    # (uid, path, display name, category, min_m, max_m, licence, licence url, authors,
+    #  source page, node name to drop, unit factor, unit note)
+    ("d8a1a19f3b324dc294d2746908f392c3", "glbs/000-031/d8a1a19f3b324dc294d2746908f392c3.glb",
+     "Arched floor lamp", "lamp", 1.5, 2.6,
+     "CC-BY-4.0", "https://creativecommons.org/licenses/by/4.0/legalcode", ["Malrus"],
+     "https://sketchfab.com/3d-models/none-d8a1a19f3b324dc294d2746908f392c3",
+     "Plane_Fondo_0", 0.01, "cm (inferred from a 232-unit height)"),
+]
+
+
+def edit_glb(source, target, drop_node, factor):
+    """Drop one named node and wrap the scene in ONE uniform scale. Recorded, never silent."""
+    raw = source.read_bytes()
+    magic, version, total = struct.unpack("<4sII", raw[:12])
+    if magic != b"glTF" or version != 2:
+        raise Stop(f"{source.name}: not a binary glTF 2.0")
+    chunks, offset = [], 12
+    while offset < total:
+        length, kind = struct.unpack("<II", raw[offset:offset + 8])
+        chunks.append((kind, raw[offset + 8:offset + 8 + length]))
+        offset += 8 + length
+    doc = json.loads(next(d for k, d in chunks if k == 0x4E4F534A))
+    binary = next((d for k, d in chunks if k == 0x004E4942), b"")
+
+    if drop_node:
+        matches = [i for i, n in enumerate(doc["nodes"]) if n.get("name") == drop_node]
+        if len(matches) != 1:
+            raise Stop(f"{source.name}: expected exactly one node named {drop_node!r}, found {len(matches)}")
+        index = matches[0]
+        for node in doc["nodes"]:
+            if "children" in node:
+                node["children"] = [c for c in node["children"] if c != index]
+        for scene in doc["scenes"]:
+            scene["nodes"] = [c for c in scene.get("nodes", []) if c != index]
+
+    scene = doc["scenes"][doc.get("scene", 0)]
+    doc["nodes"].append({"name": "unit-conversion", "children": list(scene["nodes"]),
+                         "scale": [factor, factor, factor]})
+    scene["nodes"] = [len(doc["nodes"]) - 1]
+
+    text = json.dumps(doc, separators=(",", ":")).encode("utf-8")
+    text += b" " * (-len(text) % 4)
+    binary += b"\x00" * (-len(binary) % 4)
+    body = struct.pack("<II", len(text), 0x4E4F534A) + text
+    if binary:
+        body += struct.pack("<II", len(binary), 0x004E4942) + binary
+    target.write_bytes(struct.pack("<4sII", b"glTF", 2, 12 + len(body)) + body)
+
+
+def process_objaverse(spec, args, previous):
+    (uid, path, name, category, low, high, licence, licence_url, authors, page,
+     drop_node, factor, unit_note) = spec
+    record = {"source": "objaverse", "assetId": uid, "name": name, "category": category,
+              "categoryInKnownList": category in KNOWN_CATEGORIES, "mount": "floor",
+              "url": page, "license": licence, "licenseUrl": licence_url,
+              "attribution": authors,
+              "unitConversion": {"factor": factor, "from": unit_note, "to": "m",
+                                 "approvedBy": "Thomas, 2026-09-20",
+                                 "note": ("the ONLY library model whose size was inferred rather "
+                                          "than authored in metres")},
+              "removedNode": drop_node,
+              "modifications": (f"removed the node {drop_node!r} (a two-triangle ground/backdrop "
+                                f"plane); uniformly scaled by {factor} (unit conversion, cm to m); "
+                                "repacked to a single GLB with 1k textures"),
+              "objectId": object_id(uid, OBJAVERSE_ID_PREFIX), "status": None}
+
+    earlier = previous.get(uid)
+    if earlier and not args.plan_only and not args.refresh:
+        done = already_seeded(args.base, record["objectId"], earlier["packedSha256"])
+        if done is not None:
+            return {**earlier, **record, "status": "already_seeded",
+                    "verified": verify(args.base, record["objectId"], earlier["packedSha256"],
+                                       earlier["bboxMeters"])}
+
+    work = Path(args.work)
+    work.mkdir(parents=True, exist_ok=True)
+    original = work / f"{uid}.original.glb"
+    original.write_bytes(get(f"{OBJAVERSE_HF}/{path}", binary=True))
+    record["sourceFileUrl"] = f"{OBJAVERSE_HF}/{path}"
+    record["sourceBytes"] = original.stat().st_size
+    record["sourceSha256"] = hashlib.sha256(original.read_bytes()).hexdigest()
+    record["boundsAsAuthored"] = measure(original)[0]
+
+    edited = work / f"{uid}.edited.glb"
+    edit_glb(original, edited, drop_node, factor)
+    packed = work / f"{uid}.packed.glb"
+    pack(edited, packed)
+    glb = packed.read_bytes()
+    sha256 = hashlib.sha256(glb).hexdigest()
+    record.update({"triangles": triangles(packed), "bytes": len(glb), "packedSha256": sha256,
+                   "textureSize": 1024, "compression": "none"})
+
+    box, raw = measure(packed)
+    record["bboxMeters"] = box
+    record["boundsAsShipped"] = box
+    record["restsOnFloorMinY"] = round(raw["min"][1], 4)
+    largest = max(box.values())
+    if len(glb) > MAX_BYTES:
+        return {**record, "status": "skipped",
+                "reason": f"packed to {len(glb)} bytes, over the {MAX_BYTES} budget"}
+    if not (low <= largest <= high):
+        return {**record, "status": "skipped",
+                "reason": f"largest side {largest:.3f} m is outside the plausible {low}-{high} m for a {category}"}
+    if args.plan_only:
+        return {**record, "status": "planned"}
+
+    oid = record["objectId"]
+    post(f"{args.base}/v1/objects", {
+        "objectId": oid, "source": "primitive", "name": name, "category": category,
+        "bboxMeters": box, "measure": {"method": "declared", "confidence": 0.5},
+    })
+    key, _ = attach(args.base, oid, glb, sha256)
+    record["glbKey"] = key
+    return {**record, "status": "seeded", "verified": verify(args.base, oid, sha256, box)}
+
+
 def say(message):
     print(message, flush=True)
 
@@ -619,10 +756,12 @@ def main(argv=None):
     wanted = set(args.only) if args.only else None
     specs = [("polyhaven", s) for s in CURATED if not wanted or s[0] in wanted]
     specs += [("khronos", s) for s in KHRONOS if not wanted or s[0] in wanted]
+    specs += [("objaverse", s) for s in OBJAVERSE if not wanted or s[0] in wanted]
     records = []
     for number, (origin_name, spec) in enumerate(specs, 1):
         try:
             record = (process_khronos(spec, args, previous) if origin_name == "khronos"
+                      else process_objaverse(spec, args, previous) if origin_name == "objaverse"
                       else process(spec, args, index, previous))
         except Stop as stop:
             record = {"assetId": spec[0], "name": spec[1], "category": spec[2],
@@ -641,6 +780,13 @@ def main(argv=None):
         "sources": {
             "polyhaven": {"license": LICENSE, "url": LICENSE_URL,
                           "note": "site-wide CC0; attribution recorded although not required"},
+            "objaverse": {
+                "license": "per model; only CC0 or CC-BY are used, read before download",
+                "url": "https://huggingface.co/datasets/allenai/objaverse",
+                "note": ("Holds ONE model. Most Objaverse GLBs are normalised to a unit cube "
+                         "and carry no real size, so they cannot be used here. The one taken "
+                         "is in centimetres and its unit conversion is recorded per model "
+                         "under unitConversion, approved by Thomas.")},
             "khronos-gltf-sample-assets": {
                 "license": "per model, read from that model's README.md",
                 "url": "https://github.com/KhronosGroup/glTF-Sample-Assets",

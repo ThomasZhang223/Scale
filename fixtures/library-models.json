@@ -4465,6 +4465,63 @@
         "state": "ready",
         "listed": true
       }
+    },
+    {
+      "source": "objaverse",
+      "assetId": "d8a1a19f3b324dc294d2746908f392c3",
+      "name": "Arched floor lamp",
+      "category": "lamp",
+      "categoryInKnownList": true,
+      "mount": "floor",
+      "url": "https://sketchfab.com/3d-models/none-d8a1a19f3b324dc294d2746908f392c3",
+      "license": "CC-BY-4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/4.0/legalcode",
+      "attribution": [
+        "Malrus"
+      ],
+      "unitConversion": {
+        "factor": 0.01,
+        "from": "cm (inferred from a 232-unit height)",
+        "to": "m",
+        "approvedBy": "Thomas, 2026-09-20",
+        "note": "the ONLY library model whose size was inferred rather than authored in metres"
+      },
+      "removedNode": "Plane_Fondo_0",
+      "modifications": "removed the node 'Plane_Fondo_0' (a two-triangle ground/backdrop plane); uniformly scaled by 0.01 (unit conversion, cm to m); repacked to a single GLB with 1k textures",
+      "objectId": "a2e6e3a8-02bc-5c02-bade-95cd18c328d9",
+      "status": "seeded",
+      "sourceFileUrl": "https://huggingface.co/datasets/allenai/objaverse/resolve/main/glbs/000-031/d8a1a19f3b324dc294d2746908f392c3.glb",
+      "sourceBytes": 6293988,
+      "sourceSha256": "b5b325fb21e1c403d963c6b552bdde678bcc943011d6dd60cf63a9d8c82e1bc6",
+      "boundsAsAuthored": {
+        "w": 414.4591,
+        "h": 232.0906,
+        "d": 414.4591
+      },
+      "triangles": 58816,
+      "bytes": 3520364,
+      "packedSha256": "0deef1032da943883d4376be078628c09989cd92b3ae4f6ddbe45afa3b6e85e4",
+      "textureSize": 1024,
+      "compression": "none",
+      "bboxMeters": {
+        "w": 2.1263,
+        "h": 2.3209,
+        "d": 0.3106
+      },
+      "boundsAsShipped": {
+        "w": 2.1263,
+        "h": 2.3209,
+        "d": 0.3106
+      },
+      "restsOnFloorMinY": -0.0001,
+      "glbKey": "objects/a2e6e3a8-02bc-5c02-bade-95cd18c328d9/mesh.glb",
+      "verified": {
+        "ok": true,
+        "problems": [],
+        "glbUrl": "https://full-scale-workers.thomaszhangdev.workers.dev/v1/assets/objects/a2e6e3a8-02bc-5c02-bade-95cd18c328d9/mesh.glb",
+        "state": "ready",
+        "listed": true
+      }
     }
   ],
   "sources": {
@@ -4472,6 +4529,11 @@
       "license": "CC0-1.0",
       "url": "https://polyhaven.com/license",
       "note": "site-wide CC0; attribution recorded although not required"
+    },
+    "objaverse": {
+      "license": "per model; only CC0 or CC-BY are used, read before download",
+      "url": "https://huggingface.co/datasets/allenai/objaverse",
+      "note": "Holds ONE model. Most Objaverse GLBs are normalised to a unit cube and carry no real size, so they cannot be used here. The one taken is in centimetres and its unit conversion is recorded per model under unitConversion, approved by Thomas."
     },
     "khronos-gltf-sample-assets": {
       "license": "per model, read from that model's README.md",

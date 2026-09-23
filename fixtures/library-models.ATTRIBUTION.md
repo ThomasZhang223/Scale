@@ -153,6 +153,18 @@ The models below are **not** CC0. Their licence requires attribution and that
 changes be indicated. Both are given here and per model in
 `fixtures/library-models.json`.
 
+### Arched floor lamp
+
+- Source: [d8a1a19f3b324dc294d2746908f392c3](https://sketchfab.com/3d-models/none-d8a1a19f3b324dc294d2746908f392c3), via the [Objaverse dataset](https://huggingface.co/datasets/allenai/objaverse)
+- Author: Malrus
+- Licence: [CC-BY-4.0](https://creativecommons.org/licenses/by/4.0/legalcode)
+- Changes made: removed the node 'Plane_Fondo_0' (a two-triangle ground/backdrop plane); uniformly scaled by 0.01 (unit conversion, cm to m); repacked to a single GLB with 1k textures
+- **Unit conversion:** the source file is in centimetres (cm (inferred from a 232-unit height)), so it was uniformly
+  scaled by 0.01 to metres. Approved by Thomas, 2026-09-20. This is
+  the ONLY library model whose size was inferred rather than authored in metres — every other model in this library is used at the size its author exported.
+  As authored: 414.4591 x 232.0906 x 414.4591 units.
+  As shipped: 2.1263 x 2.3209 x 0.3106 m.
+
 ### Arc floor lamp
 
 - Source: [LightsPunctualLamp](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/LightsPunctualLamp), Khronos glTF-Sample-Assets
