@@ -11,9 +11,6 @@
   Scale measures it with LiDAR, reconstructs it in 3D, finds real products like it that actually fit your room,
   and drops everything into a Meta Quest at true scale.
 </p>
-
-<p align="center">Built in 36 hours at <strong>Hack the North 2026</strong>.</p>
-
 ---
 
 ## See it
