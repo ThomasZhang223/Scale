@@ -1,3 +1,5 @@
+https://github.com/user-attachments/assets/6ad0c49c-1cf5-4c4a-b9af-98400d4c6c59
+
 <p align="center">
   <img src="apps/xr/public/Gemini_Generated_Image_rhxwm5rhxwm5rhxw.jpeg" alt="Scale" width="100%">
 </p>
@@ -11,7 +13,6 @@
   Scale measures it with LiDAR, reconstructs it in 3D, finds real products like it that actually fit your room,
   and drops everything into a Meta Quest at true scale.
 </p>
----
 
 ## See it
 
