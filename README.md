@@ -136,21 +136,3 @@ cd services/agent && npm run dev
 Every `/v1` route returns a committed fixture when the request carries `X-Stub: 1`, so each client can be developed without the full live stack.
 
 </details>
-
-## Team
-
-Four engineers, four swimlanes, shared contracts.
-
-| | Owns |
-| --- | --- |
-| **Thomas** | iOS capture, Expo app, Cloudflare API and storage, generation and ingest workflows, infra |
-| **Justin** | Quest WebXR runtime, physics and interaction, voice panels, OR-Tools solver, designer agent |
-| **Ani** | SigLIP2 embeddings, SF3D on Baseten, metric GLB binding, Shopify discovery and fit verification |
-| **Paul** | Merchant crawl and dimension extraction, 100-product catalog, ranking service, mobile voice intent |
-
-## The rules we kept
-
-> Shape can be generated. Scale must be measured.
-> Similarity does not imply fit.
-> The LLM understands intent. Deterministic systems own geometry.
-> If we do not know a measurement, we say we do not know it.
